@@ -11976,3 +11976,15 @@ R1123 is deferred: preserve a deliberate serialized-plan boundary check if requi
 ### Status (part three hundred fifty-five)
 
 R1124 is deferred: make release-artifact membership consume `$SharpProofPackageIds`, while preserving the distinct push-order contract for publication sequencing.
+
+## Second survey, part three hundred fifty-six: R1125 - repeated release-workflow YAML parsing
+
+`Test-SharpProofReleaseConfiguration.ps1` calls `Get-CanonicalWorkflowJob` once for every contract workflow job. Each call normalizes the entire workflow text, locates the single `jobs` mapping, extracts every job heading, groups all headings to detect duplicate IDs, and searches for the requested job before returning its block. The current contract has two jobs, so all of that document-wide work and duplicate-key check runs twice against the same immutable `$workflow` string. A parse-once helper returning an indexed job map can retain the per-job block, empty-block, and alias checks while making the document-wide syntax and duplicate-ID validation one operation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1125 | **Release-configuration validation reparses the complete workflow once per expected job.** `Get-CanonicalWorkflowJob` repeats normalization, `jobs` discovery, heading extraction, duplicate-ID grouping, and block slicing for each entry in `$contract.workflowJobs`. Build one canonical job index first, then validate the expected IDs against it, preserving the existing no-alias and nonempty-block checks. | `scripts/Test-SharpProofReleaseConfiguration.ps1:111-167,169-177` |
+
+### Status (part three hundred fifty-six)
+
+R1125 is deferred: separate one-time workflow-document parsing from per-job lookup and retain the explicit contract-job existence and alias checks.
