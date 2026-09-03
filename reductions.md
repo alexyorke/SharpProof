@@ -21216,3 +21216,8 @@ artifact name and retention contract.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2005 | `SharpProof.Release.props` defines `SharpProofProductName` and `SharpProofProductDescription` with zero in-repository consumers; remove the dead properties or connect them to an explicit packaging authority. | SharpProof.Release.props:3,12-13; Directory.Build.props:2; exact `git grep` census found one definition and no read for each |
+
+R2005 is applied: removed the two unconsumed product metadata properties from
+the globally imported release props file, retaining the live publisher,
+version, and project URL authorities. The canonical release-version fixture
+and focused release-authority architecture tests pass (7/7).

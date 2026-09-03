@@ -1,6 +1,5 @@
 <Project>
   <PropertyGroup>
-    <SharpProofProductName>SharpProof</SharpProofProductName>
     <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
     <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
@@ -9,7 +8,6 @@
     <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
     <FileVersion>$(SharpProofAssemblyVersion)</FileVersion>
     <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>
-    <SharpProofProductDescription>Portable SharpProof Roslyn analysis and contract generation for bounded effect contracts, compiler-bound preconditions, and accountable postcondition verification. Unsupported selected code remains visibly incomplete.</SharpProofProductDescription>
     <SharpProofProjectUrl>https://github.com/alexyorke/SharpProof</SharpProofProjectUrl>
   </PropertyGroup>
 </Project>
