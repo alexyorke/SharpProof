@@ -15010,6 +15010,13 @@ key before joining and comparing. Managed abstract-flow tests pass (34 passed).
 |---|---|---|
 | R1240 | **`TryArithmetic` materializes candidate bounds solely to enumerate them twice.** Its `BigInteger[]? bounds` is consumed only by `bounds.Min()` and `bounds.Max()`, so a direct min/max accumulator can produce the identical interval without a temporary array or LINQ passes. | `SharpProof.Effects/ManagedAbstractFlow.cs:1836-1872` |
 
+### Status (part five hundred sixty-two)
+
+R1240 is applied: arithmetic now accumulates minimum and maximum candidate
+bounds directly for add, subtract, and multiply, avoiding the temporary array
+and two enumerations while retaining overflow checks. Managed abstract-flow tests
+pass (34 passed).
+
 ## Second survey, part five hundred sixty-three: R1241 - simple-assignment recovery is unreachable after the mutation gate
 
 `ManagedFlowResult.TryEvaluate` has a fallback that unwraps `value` and, if it becomes a simple assignment, evaluates the assignment value from a recorded state. Every entry into the private overload first supplies `hasMutation` from `ManagedMutationFacts.HasMutation` (the public overload and the cached-mutation proof callers); that predicate returns true for any assignment anywhere under `value`, including through the harmless wrappers that the fallback removes. Consequently the earlier `!hasMutation` gate cannot pass for the assignment shape tested by the fallback, and its extra mutation scan/state lookup path is dead under the current predicate contract. Either remove the branch or make its intended exception explicit with a different fact, keeping the public mutation rejection semantics intact.
