@@ -85,11 +85,14 @@ internal static class IrTraversal
         Func<IrTerm, Dictionary<IrId, T>, T> combine,
         Func<IrTerm, (bool HasValue, T Value)>? shortCircuit = null)
     {
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((root, false));
+        var pending = new Stack<(
+            IrTerm Term,
+            bool ChildrenReady,
+            ImmutableArray<IrTerm> Children)>();
+        pending.Push((root, false, default));
         while (pending.Count != 0)
         {
-            var (term, childrenReady) = pending.Pop();
+            var (term, childrenReady, children) = pending.Pop();
             if (memo.ContainsKey(term.Id))
             {
                 continue;
@@ -101,19 +104,22 @@ internal static class IrTraversal
                 continue;
             }
 
-            var children = GetChildren(term);
-            if (!childrenReady && children.Length != 0)
+            if (!childrenReady)
             {
-                pending.Push((term, true));
-                foreach (var child in children)
+                children = GetChildren(term);
+                if (children.Length != 0)
                 {
-                    if (!memo.ContainsKey(child.Id))
+                    pending.Push((term, true, children));
+                    foreach (var child in children)
                     {
-                        pending.Push((child, false));
+                        if (!memo.ContainsKey(child.Id))
+                        {
+                            pending.Push((child, false, default));
+                        }
                     }
-                }
 
-                continue;
+                    continue;
+                }
             }
 
             memo.Add(term.Id, combine(term, memo));

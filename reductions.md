@@ -343,6 +343,7 @@ the smallest relevant containerized test target passes.
 | R949 | Share the native `prctl` binding and control constants across Host and BuildTasks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 | R948 | Share supervisor protocol-line normalization between record checks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 | R818 | Remove the unreachable unsupported-host sample branch | `samples` command passed (expected diagnostics included) |
+| R875 | Reuse bottom-up traversal child arrays after suspension | `SharpProof.Ir.Test`: 114 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -7997,8 +7998,9 @@ build-file changes were made during this audit.
 
 ### Status (part three hundred eighty-five)
 
-R875 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R875 is `applied`: `FoldBottomUp` now carries the already fetched child array
+on its resumed stack frame, preserving postorder/memo behavior without a second
+child enumeration.
 
 ## Second survey, part three hundred eighty-six: R876 - unchanged substitution-node rebuilding
 
