@@ -18800,3 +18800,8 @@ pass (3/3).
 R1656 is applied: the unreferenced `EffectContractMappings.ToContractEffects`
 wrapper is removed; paired `ProjectCapabilities` remains the sole production
 projection seam. `EffectContractWireParityTests` pass (19/19).
+
+R1640 is applied: the architecture scheduling gate now derives its parallel
+fixture roster from decorated test-fixture types and checks the current
+seven-fixture population, preserving the per-fixture scope and worker-limit
+assertions. `ExpensiveScriptFixturesUseBoundedCaseParallelism` passes (1/1).

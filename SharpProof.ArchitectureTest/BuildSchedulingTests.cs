@@ -941,15 +941,15 @@ public sealed class BuildSchedulingTests
     [Test]
     public void ExpensiveScriptFixturesUseBoundedCaseParallelism()
     {
-        var fixtures = new[]
-        {
-            typeof(BoundaryEnforcementTests),
-            typeof(CoverageScriptTests),
-            typeof(DocumentationSupportContractTests),
-            typeof(PackageDependencyAuthorityTests),
-            typeof(PublicationDestinationAuthorityTests),
-            typeof(PublicationPlanIdentityTests)
-        };
+        var fixtures = typeof(BuildSchedulingTests).Assembly.GetTypes()
+            .Where(static type =>
+                type.Namespace == "SharpProof.ArchitectureTest" &&
+                type.GetCustomAttributesData().Any(static attribute =>
+                    attribute.AttributeType == typeof(TestFixtureAttribute)) &&
+                type.GetCustomAttributesData().Any(static attribute =>
+                    attribute.AttributeType == typeof(ParallelizableAttribute)))
+            .OrderBy(static type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
         var workerAttribute = typeof(BuildSchedulingTests).Assembly
             .GetCustomAttributesData()
             .Single(static attribute =>
@@ -957,6 +957,7 @@ public sealed class BuildSchedulingTests
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(fixtures, Has.Length.EqualTo(7));
             foreach (var fixture in fixtures)
             {
                 var attribute = fixture.GetCustomAttributesData()
