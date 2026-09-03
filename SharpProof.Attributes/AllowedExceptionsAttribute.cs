@@ -12,5 +12,7 @@ public sealed class AllowedExceptionsAttribute : Attribute
         ExceptionTypes = exceptionTypes ?? throw new ArgumentNullException(nameof(exceptionTypes));
     }
 
+    /// <summary>Gets the allowed exception types.</summary>
+    /// <value>The allowed exception types.</value>
     public Type[] ExceptionTypes { get; }
 }

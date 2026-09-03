@@ -11,5 +11,7 @@ public sealed class ContractForAttribute : Attribute
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
     }
 
+    /// <summary>Gets the type described by the companion.</summary>
+    /// <value>The target type.</value>
     public Type TargetType { get; }
 }

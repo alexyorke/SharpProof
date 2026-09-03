@@ -14,6 +14,8 @@ public sealed class EffectContractAttribute : Attribute
         Effects = effects;
     }
 
+    /// <summary>Gets the declared effect flags.</summary>
+    /// <value>The declared effects.</value>
     public SharpProofEffect Effects { get; }
 
     /// <summary>Gets or sets the ambient capabilities used by the member.</summary>

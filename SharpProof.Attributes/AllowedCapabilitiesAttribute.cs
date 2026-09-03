@@ -11,5 +11,7 @@ public sealed class AllowedCapabilitiesAttribute : Attribute
         Capabilities = capabilities;
     }
 
+    /// <summary>Gets the allowed capability flags.</summary>
+    /// <value>The allowed capabilities.</value>
     public SharpProofCapability Capabilities { get; }
 }
