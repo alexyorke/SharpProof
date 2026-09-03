@@ -15707,3 +15707,50 @@ Get-PortablePdbModule builds $sourceLines and $sourceRanges as separate dictiona
 | ID | Finding | Evidence |
 |---|---|---|
 | R1311 | **Get-SharpProofProductionInventory.Get-PortablePdbModule maintains two synchronized dictionaries for each source path. Combine the line set and range map in one document-state value, preserving compiler-generated filtering for sequencePoints and all-range retention for sequencePointRanges.** | scripts/Get-SharpProofProductionInventory.ps1:245-246,266-293 |
+## Second survey, continued: R1312 - slot-domain membership uses two linear array passes
+
+Generate-CompilerArtifactModel materializes the actual slot-mapping keys and declared slot-domain keys as arrays, then checks every actual key with -notin against the declared array and every declared key with -notin against the actual array. These collections are stable after construction and the two loops only differ in which missing-side diagnostic they produce. Ordinal sets built once can retain both fail-closed checks while removing repeated linear membership scans.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1312 | **Generate-CompilerArtifactModel validates portable IR slot-domain membership with two repeated array searches. Build ordinal key sets once and keep the separate unsupported-domain and missing-domain diagnostics.** | scripts/Generate-CompilerArtifactModel.ps1:542-570 |
+
+## Second survey, continued: R1313 - protocol declaration uniqueness keeps a redundant name set
+
+Generate-ProtocolModel creates declarationNames to detect duplicate protocol declarations and immediately inserts the same name and declaration object into declarationByName. The name set is not read after the construction loop, while Dictionary.Add already rejects a duplicate key. A single ordinal dictionary insertion with the existing duplicate diagnostic can provide both uniqueness validation and the later name lookup.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1313 | **Generate-ProtocolModel maintains declarationNames alongside declarationByName even though only the dictionary survives and its Add operation has the same duplicate-key fact. Use one name-to-declaration index with an explicit duplicate check that preserves the current error text.** | scripts/Generate-ProtocolModel.ps1:424-452 |
+
+## Second survey, continued: R1314 - validation plan indexes are split across three keyed structures
+
+Generate-ProtocolModel stores validation plan names in one HashSet and stores each plan's type and mode in two separate dictionaries keyed by that same name. The set only detects duplicates; later generation and condition conversion read the type and mode dictionaries for the same plan. One ordinal dictionary whose value contains type and mode can perform the uniqueness check during insertion and remove the parallel-key coordination.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1314 | **Generate-ProtocolModel represents each validation plan with validationPlanNames, validationPlanTypes, and validationPlanModes. Consolidate those keyed values into one plan metadata record while preserving duplicate-name rejection and the later type/mode lookups.** | scripts/Generate-ProtocolModel.ps1:401-422,872-891; validation lookups at :292-297 |
+
+## Second survey, continued: R1315 - validation table rows are kept in parallel pattern lists
+
+For each validation table, Generate-ProtocolModel adds the formatted pattern string to patternSources and adds a separate object containing the same row's Parts to partRows. The parts list is used for two-argument grouping, while the pattern list is used for the fallback expression; both are created in the same loop and remain positionally paired. A single row record carrying both Pattern and Parts can preserve the two output strategies without maintaining synchronized collections.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1315 | **Generate-ProtocolModel stores each validation row twice in parallel structures, patternSources and partRows. Replace them with one normalized row record and project the required representation for grouping or fallback emission.** | scripts/Generate-ProtocolModel.ps1:771-810,813-869 |
+
+## Second survey, continued: R1316 - declarative class emission re-reads validated properties
+
+Emit-Class first walks every property to validate its identifier and type and populate propertyNames for constructor-assignment checks. After assignments, it walks the same property objects again and re-resolves accessibility, type, and name solely to emit declarations. A normalized property record from the first pass can retain the validation facts and drive emission, while the separate assignment validation remains intact.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1316 | **Generate-DeclarativeModels.Emit-Class traverses each property twice and repeats name/type extraction. Cache the normalized property descriptors or emit from the prepared values instead of re-reading the raw schema objects.** | scripts/Generate-DeclarativeModels.ps1:107-112,142-158 |
+
+## Second survey, continued: R1317 - declarative class assignments linearly re-find parameters
+
+Emit-Class already traverses all constructor parameters to validate their names and types and build parameterSources. Every assignment then runs Where-Object over the complete raw parameter array to check that its parameter exists. A parameter-name HashSet or dictionary built during the first pass can preserve the unknown-parameter diagnostic without repeating a pipeline scan for each assignment.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1317 | **Generate-DeclarativeModels.Emit-Class re-scans constructor parameters for every assignment after the parameter list has been parsed. Reuse an ordinal parameter-name index while retaining assignment order and the unknown-parameter failure.** | scripts/Generate-DeclarativeModels.ps1:120-150 |
