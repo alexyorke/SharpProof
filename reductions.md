@@ -13684,3 +13684,20 @@ analysis.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1168 | **`ConversionOwnershipClassifier.MethodMayIntroduceUnknownRefAlias` traverses each method operation tree twice.** It separately enumerates all ref assignments and all ref-like invocations from the same `root.DescendantsAndSelf()` sequence, even though both checks only inspect that immutable tree. A combined accumulator walk can preserve the distinct assignment and recursive-invocation policies, including cycle/depth fallbacks, while eliminating the duplicate traversal. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:673-723` |
+
+## Second survey, part four hundred ninety-one: R1169 - ref-alias method analysis is re-run across the fixed point
+
+`ConversionOwnershipClassifier.BuildLocalRegions` iterates its entire relevant
+operation set until no region changes, and each iteration can call
+`MethodMayIntroduceUnknownRefAlias` for invocation targets, property setters,
+and property getters. The helper resolves the method syntax, obtains its
+semantic operation root, and recursively analyzes its ref-like call graph each
+time. Those results are determined by the normalized method and compilation;
+only the active-call-set and depth-limit fallbacks are context-sensitive. A
+cache of completed context-independent results, scoped to this classifier or
+compilation, can remove repeated method-tree and call-graph analysis while
+retaining conservative recomputation when a cycle or depth boundary is active.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1169 | **`ConversionOwnershipClassifier.BuildLocalRegions` re-runs method-level ref-alias analysis on every fixed-point pass.** The invocation, setter, and getter branches call `MethodMayIntroduceUnknownRefAlias` inside `while (changed)`, and that helper reparses and recursively walks each target method from scratch. Memoizing only completed, context-independent method results can preserve the active-method cycle and maximum-depth fallbacks while avoiding repeated compilation/tree work across call sites and region iterations. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:238-421,666-729` |
