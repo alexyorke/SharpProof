@@ -194,6 +194,7 @@ the smallest relevant containerized test target passes.
 | R899 | Remove the repeated source declaration-count check after candidate admission | `SharpProof.Worker.Test`: CompilerRelationalSummaryProviderTests passed |
 | R918 | Cache the constant runtime type used by canonical identity writing | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
 | R962 | Remove the unused virtual dispatch from the closed abstract domain | `SharpProof.Dataflow.Test`: full suite passed |
+| R901 | Materialize canonical manifest target ordering once | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -8300,8 +8301,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred eleven)
 
-R901 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R901 is `applied`: manifest building now materializes the canonical target order
+once and reuses it for callable and claim projections. ClaimManifestBuilderTests
+passed.
 
 ## Second survey, part four hundred twelve: R902 - repeated contract-selection discovery
 
@@ -9213,3 +9215,13 @@ R962 is `applied`: the closed abstract domain's equivalence implementation had
 no overrides across the repository, so it is now non-virtual while preserving
 the interface contract and all concrete domain behavior. The full Dataflow test
 suite passed.
+
+## Second survey, part one hundred eighty-six: R963 - charged terms are traversed twice
+
+| R963 | **`IrRelationalSummaryBuilder.Supported` walks each term graph twice for two limits that can be measured together.** The method first calls `Charge`, which performs a stack walk over every previously unseen `IrId` and decrements the global symbolic-operation budget, then immediately calls `IrTermAnalysis.GetDepth`, whose bottom-up fold traverses the same graph again to compute the expression-depth budget. The builder does retain `_visitedTerms` and `_termDepths`, so later checks can skip parts of the work, but the first check for each newly reached term pays for both complete traversals, and every newly built composite term repeats the pattern. A single iterative traversal can record each term's depth from already-computed children while charging only new IDs, or `Charge` can feed the existing depth memo through a policy callback; either keeps the existing resource-limit boundaries and stack-safety without maintaining two independent graph walks in the hot validation path. This is separate from R515/R874: the issue is not child-kind ownership or receiver-array allocation, but the duplicate pass caused by combining operation accounting with depth validation at the call site. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:267,343,454-455,477,519,561,588,630,674,710,748,765,774-788`; `SharpProof.Ir/IrSemanticTerms.cs:126-150`; traversal primitive `SharpProof.Ir/IrTraversal.cs:4-18,85-123` |
+
+### Status (part one hundred eighty-six)
+
+R963 is `deferred`: the reduction is local and preserves the builder's distinct
+global operation-charge and per-term depth semantics, but changing the shared
+traversal needs focused resource-limit tests for DAG reuse and depth overflow.
