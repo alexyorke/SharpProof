@@ -8324,8 +8324,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred thirteen)
 
-R903 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R903 is `applied`: spec-call preparation now reads the validated target type
+once and reuses it for result-type admission and equality. Focused
+`CompilerCallableLowererTests` passed (20 tests).
 
 ## Second survey, part four hundred fourteen: R904 - repeated receiver-variable search
 

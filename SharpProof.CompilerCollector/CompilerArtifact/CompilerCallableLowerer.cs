@@ -274,14 +274,19 @@ internal sealed class CompilerCallableLowerer
         out CompilerPreparedSpecCall? prepared)
     {
         prepared = null;
-        if (!TryGetAdmissibleByValueCall(call, invocation) ||
-            !_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
+        if (!TryGetAdmissibleByValueCall(call, invocation))
+        {
+            return false;
+        }
+
+        var targetType = _factory.GetVariableInfo(call.Target!.Value).Type;
+        if (!_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
             resolved.Template.Facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow ||
             !TryAdmitSpecCallEffects(invocation, call, resolved.Template, out var consumesMemoryHavoc) ||
             !resolved.Template.Result.HasValue ||
             !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
-                _factory.GetVariableInfo(call.Target!.Value).Type, out var resultType) ||
-            _factory.GetVariableInfo(call.Target!.Value).Type != resultType ||
+                targetType, out var resultType) ||
+            targetType != resultType ||
             invocation.Arguments.Length != resolved.Template.Parameters.Length ||
             resolved.Template.Target.DocumentationCommentId != callIdentity ||
             resolved.Template.Receiver.HasValue != (call.Receiver != null) ||
