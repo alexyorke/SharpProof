@@ -16627,6 +16627,11 @@ remain unchanged. Focused ReleasePublicationScriptTests pass (24 passed).
 |---|---|---|
 | R1376 | `Get-CanonicalWorkflowJobs` performs a document-wide duplicate-heading grouping pass and then a second pass over the identical headings to build the canonical job map. Combine duplicate detection with dictionary insertion while preserving block boundaries and YAML-alias rejection. | `scripts/Test-SharpProofReleaseConfiguration.ps1:126-153` |
 
+R1376 is applied: canonical workflow parsing now detects duplicate job IDs
+during the existing block-slicing pass, eliminating the separate grouping
+traversal while retaining exact job boundaries and alias rejection. The
+release-configuration fixture test passes (1 passed).
+
 ## Second survey, continued: R1377 - Release configuration exact-set validation materializes side-effecting pipelines
 
 `Require-ExactSet` builds two hash sets, but expresses duplicate detection through `Where-Object` pipelines whose only purpose is the side effect of calling `.Add()`, materializes their results to inspect `.Count`, and then enumerates the actual set once more for a subset check. A pair of direct loops can record duplicate flags without pipeline arrays, followed by `HashSet.SetEquals` for the exact comparison. This keeps the current ordinal, duplicate-sensitive contract while reducing temporary collections and making the invariant easier to read; it is separate from the already-recorded empty-set wrapper and forwarding-wrapper issues.
@@ -16634,6 +16639,11 @@ remain unchanged. Focused ReleasePublicationScriptTests pass (24 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1377 | `Require-ExactSet` uses three materializing PowerShell pipelines around hash-set insertion and a fourth to test the final subset, although the helper already owns both sets. Replace the side-effecting pipelines with direct loops and `SetEquals`, retaining duplicate rejection and ordinal semantics. | `scripts/Test-SharpProofReleaseConfiguration.ps1:59-80` |
+
+R1377 is applied: exact-set validation now tracks duplicate values with direct
+loops and compares the resulting ordinal hash sets with `SetEquals`, removing
+the side-effecting materialized pipelines while preserving duplicate rejection.
+The release-configuration fixture test passes (1 passed).
 
 ## Second survey, continued: R1378 - Container execution reparses the acceptance contract for adjacent policies
 
@@ -16655,6 +16665,11 @@ coverage run passes (182 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1379 | `New-SharpProofReleaseEvidence` checks `$versions.Count -ne 1` and then invokes `Test-SharpProofReleaseVersionSet` over the same values. The helper already makes every version equal the release authority, which implies one nonempty value; keep one validation boundary and retain the distinct commit-consistency check. | `scripts/New-SharpProofReleaseEvidence.ps1:351-362`; helper `scripts/Get-SharpProofReleaseVersion.ps1:63-77` |
+
+R1379 is applied: release evidence now sends the original artifact-version
+sequence directly to `Test-SharpProofReleaseVersionSet`, removing the
+redundant unique-count branch while retaining the authoritative version and
+commit consistency checks. ReleasePublicationScriptTests pass (24 passed).
 
 R1373 is applied: `container-verifier` now publishes the package-consumer
 evidence and receipt, and tag qualification downloads them instead of rerunning

@@ -348,17 +348,10 @@ foreach ($extension in @('.nupkg', '.snupkg')) {
     }
 }
 
-$versions = @(
-    $identities |
-        ForEach-Object { $_.Identity.Version } |
-        Sort-Object -Unique
-)
-if ($versions.Count -ne 1) {
-    throw "NuGet artifact versions must match; found '$($versions -join ', ')'."
-}
+$versions = @($identities | ForEach-Object { $_.Identity.Version })
 Test-SharpProofReleaseVersionSet `
     -ExpectedVersion $releaseVersion `
-    -Versions @($identities | ForEach-Object { $_.Identity.Version }) `
+    -Versions $versions `
     -Owner 'NuGet artifacts'
 $commits = @(
     $identities |

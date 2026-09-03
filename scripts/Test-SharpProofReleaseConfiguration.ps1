@@ -68,14 +68,21 @@ function Require-ExactSet {
         [StringComparer]::Ordinal)
     $expectedUnique = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
-    if (@($Actual | Where-Object { -not $actualUnique.Add($_) }).Count -ne 0 -or
-        @($expectedStrings | Where-Object {
-                -not $expectedUnique.Add($_)
-            }).Count -ne 0 -or
-        $actualUnique.Count -ne $expectedUnique.Count -or
-        @($actualUnique | Where-Object {
-                -not $expectedUnique.Contains($_)
-            }).Count -ne 0) {
+    $actualHasDuplicates = $false
+    foreach ($value in $Actual) {
+        if (-not $actualUnique.Add($value)) {
+            $actualHasDuplicates = $true
+        }
+    }
+    $expectedHasDuplicates = $false
+    foreach ($value in $expectedStrings) {
+        if (-not $expectedUnique.Add($value)) {
+            $expectedHasDuplicates = $true
+        }
+    }
+    if ($actualHasDuplicates -or
+        $expectedHasDuplicates -or
+        -not $actualUnique.SetEquals($expectedUnique)) {
         throw "$Owner must equal the exact contract set."
     }
 }
@@ -126,13 +133,9 @@ function Get-CanonicalWorkflowJobs {
     $jobHeadings = [regex]::Matches(
         $jobsText,
         '(?m)^  (?<id>[A-Za-z0-9_-]+):\s*(?:#.*)?$')
-    $duplicateJobIds = @($jobHeadings | Group-Object {
-            $_.Groups['id'].Value
-        } | Where-Object Count -ne 1)
-    if ($duplicateJobIds.Count -ne 0) {
-        throw 'The release workflow contains duplicate job keys.'
-    }
     $jobs = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::Ordinal)
+    $jobIds = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
     for ($index = 0; $index -lt $jobHeadings.Count; $index++) {
         $heading = $jobHeadings[$index]
@@ -144,6 +147,9 @@ function Get-CanonicalWorkflowJobs {
             $jobHeadings[$index + 1].Index - $start
         }
         $jobId = $heading.Groups['id'].Value
+        if (-not $jobIds.Add($jobId)) {
+            throw 'The release workflow contains duplicate job keys.'
+        }
         $block = $jobsText.Substring($start, $length).TrimEnd("`n")
         if ([regex]::IsMatch($block, '(?m)^\s*(?:<<:|[^#\n]+:\s*[&*][A-Za-z0-9_-]+)')) {
             throw "Release job '$jobId' cannot use YAML aliases or merge keys."
