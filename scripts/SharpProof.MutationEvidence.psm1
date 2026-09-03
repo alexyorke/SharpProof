@@ -487,7 +487,7 @@ function Read-SharpProofMutationTestEvidence {
         $entriesById[$testId] = $entry.GetAttribute('executionId')
     }
 
-    $ledger = @()
+    $ledger = [Collections.Generic.List[string]]::new()
     $ledgerByMethod =
         [Collections.Generic.Dictionary[string, object]]::new(
             [StringComparer]::Ordinal)
@@ -495,7 +495,7 @@ function Read-SharpProofMutationTestEvidence {
         $ledgerByMethod[$methodName] =
             [Collections.Generic.List[string]]::new()
     }
-    $failedResults = @()
+    $failedResults = [Collections.Generic.List[object]]::new()
     $seenResults =
         [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
@@ -529,11 +529,11 @@ function Read-SharpProofMutationTestEvidence {
 
         $identity = $definition.className + '.' + $definition.methodName +
             '|' + $definition.displayName
-        $ledger += $identity
-        $ledgerByMethod[$matchingExpectedMethods[0]].Add($identity)
+        $null = $ledger.Add($identity)
+        $null = $ledgerByMethod[$matchingExpectedMethods[0]].Add($identity)
         $outcome = $result.GetAttribute('outcome')
         if ($outcome -eq 'Failed') {
-            $failedResults += $result
+            $null = $failedResults.Add($result)
         }
         elseif ($outcome -ne 'Passed') {
             throw "TRX for '$EvidenceName' has unsupported result '$outcome'."

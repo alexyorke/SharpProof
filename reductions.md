@@ -17569,3 +17569,112 @@ sit in an assembly that already calls the helper 37 times, and
 change. R1300 should move to applied. R296 should move to applied with its
 PowerShell figure recorded as zero, so that no later pass spends effort on the
 141 lines it pointed at.
+
+## Second survey, part five hundred ninety-eight: R362 measured - eleven gates ride on the hand-written production list, including the one named for new layers - and R1508, the list's own definition written a third time
+
+### Evidence update: R362's cost is eleven architecture gates, and the two definitions agree exactly today
+
+R362 records that `ArchitectureRepository.ProductionProjects` hardcodes a
+22-element array duplicating `Directory.Build.props`'s `SharpProofProductionProject`
+classification, and asks for the membership to be derived. It states the drift
+risk without measuring it. Measured:
+
+- **The two definitions agree exactly, so this is latent and not a live defect.**
+  Evaluating the MSBuild condition by hand over all 58 tracked `.csproj` - drop
+  names matching `Test$`, drop anything under `samples/` or `eng/pilots/`, drop
+  `^SharpProof\.(Testing|Package|Verifier|Smoke\.Net472|CompilerProbe\.TestAsset)$` -
+  yields **23** projects. `ArchitectureRepository.BannedApiProjects`, which is
+  `ProductionProjects` plus `SharpProof.Gates`, is **23**. The symmetric difference
+  is empty in both directions. Nothing checks this.
+- **Eleven named architecture gates are scoped by the two arrays**, so a
+  production project added to the build but not to the array is silently exempt
+  from all eleven. Via `BannedApiProjects`:
+  `GeneratedProductionFilesAreExplicitlyApproved` (`:207`),
+  `SemanticModelsFlowThroughTheSingleAuditedHostAdapter` (`:278`),
+  `InternalsVisibleToMatchesApprovedAssemblyBoundary` (`:390`),
+  `MetaAnalyzerSelfDogfoodsBannedApisWithoutReferencingItself` (`:410`),
+  `CurrentProductionDoesNotParseContractStrings` (`:474`),
+  `ProductionProjectsDoNotUseSemanticDisplayText` (`:489`). Via
+  `ProductionProjects`: `NewLayerProjectReferencesFollowTheDependencyDag`
+  (`ArchitectureTests.cs:211`),
+  `OnlyTheSmtLayerAndFuzzHarnessReferenceZ3InTheProductionGraph` (`:342`),
+  `ProofProducingOutcomeConstructorsStayInTheKernel` (`:477`),
+  `CoverageCollectionPreservesTrustedContractPayloadIdentity` (`:1931`), and
+  `ContractApiMetadataNamesHaveOneSourceOfTruth` (`:2022`).
+- **The first of those is named for the case it cannot see.**
+  `NewLayerProjectReferencesFollowTheDependencyDag` exists to check that a *new*
+  layer's project references follow the dependency DAG, and iterates
+  `ProductionProjects` - a list a new layer is not in until someone remembers to
+  add it. The test for new layers is blind to new layers.
+- **The repository already forbids exactly this shape on the other side.**
+  `BoundaryEnforcementTests.BannedApiAnalyzerIsScopedToProductionProjects:150`
+  asserts `Does.Not.Contain("== 'SharpProof.")` against the `SharpProofProductionProject`
+  condition - an explicit guard that the MSBuild classification must not degenerate
+  into a list of project names. The C# consumer of the same concept **is** a list
+  of project names, and no assertion points the other way.
+- **The verification chain is closed among hand-written artifacts and open to
+  reality.** `CoverageCollectionPreservesTrustedContractPayloadIdentity` asserts
+  exact set equality between `eng/coverage/baseline.json`'s 23 project keys and
+  `ProductionProjects` plus `SharpProof.Gates`. That is a real check and it is why
+  the two agree. But both sides are hand-written: add a production project and
+  touch neither, and the assertion still passes while the new assembly has no
+  coverage floor and is exempt from the other ten gates.
+
+R362 stays `pending`; this is the measurement it was missing, and it argues for
+raising its priority rather than changing its remedy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1508 | **`ArchitectureTests.cs:1931-1934` recomputes `BannedApiProjects` inline, expression for expression, in the same assembly where `BannedApiProjects` is an `internal static readonly` field already in scope.** `ArchitectureRepository.cs:32-35` defines it as `ProductionProjects.Append("SharpProof.Gates").OrderBy(static project => project, StringComparer.Ordinal)`. `CoverageCollectionPreservesTrustedContractPayloadIdentity` builds `expectedCoverageProjects` as `ProductionProjects.Append("SharpProof.Gates").OrderBy(static name => name, StringComparer.Ordinal).ToArray()` - identical operations in identical order, differing only in the lambda's parameter name and `[.. ]` versus `.ToArray()`. The same file already resolves `ProductionProjects` unqualified from `ArchitectureRepository`, so `BannedApiProjects` is reachable with no using change; the substitution is one line. **The concept now has three spellings in two files** - `ProductionProjects` (22, no Gates), `BannedApiProjects` (23, with Gates), and this unnamed local that is the second of those under a third name - which is what makes the coverage gate's relationship to the banned-API gate invisible: they enforce membership over the same 23 projects and nothing in either file says so. Whoever applies R362 has to notice this copy, because deriving `ProductionProjects` fixes two of the three spellings and leaves this one computing the derived value again by hand. | `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-35`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:1931-1938`; `eng/coverage/baseline.json`; related R362 |
+
+### Checked and not proposed (part five hundred ninety-eight)
+
+- **`GeneratedProductionFilesAreExplicitlyApproved` is a model gate and the
+  naming exception it tolerates is deliberate.** It discovers generated files by
+  a **disjunction** - the `\.(g|generated)\.cs$` name pattern **or** an
+  `// <auto-generated>` marker - and asserts exact set equality against
+  `eng/generated/approved-outputs.v1.json`. Measured across the tree: **43** files
+  carry the marker, **42** of them `.cs`, and exactly **one** breaks the naming
+  convention, `SharpProof.Ir/IrIdentifierAliases.cs`, which the disjunction catches
+  by marker and which is duly listed among the 41 approved outputs. The reverse
+  direction is clean too: **zero** files named `*.generated.*` lack the marker. The
+  two marker-carrying files outside the approved list are
+  `SharpProof.Specs.Test/ApiSpecRuntimeWitnesses.generated.cs` and
+  `docs/api-spec-catalog.generated.md`, both correctly out of scope for a gate
+  restricted to production `.cs`.
+- **Generator-to-output correspondence is exact.** 15 generator scripts, 43
+  generated files; every generated file's `Generated by <script>` header names a
+  script that exists, and every one of the 15 has at least one output - from 1 for
+  `Generate-ContractApiCatalog.ps1` to 10 each for `Generate-DeclarativeModels.ps1`
+  and `Generate-ProjectionCatalog.ps1`. There is no orphan generator and no output
+  attributed to a missing one.
+- **R755 is unchanged and its file count has moved.** Re-measured: **3** generated
+  files lack *"Do not edit this file directly."* - `CSharpScalarSemantics.generated.cs`,
+  `IrOperatorCatalog.generated.cs`, and `ContractApiMetadata.generated.cs`, the
+  last saying *"Do not edit by hand."* instead - and **3** `.cs` files lack
+  `#nullable enable`, of which two are R755's (`ContractApiMetadata.generated.cs`,
+  `ApiSpecRuntimeWitnesses.generated.cs`) and the third is `IrIdentifierAliases.cs`,
+  a file of `global using` aliases with no types where the directive would mean
+  nothing. R755's totals should read 43 rather than 41 when it is acted on.
+- **The path-containment implementations are three different problems, not one
+  duplication.** `scripts/Resolve-SharpProofContainedPath.ps1` (123 lines, in the
+  TCB, with its own 96-line fixture script) resolves reparse points and checks
+  *physical* containment with a documented exception for the container's
+  `artifacts` symlink; `SharpProof.Host/LinuxPathIdentity.cs` (1022 lines) does
+  fail-closed containment at the syscall level with `O_NOFOLLOW` and `st_mode`
+  type checks for publication; and the C# temp-directory helper does lexical
+  containment for test cleanup. Only the last family is duplicated, and that is
+  R1300 and R1507. The three do not converge and proposing that they should would
+  be wrong.
+
+### Status (part five hundred ninety-eight)
+
+R1508 is `pending` and is a one-line substitution. The R362 evidence carries no
+new ID and should travel with it: eleven gates, a test named for the case it
+cannot see, a guard on the MSBuild side that the C# side violates, and a
+verification chain that is exact between two hand-written files and unattached to
+the project set either describes.
+
+R1397 is applied: mutation evidence now uses growable lists for the stable
+ledger and failed TRX results, materializing the sorted ledger only after the
+result loop. Mutation evidence behavioral fixtures pass.
