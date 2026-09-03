@@ -62,7 +62,7 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public async Task StrictProfileDoesNotUseTheAdvisoryFastPath()
     {
-        var factory = new SpecReuseSessionFactory();
+        var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "public static class Fixture { public static int Add(int x) => x + 1; }",
             mode: null,
@@ -80,7 +80,7 @@ public sealed class AnalyzerModeAndEffectTests
     public async Task AdvisoryPotentialWorkCreatesOnlyALightweightSession(
         string source)
     {
-        var factory = new SpecReuseSessionFactory();
+        var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             source,
             mode: null,
@@ -146,7 +146,7 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public async Task SharpProofAssemblyMetadataDefeatsTheFastPath()
     {
-        var factory = new SpecReuseSessionFactory();
+        var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -168,7 +168,7 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public async Task EffectModeReusesAnalyzerResolvedApiSpecs()
     {
-        var factory = new SpecReuseSessionFactory();
+        var factory = new RecordingSessionFactory();
         _ = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
             "effects",
@@ -3715,23 +3715,4 @@ public sealed class AnalyzerModeAndEffectTests
         }
     }
 
-    private sealed class SpecReuseSessionFactory : IAnalyzerSessionFactory
-    {
-        internal AnalyzerSession? Session
-        {
-            get; private set;
-        }
-
-        public AnalyzerSession Create(
-            Compilation compilation,
-            AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken)
-        {
-            Session = new AnalyzerSession(
-                compilation,
-                configuration,
-                cancellationToken);
-            return Session;
-        }
-    }
 }
