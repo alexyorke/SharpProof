@@ -288,9 +288,10 @@ public sealed class FuzzRunnerTests
     public void CancellationPropagates()
     {
         var cancellation = new CancellationToken(canceled: true);
-        Assert.ThrowsAsync<OperationCanceledException>(() => FuzzRunner.RunAsync(
-            new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
-            cancellation));
+        Assert.ThrowsAsync<OperationCanceledException>((AsyncTestDelegate)(() =>
+            FuzzRunner.RunAsync(
+                new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
+                cancellation)));
     }
 
     [Test]
@@ -638,7 +639,8 @@ public sealed class FuzzRunnerTests
     [TestCase("--unknown", "1")]
     public void InvalidOptionsFailClosed(string option, string value)
     {
-        Assert.Throws<FuzzUsageException>(() => FuzzOptions.Parse([option, value]));
+        Assert.Throws<FuzzUsageException>((TestDelegate)(() =>
+            FuzzOptions.Parse([option, value])));
     }
 
     [TestCase(0, 1)]
