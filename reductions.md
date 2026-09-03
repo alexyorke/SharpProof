@@ -14109,6 +14109,12 @@ semantics.
 |---|---|---|
 | R1187 | **`ExceptionHandlerReachability.PushChildrenCore` checks simple-assignment target inputs twice.** Its `ISimpleAssignmentOperation` case calls `inputs.All(canCompleteNormally)` and then calls `PushSequentialCore(inputs, remaining)`, whose loop invokes `canCompleteNormally` over the same receiver/index/argument sequence again. A prefix helper that returns both the reachable inputs and the all-complete flag can keep value scheduling and target traversal aligned without repeating completion analysis. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1213-1221,1413-1427` |
 
+### Status (part five hundred nine)
+
+R1187 is applied: the sequential prefix walk now reports whether all target
+inputs complete and schedules the assignment value without a second predicate
+pass, preserving stack order. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred ten: R1188 - object-creation arguments are revalidated
 
 The object-creation branch uses the argument-completion result to decide
