@@ -21268,3 +21268,11 @@ generator, followed by regenerated output and compatibility validation. A
 data-only edit would either change the wire model or leave the generator's
 authority inconsistent, so this larger feature change is outside the safe
 mechanical reduction pass.
+
+## Second survey, continued: R2007 - CompilerEffectReplayLowerer and OperationEffectScanner duplicate non-throwing spec classification
+
+`CompilerEffectReplayLowerer.HasNonThrowingConstructorSpec` checks its constructor's resolved API spec for `SpecThrowBehavior.DoesNotThrow` and `SpecTerminationBehavior.Terminates`. `OperationEffectScanner.HasNonThrowingMethodSpec` performs the same `ResolvedApiSpecTable.TryGet` plus the same two facet comparisons; its constructor wrapper adds only the caller-specific null check. The lowerer and scanner otherwise retain different exception and contract policies and should not be merged. A small Effects-owned predicate over `(ResolvedApiSpecTable, IMethodSymbol)` can own the exact facet test, leaving each caller's constructor admission, table source, and surrounding behavior explicit. This removes a duplicated specification semantic that can drift if the meaning of non-throwing changes without changing either call site's policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2007 | CompilerEffectReplayLowerer and OperationEffectScanner repeat the same resolved-spec `DoesNotThrow` plus `Terminates` predicate; centralize only that facet classification while retaining their distinct constructor and exception policies. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:297-307`; `SharpProof.Effects/OperationEffectScanner.cs:1481-1494`; `SharpProof.Effects/ApiSpecResolution.cs:27-65` |
