@@ -14939,6 +14939,13 @@ keeping fallback and source-span ordering unchanged. Effect analysis tests pass
 |---|---|---|
 | R1235 | **`EvaluateConditional` reevaluates an unknown condition during both branch assumptions.** After `EvaluateCore(operation.Condition, state)` fails to produce a Boolean, each `Assume(state, operation.Condition, ...)` invokes `EvaluateCore` on that same condition again before refining. A cached condition value/refinement entry point can preserve branch-sensitive state while avoiding up to two duplicate condition traversals. | `SharpProof.Effects/ManagedAbstractFlow.cs:377-410,757-768` |
 
+### Status (part five hundred fifty-seven)
+
+R1235 is applied: conditional evaluation carries its already-computed abstract
+condition into both branch assumptions, avoiding redundant condition walks while
+preserving the existing recursive refinement behavior. Managed abstract-flow
+tests pass (34 passed).
+
 ## Second survey, part five hundred fifty-eight: R1236 - managed transfer rewalks mutation-bearing values
 
 `ManagedAbstractFlow.TransferCore` separately calls `ManagedMutationFacts.HasMutation` for a variable initializer, flow capture, or assignment value, then recursively transfers that same value subtree and finally calls `EvaluateCore` on it to derive the stored abstract value. The post-transfer evaluation is state-sensitive and must remain distinct, but the mutation fact is a structural property already encountered during transfer. Returning or threading that fact from the transfer walk, or using a scoped operation fact cache, can remove the standalone mutation traversal while preserving the conservative top-value choice and post-transfer state semantics.
