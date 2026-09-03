@@ -11771,7 +11771,7 @@ In `SharpProof.Ir.Test/IrProgramTests.cs`, `InterpreterEvaluatesCallArgumentsBef
 
 ### Status (part three hundred thirty-eight)
 
-R1107 is deferred: extract a shared execution helper for operand-before-null-receiver evaluation tests.
+R1107 is applied: extract a shared execution helper for operand-before-null-receiver evaluation tests; both focused cases pass.
 
 ## Second survey, part three hundred thirty-nine: R1108 - duplicated multi-property satisfiability assertion envelope in finite-domain oracle tests
 
@@ -11783,7 +11783,7 @@ In `SharpProof.Fuzz.Test/FuzzRunnerTests.cs`, `FiniteDomainOracleChecksSatAndUns
 
 ### Status (part three hundred thirty-nine)
 
-R1108 is deferred: extract an assertion helper for finite-domain differential oracle results in `FuzzRunnerTests`.
+R1108 is applied: extract an assertion helper for finite-domain differential oracle results in `FuzzRunnerTests`; the focused test passes.
 
 ## Second survey, part three hundred forty: R1109 - unforwarded CI locked-mode restore configuration
 
@@ -12108,3 +12108,15 @@ R1134 is deferred: use one case-ID index/uniqueness boundary so duplicates remai
 ### Status (part three hundred sixty-six)
 
 R1135 is deferred: fold candidate-round termination into the existing group walk and retain ordering, diversity, and exact-count validation.
+
+## Second survey, part three hundred sixty-seven: R1136 - repeated descendant membership proof
+
+`StopDescendants` builds `discovered` by calling `DescendantProcessIds(supervisorId, parents)`. That helper already filters `parents.Keys` through `IsDescendant`, so every element in the returned set has passed the exact ancestry predicate against the same immutable `parents` snapshot. The per-process loop then calls `IsDescendant` again before signaling it. No intervening operation mutates `parents`, and the set is private to this call, so the second walk and its cycle-detection allocation cannot change the result. Retain the pidfd identity check and signal failure handling, but carry forward the validated set directly.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1136 | **Verifier descendant cleanup re-proves membership for every already-filtered PID.** `DescendantProcessIds` admits only PIDs for which `IsDescendant` is true, then `StopDescendants` repeats that ancestry walk inside the signaling loop against the same parent snapshot. Remove the second proof or return richer validated entries while preserving pidfd checks and race handling. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:242-275,385-393` |
+
+### Status (part three hundred sixty-seven)
+
+R1136 is deferred: use the existing descendant-set proof once per parent snapshot and retain all pidfd and signal safety checks.
