@@ -12747,7 +12747,6 @@ No new ID. R1143 should move to the refuted table with this part as its evidence
 and R1147's status improves from "one of several" to "the single ungated
 cross-assembly vocabulary pair in the product" - which makes it the more worthwhile
 of the two and the one that should carry the fix.
-
 ## Second survey, part four hundred seventy-two: the reflection-gate census, and a correction to R978
 
 Having been wrong twice about "nothing checks this", I enumerated the gates a
@@ -12912,3 +12911,42 @@ No new ID. R980 stays open in narrowed form; the byte-exact half is real and the
 pipeline evidence for it was independently verified. What changes is its size: the
 gap is five catalog-shaped generators and a formatting-drift class, not fourteen
 generators and everything about them.
+
+## Second survey, part four hundred seventy-five: R1154 - one hex convention, three encodings, and a no-op
+
+A census of every SHA-256 computation and hex encoding in production, against the
+lowercase-hex invariant the repository validates for.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1154 | **The "SHA-256 hex is lowercase" invariant is validated in two places, produced three different ways, and not applied at four production sites - and one of the encodings ends in a call that does nothing.** The invariant is asserted by `SharpProof.Ir/HashEncoding.cs:26-29` `IsSha256`, which accepts only `0-9a-f`, by its `ProtocolHashEncoding` twin in `SharpProof.Worker.Protocol`, and in prose by the CA1308 justification at `OpenSourceCorpusCatalog.cs:63,72` - *"Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal."* It is produced three ways. **First**, the shared helper `HashEncoding.ToLowerHex` (`:14-17`), which formats each byte with `"x2"` and `InvariantCulture`; it has real adoption - `CompilerCompilationCapture`, `CompilerRelationalSummaryProvider`, `CompilerSpecificationPackProvider`, `ApiSpecResolution`, `WorkerPerformanceProbe`, `ProbeHash`. **Second**, `Convert.ToHexString(...)` followed by `.ToLowerInvariant()`, at `OpenSourceCorpusCatalog.cs:75,390` and `OpenSourceCorpusImporter.cs:161-164` - a two-step spelling of what the shared helper does in one, in the very files whose comments state the convention. **Third, not at all**: `Convert.ToHexString` returns **uppercase**, and four production sites keep it - `RunVerifier.cs:1376` `GetFileIdentity`, and `LinuxPathIdentity.cs:488,624`, one of which feeds a filesystem path component. **And `RunVerifier.cs:392` ends with `.ToUpperInvariant()` on a `Convert.ToHexString` result, which is already uppercase - a no-op.** Whether the four uppercase sites are defects depends on whether their values ever meet an `IsSha256` check; what is certain is that one repository-wide identity convention has three encodings and a shared helper that four sites bypass. | `SharpProof.Ir/HashEncoding.cs:12-30`; `SharpProof.BuildTasks/RunVerifier.cs:392,1376`; `SharpProof.Host/LinuxPathIdentity.cs:488,624`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:63,72,75,390`; `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:161-164` |
+
+### Checked and not proposed (part four hundred seventy-five)
+
+- **The four SHA-256 *APIs* in use are not themselves an inconsistency.**
+  `SHA256.HashData` (one-shot static), `SHA256.Create()` (instance),
+  `IncrementalHash.CreateHash(HashAlgorithmName.SHA256)` (streaming) and the fully
+  qualified form each suit their call site: `CanonicalHashWriter` and
+  `LinuxPathIdentity` genuinely stream, the corpus files hash a single buffer. Only
+  the **encoding** of the result is at issue, not its computation.
+- **`HashEncoding.cs` is a third instance of the namespace-switching conditional
+  compilation described by R355 and R953.** It wraps its declarations in
+  `#if SHARPPROOF_WORKER_PROTOCOL`, becoming `ProtocolHashEncoding` in
+  `SharpProof.Worker.Protocol` and `HashEncoding` in `SharpProof.Ir`. Unlike the
+  symbol R1148 records as dead, `SHARPPROOF_WORKER_PROTOCOL` **is** still defined
+  in MSBuild, so this instance is live. It belongs with R355 and R953 rather than
+  being filed separately, but is recorded here because those two items name only
+  `ArgumentNullGuard.cs` and the mechanism has a second user.
+- `RunVerifier.cs:392` hashes `RandomNumberGenerator.GetBytes(32)` rather than
+  content - it is generating an identifier, not a digest - so its case is a
+  cosmetic choice rather than an invariant violation. The redundant
+  `.ToUpperInvariant()` is still worth removing, and is part of R1154.
+
+### Status (part four hundred seventy-five)
+
+R1154 is `pending`. The safe, mechanical part is replacing the two
+`Convert.ToHexString(...).ToLowerInvariant()` pairs with the shared helper and
+deleting the no-op `.ToUpperInvariant()`. The part that needs an owner's answer is
+the four uppercase sites: either they are outside the lowercase domain and should
+say so, or they are inside it and are currently producing values that
+`HashEncoding.IsSha256` would reject.

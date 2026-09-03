@@ -78,8 +78,17 @@ internal static class CorpusGate
                 $"{OpenSourceCorpusCatalog.MaximumMethodCount} are required.");
         }
 
-        if (cases.Select(static item => item.Id).Distinct(StringComparer.Ordinal)
-                .Count() != cases.Length)
+        var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
+            string, CorpusCase>(StringComparer.Ordinal);
+        var duplicateCaseIds = false;
+        foreach (var item in cases)
+        {
+            if (!casesByIdBuilder.TryAdd(item.Id, item))
+            {
+                duplicateCaseIds = true;
+            }
+        }
+        if (duplicateCaseIds)
         {
             failures.Add("Corpus case IDs are not unique.");
         }
@@ -180,9 +189,7 @@ internal static class CorpusGate
         var silentUnknownCount = immutableObservations.Count(static observation =>
             observation.Verdict == CorpusVerdict.SilentUnknown);
         var totalUnknownCount = unknownCount + silentUnknownCount;
-        var casesById = cases.ToImmutableDictionary(
-            static item => item.Id,
-            StringComparer.Ordinal);
+        var casesById = casesByIdBuilder.ToImmutable();
         var supportedCaseCount = cases.Count(static item =>
             item.Support == CorpusSupport.Supported);
         var supportedOpenSourceMethodCount = cases.Count(static item =>
