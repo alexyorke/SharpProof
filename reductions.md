@@ -18532,3 +18532,11 @@ finding was renumbered to R1540 by the ledger reconciliation.)
 R1522 is applied: the eight constant-loop completion cases now share one
 fixture-scoped Roslyn compilation while each test creates its own analysis
 facts and session. `ConstantTrueLoopCompletionTests` pass (8/8).
+
+## Second survey, continued: R1643 - the source-tree consumer target duplicates analyzer and collector remapping
+
+**`SharpProof.AnalyzerConsumer.props._SharpProofApplyMappedAnalyzerConfigurations` contains two parallel MSBuild remapping pipelines with identical mechanics.** The analyzer and collector branches each discover a mapped project reference, extract its `Configuration` with the same fallback to `$(Configuration)`, derive a role-specific `netstandard2.0` dependency directory, then remove the default role-tagged `@(Analyzer)` items and reinclude them through the same `Filename`/`Extension` transform. Only the project/dependency item names, role tag, and directory stem differ. A role-parameterized item projection or a shared target fragment can centralize the fallback and remove/reinclude ceremony while preserving the intentionally separate analyzer and collector dependency roots and conditions. This is narrower than R343/R290, which cover the repeated dependency filename closures, and R479/R738, which cover compiler-visible property declarations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1643 | The analyzer and collector branches repeat configuration fallback, dependency-directory projection, and `@(Analyzer)` remove/reinclude logic; share the remapping mechanics while retaining separate role roots and conditions. | `SharpProof.AnalyzerConsumer.props:60-95` |
