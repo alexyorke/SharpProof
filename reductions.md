@@ -20848,3 +20848,11 @@ RequiresCallSiteTreeAnalyzer resolves a tuple-path component in two production p
 | ID | Finding | Evidence |
 |---|---|---|
 | R1982 | RequiresCallSiteTreeAnalyzer repeats the same tuple element/backing-field name-to-index search in assignment deconstruction and recursive-pattern traversal; centralize the search helper while retaining the distinct descent and pattern-yield policies. | SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1014-1033,1477-1514 |
+
+## Second survey, continued: R1983 - CompilerEffectReplayLowerer repeats unresolved source defaults across early returns
+
+CompilerEffectReplayLowerer.TryResolveSource assigns the same seven out-parameter defaults in both the missing-syntax-tree branch and the invalid-span branch: three tree hashes, the source-tree ordinal sentinel, and three source identity strings. It then assigns the four source defaults a third time immediately before FindUniqueTree, even though those fields already have their unresolved values if initialized once at method entry. The successful path overwrites the tree fields after capture and the source fields after a unique source tree is found; the source-not-found path intentionally retains valid tree hashes with unresolved source fields. Moving the full default initialization after the cancellation check and deleting the two repeated blocks plus the later source-only reset preserves those three distinct outcomes while removing 18 repeated assignment lines from one source-binding helper. The current duplication means a new out parameter or sentinel change must be kept synchronized in three branches.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1983 | CompilerEffectReplayLowerer repeats the unresolved out-parameter initialization in two early failure branches and a third source-lookup boundary; initialize the defaults once and retain the existing success/failure overwrites. | SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:374-429 |
