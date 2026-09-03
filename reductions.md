@@ -14118,3 +14118,19 @@ decision, preserving the separate selection and barrier predicates.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1190 | **`ExceptionHandlerReachability.GetReachableSwitchCases` can recheck a clause's pattern and guard completion.** `CanCaseClauseReachBody` calls `canCompleteNormally` for the pattern and non-constant guard, while the following `stopsSelection` expression can call the same predicate again for the barrier pattern and for an `Always` pattern's guard. A clause-completion projection can share those results without changing the ordered switch stop rules. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1492-1520,1668-1697` |
+
+## Second survey, part five hundred thirteen: R1191 - selected switch cases are copied through extra passes
+
+`GetReachableSwitchCases` first walks the switch cases to compute the selected
+case map, possibly stopping once selection is definite. After the default-case
+adjustment, it walks the entire `@switch.Cases` collection again to copy
+selected records into `switchCaseReachability` and `scheduledSwitchBodies`,
+then walks the entire collection a third time for the returned array. The
+second and third passes need only the selected records plus source order. A
+selected-case list, or a combined projection that carries the source-order
+list and updates the two output structures together, can remove those full
+collection scans without changing default-case admission or ordering.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1191 | **`ExceptionHandlerReachability.GetReachableSwitchCases` scans the case collection up to three times.** The selection pass builds `selected`, a second `foreach (@switch.Cases)` copies its entries into the reachability/scheduling outputs, and `@switch.Cases.Where(selected.ContainsKey).ToArray()` scans all cases again for the return value. Retaining selected cases in source order while populating the side tables can eliminate the latter two collection walks and preserve the existing early-stop and default-case semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1448-1559` |
