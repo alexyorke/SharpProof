@@ -10741,3 +10741,15 @@ R1021 is deferred: share the valid-peer batch and invariant status assertions, b
 ### Status (part two hundred fifty-three)
 
 R1022 is deferred: share only the common definite type-initialization-failure assertions, and preserve each source fixture and its scenario-specific effects.
+
+## Second survey, part two hundred fifty-four: R1023 - repeated later-initializer assertions
+
+`ConditionallyThrowingInitializerStillPermitsLaterEffects` analyzes both the later module initializer and the ordinary entry point, then repeats the same four assertions for `second` and `entry`: the summary contains a static write, contains synchronization, reports `FirstException`, and has no direct witnesses. The first initializer has intentionally different empty-effect expectations, so it should not use that helper, but a focused `AssertLaterInitializerEffects` helper can own the duplicated later-path envelope.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1023 | **Conditional module-initializer coverage duplicates the later-path assertion block.** The `second` and `entry` results are checked with byte-equivalent static-write, synchronization, exception-name, and empty-direct-witness assertions; only the method under test differs. A helper can remove that repeated assertion plumbing while preserving the first-initializer empty-effect case and the distinct result acquisition. | `SharpProof.Effects.Test/ModuleInitializerOrderingRegressionTests.cs:67-105` |
+
+### Status (part two hundred fifty-four)
+
+R1023 is deferred: share only the assertions for methods after a conditionally throwing initializer, and retain the first-initializer expectations separately.
