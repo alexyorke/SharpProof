@@ -12,11 +12,6 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageId>SharpProof.Verifier</PackageId>
-    <Title>SharpProof Verifier</Title>
-    <Description>Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.</Description>
-    <PackageReleaseNotes>Initial container-first Linux amd64 verifier package for the soundness-first SharpProof preview.</PackageReleaseNotes>
-    <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>SharpProof;Verifier;Contracts;SMT;Z3;Linux;Container;x64</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>
   <ItemGroup>

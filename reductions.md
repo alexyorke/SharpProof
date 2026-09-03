@@ -12573,11 +12573,11 @@ NuGet actually packs from.
 
 ### Status (part four hundred sixty-eight)
 
-R1152 is `pending`. Deleting the twelve inert properties is the safe half and
-changes no package. Forwarding the description and release notes as
-`NuspecProperties` tokens is the half that matters, because it is the only way the
-shipped text comes from `SharpProof.Release.props` rather than from a literal that
-happens to match it today.
+R1152 is partly applied: the duplicated title, description, release-notes,
+copyright, and tag properties are gone from both custom-nuspec projects. Their
+`PackageId` properties remain because they control package identity/output naming;
+the live nuspec metadata remains unchanged. The container pack workflow is the
+next validation gate before considering this safe half complete.
 
 ## Second survey, part four hundred sixty-nine: documentation links and layer separation - no finding
 
