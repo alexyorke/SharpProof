@@ -14731,3 +14731,11 @@ allocating an array snapshot. Worker MSBuild integration tests pass (75 passed,
 | ID | Finding | Evidence |
 |---|---|---|
 | R1226 | **`GetSemanticLiteral` rebuilds and rescans the containing operation root for each operand query.** Binary operands and invocation instance/arguments independently allocate `visitedLocals` and search `root.DescendantsAndSelf()` when earlier candidates do not yield a literal. A per-root projection/cache preserves first-match precedence while avoiding repeated local-assignment traversal. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:296-301,326-335,543-637` |
+
+## Second survey, part five hundred forty-nine: R1227 - property analysis repeats auto-property syntax lookup
+
+`SharpProofSoundnessAnalyzer.AnalyzeProperty` uses `IsAutoProperty(property, cancellationToken)` in both the IR string-field diagnostic condition and the mutable-static-state condition. For properties satisfying both prefixes, these calls independently enumerate declaring syntax references and inspect every accessor body/expression, with no intervening mutation. Cache the result once for the property (or use a lazy local after the abstract-property guard) while keeping the two diagnostic policies and their separate mutable-storage checks intact.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1227 | **`AnalyzeProperty` invokes `IsAutoProperty` twice for the same property.** The string-field and mutable-static checks perform identical declaration/accessor syntax analysis when both conditions reach their final conjunct. A per-property cached boolean removes the repeated Roslyn traversal without merging the distinct diagnostics. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:676-704,922-934` |
