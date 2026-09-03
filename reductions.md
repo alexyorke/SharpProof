@@ -11940,3 +11940,15 @@ R1120 is deferred: give the analyzer-to-protocol tuple bridge one declarative, v
 ### Status (part three hundred fifty-two)
 
 R1121 is deferred: retain the 14-generator verification helper and eliminate its duplicate declarative-model call from the acceptance path.
+
+## Second survey, part three hundred fifty-three: R1122 - inert timeout parameter in sample builds
+
+`Test-SharpProofSamples.ps1` exposes `TimeoutSeconds` on `Invoke-CapturedDotNet` and passes `900` for the package-building calls, but the function never uses that value to configure a process timeout, cancellation path, or deadline. All invocations execute `& dotnet @effectiveArguments` synchronously and return only after the child exits. The default `300` and the caller's `900` therefore describe behavior the harness does not provide; removing the parameter or implementing one shared timeout-aware process wrapper would make the interface honest without changing the sample assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1122 | **The sample harness carries a dead `TimeoutSeconds` control.** `Invoke-CapturedDotNet` accepts a default timeout and the package-feed builder supplies `900`, but no code reads the value or enforces a deadline around the synchronous `dotnet` invocation. Delete the unused parameter or route it through a real timeout mechanism so callers do not receive false execution-time guarantees. | `scripts/Test-SharpProofSamples.ps1:36-75,244-255` |
+
+### Status (part three hundred fifty-three)
+
+R1122 is deferred: either remove the misleading timeout parameter and argument or implement it in the process wrapper while preserving captured output and exit-code handling.
