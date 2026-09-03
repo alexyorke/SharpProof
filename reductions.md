@@ -16070,6 +16070,12 @@ WorkerProtocolJson.AreDefinedUnique first uses All to validate every enum value 
 |---|---|---|
 | R1336 | **`AreDefinedUnique<T>` enumerates each enum array once for validity and again for duplicate detection. Combine the defined-value and HashSet checks in one pass while retaining the `nonEmpty` contract and fail-closed result.** | `SharpProof.Worker.Protocol/ProtocolJson.cs:913-919`; generated callers at `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:840-843` |
 
+### Status (continued)
+
+R1336 is applied: enum validity and duplicate detection now share one pass,
+while null and non-empty requirements remain fail-closed. Protocol JSON tests
+pass (108 passed).
+
 ## Second survey, continued: R1337 - protocol identity indexes probe each new key twice
 
 OrdinalIdentityIndex adds non-null IDs with ContainsKey followed by Add. Every previously unseen ID therefore incurs two dictionary probes, while duplicate IDs are intentionally ignored so the first row wins. Dictionary.TryAdd expresses that first-wins insertion policy with one lookup and keeps the null-ID handling separate.
