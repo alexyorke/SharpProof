@@ -9,6 +9,19 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
+function Assert-UniqueCatalogKey {
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()]
+        [Collections.Generic.HashSet[string]]$Seen,
+        [Parameter(Mandatory)][string]$Key,
+        [Parameter(Mandatory)][string]$DuplicateMessage
+    )
+
+    if (-not $Seen.Add($Key)) {
+        throw $DuplicateMessage
+    }
+}
+
 $repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
 $CatalogPath = Resolve-SharpProofPath $CatalogPath (
     Join-Path $repositoryRoot 'SharpProof.Analyzer.Core\AnalyzerDiagnostic.catalog.json')
@@ -41,9 +54,10 @@ $seenIntrinsic = [Collections.Generic.HashSet[string]]::new([StringComparer]::Or
 foreach ($entry in @($catalog.intrinsicDescriptions)) {
     Assert-Identifier ([string]$entry.failure) 'Analyzer diagnostic intrinsic failure'
     $key = ([string]$entry.failure) + '|' + ([bool]$entry.isOld).ToString()
-    if (-not $seenIntrinsic.Add($key)) {
-        throw "Analyzer diagnostic intrinsic mapping repeats '$key'."
-    }
+    Assert-UniqueCatalogKey `
+        -Seen $seenIntrinsic `
+        -Key $key `
+        -DuplicateMessage "Analyzer diagnostic intrinsic mapping repeats '$key'."
     $suffix = if ([bool]$entry.isOld) { 'true' } else { 'false' }
     $lines.Add("            (ContractBindingFailure.$($entry.failure), $suffix) => (")
     $lines.Add("                $(ConvertTo-CSharpString ([string]$entry.argument)),")
@@ -62,9 +76,11 @@ $lines.Add('        {')
 $seenPlacement = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($entry in @($catalog.placementDescriptions)) {
     Assert-Identifier ([string]$entry.placement) 'Analyzer diagnostic placement'
-    if (-not $seenPlacement.Add([string]$entry.placement)) {
-        throw "Analyzer diagnostic placement mapping repeats '$($entry.placement)'."
-    }
+    $placement = [string]$entry.placement
+    Assert-UniqueCatalogKey `
+        -Seen $seenPlacement `
+        -Key $placement `
+        -DuplicateMessage "Analyzer diagnostic placement mapping repeats '$placement'."
     $lines.Add("            ContractClausePlacement.$($entry.placement) =>")
     $lines.Add("                $(ConvertTo-CSharpString ([string]$entry.description)),")
 }

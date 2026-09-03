@@ -18557,3 +18557,8 @@ pass (5/5).
 R1526 is applied: the two analyzer-session cancellation cases now share one
 immutable compilation while each case retains its own cancellation source and
 session. `AnalyzerSessionCancellationTests` pass (2/2).
+
+R1527 is applied: analyzer-diagnostic catalog intrinsic and placement sections
+now use one shared uniqueness-validation helper while retaining their distinct
+keys and duplicate messages. `Test-SharpProofGeneratedOutputs.ps1` verifies all
+14 generators successfully.
