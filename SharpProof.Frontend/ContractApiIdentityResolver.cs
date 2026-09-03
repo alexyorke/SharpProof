@@ -413,13 +413,13 @@ internal sealed class ContractApiIdentityResolver
         var count = 0;
         foreach (var candidate in contract.GetMembers(name))
         {
-            if (candidate is not IMethodSymbol method)
+            if (candidate is not IMethodSymbol candidateMethod)
             {
                 continue;
             }
 
             count++;
-            member ??= method;
+            member ??= candidateMethod;
         }
 
         return count == 1 &&
@@ -500,13 +500,13 @@ internal sealed class ContractApiIdentityResolver
         var count = 0;
         foreach (var candidate in contract.GetMembers(name))
         {
-            if (candidate is not IMethodSymbol method)
+            if (candidate is not IMethodSymbol candidateMethod)
             {
                 continue;
             }
 
             count++;
-            member ??= method;
+            member ??= candidateMethod;
         }
 
         return count == 1 &&
