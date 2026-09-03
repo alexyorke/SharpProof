@@ -70,9 +70,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
+        AssertSingle(run, "SPCF0005");
     }
 
     [TestCase("double", "0.0", "0.0")]
@@ -129,10 +127,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(
-            GeneratorTestHost.Run(compilation).Diagnostics
-                .Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
+        AssertSingle(GeneratorTestHost.Run(compilation), "SPCF0005");
     }
 
     [Test]
@@ -774,9 +769,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
+        AssertSingle(run, "SPCF0005");
     }
 
     [TestCase(
@@ -804,8 +797,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(run.Diagnostics, Has.Length.EqualTo(1));
-        Assert.That(run.Diagnostics[0].Id, Is.EqualTo("SPCF0005"));
+        AssertSingle(run, "SPCF0005");
     }
 
     [Test]

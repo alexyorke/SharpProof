@@ -11796,6 +11796,8 @@ R1100 is deferred: replace multi-stage LINQ variable chaining with a single set 
 
 R1101 is deferred: adopt `AssertSingle` across single-diagnostic test cases in `ContractForValidatorGeneratorTests`.
 
+R1101 is partially applied: exact-one diagnostic cases now use the shared `AssertSingle` helper; tests that intentionally accept multiple diagnostics or only require containment retain their broader assertions. `ContractForValidatorGeneratorTests` pass (120/120).
+
 ## Second survey, part three hundred thirty-three: R1102 - unreachable dead fallback in RoslynOperationLowerer.GetSyntheticInstance
 
 In `SharpProof.Frontend/RoslynOperationLowerer.cs`, `GetSyntheticInstance` is a private method called only when `operation.Type == null`. Inside `GetSyntheticInstance`, lines 285-291 check `if (type == null)` and return `_missingInstance`. Lines 292-297 then attempt to check `if (!_instances.TryGetValue(type, out var variable))` and create a variable using `GetTypeId(type)`. Because `type` can never be non-null after the null check, lines 292-297 are 100% unreachable dead code. Removing these lines simplifies the synthetic instance fallback.
