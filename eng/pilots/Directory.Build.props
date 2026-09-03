@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <NuGetAudit>false</NuGetAudit>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <SharpProofPilotVersion Condition="'$(SharpProofPilotVersion)' == ''">$(SharpProofPackageVersion)</SharpProofPilotVersion>
