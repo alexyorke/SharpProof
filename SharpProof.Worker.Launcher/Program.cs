@@ -208,7 +208,7 @@ internal static class Program
             return resultExitCode;
         }
 
-        if (validResponse & resultExitCode != 0)
+        if (validResponse && resultExitCode != 0)
         {
             return resultExitCode;
         }
@@ -288,11 +288,11 @@ internal static class Program
         {
             projectRoot += Path.DirectorySeparatorChar;
         }
-        if (!Path.IsPathFullyQualified(candidate) |
+        if (!Path.IsPathFullyQualified(candidate) ||
             !string.Equals(Path.GetFileName(hostPath), "dotnet",
-                StringComparison.Ordinal) |
-            !File.Exists(hostPath) |
-            !Directory.Exists(Path.Combine(hostRoot, "host", "fxr")) |
+                StringComparison.Ordinal) ||
+            !File.Exists(hostPath) ||
+            !Directory.Exists(Path.Combine(hostRoot, "host", "fxr")) ||
             hostPath.StartsWith(projectRoot, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
@@ -952,12 +952,12 @@ internal sealed partial class LauncherArguments
             }
 
             key = key.Substring(2);
-            if (!s_allowed.Contains(key) | !values.TryAdd(key, args[index + 1]))
+            if (!s_allowed.Contains(key) || !values.TryAdd(key, args[index + 1]))
             {
                 return false;
             }
         }
-        if (s_required.Any(key => !values.TryGetValue(key, out var value) | string.IsNullOrWhiteSpace(value)))
+        if (s_required.Any(key => !values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value)))
         {
             return false;
         }
