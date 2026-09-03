@@ -12407,11 +12407,11 @@ links the file and defines its own symbol, having no path to `SharpProof.Ir`.
 
 ### Status (part four hundred sixty-three)
 
-R1148 is `pending` and is three lines. It is worth recording separately from
-R355 and R953 because those two describe a mechanism that should be removed, while
-this describes what removing half of it left behind - and the remaining half, the
-`SharpProof.Dataflow` link, is the one case where the mechanism is still doing
-real work.
+R1148 is applied: `ArgumentNullGuard.cs` now tests only the live
+`SHARPPROOF_DATAFLOW_ARGUMENT_GUARD` branch, leaving the `SharpProof.Dataflow`
+link intact while removing the unreachable SMT symbol and namespace arm. The
+focused `SharpProof.Dataflow.Test` and `SharpProof.Ir.Test` suites pass (50/50
+and 115/115).
 
 ## Second survey, part four hundred sixty-four: R1149 - discarded default assumption projection
 
