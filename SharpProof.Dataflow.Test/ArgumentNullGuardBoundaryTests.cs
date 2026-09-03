@@ -3,73 +3,74 @@ namespace SharpProof.Dataflow.Test;
 [TestFixture]
 public sealed class ArgumentNullGuardBoundaryTests
 {
-    private static readonly string[] ExpectedParameterNames =
-    [
-        "transfer",
-        "blocks",
-        "edges",
-        "graph",
-        "domain",
-        "options",
-        "worklistOrder"
-    ];
-
-    [Test]
-    public void PublicAndInternalGuardsPreserveEveryParameterName()
+    [TestCaseSource(nameof(GuardCases))]
+    public void PublicAndInternalGuardsPreserveEveryParameterName(
+        string expectedParameterName,
+        Action guard)
     {
-        var domain = NullnessDomain.Instance;
-        var graph = new DataflowGraph<NullnessValue>(
+        var error = Assert.Throws<ArgumentNullException>(guard);
+
+        Assert.That(error!.ParamName, Is.EqualTo(expectedParameterName));
+    }
+
+    private static IEnumerable<TestCaseData> GuardCases()
+    {
+        yield return new TestCaseData(
+            "transfer",
+            (Action)(() =>
+            {
+                _ = new DataflowBlock<NullnessValue>(0, null!);
+            }));
+        yield return new TestCaseData(
+            "blocks",
+            (Action)(() =>
+            {
+                _ = new DataflowGraph<NullnessValue>(null!, []);
+            }));
+        yield return new TestCaseData(
+            "edges",
+            (Action)(() =>
+            {
+                _ = new DataflowGraph<NullnessValue>(
+                    [new(0, static value => value)],
+                    null!);
+            }));
+        yield return new TestCaseData(
+            "graph",
+            (Action)(() => ForwardDataflowAnalysis.Analyze(
+                null!,
+                NullnessDomain.Instance,
+                NullnessValue.MaybeNull)));
+        yield return new TestCaseData(
+            "domain",
+            (Action)(() => ForwardDataflowAnalysis.Analyze(
+                CreateGraph(),
+                null!,
+                NullnessValue.MaybeNull)));
+        yield return new TestCaseData(
+            "options",
+            (Action)(() =>
+                ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
+                    CreateGraph(),
+                    NullnessDomain.Instance,
+                    NullnessValue.MaybeNull,
+                    null!,
+                    static pending => pending)));
+        yield return new TestCaseData(
+            "worklistOrder",
+            (Action)(() =>
+                ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
+                    CreateGraph(),
+                    NullnessDomain.Instance,
+                    NullnessValue.MaybeNull,
+                    new ForwardDataflowAnalysisOptions(),
+                    null!)));
+    }
+
+    private static DataflowGraph<NullnessValue> CreateGraph()
+    {
+        return new DataflowGraph<NullnessValue>(
             [new(0, static value => value)],
             []);
-        var options = new ForwardDataflowAnalysisOptions();
-
-        var errors = new[]
-        {
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() =>
-                {
-                    _ = new DataflowBlock<NullnessValue>(0, null!);
-                })),
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() =>
-                {
-                    _ = new DataflowGraph<NullnessValue>(null!, []);
-                })),
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() =>
-                {
-                    _ = new DataflowGraph<NullnessValue>(
-                        [new(0, static value => value)],
-                        null!);
-                })),
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() => ForwardDataflowAnalysis.Analyze(
-                    null!,
-                    domain,
-                    NullnessValue.MaybeNull))),
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() => ForwardDataflowAnalysis.Analyze(
-                    graph,
-                    null!,
-                    NullnessValue.MaybeNull))),
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() => ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
-                    graph,
-                    domain,
-                    NullnessValue.MaybeNull,
-                    null!,
-                    static pending => pending))),
-            Assert.Throws<ArgumentNullException>(
-                (Action)(() => ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
-                    graph,
-                    domain,
-                    NullnessValue.MaybeNull,
-                    options,
-                    null!)))
-        };
-
-        Assert.That(
-            errors.Select(static error => error!.ParamName),
-            Is.EqualTo(ExpectedParameterNames));
     }
 }

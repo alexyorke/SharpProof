@@ -11641,6 +11641,8 @@ In `SharpProof.Dataflow.Test/FiniteCfgConcreteOracleTests.cs`, `AllOneAndTwoBloc
 
 R1087 is deferred: parameterize `VerifyEveryFinitePowersetCase` across both worklist directions in `FiniteCfgConcreteOracleTests`.
 
+R1087 is already applied in the current tree: the powerset model-check fixture is parameterized with `TestCase(false)` and `TestCase(true)`, preserving both worklist directions without duplicate test bodies.
+
 ## Second survey, part three hundred nineteen: R1088 - unadopted helper methods in Effects completion regression tests
 
 `EffectTestHost` provides established shared test helpers `AnalyzeSample(compilation, methodName)` and `HasStaticWrite(compilation, method)`. However, several newer regression test suites (including `BinaryPatternCompletionRegressionTests.cs`, `NullablePatternCompletionRegressionTests.cs`, and `ForeachElementConversionReachabilityRegressionTests.cs`) manually inline sample method resolution, session instantiation, analysis, and static-write assertions. Standardizing on `EffectTestHost` helpers consolidates repetitive boilerplate across these regression tests.
@@ -11664,6 +11666,8 @@ In `SharpProof.Dataflow.Test/ArgumentNullGuardBoundaryTests.cs`, `PublicAndInter
 ### Status (part three hundred twenty)
 
 R1089 is deferred: table-drive boundary guard invocations and parameter assertions in dataflow tests.
+
+R1089 is applied: each of the seven argument guards is now an independent test case sourced by its expected parameter name, preserving the same guard calls with isolated failures. `ArgumentNullGuardBoundaryTests` pass (7/7).
 
 ## Second survey, part three hundred twenty-one: R1090 - exhaustive AST descent for method discovery in EffectAnalysisSession
 
