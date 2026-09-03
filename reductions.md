@@ -10643,3 +10643,15 @@ R1013 is deferred: deduplicate only the pre-lock ancestor probes within one acqu
 ### Status (part two hundred forty-five)
 
 R1014 is deferred: share only the resolved-symbol inheritance relation; do not merge the two analyzers' catch syntax, filter completion, or reachability policies.
+
+## Second survey, part two hundred forty-six: R1015 - duplicated IR havoc test scaffolding
+
+`InterpreterFailsClosedAtVariableHavocAfterInvalidatingValues` and `InterpreterPreservesVariablesAtMemoryOnlyHavoc` construct the same `IrFactory`, integer variable, `IrProgramBuilder`, entry block, `Havoc` instruction, return instruction, initial value dictionary, and unsupported-result assertions. The first test already parameterizes the two variable-affecting havoc kinds, while the adjacent memory-only case repeats the entire setup to change only the `IrHavocKind` and whether the final variable value is absent or still `7`. A small scenario helper or one parameterized test can retain the separate invalidation and preservation expectations while removing this local fixture duplication; the distinct semantics and instruction-identity assertions should remain covered.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1015 | **Adjacent IR havoc tests duplicate their complete program fixture and status assertions.** The variable-havoc test and the memory-only-havoc test each allocate the same factory/variable/builder, emit the same havoc-plus-return program, execute it with the same initial dictionary, and assert the same unsupported status and instruction identity; only the havoc kind and current-value expectation differ. Parameterizing that scenario, or extracting a helper that returns the execution and havoc instruction, would remove the repeated scaffolding without collapsing the distinct value-preservation contract. | `SharpProof.Ir.Test/IrProgramTests.cs:438-473,475-504` |
+
+### Status (part two hundred forty-six)
+
+R1015 is deferred: share only the common IR havoc fixture and invariant assertions, and keep the variable-invalidation and memory-preservation expectations explicit.
