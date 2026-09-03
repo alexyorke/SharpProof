@@ -14302,3 +14302,16 @@ sorted order and the entry-block lookup while removing one collection pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1200 | **`CompilerImplementationIlSummaryLowerer.Translator.Translate` enumerates the leader set twice.** It calls `leaders.ToDictionary(...)` to create IR blocks and then calls `leaders.ToArray()` for the ordered block-emission loop, with no intervening mutation. Building both projections from one materialized leader array preserves block order and entry selection without repeating the `SortedSet<int>` walk. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:557-577` |
+
+## Second survey, part five hundred twenty-three: R1201 - IL wrapping re-interns one constant
+
+`WrapInt32` uses the same `4294967296` modulus in its remainder, unsigned
+adjustment, and signed-adjustment terms. Each `_factory.Integer(modulus)` call
+enters the synchronized interning path with the same factory/key and returns
+the same structural term. Retaining one local modulus term makes the reuse
+explicit and avoids two repeated lock/dictionary lookups while preserving the
+IR factory's interning behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1201 | **`CompilerImplementationIlSummaryLowerer.Translator.WrapInt32` re-interns the same modulus three times.** The remainder, negative-remainder adjustment, and final signed adjustment each call `_factory.Integer(modulus)` with unchanged input; `IrFactory.Integer` synchronizes and interns by the same structural key on every call. Caching one `IrIntegerTerm` per wrap removes the duplicate factory work without changing the generated term graph. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:1523-1549`; `SharpProof.Ir/IrFactory.cs:372-380` |
