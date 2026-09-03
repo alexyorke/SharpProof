@@ -14797,6 +14797,12 @@ weakening exact membership validation.
 |---|---|---|
 | R1225 | **`IsMutableStorageType` calls `GetMembers()` three times for the same type.** It performs independent field, property, and event scans after the same type/base checks; a shared member snapshot or carefully ordered combined walk can remove the repeated Roslyn enumeration without weakening recursive nested-storage detection. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:775-835` |
 
+### Status (part five hundred forty-seven)
+
+R1225 is applied: mutable-storage classification snapshots each type's members
+once and reuses that immutable set for field, property, and event checks. Meta
+analyzer tests pass (162 passed).
+
 ## Second survey, part five hundred forty-eight: R1226 - semantic-literal lookup repeats the same root search
 
 `SharpProofSoundnessAnalyzer.GetSemanticLiteral(IOperation, CancellationToken)` climbs to the operation root and starts a fresh local-symbol set for every query. `AnalyzeSemanticString` queries the left operand and, when it finds nothing, the right operand; `AnalyzeSemanticStringInvocation` similarly queries the instance and then each argument through a projection. Each unresolved query can rescan the same root's descendants and follow the same local assignments. A root-scoped resolver with memoized local results, while preserving operand/argument order and cycle handling, can remove repeated syntax-tree walks without changing which literal is reported.
