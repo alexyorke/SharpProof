@@ -12061,7 +12061,11 @@ fuzz evidence architecture tests pass (3/3).
 
 ### Status (part three hundred sixty-one)
 
-R1130 is deferred: make retained-seed property validation fail closed on duplicates and missing keys, preserving the existing strict types and budget limits.
+R1130 is applied: retained-seed manifest parsing now reuses the strict
+`Assert-ExactJsonObjectProperties` helper used by fuzz results, so duplicate,
+unknown, and missing top-level keys fail at the JSON boundary before typed
+values are read. Existing seed, case, and byte-budget checks remain unchanged.
+The focused fuzz evidence architecture tests pass (3/3).
 
 ## Second survey, part three hundred sixty-two: R1131 - duplicate-key loss in standalone gate evidence
 
@@ -12398,3 +12402,110 @@ dispatching the actual proof outcome.
 R1149 is `pending`: avoid projecting `target.Entry.Assumptions` while creating
 the temporary default record, then retain the single final projection for the
 actual outcome's usage policy.
+
+## Second survey, part four hundred sixty-five: the determinism audit - no finding
+
+A census of every construct that can make output depend on machine, culture, clock
+or hash seed, across all production C#. This is the property the product exists to
+provide, so a negative result here is worth recording with its numbers. **No ID is
+allocated.**
+
+### Checked and not proposed (part four hundred sixty-five)
+
+- **The nondeterminism sources that would matter are absent entirely.** Production
+  C# contains **zero** occurrences of `DateTime.Now`, `StringComparison.CurrentCulture`,
+  `StringComparer.CurrentCulture`, `StringComparer.InvariantCulture`,
+  `StringComparison.InvariantCulture`, `new Random`, `Random.Shared`,
+  `Environment.TickCount`, `.ToUpper()` or `.ToLower()`. Not "few" - none.
+- **Explicit ordinal comparison is the overwhelming norm.** `StringComparer.Ordinal`
+  appears at **299 sites in 71 files** and `StringComparison.Ordinal` at **225 in
+  60**, against 9 and 23 respectively for their `OrdinalIgnoreCase` forms - so 524
+  of 556 string comparisons state ordinal semantics explicitly, and the remaining
+  32 state case-insensitive ordinal. No comparison anywhere defers to culture.
+  `CultureInfo.InvariantCulture` appears at 109 sites and
+  `FormattableString.Invariant` at 5.
+- **The 93 bare `.ToString()` calls are culture-invariant by type, not by
+  accident.** They cluster in `SemanticClaimIdentity.cs` (21) and
+  `CompilerProbeSnapshot.cs` (24) - files whose output is hashed - which looked
+  like a real exposure. Reading them shows every one is on an **enum**:
+  `symbol.Kind`, `operation.Kind`, `value.ReferenceKind`, `value.ArgumentKind`,
+  `value.OperatorKind`, `RefKind`. Enum `ToString()` does not consult
+  `NumberFormatInfo`, so the hashed evidence cannot vary by culture. This is also
+  independently enforced: `CA1305` is active through `AnalysisLevel=latest-all`,
+  is **suppressed nowhere in the repository**, and is an error in production
+  projects through `TreatWarningsAsErrors`.
+- **The one `DateTime.UtcNow` and all twelve production `Guid.NewGuid()` calls are
+  outside the evidence path.** `SharpProof.Worker/VerificationCache.cs:120` uses
+  the clock for `File.SetLastWriteTimeUtc`, an LRU eviction stamp that enters no
+  key and no hash. Every `Guid.NewGuid()` names a temporary artefact - `.tmp` in
+  `AtomicFile.cs:16`, `.rollback` and `.eviction` in `VerificationCache.cs:204,433`,
+  `.restore` and a transaction id in `CorpusFileTransaction.cs:46,155,211`, probe
+  and gate scratch directories - or, in `CorpusCatalog.cs:79,97,109`, appears inside
+  a **string literal** that is corpus mutation *source text* rather than executed
+  code.
+- **Ordering is comparer-explicit where it matters.** Of 164 `OrderBy` calls, 89
+  pass an explicit comparer; the remainder order by types with a total order.
+  There are 4 `Sort`, 60 `Distinct`, 5 `ToHashSet` and 9 `GroupBy` calls, and the
+  hash-backed ones sit behind `StringComparer.Ordinal` at their construction sites.
+
+### Status (part four hundred sixty-five)
+
+No ID allocated. This closes the determinism dimension: the product's central
+property is enforced by construction, by an analyzer rule that is on and
+unsuppressed, and by an ordinal-comparison convention with no exceptions. A future
+pass should not re-derive it - in particular the 93 bare `.ToString()` calls look
+like a finding from a grep and are not one, which is why the reason is recorded
+here rather than the count alone.
+
+## Second survey, part four hundred sixty-six: R1150 - uncached awaiter implementation lookup
+
+`EffectKnownSymbols` is owned by one compilation-scoped `EffectAnalysisSession`,
+but its awaiter lookup retains no result for an already-seen awaiter type.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1150 | **`EffectKnownSymbols.FindAwaitContinuationMethod` repeats Roslyn interface-resolution work for the same awaiter type.** The method tries `FindImplementationForInterfaceMember` for the cached `ICriticalNotifyCompletion.UnsafeOnCompleted` symbol and then the cached `INotifyCompletion.OnCompleted` symbol on every call, but does not memoize the resulting method or a null result by `INamedTypeSymbol`. Both `OperationEffectScanner` and `ExceptionHandlerReachability` call it through the same compilation-scoped session, so a method containing several awaits, or the same await site visited by both analyses, can repeat the symbol graph lookup. A comparer-backed cache can preserve the unsafe-first fallback and null result while removing repeated interface searches; keep the cache scoped to the session/compilation so it does not retain symbols across compilations. | `SharpProof.Effects/EffectKnownSymbols.cs:24-60`; session ownership `SharpProof.Effects/EffectAnalysisSession.cs:23-80`; callers `SharpProof.Effects/OperationEffectScanner.Expressions.cs:321-326` and `SharpProof.Effects/ExceptionHandlerReachability.cs:1108-1118` |
+
+### Status (part four hundred sixty-six)
+
+R1150 is `pending`: memoize awaiter-type continuation resolution within the
+compilation-scoped analysis session, including negative results, without changing
+the unsafe-before-ordinary continuation selection.
+
+## Second survey, part four hundred sixty-seven: R1151 - two forms of one assertion scope, 96 to 4
+
+A census of every assertion in the 264 test files: style, multiple-assert scope
+form, and message use.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1151 | **The multiple-assert scope is written two ways in a 96-to-4 split, five files use both, and none of the minority uses needs the older form.** `Assert.EnterMultipleScope()` - the `using`-scoped form - appears **944 times across 166 files**. `Assert.Multiple(delegate)` - the lambda form - appears **39 times across 9 files**. **Five files use both**: `BuildTaskTests.cs` (5 lambda, 23 scope), `PackageLayoutSmokeTests.cs` (1 / 3), `IrSmtBackendTests.cs` (2 / 5), `AcyclicBlockPredicateExecutorTests.cs` (1 / 10), and `ApiSpecTests.cs` (22 / 2) - the last being the only file where the minority form dominates. **The lambda form is not being used for anything the scoped form cannot do**: a search for `Assert.Multiple(async` returns **nothing**, so every one of the 39 is a synchronous `Action`. Worse, **nine of them carry an explicit `(Action)` cast** - `Assert.Multiple((Action)(() => ...))` at five sites in `BuildTaskTests.cs` and one each in three other files - which exists purely to disambiguate NUnit's `Action` and `AsyncTestDelegate` overloads. That cast is ceremony the scoped form does not require, and it appears only in the minority style. | `SharpProof.Package.Test/BuildTaskTests.cs:786,807,837,894,1833`; `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:294`; `SharpProof.Smt.Test/IrSmtBackendTests.cs:556,604`; `SharpProof.Worker.Test/AcyclicBlockPredicateExecutorTests.cs`; `SharpProof.Specs.Test/ApiSpecTests.cs:31,141,201,229,250,281,316,331,386,415`; `SharpProof.Specs.Test/ApiSpecContentDigestTests.cs:27`; `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:62` |
+
+### Checked and not proposed (part four hundred sixty-seven)
+
+- **Assertion style is otherwise perfectly uniform.** Across 264 test files there
+  are **7,933 `Assert.That` constraint assertions and zero classic assertions** -
+  no `Assert.AreEqual`, `Assert.IsTrue`, `Assert.IsNull`, `Assert.AreNotEqual`, and
+  no `ClassicAssert.` anywhere. The supporting forms are used sparingly and
+  appropriately: 370 `Assert.Throws`, 20 `Assert.Ignore`, 10 `Assert.Fail`, and a
+  single `Assume.That` in `PerformanceGateTests.cs`. There is no second assertion
+  vocabulary to reconcile.
+- **The low rate of assertion messages is not proposed as a finding.** Only 368 of
+  7,933 `Assert.That` calls pass a message, about 4.6 percent. Inside a multiple
+  assert scope an unmessaged failure reports the constraint but not which of N
+  assertions failed, so more messages would help there - but requiring them across
+  7,933 sites would be noise, and NUnit's constraint output already names the
+  actual and expected values. This is a judgement call for the owner rather than a
+  defect, and is recorded rather than filed.
+- `Assert.Multiple` and `Assert.EnterMultipleScope` are **both current NUnit 4
+  API**; neither is deprecated. R1151 is a consistency finding, not a correctness
+  one - which is why the `(Action)` casts matter to it: they are the one place the
+  split has a concrete cost in the source.
+
+### Status (part four hundred sixty-seven)
+
+R1151 is `pending` and is mechanical: 39 call sites, of which 9 also shed a cast.
+It is worth doing mainly because five files currently contain both forms, so a
+reader of those files sees two idioms for one operation with nothing distinguishing
+them - and `ApiSpecTests.cs`, which uses the minority form 22 times against 2, is
+the file most likely to propagate it.
