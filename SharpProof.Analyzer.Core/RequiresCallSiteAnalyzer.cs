@@ -376,14 +376,10 @@ internal static partial class RequiresCallSiteAnalyzer
             }
 
             var operationFacts = new DefiniteOperationFacts(semanticModel.Compilation, cancellationToken);
-            if (candidate.Instance != null &&
-                candidate.Instance is not IInstanceReferenceOperation &&
-                !operationFacts.CompletesNormally(candidate.Instance) ||
-                !candidate.TargetMethod.IsStatic &&
-                candidate.Instance != null &&
-                DefiniteOperationFacts.IsDefinitelyNull(candidate.Instance) ||
-                candidate.Arguments.Any(argument =>
-                    !operationFacts.CompletesNormally(argument.Value)))
+            if (!CallPrerequisitesComplete(
+                    candidate,
+                    operationFacts.CompletesNormally,
+                    skipInstanceReference: true))
             {
                 return AnalyzerSemanticOutcome.Unknown;
             }
@@ -458,6 +454,30 @@ internal static partial class RequiresCallSiteAnalyzer
                 }));
         }
 
+        private static bool CallPrerequisitesComplete(
+            RequiresCallSiteCandidate candidate,
+            Func<IOperation?, bool> completesNormally,
+            bool skipInstanceReference)
+        {
+            var instance = candidate.Instance;
+            if (instance != null &&
+                (!skipInstanceReference || instance is not IInstanceReferenceOperation) &&
+                !completesNormally(instance))
+            {
+                return false;
+            }
+
+            if (!candidate.TargetMethod.IsStatic &&
+                instance != null &&
+                DefiniteOperationFacts.IsDefinitelyNull(instance))
+            {
+                return false;
+            }
+
+            return candidate.Arguments.All(argument =>
+                completesNormally(argument.Value));
+        }
+
         private AnalyzerSemanticOutcome? AnalyzeConcreteCall(
             RequiresCallSiteCandidate callSite,
             BoundMethodContracts contracts,
@@ -474,13 +494,10 @@ internal static partial class RequiresCallSiteAnalyzer
 
             var operationFacts = new DefiniteOperationFacts(
                 semanticModel.Compilation, cancellationToken);
-            if (callSite.Instance != null &&
-                    !operationFacts.MayCompleteNormally(callSite.Instance) ||
-                !callSite.TargetMethod.IsStatic &&
-                callSite.Instance != null &&
-                DefiniteOperationFacts.IsDefinitelyNull(callSite.Instance) ||
-                callSite.Arguments.Any(argument =>
-                    !operationFacts.MayCompleteNormally(argument.Value)))
+            if (!CallPrerequisitesComplete(
+                    callSite,
+                    operationFacts.MayCompleteNormally,
+                    skipInstanceReference: false))
             {
                 return null;
             }
