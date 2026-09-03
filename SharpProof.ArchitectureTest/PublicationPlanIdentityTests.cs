@@ -49,7 +49,7 @@ public sealed class PublicationPlanIdentityTests
         var write = script.IndexOf(
             "Write-PublicationPlan `", validate, StringComparison.Ordinal);
         var replay = script.IndexOf(
-            "Test-SharpProofPublicationPlan.ps1", write, StringComparison.Ordinal);
+            "Assert-PublicationPlanRoundTrip `", write, StringComparison.Ordinal);
         Assert.That(create, Is.GreaterThanOrEqualTo(0));
         Assert.That(validate, Is.GreaterThan(create));
         Assert.That(write, Is.GreaterThan(validate));

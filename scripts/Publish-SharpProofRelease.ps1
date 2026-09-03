@@ -652,6 +652,23 @@ function Write-PublicationPlan {
         -InputSnapshot $InputSnapshot
 }
 
+function Assert-PublicationPlanRoundTrip {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Plan,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $written = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $expectedJson = $Plan | ConvertTo-Json -Depth 6 -Compress
+    $actualJson = $written | ConvertTo-Json -Depth 6 -Compress
+    if ($actualJson -cne $expectedJson) {
+        throw 'Serialized publication plan does not round-trip exactly.'
+    }
+}
+
 $resolvedPackageSource = (Resolve-Path `
     -LiteralPath $PackageSource `
     -ErrorAction Stop).Path
@@ -792,8 +809,9 @@ if ($PlanOnly) {
         -OutputPath $resolvedPlanOutputPath `
         -InputSnapshot $publicationInputSnapshot
     if (-not [string]::IsNullOrWhiteSpace($resolvedPlanOutputPath)) {
-        & (Join-Path $PSScriptRoot 'Test-SharpProofPublicationPlan.ps1') `
-            -PlanPath $resolvedPlanOutputPath
+        Assert-PublicationPlanRoundTrip `
+            -Plan $plan `
+            -Path $resolvedPlanOutputPath
     }
     return
 }
