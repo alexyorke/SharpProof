@@ -15275,6 +15275,12 @@ without repeated parsing. Contract API identity tests pass (6 passed).
 |---|---|---|
 | R1258 | **`ContractApiIdentityResolver` materializes filtered arrays solely for one-item checks.** Contract methods and conditional attributes are copied into new immutable arrays before checking cardinality and indexing the sole match. A bounded single-match projection removes those temporary arrays while preserving the current exact-one validation semantics. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:401-425,428-450,466-500` |
 
+### Status (part five hundred eighty)
+
+R1258 is applied: contract-shape and conditional-attribute validation now use
+bounded single-match scans instead of filtered immutable-array copies, retaining
+exact-one and fail-closed semantics. Contract API identity tests pass (6 passed).
+
 ## Second survey, part five hundred eighty-one: R1259 - intrinsic-length detection repeats its property-shape guard
 
 `CompilerIdentityBridge.IsIntrinsicSequenceLength` checks the same readable, non-static, non-indexer, parameterless property shape in both the string branch and the array branch: `IsStatic`, `IsIndexer`, `GetMethod`, `SetMethod`, and empty parameters are tested twice. Only the containing-type/name/type rules differ after that common admission. Factoring the shared property-shape predicate keeps the distinct string and array length policies while removing repeated structural pattern matching.
