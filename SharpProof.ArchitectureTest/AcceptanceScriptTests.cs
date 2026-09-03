@@ -7,6 +7,9 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class AcceptanceScriptTests
 {
+    private const string TemporaryRepositoryRootName =
+        "SharpProof.Architecture.Acceptance";
+
     [TestCase("canonical", true)]
     [TestCase("zero-restore", true)]
     [TestCase("nonzero-restore", true)]
@@ -85,7 +88,8 @@ public sealed class AcceptanceScriptTests
     {
         var fixture = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-acceptance-status-" + Guid.NewGuid().ToString("N"));
+            TemporaryRepositoryRootName,
+            "status-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(fixture);
         try
         {
@@ -262,19 +266,10 @@ public sealed class AcceptanceScriptTests
 
     private static void DeleteDirectory(string path)
     {
-        if (!Directory.Exists(path))
-        {
-            return;
-        }
-
-        foreach (var file in Directory.EnumerateFiles(
+        TestRepository.DeleteOwnedTemporaryDirectory(
             path,
-            "*",
-            SearchOption.AllDirectories))
-        {
-            File.SetAttributes(file, FileAttributes.Normal);
-        }
-        Directory.Delete(path, recursive: true);
+            TemporaryRepositoryRootName,
+            "Refusing to remove an unexpected acceptance directory.");
     }
 
 }

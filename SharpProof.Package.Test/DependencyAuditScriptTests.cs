@@ -518,17 +518,6 @@ public sealed class DependencyAuditScriptTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Root))
-            {
-                foreach (var file in Directory.EnumerateFiles(
-                             Root,
-                             "*",
-                             SearchOption.AllDirectories))
-                {
-                    File.SetAttributes(file, FileAttributes.Normal);
-                }
-            }
-
             TestRepository.DeleteOwnedTemporaryDirectory(
                 Root,
                 Path.GetFileName(_expectedParent),

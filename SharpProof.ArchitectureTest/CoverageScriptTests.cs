@@ -8,6 +8,9 @@ namespace SharpProof.ArchitectureTest;
 [Parallelizable(ParallelScope.Children)]
 public sealed class CoverageScriptTests
 {
+    private const string TemporaryRepositoryRootName =
+        "SharpProof.Architecture.Coverage";
+
     private static readonly string[] s_trustedPaths =
     [
         "Project/Trusted.cs"
@@ -720,7 +723,8 @@ public sealed class CoverageScriptTests
         var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-coverage-diff-" + Guid.NewGuid().ToString("N"));
+            TemporaryRepositoryRootName,
+            "diff-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         try
         {
@@ -827,7 +831,8 @@ public sealed class CoverageScriptTests
         var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-coverage-identity-" + Guid.NewGuid().ToString("N"));
+            TemporaryRepositoryRootName,
+            "identity-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         try
         {
@@ -916,7 +921,8 @@ public sealed class CoverageScriptTests
         var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-coverage-unmapped-" + Guid.NewGuid().ToString("N"));
+            TemporaryRepositoryRootName,
+            "unmapped-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         try
         {
@@ -1059,7 +1065,8 @@ public sealed class CoverageScriptTests
     {
         var repository = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-coverage-authority-" + Guid.NewGuid().ToString("N"));
+            TemporaryRepositoryRootName,
+            "authority-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         await InitializeRepositoryAsync(repository);
         await WriteFixtureAsync(TestRepository.FindRoot(), repository);
@@ -1586,19 +1593,10 @@ public sealed class CoverageScriptTests
 
     private static void DeleteTemporaryRepository(string repository)
     {
-        if (!Directory.Exists(repository))
-        {
-            return;
-        }
-
-        foreach (var path in Directory.EnumerateFiles(
+        TestRepository.DeleteOwnedTemporaryDirectory(
             repository,
-            "*",
-            SearchOption.AllDirectories))
-        {
-            File.SetAttributes(path, FileAttributes.Normal);
-        }
-        Directory.Delete(repository, recursive: true);
+            TemporaryRepositoryRootName,
+            "Refusing to remove an unexpected coverage directory.");
     }
 
     private sealed record CoverageEntry(

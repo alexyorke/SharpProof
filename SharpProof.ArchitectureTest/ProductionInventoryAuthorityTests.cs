@@ -6,12 +6,16 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class ProductionInventoryAuthorityTests
 {
+    private const string TemporaryRepositoryRootName =
+        "SharpProof.Architecture.ProductionInventory";
+
     [Test]
     public async Task InventoryBindsParseGeneratorAndGeneratedAuthorities()
     {
         var repository = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-production-inventory-" + Guid.NewGuid().ToString("N"));
+            TemporaryRepositoryRootName,
+            "inventory-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         try
         {
@@ -99,7 +103,8 @@ public sealed class ProductionInventoryAuthorityTests
     {
         var repository = Path.Combine(
             Path.GetTempPath(),
-            "sharpproof-production-inventory-analyzer-" +
+            TemporaryRepositoryRootName,
+            "analyzer-" +
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         try
@@ -304,19 +309,10 @@ public sealed class ProductionInventoryAuthorityTests
 
     private static void DeleteTemporaryRepository(string repository)
     {
-        if (!Directory.Exists(repository))
-        {
-            return;
-        }
-
-        foreach (var path in Directory.EnumerateFiles(
+        TestRepository.DeleteOwnedTemporaryDirectory(
             repository,
-            "*",
-            SearchOption.AllDirectories))
-        {
-            File.SetAttributes(path, FileAttributes.Normal);
-        }
-        Directory.Delete(repository, recursive: true);
+            TemporaryRepositoryRootName,
+            "Refusing to remove an unexpected production-inventory directory.");
     }
 
 }

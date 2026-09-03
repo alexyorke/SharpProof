@@ -77,6 +77,14 @@ internal static class TestRepository
 
         if (Directory.Exists(resolved))
         {
+            foreach (var file in Directory.EnumerateFiles(
+                         resolved,
+                         "*",
+                         SearchOption.AllDirectories))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+            }
+
             Directory.Delete(resolved, recursive: true);
         }
     }

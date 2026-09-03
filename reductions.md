@@ -18874,3 +18874,13 @@ passes (1/1).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1660 | The compiler-artifact and protocol schema suites duplicate declaration dispatch and reflection/default/property validation; consolidate shared validator machinery to prevent drift. | `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:39-79,465-834`; `SharpProof.Worker.Test/ProtocolModelSchemaTests.cs:47-78,318-556`; shared low-level helper at `SharpProof.Worker.Test/SchemaModelTestHelpers.cs:11-132` |
+
+R1507 is applied: the shared temporary-directory helper now clears read-only
+file attributes before its guarded recursive deletion, and the architecture
+coverage, production-inventory, and acceptance fixtures now use it under
+explicit temporary parents. The affected cleanup paths are covered by
+`CoverageScriptTests` (33/33), the three non-ratchet production-inventory tests
+(3/3), and `DependencyAuditScriptTests` (14/14). The full production-inventory
+class still has its pre-existing complexity-ratchet failure
+(`members 5970/5808`), and the acceptance class still has its pre-existing
+`$activeTimingStopwatch` failures (11/15 passed).
