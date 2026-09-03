@@ -15883,6 +15883,13 @@ Test-SharpProofReadme calls Get-EnumMembers for ten protocol enum names while va
 |---|---|---|
 | R1322 | **Test-SharpProofReadme.Get-EnumMembers rescans and reparses the full generated protocol source once per enum. Build the enum-member map in one source pass or cache each content/name result, preserving exact member-order comparison and unknown-reason coverage.** | scripts/Test-SharpProofReadme.ps1:300-321,693-716 |
 
+### Status (continued)
+
+R1322 is applied: the generated protocol source is parsed once into an ordinal
+enum-member map, preserving member order and missing-enum diagnostics. The
+README drift matrix passes all 20 mutation cases; the pre-existing clean fixture
+still fails because README.md lacks SP0047/SP0048.
+
 ## Second survey, continued: R1323 - corpus snapshot validation performs two full passes
 
 ValidateCanonicalData first calls Any(!IsCanonicalData) over every data line; once all lines pass it calls IsCanonicalOrder, which sorts a second full copy and compares it with the original. The input is immutable for this validation and canonical order is ordinal non-decreasing, so a single loop can parse/check each line once while comparing each line to its predecessor, preserving the current invalid-data exception and order semantics without the second enumeration/sort allocation.
