@@ -16686,3 +16686,19 @@ R1373 is applied: `container-verifier` now publishes the package-consumer
 evidence and receipt, and tag qualification downloads them instead of rerunning
 the same exact-package consumer command. The focused release qualification and
 baseline architecture tests pass (16 passed).
+
+## Second survey, continued: R1380 - IrOperatorCatalogTests repeats the exhaustive operator-metadata harness
+
+IrOperatorCatalogTests.UnaryMetadataIsExactAndExhaustive and BinaryMetadataIsExactAndExhaustive use separate test bodies that both assert the enum values equal the expected dictionary keys, assert numeric keys are unique, loop through every row to compare its numeric value and IrOperatorCatalog.Get result, and assert that an out-of-range enum throws. The expected dictionaries and tuple shapes legitimately differ, but a generic local helper taking the enum type, key/value projections, metadata getter, and invalid-value factory can own this harness; keep the unary/binary expected tables and exact exception cases visible at the call sites.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1380 | The unary and binary exhaustive tests duplicate the enum/key coverage, numeric-key, per-row metadata, and invalid-enum assertion envelope; share that harness while retaining their distinct expected tables. | SharpProof.Ir.Test/IrOperatorCatalogTests.cs:68-100,103-164 |
+
+## Second survey, continued: R1381 - CSharpScalarOperatorSemanticsTests repeats supported-operator key projection checks
+
+BinaryMappingsAndArithmeticCategoriesAreExhaustive and UnaryMappingsAndCheckedPoliciesAreExhaustive each enumerate the generated supported-operator collection twice through the same Select(static semantics => semantics.Kind) projection - first for Is.Unique and then for Is.EquivalentTo(...). Materializing the projected kinds once per test, or sharing a small catalog-key assertion helper, removes the redundant enumeration while preserving the separate binary/unary expectation tables and their different per-kind semantic assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1381 | The binary and unary catalog tests repeat the same supported-kind projection solely for two assertions; cache that projection within each test or centralize the key assertion. | SharpProof.Frontend.Test/CSharpScalarOperatorSemanticsTests.cs:45-55,229-239 |
