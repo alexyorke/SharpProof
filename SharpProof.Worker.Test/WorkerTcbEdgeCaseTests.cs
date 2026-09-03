@@ -378,8 +378,10 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
-    [Test]
-    public async Task SemanticPreconditionContradictionIsExplicitVacuityEvidence()
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task SemanticPreconditionContradictionIsExplicitVacuityEvidence(
+        bool hasBody)
     {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
@@ -398,41 +400,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 Ensures(factory.Boolean(false))
             ],
             [Parameter(value)],
-            CompilerPreparedBody.Trivial());
-
-        var result = await VerifyWithSmtAsync(target);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                result.Vacuity,
-                Is.EqualTo(
-                    WorkerVacuityKind.ContradictoryPreconditions));
-        }
-    }
-
-    [Test]
-    public async Task SemanticPreconditionContradictionShortCircuitsUnsupportedBody()
-    {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.IntegerType);
-        var variable = factory.Variable(value);
-        var target = CreateTarget(
-            factory,
-            [
-                Requires(factory.Binary(
-                    IrBinaryOperator.GreaterThan,
-                    variable,
-                    factory.Integer(0))),
-                Requires(factory.Binary(
-                    IrBinaryOperator.LessThan,
-                    variable,
-                    factory.Integer(0))),
-                Ensures(factory.Boolean(false))
-            ],
-            [Parameter(value)],
-            body: null);
+            hasBody ? CompilerPreparedBody.Trivial() : null);
 
         var result = await VerifyWithSmtAsync(target);
 
@@ -517,8 +485,11 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
-    [Test]
-    public async Task SatisfiablePreconditionProducesOrdinaryProof()
+    [TestCase(true, WorkerClaimOutcome.Proven)]
+    [TestCase(false, WorkerClaimOutcome.Refuted)]
+    public async Task SatisfiablePreconditionPreservesPostconditionVerdict(
+        bool postcondition,
+        WorkerClaimOutcome expectedOutcome)
     {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
@@ -529,7 +500,7 @@ public sealed class WorkerTcbEdgeCaseTests
                     IrBinaryOperator.GreaterThan,
                     factory.Variable(value),
                     factory.Integer(0))),
-                Ensures(factory.Boolean(true))
+                Ensures(factory.Boolean(postcondition))
             ],
             [Parameter(value)],
             CompilerPreparedBody.Trivial());
@@ -538,33 +509,7 @@ public sealed class WorkerTcbEdgeCaseTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
-        }
-    }
-
-    [Test]
-    public async Task SatisfiablePreconditionDoesNotHideFalsePostcondition()
-    {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.IntegerType);
-        var target = CreateTarget(
-            factory,
-            [
-                Requires(factory.Binary(
-                    IrBinaryOperator.GreaterThan,
-                    factory.Variable(value),
-                    factory.Integer(0))),
-                Ensures(factory.Boolean(false))
-            ],
-            [Parameter(value)],
-            CompilerPreparedBody.Trivial());
-
-        var result = await VerifyWithSmtAsync(target);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(result.Outcome, Is.EqualTo(expectedOutcome));
             Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
         }
     }
@@ -608,35 +553,25 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
-    [Test]
-    public async Task NonliteralUnreachableNormalCompletionIsExplicitVacuityEvidence()
+    [TestCase(IrBinaryOperator.Equal, false, false, WorkerVacuityKind.NoModeledNormalReturn)]
+    [TestCase(IrBinaryOperator.NotEqual, true, false, WorkerVacuityKind.None)]
+    [TestCase(IrBinaryOperator.Equal, false, true, WorkerVacuityKind.NoModeledNormalReturn)]
+    public async Task NormalCompletionVacuityMatchesModeledPath(
+        IrBinaryOperator completionOperator,
+        bool postcondition,
+        bool assumeCompletion,
+        WorkerVacuityKind expectedVacuity)
     {
         var result = await VerifyWithSmtAsync(
             CreateDivisionTarget(
-                IrBinaryOperator.Equal,
-                postcondition: false));
+                completionOperator,
+                postcondition,
+                assumeCompletion));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                result.Vacuity,
-                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
-        }
-    }
-
-    [Test]
-    public async Task NonliteralReachableNormalCompletionIsNotVacuous()
-    {
-        var result = await VerifyWithSmtAsync(
-            CreateDivisionTarget(
-                IrBinaryOperator.NotEqual,
-                postcondition: true));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(result.Vacuity, Is.EqualTo(expectedVacuity));
         }
     }
 
@@ -665,23 +600,6 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
-    [Test]
-    public async Task UserAssumeCannotSupplyNormalCompletionEvidence()
-    {
-        var result = await VerifyWithSmtAsync(
-            CreateDivisionTarget(
-                IrBinaryOperator.Equal,
-                postcondition: false,
-                assumeCompletion: true));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                result.Vacuity,
-                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
-        }
-    }
 
     [Test]
     public void UnknownCompilerClauseKindIsRejectedExhaustively()
