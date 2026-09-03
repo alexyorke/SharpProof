@@ -191,19 +191,30 @@ internal sealed class OperationCompletionEvaluator
         IPatternOperation pattern,
         bool inputDefinitelyNonNull = false)
     {
+        return GetPatternCompletionFacts(
+            pattern,
+            inputDefinitelyNonNull).CanComplete;
+    }
+
+    private PatternCompletionFacts GetPatternCompletionFacts(
+        IPatternOperation pattern,
+        bool inputDefinitelyNonNull)
+    {
         if (pattern is INegatedPatternOperation negated)
         {
-            return CanCompletePatternEvaluation(
-                negated.Pattern,
-                inputDefinitelyNonNull);
+            return new(
+                GetPatternCompletionFacts(
+                    negated.Pattern,
+                    inputDefinitelyNonNull).CanComplete,
+                false);
         }
         if (pattern is IBinaryPatternOperation binary)
         {
-            if (!CanCompletePatternEvaluation(
+            if (!GetPatternCompletionFacts(
                     binary.LeftPattern,
-                    inputDefinitelyNonNull))
+                    inputDefinitelyNonNull).CanComplete)
             {
-                return false;
+                return new(false, false);
             }
             var leftSelection =
                 SwitchExpressionFacts.GetPatternSelectionForUnknownValue(
@@ -215,16 +226,22 @@ internal sealed class OperationCompletionEvaluator
                 leftSelection == SwitchExpressionSelection.Always ||
                 binary.OperatorKind == BinaryOperatorKind.Or &&
                 leftSelection == SwitchExpressionSelection.Never;
-            return !rightIsRequired || CanCompletePatternEvaluation(
-                binary.RightPattern,
-                inputDefinitelyNonNull);
+            return new(
+                !rightIsRequired || GetPatternCompletionFacts(
+                    binary.RightPattern,
+                    inputDefinitelyNonNull).CanComplete,
+                false);
         }
-        if (pattern is IListPatternOperation listPattern &&
-            !CanCompleteListPattern(
-                listPattern,
-                inputDefinitelyNonNull))
+        if (pattern is IListPatternOperation listPattern)
         {
-            return false;
+            var listCanComplete = CanCompleteListPattern(
+                listPattern,
+                inputDefinitelyNonNull);
+            return new(
+                listCanComplete,
+                SwitchExpressionFacts.IsTotalPattern(
+                    pattern,
+                    pattern.InputType));
         }
         if (pattern is not IRecursivePatternOperation recursive ||
             pattern.InputType?.IsValueType != true &&
@@ -233,49 +250,86 @@ internal sealed class OperationCompletionEvaluator
                 pattern.InputType,
                 recursive.MatchedType))
         {
-            return true;
+            return new(
+                true,
+                SwitchExpressionFacts.IsTotalPattern(
+                    pattern,
+                    pattern.InputType));
         }
         if (recursive.DeconstructSymbol is IMethodSymbol deconstruct &&
             !CanMethodCompleteNormally(deconstruct))
         {
-            return false;
+            return new(
+                false,
+                SwitchExpressionFacts.IsTotalPattern(
+                    pattern,
+                    pattern.InputType));
         }
+
+        var isTotal = pattern.InputType?.IsValueType == true &&
+            SymbolEqualityComparer.Default.Equals(
+                recursive.MatchedType,
+                pattern.InputType);
+        var canComplete = true;
         foreach (var subpattern in recursive.DeconstructionSubpatterns)
         {
-            var canComplete = CanCompletePatternEvaluation(subpattern);
-            var isTotal = SwitchExpressionFacts.IsTotalPattern(
-                subpattern,
-                subpattern.InputType);
-            if (!canComplete && isTotal)
+            if (!canComplete)
             {
-                return false;
+                isTotal &= SwitchExpressionFacts.IsTotalPattern(
+                    subpattern,
+                    subpattern.InputType);
+                continue;
             }
-            if (!isTotal)
+
+            var facts = GetPatternCompletionFacts(subpattern, false);
+            if (!facts.CanComplete)
             {
-                return true;
+                canComplete = false;
             }
+            if (!facts.IsTotal)
+            {
+                return new(true, false);
+            }
+            isTotal &= facts.IsTotal;
         }
         foreach (var subpattern in recursive.PropertySubpatterns)
         {
+            if (!canComplete)
+            {
+                isTotal &= SwitchExpressionFacts.IsTotalPattern(
+                    subpattern.Pattern,
+                    subpattern.Pattern.InputType);
+                continue;
+            }
+
             if (!CanCompleteNormally(subpattern.Member))
             {
-                return false;
+                return new(
+                    false,
+                    SwitchExpressionFacts.IsTotalPattern(
+                        pattern,
+                        pattern.InputType));
             }
-            var canComplete = CanCompletePatternEvaluation(subpattern.Pattern);
-            var isTotal = SwitchExpressionFacts.IsTotalPattern(
+
+            var facts = GetPatternCompletionFacts(
                 subpattern.Pattern,
-                subpattern.Pattern.InputType);
-            if (!canComplete && isTotal)
+                false);
+            if (!facts.CanComplete)
             {
-                return false;
+                canComplete = false;
             }
-            if (!isTotal)
+            if (!facts.IsTotal)
             {
-                return true;
+                return new(true, false);
             }
+            isTotal &= facts.IsTotal;
         }
-        return true;
+        return new(canComplete, isTotal);
     }
+
+    private readonly record struct PatternCompletionFacts(
+        bool CanComplete,
+        bool IsTotal);
 
     private bool IsGuaranteedRecursivePatternTypeMatch(
         ITypeSymbol? inputType,
