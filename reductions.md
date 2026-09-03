@@ -11900,3 +11900,15 @@ R1117 is deferred: extract only the common parallel-process start/capture/cleanu
 ### Status (part three hundred forty-nine)
 
 R1118 is deferred: extract the common operator/key uniqueness, coverage, and ordinal validator, retaining separate unary/binary row parsing and error context.
+
+## Second survey, part three hundred fifty: R1119 - repeated required-property lookup in API-spec generation
+
+`Generate-ApiSpecCatalog.ps1` has `Get-RequiredArrayProperty`, which repeats `Get-RequiredProperty`'s `PSObject.Properties[$Name]` lookup, null check, and missing-property error before adding its array-type check. The array helper can call the required-property helper, then validate the returned value as an array; its context-specific type error and all optional-property behavior remain unchanged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1119 | **The API-spec generator repeats the required JSON-property lookup inside its array-specific accessor.** `Get-RequiredArrayProperty` duplicates the required accessor's presence check before performing its only additional responsibility, array validation. Delegating the lookup to `Get-RequiredProperty` removes one local authority and preserves the array-specific diagnostic. | `scripts/Generate-ApiSpecCatalog.ps1:101-118,136-157` |
+
+### Status (part three hundred fifty)
+
+R1119 is deferred: have `Get-RequiredArrayProperty` reuse `Get-RequiredProperty`, retaining its array-kind validation and context-specific failure text.
