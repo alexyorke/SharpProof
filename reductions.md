@@ -10243,3 +10243,43 @@ changed-test invocation silently keeps the old deadline.
 R991 is `deferred`: centralize the direct-run fallback or explicitly declare
 that it is intentionally independent of `automation.solutionTestWallSeconds`;
 preserve the caller override and the narrower command-specific deadlines.
+
+## Second survey, part two hundred twenty-three: R992 - repeated response canonicalization at output boundaries
+
+The response assembler and the protocol serializer both claim the same
+canonicalization boundary. `WorkerResultAssembler.Create` builds the complete
+response, computes its summary, and then calls `WorkerProtocolJson.Canonicalize`
+before returning it. The worker process's `Respond` closure immediately passes
+that response to `WriteResponseAtomicAsync`, whose only operation is
+`WorkerProtocolJson.SerializeResponse`; the serializer canonicalizes the
+response again before JSON serialization. The same sequence exists on launcher
+failure and timeout-promotion paths through `CreateIncomplete`, and the normal
+launcher path canonicalizes the response in `ValidateAndReport` before
+`PublishOutputs` serializes it. When a SARIF file is requested,
+`SarifProjection.Serialize` canonicalizes the already validated response and
+`PublishOutputs` then calls `SerializeResponse`, adding a second canonicalizing
+pass in that branch.
+
+The repeated work is not just a harmless method call: canonicalization sorts
+callable results, claim results, proof-core/model arrays, assumptions, effect
+witness hierarchies, summary dictionaries, and errors, allocating replacement
+arrays along the way. The defensive behavior is legitimate at public or
+standalone boundaries: `SerializeResponse` is called directly by tests and
+other production helpers, and `SarifProjection.Serialize` is tested as an
+independent projection. The reduction is therefore to expose an internal
+already-canonical serializer, or to carry an explicit canonical-response
+capability through the worker/launcher output helpers, while retaining the
+current public serializer's canonicalization for arbitrary callers. Removing
+the assembler's canonicalization outright would be unsafe because assembled
+responses are also consumed in memory and passed through cache/projection code;
+the seam is the internal write path, not the response contract itself.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R992 | **Production response writers repeatedly canonicalize responses that their producers have already canonicalized.** `WorkerResultAssembler.Create` canonicalizes every assembled response; `SharpProof.Worker.Program.Respond` then routes it through `SerializeResponse`, which canonicalizes again. Launcher failure and timeout-promotion responses follow the same assembler-to-serializer path, while the normal launcher result is canonicalized by `ValidateAndReport` before `PublishOutputs` serializes it. With SARIF enabled, `SarifProjection.Serialize` canonicalizes the same response before the result serializer performs another pass. Keep canonicalization at the public/standalone serializer and SARIF boundaries, but add an internal already-canonical write path or explicit capability so internal output does not repeat sorting and replacement-array allocation. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:8-40,60-109`; `SharpProof.Worker/Program.cs:45-48,184-187`; `SharpProof.Worker.Launcher/Program.cs:443-446,587-596,817-832,879-895`; `SharpProof.Worker.Launcher/SarifProjection.cs:11-19`; `SharpProof.Worker.Protocol/ProtocolJson.cs:134-137` |
+
+### Status (part two hundred twenty-three)
+
+R992 is `deferred`: retain defensive canonicalization for public and
+standalone serializers, but give trusted internal output paths an explicit
+already-canonical contract.
