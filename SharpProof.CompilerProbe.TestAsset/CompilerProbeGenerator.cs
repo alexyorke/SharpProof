@@ -47,9 +47,15 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
             return;
         }
 
-        var input = inputs
-            .OrderBy(static value => value.Path, StringComparer.Ordinal)
-            .First();
+        var input = inputs[0];
+        for (var index = 1; index < inputs.Length; index++)
+        {
+            var candidate = inputs[index];
+            if (StringComparer.Ordinal.Compare(candidate.Path, input.Path) < 0)
+            {
+                input = candidate;
+            }
+        }
         var fingerprint = ProbeHash.Text(
             globalValue + "\0" + input.Metadata + "\0" + input.Text);
         context.AddSource(
