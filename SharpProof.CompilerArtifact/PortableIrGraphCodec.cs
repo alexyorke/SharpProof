@@ -403,8 +403,28 @@ internal static partial class PortableIrGraphCodec
                 VariableIndex(variable);
             }
 
-            _blocks = _program == null ? [] :
-                [.. _program.Blocks.OrderBy(static block => block.Id.Value)];
+            if (_program == null)
+            {
+                _blocks = [];
+            }
+            else
+            {
+                var programBlocks = _program.Blocks;
+                var builderOrder = true;
+                for (var index = 0; index < programBlocks.Length; index++)
+                {
+                    if (programBlocks[index].Id.Value != index)
+                    {
+                        builderOrder = false;
+                        break;
+                    }
+                }
+
+                _blocks = builderOrder
+                    ? [.. programBlocks]
+                    : [.. programBlocks.OrderBy(
+                        static block => block.Id.Value)];
+            }
             _blockIndices = Dense(_blocks.Select(static block => block.Id));
             _instructionIndices = Dense(_blocks
                 .SelectMany(static block => block.Instructions)
