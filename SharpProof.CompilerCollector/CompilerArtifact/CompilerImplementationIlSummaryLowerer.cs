@@ -1170,11 +1170,6 @@ internal static class CompilerImplementationIlSummaryLowerer
                 ILOpCode.Rem => IrBinaryOperator.Remainder,
                 _ => (IrBinaryOperator)(-1)
             };
-            if (!Enum.IsDefined(typeof(IrBinaryOperator), @operator))
-            {
-                return false;
-            }
-
             var raw = _factory.Binary(
                 @operator,
                 left.Term,
@@ -1359,8 +1354,7 @@ internal static class CompilerImplementationIlSummaryLowerer
                 ILOpCode.Ble => IrBinaryOperator.LessThanOrEqual,
                 _ => (IrBinaryOperator)(-1)
             };
-            if (!Enum.IsDefined(typeof(IrBinaryOperator), @operator) ||
-                left.Term.Type == _factory.BooleanType &&
+            if (left.Term.Type == _factory.BooleanType &&
                 @operator is not (
                     IrBinaryOperator.Equal or
                     IrBinaryOperator.NotEqual))
