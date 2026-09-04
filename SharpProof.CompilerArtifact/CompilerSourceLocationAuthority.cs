@@ -237,23 +237,22 @@ internal static class CompilerSourceLocationAuthority
             };
         }
 
-        var ordinal = FindUniqueTree(location, compilation);
-        if (ordinal < 0)
-        {
-            throw new InvalidDataException(
-                "A compiler source location is not bound to one physical tree.");
-        }
-
-        var tree = compilation.SyntaxTrees[ordinal]!;
+        Bind(
+            location,
+            compilation,
+            out var sourceTreeOrdinal,
+            out var sourceTreePath,
+            out var sourceTreeSha256,
+            out var sourceLineMapSha256);
         return new CompilerLocationAuthorityArtifact
         {
             OwnerKind = ownerKind,
             OwnerId = ownerId,
             Location = CopyLocation(location),
-            SourceTreeOrdinal = ordinal,
-            SourceTreePath = tree.Path,
-            SourceTreeSha256 = tree.Sha256,
-            SourceLineMapSha256 = tree.LineMapSha256
+            SourceTreeOrdinal = sourceTreeOrdinal,
+            SourceTreePath = sourceTreePath,
+            SourceTreeSha256 = sourceTreeSha256,
+            SourceLineMapSha256 = sourceLineMapSha256
         };
     }
 
