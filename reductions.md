@@ -21364,3 +21364,11 @@ EffectDirectEventKinds.FromWireName and ToWireName each linearly scan the same g
 | ID | Finding | Evidence |
 |---|---|---|
 | R2018 | EffectDirectEventKinds.FromWireName and ToWireName duplicate inverse linear scans of the same generated WireNames table; generate or share the two lookup projections while retaining ordinal matching and fail-closed invalid-input behavior. | SharpProof.Effects/EffectValues.cs:68-102; SharpProof.Effects/EffectContractMappings.catalog.json:183-191 |
+
+## Second survey, continued: R2019 - Assert-SharpProofStandaloneGateResult duplicates recursive JSON property uniqueness validation
+
+Assert-SharpProofStandaloneGateResult.ps1 defines Assert-UniqueJsonElementProperties, which recursively descends arrays and objects, tracks each object's names in an ordinal HashSet, throws on duplicate keys, and visits every property value. GeneratedFileHelpers.ps1 defines Assert-UniqueJsonProperties with the same recursion, collection type, comparison, exception shape, and array/object admission; the two differ only in the helper/parameter names and formatting. The standalone validator is intentionally self-contained and should not import the generator helper blindly because that file also loads generator-oriented CSharpSourceMetrics, but a small dependency-neutral JSON validation helper or a narrowly shared implementation can remove the duplicate while retaining the standalone script's strict UTF-8/document checks and the generator helper's schema-specific callers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2019 | Assert-SharpProofStandaloneGateResult and GeneratedFileHelpers repeat the same recursive ordinal JSON duplicate-property walk; extract a dependency-neutral helper while retaining the standalone validator's lightweight boundary. | scripts/Assert-SharpProofStandaloneGateResult.ps1:3-28,71-72; scripts/GeneratedFileHelpers.ps1:59-92 |
