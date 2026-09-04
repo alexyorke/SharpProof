@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Frontend;
 
 internal enum OperationSupportStage
@@ -12,11 +14,28 @@ internal enum OperationSupportStage
 /// </summary>
 internal static class OperationSupportCatalog
 {
+    private static readonly ImmutableHashSet<OperationKind>
+        ContractExpression = ImmutableHashSet.CreateRange(
+            OperationSupportCatalogData.ContractExpression);
+    private static readonly ImmutableHashSet<OperationKind>
+        EffectDiscovery = ImmutableHashSet.CreateRange(
+            OperationSupportCatalogData.EffectDiscovery);
+
     internal static bool IsSupported(
         OperationSupportStage stage,
         OperationKind kind)
     {
-        return OperationSupportProjections.GetSupported(stage).Contains(kind);
+        return stage switch
+        {
+            OperationSupportStage.ContractExpressionLowering =>
+                ContractExpression.Contains(kind),
+            OperationSupportStage.EffectDiscovery =>
+                EffectDiscovery.Contains(kind),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(stage),
+                stage,
+                "Unknown operation support stage.")
+        };
     }
 
 }
