@@ -22461,6 +22461,11 @@ R2249 is applied: `TryGetMethodDefinition` now caches the validated metadata
 row number before checking the method-definition count. The focused compiler
 relational-summary tests pass 3/3.
 
+R2237 is applied: invocation argument lowering now carries its `ref`/`out`
+variable projection alongside the lowered arguments, removing the later
+rescan while retaining directness, closure, and havoc policies. The full
+Frontend.Test suite passes 121/121.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

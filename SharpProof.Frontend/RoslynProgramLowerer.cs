@@ -389,6 +389,7 @@ public sealed class RoslynProgramLowerer(
                 operation,
                 invocation);
             var arguments = loweredArguments.Arguments;
+            var mutated = loweredArguments.Mutated;
             var resultType = _expressions.GetTypeId(invocation.Type);
             var hasSupportedResult = invocation.TargetMethod.ReturnsVoid ||
                 CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type);
@@ -409,15 +410,6 @@ public sealed class RoslynProgramLowerer(
             var call = _builder.Call(block, operation, target, member, receiver, arguments);
             _calls.Add(call, invocation);
 
-            var mutated = invocation.Arguments
-                .Where(static argument => argument.Parameter?.RefKind is
-                    RefKind.Ref or RefKind.Out)
-                .Select(argument => _expressions.GetReferencedVariable(argument.Value))
-                .Where(static variable => variable.HasValue)
-                .Select(static variable => variable!.Value)
-                .Distinct()
-                .OrderBy(static variable => variable.Value)
-                .ToArray();
             if (mutated.Length != 0 || !isDirect ||
                 !IsStaticallyBound(invocation.TargetMethod) ||
                 !_isKnownPure(invocation.TargetMethod))
@@ -447,7 +439,8 @@ public sealed class RoslynProgramLowerer(
             return null;
         }
 
-        private (IrTerm[] Arguments, bool IsDirect) LowerInvocationArguments(
+        private (IrTerm[] Arguments, bool IsDirect, IrVarId[] Mutated)
+            LowerInvocationArguments(
             IrBlockId block,
             OperationId operation,
             IInvocationOperation invocation)
@@ -456,6 +449,7 @@ public sealed class RoslynProgramLowerer(
                 invocation.Arguments.Length ==
                 invocation.TargetMethod.Parameters.Length;
             var ordinals = isDirect ? new HashSet<int>() : null;
+            var mutated = new HashSet<IrVarId>();
             var lowered = new List<(
                 int Ordinal, IrTerm Value)>(invocation.Arguments.Length);
             foreach (var argument in invocation.Arguments)
@@ -463,6 +457,11 @@ public sealed class RoslynProgramLowerer(
                 var ordinal = argument.Parameter?.Ordinal ?? -1;
                 var value = LowerValue(block, operation, argument.Value);
                 lowered.Add((argument.Parameter?.Ordinal ?? int.MaxValue, value));
+                if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
+                    _expressions.GetReferencedVariable(argument.Value) is { } variable)
+                {
+                    mutated.Add(variable);
+                }
                 if (isDirect &&
                     (argument.ArgumentKind != ArgumentKind.Explicit ||
                      ordinal < 0 ||
@@ -481,7 +480,9 @@ public sealed class RoslynProgramLowerer(
 
             return ([.. lowered
                 .OrderBy(static argument => argument.Ordinal)
-                .Select(static argument => argument.Value)], isDirect);
+                .Select(static argument => argument.Value)],
+                isDirect,
+                [.. mutated.OrderBy(static variable => variable.Value)]);
         }
 
         private LocationLowering LowerLocation(
