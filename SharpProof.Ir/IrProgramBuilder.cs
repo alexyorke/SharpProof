@@ -181,7 +181,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private void ValidateInstruction(IrInstruction instruction)
     {
-        ValidateOperation(instruction.Operation);
+        _factory.GetOperationInfo(instruction.Operation);
         switch (instruction)
         {
             case IrAssignInstruction value:
@@ -316,11 +316,6 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
         _factory.EnsureTerm(term, parameterName);
         return term.Type;
-    }
-
-    private void ValidateOperation(OperationId operation)
-    {
-        _factory.GetOperationInfo(operation);
     }
 
     private static void RequireSameType(

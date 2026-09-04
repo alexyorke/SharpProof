@@ -22419,6 +22419,10 @@ R2246 is applied: `VerificationCache.IsCacheable` now uses an internal
 precheck, avoiding a second shape scan while preserving full response validation.
 The WorkerTests cache/worker suite passes 148/148.
 
+R2321 is applied: `IrProgramBuilder.ValidateInstruction` now calls the factory's
+operation validation directly; its private single-use pass-through is removed.
+The affected IR program and schema tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
