@@ -120,6 +120,8 @@ public static class ForwardDataflowAnalysis
         inputs[graph.EntryBlockId] = initialState;
 
         var pending = FindReachableBlocks(graph);
+        var changedOutputs = new List<int>();
+        var affected = new SortedSet<int>();
         var iterations = 0;
         while (pending.Count != 0)
         {
@@ -137,7 +139,7 @@ public static class ForwardDataflowAnalysis
                 batch = ValidatePermutation(batch, worklistOrder(batch));
             }
 
-            var changedOutputs = new List<int>();
+            changedOutputs.Clear();
             foreach (var blockId in batch)
             {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
@@ -159,7 +161,7 @@ public static class ForwardDataflowAnalysis
                 continue;
             }
 
-            var affected = new SortedSet<int>();
+            affected.Clear();
             foreach (var blockId in changedOutputs)
             {
                 foreach (var successor in graph.GetSuccessors(blockId))
