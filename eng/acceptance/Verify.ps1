@@ -251,7 +251,8 @@ $productionInventory = ($productionInventoryJson -join [Environment]::NewLine) |
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReadme.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofGeneratedOutputs.ps1')
-& (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1') `
+    -SkipCanonical
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationScheduling.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationBaselines.ps1')

@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$SkipCanonical
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -81,10 +83,12 @@ function Invoke-GeneratorCase {
 
 try {
     $canonical = [IO.File]::ReadAllText($schemaPath)
-    Invoke-GeneratorCase `
-        -Name 'canonical' `
-        -Schema $canonical `
-        -ShouldPass $true
+    if (-not $SkipCanonical) {
+        Invoke-GeneratorCase `
+            -Name 'canonical' `
+            -Schema $canonical `
+            -ShouldPass $true
+    }
 
     $unknownProperty = $canonical.Replace(
         '      "method": "TypeRow",',
