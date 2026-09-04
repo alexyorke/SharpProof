@@ -22428,6 +22428,11 @@ fresh-array facts in one pass over its immutable operation snapshot; local-regio
 construction and both policies remain unchanged. The full Effects.Test suite
 passes 323/323.
 
+R2323 is applied: `IrFactory.GetOrCreateMember` now interns a member name only
+after the structural-key lookup misses, so duplicate requests avoid creating an
+unused string entry while validation and canonical member identity remain
+unchanged. The full Ir.Test suite passes 115/115.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

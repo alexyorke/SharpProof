@@ -225,7 +225,6 @@ public sealed class IrFactory
                 GetTypeInfoCore(parameterType, nameof(parameterTypes));
             }
 
-            var nameId = InternStringCore(name);
             var key = new StructuralKey(
                 default, declaringType.Value, identity.Value, returnType.Value, isStatic ? 1 : 0,
                 children: [.. parameters.Select(static value => value.Value)]);
@@ -234,6 +233,7 @@ public sealed class IrFactory
                 return existing;
             }
 
+            var nameId = InternStringCore(name);
             var id = new IrMemberId(_scope, _members.Count);
             _memberIds.Add(key, id);
             _members.Add(new IrMemberInfo(id, identity, declaringType, nameId, returnType, isStatic, parameters));
