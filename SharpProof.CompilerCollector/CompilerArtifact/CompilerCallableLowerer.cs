@@ -581,6 +581,10 @@ internal sealed class CompilerCallableLowerer
     {
         var canonicalParameters = contracts.Variables.Where(
             static variable => variable.Role == BoundContractVariableRole.Parameter).ToDictionary(static variable => variable.Ordinal);
+        var receiver = !target.Method.IsStatic
+            ? contracts.Variables.FirstOrDefault(
+                static variable => variable.Role == BoundContractVariableRole.Receiver)
+            : null;
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
         foreach (var binding in variables)
         {
@@ -590,17 +594,12 @@ internal sealed class CompilerCallableLowerer
             }
 
             if (binding.Symbol is ITypeSymbol instanceType &&
-                !target.Method.IsStatic &&
+                receiver != null &&
                 SymbolEqualityComparer.Default.Equals(
                     instanceType, target.Method.ContainingType))
             {
-                var receiver = contracts.Variables.FirstOrDefault(
-                    static variable => variable.Role == BoundContractVariableRole.Receiver);
-                if (receiver != null)
-                {
-                    bindings.Add(binding.Variable, receiver.Variable);
-                    continue;
-                }
+                bindings.Add(binding.Variable, receiver.Variable);
+                continue;
             }
 
             if (binding.Symbol is not IParameterSymbol parameter ||
