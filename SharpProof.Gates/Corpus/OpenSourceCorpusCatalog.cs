@@ -123,7 +123,7 @@ internal static class OpenSourceCorpusCatalog
                 "The OSS corpus must contain its pinned upstream source files.");
         }
 
-        ValidateSourceIds(document.Sources);
+        var sourceIds = ValidateSourceIds(document.Sources);
 
         if (document.Methods.Length is < MinimumMethodCount or > MaximumMethodCount)
         {
@@ -132,9 +132,6 @@ internal static class OpenSourceCorpusCatalog
                 $"{MinimumMethodCount}-{MaximumMethodCount} are required.");
         }
 
-        var sources = document.Sources.ToImmutableDictionary(
-            static source => source.Id,
-            StringComparer.Ordinal);
         foreach (var source in document.Sources)
         {
             ValidateSource(source, corpusDirectory);
@@ -146,7 +143,7 @@ internal static class OpenSourceCorpusCatalog
             StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
-            if (!sources.ContainsKey(file.SourceId))
+            if (!sourceIds.Contains(file.SourceId))
             {
                 throw new InvalidDataException(
                     $"OSS corpus file {file.Path} refers to unknown source " +
@@ -273,7 +270,7 @@ internal static class OpenSourceCorpusCatalog
         }
     }
 
-    internal static void ValidateSourceIds(
+    internal static HashSet<string> ValidateSourceIds(
         IEnumerable<OpenSourceCorpusSource> sources)
     {
         var sourceIds = new HashSet<string>(StringComparer.Ordinal);
@@ -291,6 +288,8 @@ internal static class OpenSourceCorpusCatalog
                     $"Duplicate OSS corpus source ID: {source.Id}.");
             }
         }
+
+        return sourceIds;
     }
 
     internal static ImmutableDictionary<
