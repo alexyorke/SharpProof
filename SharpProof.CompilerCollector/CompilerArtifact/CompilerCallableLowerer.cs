@@ -485,7 +485,22 @@ internal sealed class CompilerCallableLowerer
         out Microsoft.CodeAnalysis.FlowAnalysis.BasicBlock? entry,
         out int firstOperation)
     {
-        foreach (var block in graph.Blocks.OrderBy(static block => block.Ordinal))
+        var blocks = graph.Blocks;
+        var ordinalOrder = true;
+        for (var index = 0; index < blocks.Length; index++)
+        {
+            if (blocks[index].Ordinal != index)
+            {
+                ordinalOrder = false;
+                break;
+            }
+        }
+
+        IEnumerable<Microsoft.CodeAnalysis.FlowAnalysis.BasicBlock> orderedBlocks =
+            ordinalOrder
+                ? blocks
+                : blocks.OrderBy(static block => block.Ordinal);
+        foreach (var block in orderedBlocks)
         {
             if (!block.IsReachable)
             {

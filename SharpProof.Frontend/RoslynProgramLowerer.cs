@@ -786,9 +786,23 @@ public sealed class RoslynProgramLowerer(
                     pending.Push(conditional);
                 }
             }
-            var selected = new List<BasicBlock>();
+            var blocks = _graph.Blocks;
+            var ordinalOrder = true;
+            for (var index = 0; index < blocks.Length; index++)
+            {
+                if (blocks[index].Ordinal != index)
+                {
+                    ordinalOrder = false;
+                    break;
+                }
+            }
+
+            IEnumerable<BasicBlock> orderedBlocks = ordinalOrder
+                ? blocks
+                : blocks.OrderBy(static block => block.Ordinal);
+            var selected = new List<BasicBlock> { _entry };
             BasicBlock? omittedHandler = null;
-            foreach (var block in _graph.Blocks)
+            foreach (var block in orderedBlocks)
             {
                 if (block != _entry && reachable.Contains(block))
                 {
@@ -804,9 +818,6 @@ public sealed class RoslynProgramLowerer(
                 }
             }
 
-            selected.Sort(static (left, right) =>
-                left.Ordinal.CompareTo(right.Ordinal));
-            selected.Insert(0, _entry);
             return ([.. selected], omittedHandler);
         }
 
