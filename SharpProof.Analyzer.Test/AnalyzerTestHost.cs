@@ -11,6 +11,17 @@ namespace SharpProof.Analyzer.Test;
 
 internal static class AnalyzerTestHost
 {
+    // SharpProofAnalyzer keeps all compilation state in the analyzer session
+    // created by the engine, so the Roslyn analyzer object itself is safe to
+    // share between independent fixture compilations. Reusing it avoids an
+    // allocation on every test-host invocation without sharing mutable
+    // compilation state.
+    private static readonly SharpProofAnalyzer DefaultAnalyzer = new();
+    private static readonly ImmutableDictionary<string, DiagnosticDescriptor>
+        SupportedDiagnosticMap = DefaultAnalyzer.SupportedDiagnostics
+            .ToImmutableDictionary(
+                static descriptor => descriptor.Id,
+                StringComparer.Ordinal);
     private static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview);
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
@@ -74,9 +85,9 @@ internal static class AnalyzerTestHost
         if (!enabled.IsEmpty)
         {
             options = options.WithSpecificDiagnosticOptions(
-                new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
-                    static descriptor => descriptor.Id,
-                    descriptor => enabled.Contains(descriptor.Id)
+                SupportedDiagnosticMap.ToImmutableDictionary(
+                    static pair => pair.Key,
+                    pair => enabled.Contains(pair.Key)
                         ? ReportDiagnostic.Warn
                         : ReportDiagnostic.Suppress,
                     StringComparer.Ordinal));
@@ -97,9 +108,9 @@ internal static class AnalyzerTestHost
     {
         var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
         var options = compilation.Options.WithSpecificDiagnosticOptions(
-            new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
-                static descriptor => descriptor.Id,
-                descriptor => enabled.Contains(descriptor.Id)
+            SupportedDiagnosticMap.ToImmutableDictionary(
+                static pair => pair.Key,
+                pair => enabled.Contains(pair.Key)
                     ? ReportDiagnostic.Warn
                     : ReportDiagnostic.Suppress,
                 StringComparer.Ordinal));
@@ -188,7 +199,7 @@ internal static class AnalyzerTestHost
             EnsureCompilationHasNoErrors(compilation);
         }
         var withAnalyzers = compilation.WithAnalyzers(
-            [analyzer ?? new SharpProofAnalyzer()],
+            [analyzer ?? DefaultAnalyzer],
             new CompilationWithAnalyzersOptions(
                 analyzerOptions,
                 onAnalyzerException: null,
