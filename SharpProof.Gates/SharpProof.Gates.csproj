@@ -10,6 +10,8 @@
   <ItemGroup>
     <Compile Include="..\scripts\SharpProof.SymbolPackageValidator.cs"
              Link="Release\SharpProof.SymbolPackageValidator.cs" />
+    <Compile Include="..\scripts\SharpProof.JsonDefaults.cs"
+             Link="SharpProof.JsonDefaults.cs" />
     <Reference Include="Microsoft.CodeAnalysis"
                HintPath="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll"
                Private="true" />

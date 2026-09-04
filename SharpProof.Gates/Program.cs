@@ -41,7 +41,7 @@ internal static class Program
                             corpus = corpus.Result,
                             performance = performance.Result
                         },
-                        JsonDefaults.Indented));
+                        SharpProofJsonDefaults.Indented));
                 return corpus.Passed && performance.Passed ? 0 : 1;
             }
             if (command is "corpus" or "performance")
@@ -53,7 +53,7 @@ internal static class Program
                         command,
                         gate.Passed,
                         gate.Result),
-                    JsonDefaults.Indented));
+                    SharpProofJsonDefaults.Indented));
                 return gate.Passed ? 0 : 1;
             }
             if (command == "corpus-print")
@@ -75,7 +75,7 @@ internal static class Program
                 var result = await PerformanceGate.RunSmokeAsync(root)
                     .ConfigureAwait(false);
                 Console.WriteLine(
-                    JsonSerializer.Serialize(result, JsonDefaults.Indented));
+                    JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
             Console.Error.WriteLine(
@@ -155,16 +155,4 @@ internal static class Program
     }
 
     private readonly record struct GateRun(object Result, bool Passed);
-}
-
-internal static class JsonDefaults
-{
-    internal static JsonSerializerOptions Indented
-    {
-        get;
-    } =
-        new()
-        {
-            WriteIndented = true
-        };
 }
