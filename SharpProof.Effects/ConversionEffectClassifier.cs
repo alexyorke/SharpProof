@@ -264,7 +264,8 @@ internal sealed class ConversionEffectClassifier(
         }
 
         var source = preserved.Operand.Type;
-        var target = GetUnderlyingType(operation.Type);
+        var target = CompilerIdentityBridge.GetNullableUnderlyingType(
+            operation.Type) ?? operation.Type;
         if (ManagedAbstractValue.IsNullableType(source))
         {
             if (!ManagedAbstractValue.IsNullableType(operation.Type))
@@ -272,22 +273,11 @@ internal sealed class ConversionEffectClassifier(
                 return false;
             }
 
-            source = GetUnderlyingType(source);
+            source = CompilerIdentityBridge.GetNullableUnderlyingType(source);
         }
 
         return source != null && target != null &&
             SymbolEqualityComparer.Default.Equals(source, target);
-    }
-
-    private static ITypeSymbol? GetUnderlyingType(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol
-        {
-            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
-            TypeArguments.Length: 1
-        } nullable
-            ? nullable.TypeArguments[0]
-            : type;
     }
 
     private EffectSummary ClassifyNullableConversion(

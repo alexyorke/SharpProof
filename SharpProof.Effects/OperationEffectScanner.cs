@@ -1651,13 +1651,8 @@ internal sealed partial class OperationEffectScanner
     private static bool TryGetIntegralDivisionSemantics(
         ITypeSymbol? type, out bool isSigned, out bool hasMinimum, out long minimum)
     {
-        var specialType = type is INamedTypeSymbol
-        {
-            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
-            TypeArguments.Length: 1
-        } nullable
-            ? nullable.TypeArguments[0].SpecialType
-            : type?.SpecialType ?? SpecialType.None;
+        var specialType = (CompilerIdentityBridge.GetNullableUnderlyingType(type) ??
+            type)?.SpecialType ?? SpecialType.None;
         if (CSharpScalarSemantics.TryGetInteger(specialType, out var semantics))
         {
             isSigned = semantics.IsSigned;

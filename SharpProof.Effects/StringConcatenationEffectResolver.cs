@@ -318,14 +318,7 @@ internal static class StringConcatenationEffectResolver
 
     private static ITypeSymbol? UnwrapNullable(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol
-        {
-            OriginalDefinition.SpecialType:
-                SpecialType.System_Nullable_T,
-            TypeArguments: { Length: 1 } typeArguments
-        }
-            ? typeArguments[0]
-            : type;
+        return CompilerIdentityBridge.GetNullableUnderlyingType(type) ?? type;
     }
 
     private static IMethodSymbol? ResolveToString(

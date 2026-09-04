@@ -300,15 +300,8 @@ internal sealed class UsingDisposalEffectResolver
         IMethodSymbol caller,
         ITypeSymbol resourceType)
     {
-        if (resourceType is INamedTypeSymbol
-            {
-                OriginalDefinition.SpecialType:
-                    SpecialType.System_Nullable_T,
-                TypeArguments: { Length: 1 } typeArguments
-            })
-        {
-            resourceType = typeArguments[0];
-        }
+        resourceType = CompilerIdentityBridge.GetNullableUnderlyingType(
+            resourceType) ?? resourceType;
 
         if (resourceType is not INamedTypeSymbol named)
         {

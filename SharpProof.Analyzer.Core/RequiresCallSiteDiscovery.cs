@@ -875,38 +875,19 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IConversionOperation conversion,
         IMethodSymbol method)
     {
+        var operandType = CompilerIdentityBridge.GetNullableUnderlyingType(
+            conversion.Operand.Type);
+        var resultType = CompilerIdentityBridge.GetNullableUnderlyingType(
+            conversion.Type);
         return method.Parameters.Length == 1 &&
-            TryGetNullableUnderlyingType(
-                conversion.Operand.Type,
-                out var operandType) &&
-            TryGetNullableUnderlyingType(
-                conversion.Type,
-                out var resultType) &&
+            operandType != null &&
+            resultType != null &&
             SymbolEqualityComparer.Default.Equals(
                 operandType,
                 method.Parameters[0].Type) &&
             SymbolEqualityComparer.Default.Equals(
                 resultType,
                 method.ReturnType);
-    }
-
-    private static bool TryGetNullableUnderlyingType(
-        ITypeSymbol? type,
-        out ITypeSymbol underlying)
-    {
-        if (type is INamedTypeSymbol
-            {
-                OriginalDefinition.SpecialType:
-                    SpecialType.System_Nullable_T,
-                TypeArguments.Length: 1
-            } nullable)
-        {
-            underlying = nullable.TypeArguments[0];
-            return true;
-        }
-
-        underlying = null!;
-        return false;
     }
 
     private static RequiresCallTarget CreateImplicitOperatorCall(
@@ -1327,15 +1308,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             return null;
         }
-        if (resourceType is INamedTypeSymbol
-            {
-                OriginalDefinition.SpecialType:
-                    SpecialType.System_Nullable_T,
-                TypeArguments.Length: 1
-            } nullable)
-        {
-            resourceType = nullable.TypeArguments[0];
-        }
+        resourceType = CompilerIdentityBridge.GetNullableUnderlyingType(
+            resourceType) ?? resourceType;
         if (resourceType is ITypeParameterSymbol typeParameter)
         {
             foreach (var constraint in typeParameter.ConstraintTypes)

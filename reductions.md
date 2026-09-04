@@ -22232,6 +22232,12 @@ replace the surrounding conversion or flow logic.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2222 | **`RequiresCallSiteDiscovery`, `ConversionEffectClassifier`, `StringConcatenationEffectResolver`, `UsingDisposalEffectResolver`, and `OperationEffectScanner` duplicate the `Nullable<T>` symbol-shape test and underlying-type projection.** Centralize only the nullable-underlying lookup, retaining each caller's original-type fallback, mutation/projection form, and conversion/disposal/numeric semantics. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:892-910,1329-1338`; `SharpProof.Effects/ConversionEffectClassifier.cs:282-291`; `SharpProof.Effects/StringConcatenationEffectResolver.cs:319-328`; `SharpProof.Effects/UsingDisposalEffectResolver.cs:302-310`; `SharpProof.Effects/OperationEffectScanner.cs:1652-1660`; existing boolean helper `SharpProof.Effects/ManagedAbstractFlow.cs:2092-2097` |
+R2222 is applied: `CompilerIdentityBridge` now owns the shared nullable
+underlying-type projection used by analyzer call-site discovery and all four
+Effects consumers, while each caller keeps its original-type fallback or
+specialized comparison semantics. The full Effects suite passes 323/323 and
+the full Analyzer suite passes 476/476, with zero warnings or errors.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

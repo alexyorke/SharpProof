@@ -114,6 +114,17 @@ public static class CompilerIdentityBridge
             CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
     }
 
+    internal static ITypeSymbol? GetNullableUnderlyingType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol
+        {
+            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
+            TypeArguments.Length: 1
+        } nullable
+            ? nullable.TypeArguments[0]
+            : null;
+    }
+
     private static OperationSemanticIdentity CreateSemanticOperationIdentity(
         IrFactory factory,
         IOperation operation)
