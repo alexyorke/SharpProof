@@ -536,9 +536,12 @@ internal static class WorkerPerformanceProbe
         private static readonly UTF8Encoding Utf8WithoutBom =
             new(encoderShouldEmitUTF8Identifier: false);
 
-        private WorkerProbeWorkspace(string directoryPath)
+        private WorkerProbeWorkspace(
+            string directoryPath,
+            WorkerFileReference cancellationManifestReference)
         {
             DirectoryPath = directoryPath;
+            _cancellationManifestReference = cancellationManifestReference;
         }
 
         internal string DirectoryPath
@@ -551,6 +554,7 @@ internal static class WorkerPerformanceProbe
             Path.Combine(DirectoryPath, "io");
         internal string LauncherManifestPath =>
             Path.Combine(IoDirectoryPath, "launcher.compiler-manifest.json");
+        private readonly WorkerFileReference _cancellationManifestReference;
 
         internal static WorkerProbeWorkspace Create()
         {
@@ -591,19 +595,27 @@ internal static class WorkerPerformanceProbe
                 Utf8WithoutBom);
 
             var references = GetReferences();
-            var workspace = new WorkerProbeWorkspace(directory);
+            var launcherManifestPath = Path.Combine(
+                ioDirectory,
+                "launcher.compiler-manifest.json");
+            var cancellationManifestPath = Path.Combine(
+                directory,
+                "cancellation.compiler-manifest.json");
             WriteCompilerManifest(
-                workspace.LauncherManifestPath,
+                launcherManifestPath,
                 "SharpProofPerformanceProbe",
                 launcherSource,
                 launcherSourceText,
                 references);
             WriteCompilerManifest(
-                workspace.CancellationManifestPath,
+                cancellationManifestPath,
                 "SharpProofCancellationPerformanceProbe",
                 cancellationSource,
                 cancellationSourceText,
                 references);
+            var workspace = new WorkerProbeWorkspace(
+                directory,
+                Reference(cancellationManifestPath));
             return workspace;
         }
 
@@ -611,7 +623,11 @@ internal static class WorkerPerformanceProbe
         {
             return new()
             {
-                CompilerManifest = Reference(CancellationManifestPath),
+                CompilerManifest = new WorkerFileReference
+                {
+                    Path = _cancellationManifestReference.Path,
+                    Sha256 = _cancellationManifestReference.Sha256
+                },
                 Budgets = new WorkerBudgets
                 {
                     MethodWallTimeMilliseconds = 30_000,
