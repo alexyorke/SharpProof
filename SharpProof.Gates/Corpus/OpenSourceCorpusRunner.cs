@@ -132,6 +132,43 @@ internal static class OpenSourceCorpusRunner
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
         var diagnosticAssignments = new int[diagnostics.Length];
+        var targetsByTree = targets.Values
+            .GroupBy(
+                static target => target.Tree,
+                (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.ToArray(),
+                (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance);
+        var diagnosticsByMethod = targets.Values
+            .Select(static target => target.Method.Id)
+            .ToDictionary(
+                static id => id,
+                static _ => new List<string>(),
+                StringComparer.Ordinal);
+        for (var index = 0; index < diagnostics.Length; index++)
+        {
+            var diagnostic = diagnostics[index];
+            if (diagnostic.Location.SourceTree is not { } tree ||
+                !targetsByTree.TryGetValue(tree, out var treeTargets))
+            {
+                continue;
+            }
+
+            foreach (var target in treeTargets)
+            {
+                if (!target.Span.Contains(diagnostic.Location.SourceSpan))
+                {
+                    continue;
+                }
+
+                diagnosticAssignments[index]++;
+                diagnosticsByMethod[target.Method.Id].Add(
+                    CorpusGate.CanonicalizeDiagnostic(
+                        diagnostic,
+                        compilation.Options));
+            }
+        }
         foreach (var method in document.Methods)
         {
             if (!outcomes.TryGetValue(method.Id, out var semanticOutcome))
@@ -145,21 +182,7 @@ internal static class OpenSourceCorpusRunner
                     info.Method.Id,
                     method.Id,
                     StringComparison.Ordinal));
-            var canonicalDiagnostics = diagnostics
-                .Select((diagnostic, index) => (Diagnostic: diagnostic, Index: index))
-                .Where(item =>
-                    ReferenceEquals(
-                        item.Diagnostic.Location.SourceTree,
-                        target.Tree) &&
-                    target.Span.Contains(
-                        item.Diagnostic.Location.SourceSpan))
-                .Select(item =>
-                {
-                    diagnosticAssignments[item.Index]++;
-                    return CorpusGate.CanonicalizeDiagnostic(
-                        item.Diagnostic,
-                        compilation.Options);
-                })
+            var canonicalDiagnostics = diagnosticsByMethod[target.Method.Id]
                 .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)
                 .ToImmutableArray();
             observations.Add(
