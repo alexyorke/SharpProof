@@ -101,10 +101,9 @@ public sealed record FuzzSummary(
         FrontendCoverage != null &&
         FrontendCoverage.HasValidCounts &&
         FrontendCoverage.HasValidExceptionCounts(Cases) &&
-        CoverageSatisfied ==
-            (Cases < FuzzOptions.DefaultCases ||
-             FrontendCoverage.HasExpandedCategories) &&
         CoverageSatisfied &&
+        (Cases < FuzzOptions.DefaultCases ||
+         FrontendCoverage.HasExpandedCategories) &&
         Abstentions == 0 &&
         Agreements == Cases &&
         FrontendAgreements == Cases &&
