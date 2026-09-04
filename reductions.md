@@ -21380,3 +21380,11 @@ Assert-SharpProofStandaloneGateResult.ps1 defines Assert-UniqueJsonElementProper
 | ID | Finding | Evidence |
 |---|---|---|
 | R2020 | `OperationNullnessEvaluator.IsImplicitLockEnterWithNullValue`, `OperationEffectScanner.IsMonitorCall`, and `IsSynthesizedLockMonitorCall` repeat the `_monitorType`/`OriginalDefinition` monitor identity check; extract only that predicate. | SharpProof.Effects/OperationNullnessEvaluator.cs:126-135; SharpProof.Effects/OperationEffectScanner.cs:1448-1471 |
+
+## Second survey, continued: R2021 - RunVerifier and LinuxWorkerProcess duplicate libc kill interop
+
+`SharpProof.BuildTasks.RunVerifier` and `SharpProof.Host.LinuxWorkerProcess` each declare a private `NativeMethods.Kill(int processId, int signal)` with identical `[LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]`, `[DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]`, and signature. `RunVerifier` uses it for negative process-group signaling during supervisor cleanup, while `LinuxWorkerProcess` uses it for worker/descendant termination and errno handling, so cleanup policies must remain at the callers. Moving only the binding into an internal Host-owned Linux process-control helper would eliminate the duplicate ABI/marshalling authority while retaining each caller's signal constants, process-group semantics, and fail-closed policy. This complements R949's prctl interop finding.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2021 | `RunVerifier` and `LinuxWorkerProcess` repeat the same libc `kill` P/Invoke; centralize only the binding and preserve their distinct process-group, signal, and errno policies. | SharpProof.BuildTasks/RunVerifier.cs:1080-1085,1394-1398; SharpProof.Host/LinuxWorkerProcess.cs:181-193,266-273,339-347 |
