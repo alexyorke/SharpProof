@@ -21356,3 +21356,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2017 | Test-SharpProofCoverage and Test-SharpProofPilotAuthorityFixtures contain one-occurrence, never-read repository-root locals; delete only those dead assignments. | scripts/Test-SharpProofCoverage.ps1:26-28; scripts/Test-SharpProofPilotAuthorityFixtures.ps1:5; parser-backed variable census and exact source search |
+
+## Second survey, continued: R2018 - EffectDirectEventKinds duplicates inverse lookup loops
+
+EffectDirectEventKinds.FromWireName and ToWireName each linearly scan the same generated WireNames tuple array, compare the opposite tuple member, and throw the same ArgumentOutOfRangeException when no mapping exists. The catalog currently has eight direct-event rows, and EffectDirectEvent.Kind calls ToWireName on every constructed direct event while the parity tests exercise both directions. A generated pair of ordinal wire-name and enum-key lookups, or one shared table-projection helper, can build the two inverse views once and keep the current StringComparison.Ordinal, enum equality, and fail-closed invalid-input behavior. This is a small lookup/maintenance seam rather than a claim that the eight-row scan is a hot-path bottleneck.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2018 | EffectDirectEventKinds.FromWireName and ToWireName duplicate inverse linear scans of the same generated WireNames table; generate or share the two lookup projections while retaining ordinal matching and fail-closed invalid-input behavior. | SharpProof.Effects/EffectValues.cs:68-102; SharpProof.Effects/EffectContractMappings.catalog.json:183-191 |
