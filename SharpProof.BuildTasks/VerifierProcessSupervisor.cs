@@ -474,20 +474,12 @@ internal static partial class VerifierProcessSupervisor
 
     private static int OpenPidFd(int processId)
     {
-        return (int)LinuxNativeMethods.SystemCall2(
-            LinuxProcessControlConstants.PidFdOpenSystemCall,
-            processId,
-            0);
+        return (int)LinuxNativeMethods.OpenPidFd(processId);
     }
 
     private static int SendPidFdSignal(int descriptor, int signal)
     {
-        return (int)LinuxNativeMethods.SystemCall4(
-            LinuxProcessControlConstants.PidFdSendSignalSystemCall,
-            descriptor,
-            signal,
-            0,
-            0);
+        return (int)LinuxNativeMethods.SendPidFdSignal(descriptor, signal);
     }
 
     private static void ReapExitedChildren()

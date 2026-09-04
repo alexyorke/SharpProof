@@ -1104,10 +1104,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 "SharpProof verifier containment requires Linux amd64.");
         }
         var descriptor = OpenPidFdOverride?.Invoke(processId) ??
-            checked((int)LinuxNativeMethods.SystemCall2(
-                LinuxProcessControlConstants.PidFdOpenSystemCall,
-                processId,
-                0));
+            checked((int)LinuxNativeMethods.OpenPidFd(processId));
         if (descriptor < 0)
         {
             throw new InvalidOperationException(
@@ -1119,12 +1116,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private static int SendPidFdSignal(int descriptor, int signal)
     {
-        return checked((int)LinuxNativeMethods.SystemCall4(
-            LinuxProcessControlConstants.PidFdSendSignalSystemCall,
+        return checked((int)LinuxNativeMethods.SendPidFdSignal(
             descriptor,
-            signal,
-            0,
-            0));
+            signal));
     }
 
     internal void LogStandardError(string standardError)

@@ -22328,6 +22328,11 @@ now live in `SwitchExpressionFacts`; ManagedAbstractFlow and
 OperationCompletionEvaluator retain their distinct length discovery and
 completion behavior. The full Effects suite passes.
 
+R2023 is applied: `LinuxNativeMethods` now owns the pidfd-open and pidfd-signal
+syscall argument projections; RunVerifier retains checked casts and overrides,
+while VerifierProcessSupervisor retains its raw-result policy. Focused build-task
+and supervisor tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
