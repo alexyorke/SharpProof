@@ -20,7 +20,6 @@ internal static class PrimaryConstructorCallableInventory
 
         var matches = type.InstanceConstructors
             .Where(candidate =>
-                candidate.MethodKind == MethodKind.Constructor &&
                 candidate.DeclaringSyntaxReferences.Any(reference =>
                     reference.SyntaxTree == declaration.SyntaxTree &&
                     reference.GetSyntax(cancellationToken) is
