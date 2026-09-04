@@ -4,15 +4,15 @@
     <id>SharpProof.Verifier</id>
     <version>$version$</version>
     <title>SharpProof Verifier</title>
-    <authors>Alex Yorke</authors>
-    <license type="expression">MIT</license>
-    <readme>README.md</readme>
-    <projectUrl>https://github.com/alexyorke/SharpProof</projectUrl>
+    <authors>$authors$</authors>
+    <license type="expression">$license$</license>
+    <readme>$readme$</readme>
+    <projectUrl>$projecturl$</projectUrl>
     <description>Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.</description>
     <releaseNotes>Initial container-first Linux amd64 verifier package for the soundness-first SharpProof preview.</releaseNotes>
     <copyright>Copyright (c) Alex Yorke</copyright>
     <tags>SharpProof Verifier Contracts SMT Z3 Linux Container x64</tags>
-    <repository type="git" url="https://github.com/alexyorke/SharpProof" commit="$repositorycommit$" />
+    <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
         <dependency id="SharpProof" version="[$version$]" />

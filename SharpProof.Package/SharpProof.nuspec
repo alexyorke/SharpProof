@@ -4,15 +4,15 @@
     <id>SharpProof</id>
     <version>$version$</version>
     <title>SharpProof</title>
-    <authors>Alex Yorke</authors>
-    <license type="expression">MIT</license>
-    <readme>README.md</readme>
-    <projectUrl>https://github.com/alexyorke/SharpProof</projectUrl>
+    <authors>$authors$</authors>
+    <license type="expression">$license$</license>
+    <readme>$readme$</readme>
+    <projectUrl>$projecturl$</projectUrl>
     <description>Portable SharpProof Roslyn analysis and contract generation for bounded effect contracts, compiler-bound preconditions, and accountable postcondition verification. Unsupported selected code remains visibly incomplete.</description>
     <releaseNotes>SharpProof 1.0 preview with opt-in effect analysis, compiler-bound contracts, accountable bounded postcondition verification, fail-closed language gating, and conservative external boundaries.</releaseNotes>
     <copyright>Copyright (c) Alex Yorke</copyright>
     <tags>SharpProof Roslyn Analyzer Purity StaticAnalysis MethodEffects Capabilities ZeroAllocations ExceptionContracts Preconditions Contracts</tags>
-    <repository type="git" url="https://github.com/alexyorke/SharpProof" commit="$repositorycommit$" />
+    <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
         <dependency id="SharpProof.Attributes" version="[$version$]" />
