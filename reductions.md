@@ -22392,6 +22392,10 @@ repository-relative generator path instead of hard-coding `scripts/`; all 15
 generators use it with correct provenance, and generated outputs remain byte-
 stable under verification.
 
+R2320 is applied: corrected the ContractFor diagnostic documentation from eight
+rules to ten, matching the catalog and its gated anchors. The documentation gate
+passes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

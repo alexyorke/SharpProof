@@ -266,7 +266,7 @@ supplies no proof fact. SP0050 is reserved for a payload that cannot be read.
 ## ContractFor generator diagnostics
 
 The incremental `ContractFor` generator validates companions and emits no
-source. All eight rules are enabled-by-default errors once the generator is
+source. All ten rules are enabled-by-default errors once the generator is
 loaded.
 
 A valid instance-member companion uses a static class and an explicit receiver
