@@ -82,14 +82,14 @@ internal static class IrTraversal
     internal static T FoldBottomUp<T>(
         IrTerm root,
         Dictionary<IrId, T> memo,
-        Func<IrTerm, Dictionary<IrId, T>, T> combine,
+        Func<IrTerm, ImmutableArray<IrTerm>, Dictionary<IrId, T>, T> combine,
         Func<IrTerm, (bool HasValue, T Value)>? shortCircuit = null)
     {
         var pending = new Stack<(
             IrTerm Term,
             bool ChildrenReady,
             ImmutableArray<IrTerm> Children)>();
-        pending.Push((root, false, default));
+        pending.Push((root, false, []));
         while (pending.Count != 0)
         {
             var (term, childrenReady, children) = pending.Pop();
@@ -98,14 +98,14 @@ internal static class IrTraversal
                 continue;
             }
 
-            if (shortCircuit?.Invoke(term) is (true, var value))
-            {
-                memo.Add(term.Id, value);
-                continue;
-            }
-
             if (!childrenReady)
             {
+                if (shortCircuit?.Invoke(term) is (true, var value))
+                {
+                    memo.Add(term.Id, value);
+                    continue;
+                }
+
                 children = GetChildren(term);
                 if (children.Length != 0)
                 {
@@ -114,7 +114,7 @@ internal static class IrTraversal
                     {
                         if (!memo.ContainsKey(child.Id))
                         {
-                            pending.Push((child, false, default));
+                            pending.Push((child, false, []));
                         }
                     }
 
@@ -122,7 +122,7 @@ internal static class IrTraversal
                 }
             }
 
-            memo.Add(term.Id, combine(term, memo));
+            memo.Add(term.Id, combine(term, children, memo));
         }
 
         return memo[root.Id];

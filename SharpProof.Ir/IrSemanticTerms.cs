@@ -139,10 +139,10 @@ public static class IrTermAnalysis
         return IrTraversal.FoldBottomUp(
             root,
             memo,
-            static (term, depths) =>
+            static (term, children, depths) =>
             {
                 var depth = 1;
-                foreach (var child in IrTraversal.GetChildren(term))
+                foreach (var child in children)
                 {
                     depth = Math.Max(depth, 1 + depths[child.Id]);
                 }

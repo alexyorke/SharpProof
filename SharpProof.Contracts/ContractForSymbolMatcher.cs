@@ -281,19 +281,29 @@ internal static class ContractForSymbolMatcher
             return CompanionResolution.None;
         }
 
-        var matching = companions.Where(companion =>
-            TargetsType(companion.ContractTarget, target.ContainingType)).ToImmutableArray();
-        if (matching.IsDefaultOrEmpty)
+        var matchingCount = 0;
+        CompanionDescriptor? matchingCompanion = null;
+        foreach (var candidateCompanion in companions)
+        {
+            if (!TargetsType(candidateCompanion.ContractTarget, target.ContainingType))
+            {
+                continue;
+            }
+
+            matchingCount++;
+            matchingCompanion ??= candidateCompanion;
+        }
+        if (matchingCount == 0)
         {
             return CompanionResolution.None;
         }
 
-        if (matching.Length != 1)
+        if (matchingCount != 1)
         {
             return CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
         }
 
-        var companion = matching[0];
+        var companion = matchingCompanion!;
         if (!CompanionTypeMatches(companion.Type, companion.ContractTarget))
         {
             return CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);

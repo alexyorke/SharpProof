@@ -117,7 +117,7 @@ public static class IrSubstitution
         return IrTraversal.FoldBottomUp(
             root,
             memo,
-            (term, rewritten) => RewriteNode(factory, term, rewritten),
+            (term, _, rewritten) => RewriteNode(factory, term, rewritten),
             term => term is IrVariableTerm variable &&
                 replacements.TryGetValue(variable.Variable, out var replacement)
                     ? (true, replacement)
