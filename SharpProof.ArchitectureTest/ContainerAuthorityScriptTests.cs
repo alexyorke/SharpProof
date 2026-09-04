@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -216,7 +215,7 @@ public sealed class ContainerAuthorityScriptTests
                 .And.Contain("CMD [\"" + command + "\"]"));
     }
 
-    private static async Task<ProcessResult> ValidateAsync(
+    private static async Task<ProcessRunnerResult> ValidateAsync(
         Func<string, string> mutateDockerfile,
         Func<string, string> mutateCompose)
     {
@@ -237,8 +236,9 @@ public sealed class ContainerAuthorityScriptTests
                 compose,
                 mutateCompose(await File.ReadAllTextAsync(Path.Combine(
                     root, "compose.yaml"))));
-            return await RunAsync(
+            return await ArchitectureRepository.RunProcessAsync(
                 root,
+                (IReadOnlyDictionary<string, string>?)null,
                 "pwsh",
                 "-NoLogo",
                 "-NoProfile",
@@ -257,29 +257,6 @@ public sealed class ContainerAuthorityScriptTests
         }
     }
 
-    private static async Task<ProcessResult> RunAsync(
-        string workingDirectory,
-        string fileName,
-        params string[] arguments)
-    {
-        var startInfo = new ProcessStartInfo(fileName)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new ProcessResult(process.ExitCode, await output, await error);
-    }
-
     private static string ResolveComposeImage(
         string imageLine,
         string projectName,
@@ -296,5 +273,4 @@ public sealed class ContainerAuthorityScriptTests
         return image ?? fallback;
     }
 
-    private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

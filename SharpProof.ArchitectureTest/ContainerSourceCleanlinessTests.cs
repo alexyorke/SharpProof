@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -274,9 +273,9 @@ public sealed class ContainerSourceCleanlinessTests
         var workspace = new TempDirectory("SharpProof.ArchiveSource.");
         try
         {
-            var copy = await RunAsync(
+            var copy = await ArchitectureRepository.RunProcessAsync(
                 repository,
-                environment: null,
+                (IReadOnlyDictionary<string, string>?)null,
                 "bash",
                 "-c",
                 "tar --exclude=./.git -cf - . | tar -C \"$1\" -xf -",
@@ -321,7 +320,7 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
-    private static Task<ProcessResult> RunEntrypointAsync(
+    private static Task<ProcessRunnerResult> RunEntrypointAsync(
         string repository,
         string command,
         bool assumeDifferentOwner = false)
@@ -335,7 +334,7 @@ public sealed class ContainerSourceCleanlinessTests
             environment["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1";
         }
 
-        return RunAsync(
+        return ArchitectureRepository.RunProcessAsync(
             repository,
             environment,
             "bash",
@@ -352,53 +351,12 @@ public sealed class ContainerSourceCleanlinessTests
         string fileName,
         params string[] arguments)
     {
-        var result = await RunAsync(
+        var result = await ArchitectureRepository.RunProcessAsync(
             workingDirectory,
-            environment: null,
+            (IReadOnlyDictionary<string, string>?)null,
             fileName,
             arguments);
         Assert.That(result.ExitCode, Is.Zero, result.Error);
     }
 
-    private static async Task<ProcessResult> RunAsync(
-        string workingDirectory,
-        IReadOnlyDictionary<string, string>? environment,
-        string fileName,
-        params string[] arguments)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        if (environment != null)
-        {
-            foreach (var entry in environment)
-            {
-                startInfo.Environment[entry.Key] = entry.Value;
-            }
-        }
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new ProcessResult(
-            process.ExitCode,
-            await output,
-            await error);
-    }
-
-    private sealed record ProcessResult(
-        int ExitCode,
-        string Output,
-        string Error);
 }

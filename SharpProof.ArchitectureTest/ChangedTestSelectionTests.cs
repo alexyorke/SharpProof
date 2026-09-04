@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -28,13 +27,19 @@ public sealed class ChangedTestSelectionTests
                 root,
                 "test@example.invalid",
                 "SharpProof Test");
-            await RunAsync(root, "git", "add", ".");
-            await RunAsync(root, "git", "commit", "--quiet", "-m", "baseline");
+            await ArchitectureRepository.RunProcessAsync(root, "git", "add", ".");
+            await ArchitectureRepository.RunProcessAsync(
+                root,
+                "git",
+                "commit",
+                "--quiet",
+                "-m",
+                "baseline");
             await File.AppendAllTextAsync(
                 Path.Combine(root, changedInput),
                 "\n<!-- changed -->\n");
 
-            var result = await RunAsync(
+            var result = await ArchitectureRepository.RunProcessAsync(
                 root,
                 "pwsh",
                 "-NoLogo",
@@ -135,31 +140,4 @@ public sealed class ChangedTestSelectionTests
         }
     }
 
-    private static async Task<ProcessResult> RunAsync(
-        string workingDirectory,
-        string fileName,
-        params string[] arguments)
-    {
-        var start = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        foreach (var argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        var combined = (await output) + Environment.NewLine + (await error);
-        Assert.That(process.ExitCode, Is.Zero, combined);
-        return new ProcessResult(combined);
-    }
-
-    private sealed record ProcessResult(string Output);
 }

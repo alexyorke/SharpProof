@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -221,11 +220,14 @@ public sealed partial class ReleaseQualificationMatrixTests
         string executable,
         params string[] arguments)
     {
-        var result = await RunProcessAsync(
+        var result = await ArchitectureRepository.RunProcessAsync(
             workingDirectory,
             executable,
             arguments);
-        Assert.That(result.ExitCode, Is.Zero, result.Output);
+        Assert.That(
+            result.ExitCode,
+            Is.Zero,
+            result.Output + Environment.NewLine + result.Error);
         return result.Output;
     }
 
@@ -234,34 +236,10 @@ public sealed partial class ReleaseQualificationMatrixTests
         string executable,
         params string[] arguments)
     {
-        return (await RunProcessAsync(
+        return (await ArchitectureRepository.RunProcessAsync(
             workingDirectory,
             executable,
             arguments)).ExitCode;
-    }
-
-    private static async Task<ProcessResult> RunProcessAsync(
-        string workingDirectory,
-        string executable,
-        params string[] arguments)
-    {
-        var start = new ProcessStartInfo(executable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        foreach (var argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new(
-            process.ExitCode,
-            (await output) + Environment.NewLine + await error);
     }
 
     [GeneratedRegex(
@@ -269,7 +247,4 @@ public sealed partial class ReleaseQualificationMatrixTests
         RegexOptions.CultureInvariant)]
     private static partial Regex FoldedCommand();
 
-    private readonly record struct ProcessResult(
-        int ExitCode,
-        string Output);
 }

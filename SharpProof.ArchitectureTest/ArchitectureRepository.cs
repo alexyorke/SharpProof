@@ -1,9 +1,64 @@
+using System.Diagnostics;
 using System.Xml.Linq;
 
 namespace SharpProof.ArchitectureTest;
 
 internal static class ArchitectureRepository
 {
+    internal static Task<ProcessRunnerResult> RunProcessAsync(
+        string workingDirectory,
+        string fileName,
+        params string[] arguments)
+    {
+        return ProcessRunner.RunCapturedAsync(
+            workingDirectory,
+            fileName,
+            arguments);
+    }
+
+    internal static Task<ProcessRunnerResult> RunProcessAsync(
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environment,
+        string fileName,
+        params string[] arguments)
+    {
+        var startInfo = ProcessRunner.CreateStartInfo(
+            workingDirectory,
+            fileName,
+            arguments);
+        if (environment is not null)
+        {
+            foreach (var entry in environment)
+            {
+                startInfo.Environment[entry.Key] = entry.Value;
+            }
+        }
+
+        return ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
+    }
+
+    internal static async Task<ProcessRunnerResult> RunProcessAsync(
+        ProcessStartInfo startInfo,
+        TimeSpan timeout)
+    {
+        using var cancellation = new CancellationTokenSource(timeout);
+        try
+        {
+            return await ProcessRunner.RunCapturedAsync(
+                startInfo,
+                cancellation.Token);
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"'{startInfo.FileName}' did not exit within " +
+                $"{timeout.TotalSeconds:N0} seconds.");
+        }
+    }
+
     internal static readonly string[] ProductionProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",

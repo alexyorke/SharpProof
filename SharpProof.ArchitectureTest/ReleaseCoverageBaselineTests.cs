@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -481,7 +480,7 @@ public sealed class ReleaseCoverageBaselineTests
             Does.Contain("checked-out HEAD"));
     }
 
-    private static Task<ProcessResult> RunResolverAsync(
+    private static Task<ProcessRunnerResult> RunResolverAsync(
         string root,
         string tag,
         string releaseCommit)
@@ -540,7 +539,7 @@ public sealed class ReleaseCoverageBaselineTests
 
         Assert.That(result.ExitCode, Is.Not.Zero, path);
     }
-    private static async Task<ProcessResult> RunAsync(
+    private static async Task<ProcessRunnerResult> RunAsync(
         string workingDirectory,
         string fileName,
         params string[] arguments)
@@ -552,21 +551,16 @@ public sealed class ReleaseCoverageBaselineTests
             arguments);
     }
 
-    private static async Task<ProcessResult> RunAsyncCore(
+    private static async Task<ProcessRunnerResult> RunAsyncCore(
         string workingDirectory,
         string fileName,
         IReadOnlyDictionary<string, string>? environment,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
+        var startInfo = ProcessRunner.CreateStartInfo(
+            workingDirectory,
+            fileName,
+            arguments);
         if (environment != null)
         {
             foreach (var entry in environment)
@@ -574,36 +568,23 @@ public sealed class ReleaseCoverageBaselineTests
                 startInfo.Environment[entry.Key] = entry.Value;
             }
         }
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        var standardOutput = await output;
-        var standardError = await error;
+        var result = await ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
         const string AnsiPattern =
             "\\x1B\\[[0-?]*[ -/]*[@-~]";
-        return new ProcessResult(
-            process.ExitCode,
+        return new ProcessRunnerResult(
+            result.ExitCode,
             System.Text.RegularExpressions.Regex.Replace(
-                standardOutput,
+                result.Output,
                 AnsiPattern,
                 string.Empty,
                 System.Text.RegularExpressions.RegexOptions.CultureInvariant),
             System.Text.RegularExpressions.Regex.Replace(
-                standardError,
+                result.Error,
                 AnsiPattern,
                 string.Empty,
                 System.Text.RegularExpressions.RegexOptions.CultureInvariant));
     }
-
-    private sealed record ProcessResult(
-        int ExitCode,
-        string Output,
-        string Error);
 
 }

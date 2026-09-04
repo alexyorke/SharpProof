@@ -100,43 +100,9 @@ public sealed class FuzzRunnerEvidenceTests
         }
     }
 
-    private static async Task<ProcessResult> RunAsync(
+    private static Task<ProcessRunnerResult> RunAsync(
         ProcessStartInfo start)
     {
-        using var process = Process.Start(start) ??
-            throw new InvalidOperationException(
-                $"Could not start '{start.FileName}'.");
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        using var cancellation = new CancellationTokenSource();
-        cancellation.CancelAfter(ScriptTimeout);
-        try
-        {
-            await process.WaitForExitAsync(cancellation.Token);
-            return new ProcessResult(
-                process.ExitCode,
-                await output.WaitAsync(cancellation.Token),
-                await error.WaitAsync(cancellation.Token));
-        }
-        catch (OperationCanceledException)
-            when (cancellation.IsCancellationRequested)
-        {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-            }
-            catch (InvalidOperationException) when (process.HasExited)
-            {
-            }
-
-            throw new TimeoutException(
-                $"'{start.FileName}' did not exit within " +
-                $"{ScriptTimeout.TotalSeconds:N0} seconds.");
-        }
+        return ArchitectureRepository.RunProcessAsync(start, ScriptTimeout);
     }
-
-    private sealed record ProcessResult(
-        int ExitCode,
-        string Output,
-        string Error);
 }

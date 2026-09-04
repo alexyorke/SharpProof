@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
@@ -32,7 +31,7 @@ public sealed class PackageDependencyAuthorityTests
         Assert.That(
             result.ExitCode == 0,
             Is.EqualTo(expectedSuccess),
-            result.Output);
+            result.Output + Environment.NewLine + result.Error);
         if (expectedSuccess)
         {
             Assert.That(
@@ -60,7 +59,7 @@ public sealed class PackageDependencyAuthorityTests
         Assert.That(
             result.ExitCode == 0,
             Is.EqualTo(expectedSuccess),
-            result.Output);
+            result.Output + Environment.NewLine + result.Error);
     }
 
     [TestCase("canonical", true)]
@@ -96,7 +95,7 @@ public sealed class PackageDependencyAuthorityTests
         Assert.That(
             result.ExitCode == 0,
             Is.EqualTo(expectedSuccess),
-            result.Output);
+            result.Output + Environment.NewLine + result.Error);
     }
 
     [TestCase("canonical", true)]
@@ -116,7 +115,7 @@ public sealed class PackageDependencyAuthorityTests
         Assert.That(
             result.ExitCode == 0,
             Is.EqualTo(expectedSuccess),
-            result.Output);
+            result.Output + Environment.NewLine + result.Error);
     }
 
     private static string[] WritePackageGraph(string root, string mutation)
@@ -332,7 +331,7 @@ public sealed class PackageDependencyAuthorityTests
             """;
     }
 
-    private static async Task<ProcessResult> RunAuthorityAsync(string[] paths)
+    private static async Task<ProcessRunnerResult> RunAuthorityAsync(string[] paths)
     {
         var repositoryRoot = TestRepository.FindRoot();
         var runner = Path.Combine(
@@ -351,7 +350,7 @@ public sealed class PackageDependencyAuthorityTests
         return await RunPowerShellAsync(repositoryRoot, runner, paths);
     }
 
-    private static async Task<ProcessResult> RunComponentAuthorityAsync(
+    private static async Task<ProcessRunnerResult> RunComponentAuthorityAsync(
         string root,
         string mutation)
     {
@@ -381,41 +380,27 @@ public sealed class PackageDependencyAuthorityTests
         return await RunPowerShellAsync(repositoryRoot, runner, mutation);
     }
 
-    private static async Task<ProcessResult> RunPowerShellAsync(
+    private static Task<ProcessRunnerResult> RunPowerShellAsync(
         string repositoryRoot,
         string runner,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "pwsh",
-            WorkingDirectory = repositoryRoot,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(runner);
-        startInfo.ArgumentList.Add(Path.Combine(
+        var startInfo = ProcessRunner.CreateStartInfo(
             repositoryRoot,
-            "scripts",
-            "Test-SharpProofPackageDependencies.ps1"));
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new ProcessResult(
-            process.ExitCode,
-            (await output) + Environment.NewLine + (await error));
+            "pwsh",
+            [
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                runner,
+                Path.Combine(
+                    repositoryRoot,
+                    "scripts",
+                    "Test-SharpProofPackageDependencies.ps1"),
+                .. arguments
+            ]);
+        return ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
     }
-
-    private sealed record ProcessResult(int ExitCode, string Output);
 }
