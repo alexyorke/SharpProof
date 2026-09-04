@@ -7,9 +7,6 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class AcceptanceScriptTests
 {
-    private const string TemporaryRepositoryRootName =
-        "SharpProof.Architecture.Acceptance";
-
     [TestCase("canonical", true)]
     [TestCase("zero-restore", true)]
     [TestCase("nonzero-restore", true)]
@@ -86,68 +83,58 @@ public sealed class AcceptanceScriptTests
         string expectedStatus,
         string expectedOutput)
     {
-        var fixture = Path.Combine(
-            Path.GetTempPath(),
-            TemporaryRepositoryRootName,
-            "status-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(fixture);
-        try
+        using var temporary = new TempDirectory("SharpProof.Architecture.Acceptance-");
+        var fixture = temporary.FullName;
+        await InitializeRepositoryAsync(fixture);
+        var harness = WriteHarness(fixture);
+        var arguments = new List<string>
         {
-            await InitializeRepositoryAsync(fixture);
-            var harness = WriteHarness(fixture);
-            var arguments = new List<string>
-            {
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-File",
-                harness
-            };
-            if (skipBuild)
-            {
-                arguments.Add("-SkipBuild");
-            }
-            if (skipTests)
-            {
-                arguments.Add("-SkipTests");
-            }
-
-            var result = await RunAsync(
-                fixture,
-                "pwsh",
-                [.. arguments]);
-            var evidencePath = Path.Combine(
-                fixture,
-                "artifacts",
-                "timings",
-                "acceptance-release.json");
-
-            Assert.That(result.ExitCode, Is.Zero, result.Error);
-            Assert.That(File.Exists(evidencePath), Is.True, result.Output);
-            using var evidence = JsonDocument.Parse(
-                await File.ReadAllTextAsync(evidencePath));
-            var root = evidence.RootElement;
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    root.GetProperty("status").GetString(),
-                    Is.EqualTo(expectedStatus));
-                Assert.That(
-                    root.GetProperty("failure").GetString(),
-                    Is.Empty);
-                Assert.That(result.Output, Does.Contain(expectedOutput));
-                if (expectedStatus == "incomplete")
-                {
-                    Assert.That(
-                        result.Output,
-                        Does.Not.Contain(
-                            "SharpProof acceptance checks passed."));
-                }
-            }
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            harness
+        };
+        if (skipBuild)
+        {
+            arguments.Add("-SkipBuild");
         }
-        finally
+        if (skipTests)
         {
-            DeleteDirectory(fixture);
+            arguments.Add("-SkipTests");
+        }
+
+        var result = await RunAsync(
+            fixture,
+            "pwsh",
+            [.. arguments]);
+        var evidencePath = Path.Combine(
+            fixture,
+            "artifacts",
+            "timings",
+            "acceptance-release.json");
+
+        Assert.That(result.ExitCode, Is.Zero, result.Error);
+        Assert.That(File.Exists(evidencePath), Is.True, result.Output);
+        using var evidence = JsonDocument.Parse(
+            await File.ReadAllTextAsync(evidencePath));
+        var root = evidence.RootElement;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                root.GetProperty("status").GetString(),
+                Is.EqualTo(expectedStatus));
+            Assert.That(
+                root.GetProperty("failure").GetString(),
+                Is.Empty);
+            Assert.That(result.Output, Does.Contain(expectedOutput));
+            if (expectedStatus == "incomplete")
+            {
+                Assert.That(
+                    result.Output,
+                    Does.Not.Contain(
+                        "SharpProof acceptance checks passed."));
+            }
         }
     }
 
@@ -267,14 +254,6 @@ public sealed class AcceptanceScriptTests
             workingDirectory,
             fileName,
             arguments);
-    }
-
-    private static void DeleteDirectory(string path)
-    {
-        TestRepository.DeleteOwnedTemporaryDirectory(
-            path,
-            TemporaryRepositoryRootName,
-            "Refusing to remove an unexpected acceptance directory.");
     }
 
 }

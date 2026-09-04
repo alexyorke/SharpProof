@@ -174,61 +174,48 @@ public sealed class CorpusGateTests
     [Test]
     public async Task CorpusBatchRollsBackACommitFailure()
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Gates.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-");
+        var root = temporary.FullName;
         var first = Path.Combine(root, "first.txt");
         var second = Path.Combine(root, "second.txt");
         await File.WriteAllTextAsync(first, "old-first\n");
         await File.WriteAllTextAsync(second, "old-second\n");
-        try
-        {
-            Func<Task> write = () => CorpusFileTransaction.WriteAllAsync(
-                root,
-                [
-                    new CorpusFileUpdate(first, "new-first\n"),
-                    new CorpusFileUpdate(second, "new-second\n")
-                ],
-                CancellationToken.None,
-                index =>
-                {
-                    if (index == 1)
-                    {
-                        throw new IOException("injected failure");
-                    }
-                });
-            Assert.ThrowsAsync<IOException>(write);
-            using (Assert.EnterMultipleScope())
+        Func<Task> write = () => CorpusFileTransaction.WriteAllAsync(
+            root,
+            [
+                new CorpusFileUpdate(first, "new-first\n"),
+                new CorpusFileUpdate(second, "new-second\n")
+            ],
+            CancellationToken.None,
+            index =>
             {
-                Assert.That(
-                    await File.ReadAllTextAsync(first),
-                    Is.EqualTo("old-first\n"));
-                Assert.That(
-                    await File.ReadAllTextAsync(second),
-                    Is.EqualTo("old-second\n"));
-                Assert.That(
-                    File.Exists(Path.Combine(
-                        root,
-                        ".sharpproof-corpus-transaction.json")),
-                    Is.False);
-            }
-        }
-        finally
+                if (index == 1)
+                {
+                    throw new IOException("injected failure");
+                }
+            });
+        Assert.ThrowsAsync<IOException>(write);
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(root, recursive: true);
+            Assert.That(
+                await File.ReadAllTextAsync(first),
+                Is.EqualTo("old-first\n"));
+            Assert.That(
+                await File.ReadAllTextAsync(second),
+                Is.EqualTo("old-second\n"));
+            Assert.That(
+                File.Exists(Path.Combine(
+                    root,
+                    ".sharpproof-corpus-transaction.json")),
+                Is.False);
         }
     }
 
     [Test]
     public async Task CorpusCatalogRecoveryRollsBackAnInterruptedBatch()
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Gates.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-");
+        var root = temporary.FullName;
         var first = Path.Combine(root, "first.txt");
         var second = Path.Combine(root, "second.txt");
         var firstStage = Path.Combine(root, "first.new");
@@ -266,27 +253,20 @@ public sealed class CorpusGateTests
                     }
                 }
             }));
-        try
-        {
-            CorpusFileTransaction.Recover(root);
+        CorpusFileTransaction.Recover(root);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    await File.ReadAllTextAsync(first),
-                    Is.EqualTo("old-first\n"));
-                Assert.That(
-                    await File.ReadAllTextAsync(second),
-                    Is.EqualTo("old-second\n"));
-                Assert.That(File.Exists(marker), Is.False);
-                Assert.That(File.Exists(secondStage), Is.False);
-                Assert.That(File.Exists(firstBackup), Is.False);
-                Assert.That(File.Exists(secondBackup), Is.False);
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(root, recursive: true);
+            Assert.That(
+                await File.ReadAllTextAsync(first),
+                Is.EqualTo("old-first\n"));
+            Assert.That(
+                await File.ReadAllTextAsync(second),
+                Is.EqualTo("old-second\n"));
+            Assert.That(File.Exists(marker), Is.False);
+            Assert.That(File.Exists(secondStage), Is.False);
+            Assert.That(File.Exists(firstBackup), Is.False);
+            Assert.That(File.Exists(secondBackup), Is.False);
         }
     }
 

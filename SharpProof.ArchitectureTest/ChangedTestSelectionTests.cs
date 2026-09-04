@@ -15,60 +15,50 @@ public sealed class ChangedTestSelectionTests
     public async Task RootBuildInputsSelectTheCompleteTestGraph(
         string changedInput)
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.ChangedTests",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            await CreateFixtureAsync(root, changedInput);
-            await ArchitectureGitRepository.InitializeAsync(
-                root,
-                "test@example.invalid",
-                "SharpProof Test");
-            await ArchitectureRepository.RunProcessAsync(root, "git", "add", ".");
-            await ArchitectureRepository.RunProcessAsync(
-                root,
-                "git",
-                "commit",
-                "--quiet",
-                "-m",
-                "baseline");
-            await File.AppendAllTextAsync(
-                Path.Combine(root, changedInput),
-                "\n<!-- changed -->\n");
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        await CreateFixtureAsync(root, changedInput);
+        await ArchitectureGitRepository.InitializeAsync(
+            root,
+            "test@example.invalid",
+            "SharpProof Test");
+        await ArchitectureRepository.RunProcessAsync(root, "git", "add", ".");
+        await ArchitectureRepository.RunProcessAsync(
+            root,
+            "git",
+            "commit",
+            "--quiet",
+            "-m",
+            "baseline");
+        await File.AppendAllTextAsync(
+            Path.Combine(root, changedInput),
+            "\n<!-- changed -->\n");
 
-            var result = await ArchitectureRepository.RunProcessAsync(
-                root,
-                "pwsh",
-                "-NoLogo",
-                "-NoProfile",
-                "-File",
-                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
-                "-ComparisonRef",
-                "HEAD",
-                "-PlanOnly");
+        var result = await ArchitectureRepository.RunProcessAsync(
+            root,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+            "-ComparisonRef",
+            "HEAD",
+            "-PlanOnly");
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    result.Output,
-                    Does.Contain(
-                        "SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
-                Assert.That(
-                    result.Output,
-                    Does.Contain(
-                        "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj"));
-                Assert.That(
-                    result.Output,
-                    Does.Contain(
-                        "SharpProof.Package.Test (duration-aware sharder)"));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(root, recursive: true);
+            Assert.That(
+                result.Output,
+                Does.Contain(
+                    "SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+            Assert.That(
+                result.Output,
+                Does.Contain(
+                    "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj"));
+            Assert.That(
+                result.Output,
+                Does.Contain(
+                    "SharpProof.Package.Test (duration-aware sharder)"));
         }
     }
 

@@ -645,34 +645,26 @@ public sealed class CompilerManifestArtifactTests
     [Platform("Linux")]
     public void CapturePreservesBackslashFilenameCharacters()
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.BackslashPath." + Guid.NewGuid().ToString("N"));
+        using var temporary = new TempDirectory("SharpProof.BackslashPath-");
+        var root = temporary.FullName;
         var projectDirectory = Path.Combine(root, "literal\\backslash");
         Directory.CreateDirectory(projectDirectory);
-        try
-        {
-            var compilation = CreateCompilation(
-                new CSharpParseOptions(LanguageVersion.CSharp12),
-                "internal sealed class Subject {}\n",
-                includeContractReference: false);
-            var artifact = CompilerManifestArtifactProducer.Create(
-                compilation,
-                projectDirectory,
-                "net8.0",
-                WorkerFeatureSet.All,
-                new ClaimManifestBuilder(compilation).Build(),
-                WorkerBudgets.DefaultMaximumExpressionDepth,
-                CancellationToken.None);
+        var compilation = CreateCompilation(
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            "internal sealed class Subject {}\n",
+            includeContractReference: false);
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            projectDirectory,
+            "net8.0",
+            WorkerFeatureSet.All,
+            new ClaimManifestBuilder(compilation).Build(),
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
 
-            Assert.That(
-                artifact.Compilation.ProjectDirectory,
-                Does.Contain("literal\\backslash"));
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        Assert.That(
+            artifact.Compilation.ProjectDirectory,
+            Does.Contain("literal\\backslash"));
     }
 
     [Test]

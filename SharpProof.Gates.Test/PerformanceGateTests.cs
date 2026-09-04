@@ -393,35 +393,25 @@ public sealed class PerformanceGateTests
     public async Task PackageBuildSdkPinRetainsRepositoryIdentity()
     {
         var repositoryRoot = RepositoryLayout.FindRoot();
-        var probeRoot = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Gates.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(probeRoot);
-        try
-        {
-            var identity = await PackageBuildSdkPin.PinAndValidateAsync(
-                repositoryRoot,
-                probeRoot,
-                CancellationToken.None);
-            var repositoryGlobalJson = await File.ReadAllBytesAsync(
-                Path.Combine(repositoryRoot, "global.json"));
-            var probeGlobalJson = await File.ReadAllBytesAsync(
-                Path.Combine(probeRoot, "global.json"));
+        using var probe = new TempDirectory("SharpProof.Gates.Test-");
+        var probeRoot = probe.FullName;
+        var identity = await PackageBuildSdkPin.PinAndValidateAsync(
+            repositoryRoot,
+            probeRoot,
+            CancellationToken.None);
+        var repositoryGlobalJson = await File.ReadAllBytesAsync(
+            Path.Combine(repositoryRoot, "global.json"));
+        var probeGlobalJson = await File.ReadAllBytesAsync(
+            Path.Combine(probeRoot, "global.json"));
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    probeGlobalJson,
-                    Is.EqualTo(repositoryGlobalJson));
-                Assert.That(identity.ConfiguredVersion, Is.Not.Empty);
-                Assert.That(identity.RollForward, Is.Not.Empty);
-                Assert.That(identity.ResolvedVersion, Is.Not.Empty);
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(probeRoot, recursive: true);
+            Assert.That(
+                probeGlobalJson,
+                Is.EqualTo(repositoryGlobalJson));
+            Assert.That(identity.ConfiguredVersion, Is.Not.Empty);
+            Assert.That(identity.RollForward, Is.Not.Empty);
+            Assert.That(identity.ResolvedVersion, Is.Not.Empty);
         }
     }
 
@@ -652,96 +642,76 @@ public sealed class PerformanceGateTests
     public async Task PackagePerformanceProbeRejectsUnusableAnalyzerEntryPoint(
         bool writeInvalidAnalyzer)
     {
-        var temporaryRoot = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Gates.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryRoot);
-        try
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-");
+        var temporaryRoot = temporary.FullName;
+        var project = CreatePerformanceProbeProject(
+            temporaryRoot,
+            "public static class Subject { }",
+            RepositoryLayout.FindRoot(),
+            importSharpProof: true);
+        var projectDocument = XDocument.Load(project);
+        var analyzerDirectory = Path.Combine(
+            temporaryRoot,
+            "unusable-analyzers");
+        projectDocument.Descendants("SharpProofAnalyzerDirectory")
+            .Single()
+            .Value = analyzerDirectory;
+        projectDocument.Save(project);
+        if (writeInvalidAnalyzer)
         {
-            var project = CreatePerformanceProbeProject(
-                temporaryRoot,
-                "public static class Subject { }",
-                RepositoryLayout.FindRoot(),
-                importSharpProof: true);
-            var projectDocument = XDocument.Load(project);
-            var analyzerDirectory = Path.Combine(
-                temporaryRoot,
-                "unusable-analyzers");
-            projectDocument.Descendants("SharpProofAnalyzerDirectory")
-                .Single()
-                .Value = analyzerDirectory;
-            projectDocument.Save(project);
-            if (writeInvalidAnalyzer)
-            {
-                Directory.CreateDirectory(analyzerDirectory);
-                await File.WriteAllTextAsync(
-                        Path.Combine(
-                            analyzerDirectory,
-                            "SharpProof.Analyzer.dll"),
-                        "not an analyzer assembly")
-                    .ConfigureAwait(false);
-            }
+            Directory.CreateDirectory(analyzerDirectory);
+            await File.WriteAllTextAsync(
+                    Path.Combine(
+                        analyzerDirectory,
+                        "SharpProof.Analyzer.dll"),
+                    "not an analyzer assembly")
+                .ConfigureAwait(false);
+        }
 
+        _ = await RunPerformanceProbeDotnetAsync(
+            project,
+            restore: true,
+            symbol: null);
+
+        Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
             _ = await RunPerformanceProbeDotnetAsync(
                 project,
-                restore: true,
-                symbol: null);
-
-            Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
-                _ = await RunPerformanceProbeDotnetAsync(
-                    project,
-                    restore: false,
-                    symbol: "SHARPPROOF_MISSING_ANALYZER")));
-        }
-        finally
-        {
-            Directory.Delete(temporaryRoot, recursive: true);
-        }
+                restore: false,
+                symbol: "SHARPPROOF_MISSING_ANALYZER")));
     }
 
     [Test]
     public void PackagePerformanceProbeHasAnInternalWallTimeLimit()
     {
-        var temporaryRoot = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Gates.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryRoot);
-        try
-        {
-            var project = Path.Combine(temporaryRoot, "Hang.csproj");
-            File.WriteAllText(
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-");
+        var temporaryRoot = temporary.FullName;
+        var project = Path.Combine(temporaryRoot, "Hang.csproj");
+        File.WriteAllText(
+            project,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <Target Name="Hang" BeforeTargets="Restore">
+                <Exec Command="sleep 30" />
+              </Target>
+            </Project>
+            """);
+
+        var stopwatch = Stopwatch.StartNew();
+        var exception = Assert.ThrowsAsync<TimeoutException>((Func<Task>)(async () =>
+            _ = await RunPerformanceProbeDotnetAsync(
                 project,
-                """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <Target Name="Hang" BeforeTargets="Restore">
-                    <Exec Command="sleep 30" />
-                  </Target>
-                </Project>
-                """);
+                restore: true,
+                symbol: null,
+                timeout: TimeSpan.FromMilliseconds(250))));
+        stopwatch.Stop();
 
-            var stopwatch = Stopwatch.StartNew();
-            var exception = Assert.ThrowsAsync<TimeoutException>((Func<Task>)(async () =>
-                _ = await RunPerformanceProbeDotnetAsync(
-                    project,
-                    restore: true,
-                    symbol: null,
-                    timeout: TimeSpan.FromMilliseconds(250))));
-            stopwatch.Stop();
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(exception!.Message, Does.Contain("restore"));
-                Assert.That(exception.Message, Does.Contain("exceeded"));
-                Assert.That(
-                    stopwatch.Elapsed,
-                    Is.LessThan(TimeSpan.FromSeconds(5)));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(temporaryRoot, recursive: true);
+            Assert.That(exception!.Message, Does.Contain("restore"));
+            Assert.That(exception.Message, Does.Contain("exceeded"));
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromSeconds(5)));
         }
     }
 

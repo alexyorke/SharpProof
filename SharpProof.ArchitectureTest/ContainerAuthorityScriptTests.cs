@@ -220,41 +220,32 @@ public sealed class ContainerAuthorityScriptTests
         Func<string, string> mutateCompose)
     {
         var root = TestRepository.FindRoot();
-        var fixture = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.ContainerAuthority." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(fixture);
-        try
-        {
-            var dockerfile = Path.Combine(fixture, "Dockerfile");
-            var compose = Path.Combine(fixture, "compose.yaml");
-            await File.WriteAllTextAsync(
-                dockerfile,
-                mutateDockerfile(await File.ReadAllTextAsync(Path.Combine(
-                    root, "eng", "container", "Dockerfile"))));
-            await File.WriteAllTextAsync(
-                compose,
-                mutateCompose(await File.ReadAllTextAsync(Path.Combine(
-                    root, "compose.yaml"))));
-            return await ArchitectureRepository.RunProcessAsync(
-                root,
-                (IReadOnlyDictionary<string, string>?)null,
-                "pwsh",
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-File",
-                Path.Combine(root, "scripts", "Test-SharpProofContainerContract.ps1"),
-                "-DockerfilePath",
-                dockerfile,
-                "-ComposePath",
-                compose,
-                "-AuthorityOnly");
-        }
-        finally
-        {
-            Directory.Delete(fixture, recursive: true);
-        }
+        using var temporary = new TempDirectory("SharpProof.ContainerAuthority-");
+        var fixture = temporary.FullName;
+        var dockerfile = Path.Combine(fixture, "Dockerfile");
+        var compose = Path.Combine(fixture, "compose.yaml");
+        await File.WriteAllTextAsync(
+            dockerfile,
+            mutateDockerfile(await File.ReadAllTextAsync(Path.Combine(
+                root, "eng", "container", "Dockerfile"))));
+        await File.WriteAllTextAsync(
+            compose,
+            mutateCompose(await File.ReadAllTextAsync(Path.Combine(
+                root, "compose.yaml"))));
+        return await ArchitectureRepository.RunProcessAsync(
+            root,
+            (IReadOnlyDictionary<string, string>?)null,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(root, "scripts", "Test-SharpProofContainerContract.ps1"),
+            "-DockerfilePath",
+            dockerfile,
+            "-ComposePath",
+            compose,
+            "-AuthorityOnly");
     }
 
     private static string ResolveComposeImage(

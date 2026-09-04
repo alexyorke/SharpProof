@@ -442,28 +442,21 @@ public sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void RequestProjectionRejectsDirectoryResultBeforeManifestRead()
     {
-        var root = Directory.CreateTempSubdirectory(
-            "sharpproof-directory-result-");
+        using var root = new TempDirectory("sharpproof-directory-result-");
         var workerDirectory = Path.Combine(root.FullName, "worker");
         var ioDirectory = Path.Combine(root.FullName, "io");
         var resultDirectory = Path.Combine(ioDirectory, "result.json");
         Directory.CreateDirectory(workerDirectory);
         Directory.CreateDirectory(resultDirectory);
-        try
-        {
-            var arguments = ProjectionArguments(
-                worker: Path.Combine(workerDirectory, "worker.dll"),
-                request: Path.Combine(ioDirectory, "request.json"),
-                result: resultDirectory,
-                compilerManifest: Path.Combine(
-                    ioDirectory,
-                    "missing-compiler-manifest.json"));
-            AssertRequestProjectionRejects(arguments);
-        }
-        finally
-        {
-            root.Delete(recursive: true);
-        }
+
+        var arguments = ProjectionArguments(
+            worker: Path.Combine(workerDirectory, "worker.dll"),
+            request: Path.Combine(ioDirectory, "request.json"),
+            result: resultDirectory,
+            compilerManifest: Path.Combine(
+                ioDirectory,
+                "missing-compiler-manifest.json"));
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -549,35 +542,27 @@ public sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void DisabledCachePathDoesNotParticipateInIoTopology()
     {
-        var outputRoot = Directory.CreateTempSubdirectory(
-            "sharpproof-disabled-cache-");
-        try
-        {
-            var requestPath = Path.Combine(
+        using var outputRoot = new TempDirectory("sharpproof-disabled-cache-");
+        var requestPath = Path.Combine(
+            outputRoot.FullName,
+            "disabled-cache-request.json");
+        var arguments = ProjectionArguments(
+            request: requestPath,
+            result: Path.Combine(
                 outputRoot.FullName,
-                "disabled-cache-request.json");
-            var arguments = ProjectionArguments(
-                request: requestPath,
-                result: Path.Combine(
-                    outputRoot.FullName,
-                    "disabled-cache-result.json"),
-                compilerManifest: Path.Combine(
-                    outputRoot.FullName,
-                    "missing-compiler-manifest.json"),
-                cacheDirectory: requestPath,
-                cacheEnabled: false);
-            Assert.That(
-                LauncherArguments.TryParse(arguments, out var parsed),
-                Is.True);
+                "disabled-cache-result.json"),
+            compilerManifest: Path.Combine(
+                outputRoot.FullName,
+                "missing-compiler-manifest.json"),
+            cacheDirectory: requestPath,
+            cacheEnabled: false);
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
 
-            Assert.That(
-                (Action)(() => parsed.CreateRequest(out _, out _)),
-                Throws.TypeOf<FileNotFoundException>());
-        }
-        finally
-        {
-            outputRoot.Delete(recursive: true);
-        }
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<FileNotFoundException>());
     }
 
     [TestCase(false)]
