@@ -370,21 +370,16 @@ try {
     }
 
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-        $packageManifest = Get-Content -LiteralPath (Join-Path `
-            $repositoryRoot 'scripts/package-projects.json') -Raw |
-            ConvertFrom-Json
         Invoke-SharpProofTimedPhase -Name 'pack' `
             -Timings $phaseTimings -RecordOnFailure -Action {
-            foreach ($project in @($packageManifest.projects)) {
-                Invoke-SharpProofRequiredDotnet `
-                    -Arguments @(
-                        'pack', [string]$project, '-c', 'Release',
-                        '--no-restore', '--no-build', '--nologo',
-                        '/nodeReuse:false', '--output', $feed,
-                        '/p:GeneratePackageOnBuild=false') `
-                    -TimeoutSeconds $TimeoutSeconds `
-                    -Quiet:$Quiet
-            }
+            Invoke-SharpProofRequiredDotnet `
+                -Arguments @(
+                    'pack', 'SharpProof.sln', '-c', 'Release',
+                    '--no-restore', '--no-build', '--nologo',
+                    '/nodeReuse:false', '--output', $feed,
+                    '/p:GeneratePackageOnBuild=false') `
+                -TimeoutSeconds $TimeoutSeconds `
+                -Quiet:$Quiet
         }
     }
 

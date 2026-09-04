@@ -590,7 +590,6 @@ switch ($Command) {
             [IO.Directory]::Delete($resolvedOutput, $true)
         }
         [System.IO.Directory]::CreateDirectory($output) | Out-Null
-        $manifest = Get-Content (Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw | ConvertFrom-Json
         $repositoryCommit = (& git rev-parse HEAD).Trim()
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
             throw 'Could not resolve the repository commit for package provenance.'
@@ -601,13 +600,11 @@ switch ($Command) {
             -AdditionalBuildArguments @(
                 '/p:GeneratePackageOnBuild=false',
                 $repositoryCommitProperty)
-        foreach ($project in @($manifest.projects)) {
-            Invoke-DotNet @(
-                'pack', [string]$project, '--configuration', 'Release',
-                '--output', $output, '--no-build', '--no-restore',
-                '/p:GeneratePackageOnBuild=false',
-                $repositoryCommitProperty)
-        }
+        Invoke-DotNet @(
+            'pack', 'SharpProof.sln', '--configuration', 'Release',
+            '--output', $output, '--no-build', '--no-restore',
+            '/p:GeneratePackageOnBuild=false',
+            $repositoryCommitProperty)
         Invoke-RequiredScript 'scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `
             @{ PackageSource = $output; ValidatePackageSourceOnly = $true }
