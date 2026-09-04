@@ -18,16 +18,6 @@ $OutputPath = Resolve-SharpProofPath $OutputPath (
 $BuildTasksOutputPath = Resolve-SharpProofPath $BuildTasksOutputPath (
     Join-Path $repositoryRoot 'SharpProof.BuildTasks\LauncherRuntimeCompanionInventory.generated.cs')
 
-function Assert-Choice(
-    [object]$Value,
-    [string[]]$Allowed,
-    [string]$Context) {
-    if ($Value -isnot [string] -or [string]$Value -notin $Allowed) {
-        throw "$Context must be one of: $($Allowed -join ', ')."
-    }
-    return [string]$Value
-}
-
 $catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
 $document = [System.Text.Json.JsonDocument]::Parse($catalogJson)
 try {
@@ -89,10 +79,10 @@ foreach ($option in @($catalog.options)) {
         -not $optionKeys.Add([string]$option.key)) {
         throw "Launcher option key is invalid or duplicated: '$($option.key)'."
     }
-    $category = Assert-Choice $option.category `
+    $category = Assert-EnumName $option.category `
         @('required', 'publication', 'optional') `
         "launcher option '$($option.key)' category"
-    $accessor = Assert-Choice $option.accessor `
+    $accessor = Assert-EnumName $option.accessor `
         @('none', 'fullPath', 'optionalFullPath', 'integer') `
         "launcher option '$($option.key)' accessor"
     if ($category -eq 'publication' -and $accessor -ne 'optionalFullPath') {

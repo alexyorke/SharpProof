@@ -240,7 +240,7 @@ function Assert-JsonInt32 {
     return [int]$number
 }
 
-function Assert-EnumValue {
+function Assert-SpecEnumValue {
     param(
         [AllowNull()]
         [object]$Value,
@@ -295,7 +295,7 @@ function Format-EnumValue {
         }
         return 'null'
     }
-    $text = Assert-EnumValue `
+    $text = Assert-SpecEnumValue `
         -Value $Value `
         -Type $Type `
         -Context $Context
@@ -581,7 +581,7 @@ foreach ($set in @($catalog.assemblySets)) {
             throw "Assembly identity '$name' requires a reference family."
         }
         foreach ($familyValue in $familyValues) {
-            $family = Assert-EnumValue `
+            $family = Assert-SpecEnumValue `
                 -Value $familyValue `
                 -Type 'ApiSpecReferenceFamily' `
                 -Context "assemblySets[$id].identities[].referenceFamilies[]"
@@ -615,7 +615,7 @@ foreach ($evidence in @($catalog.evidence)) {
     if ($evidenceById.ContainsKey($id)) {
         throw "Duplicate evidence '$id'."
     }
-    [void](Assert-EnumValue `
+    [void](Assert-SpecEnumValue `
         -Value $evidence.kind `
         -Type 'SpecEvidenceKind' `
         -Context "evidence[$id].kind")
