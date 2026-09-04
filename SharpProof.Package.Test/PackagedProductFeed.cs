@@ -144,25 +144,26 @@ internal sealed class PackagedProductFeed : IDisposable
         Directory.CreateDirectory(sourceDirectory);
         try
         {
-            foreach (var project in ReadPackageProjects(repositoryRoot))
+            // Keep the package catalog as the topology check, but invoke one
+            // solution-level pack so the SDK can schedule the shared project
+            // closure once instead of starting three sequential pack graphs.
+            _ = ReadPackageProjects(repositoryRoot);
+            var result = await RunDotNetAsync(
+                repositoryRoot,
+                "pack",
+                "SharpProof.sln",
+                "-c",
+                "Release",
+                "--nologo",
+                "/nodeReuse:false",
+                "-p:GeneratePackageOnBuild=false",
+                "--output",
+                sourceDirectory);
+            if (result.ExitCode != 0)
             {
-                var result = await RunDotNetAsync(
-                    repositoryRoot,
-                    "pack",
-                    Path.Combine(repositoryRoot, project),
-                    "-c",
-                    "Release",
-                    "--nologo",
-                    "/nodeReuse:false",
-                    "-p:GeneratePackageOnBuild=false",
-                    "--output",
-                    sourceDirectory);
-                if (result.ExitCode != 0)
-                {
-                    throw new InvalidOperationException(
-                        "Packing failed for " + project +
-                        Environment.NewLine + result.Output);
-                }
+                throw new InvalidOperationException(
+                    "Packing SharpProof.sln failed." +
+                    Environment.NewLine + result.Output);
             }
             return CreateValidated(
                 sourceDirectory,
