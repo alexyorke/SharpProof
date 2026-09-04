@@ -21340,3 +21340,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2015 | SharpProof.Smt.Test and SharpProof.Worker.Test repeat the same NUnit one-time Z3 resolver setup; centralize the assembly-neutral fixture while retaining each test assembly's discovery boundary. | SharpProof.Smt.Test/ContainerNativeLibrarySetup.cs:6-14; SharpProof.Worker.Test/ContainerNativeLibrarySetup.cs:6-14; SharpProof.Host/ContainerNativeLibrary.cs:16-26 |
+
+## Second survey, continued: R2016 - IrProgramInterpreter duplicates optional stored-value evaluation
+
+`IrProgramInterpreter.EvaluateLocationOperands` and `EvaluateCallOperands` each handle a non-null `storedValue` by calling `_terms.Evaluate(storedValue, values, cancellationToken)`, returning the non-value result, and otherwise continuing. The surrounding operand order and terminal validation differ - sequence locations evaluate sequence and index before optional store data, while calls evaluate receiver and arguments before the same optional data and then apply the null-receiver policy - so those callers should retain their order and final decisions. A tiny `EvaluateOptionalStoredValue` helper returning the evaluation failure or `null` can own only the repeated evaluation/status branch. Without that seam, the interpreter has two copies of the same optional-operand failure contract that can drift if stored-value evaluation or cancellation/error propagation changes.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2016 | IrProgramInterpreter.EvaluateLocationOperands and EvaluateCallOperands repeat optional stored-value evaluation and failure propagation; share only that narrow helper while retaining each operand order and terminal policy. | SharpProof.Ir/IrProgramInterpreter.cs:189-196,227-234 |
