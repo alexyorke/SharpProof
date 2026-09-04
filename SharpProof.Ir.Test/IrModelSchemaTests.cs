@@ -211,7 +211,7 @@ public sealed class IrModelSchemaTests
             Assert.That(generated, Does.Not.Contain("GetBlock("));
             Assert.That(handwritten, Does.Contain("IsTerminal =>"));
             Assert.That(handwritten, Does.Contain("Terminator =>"));
-            Assert.That(handwritten, Does.Contain("_blocksById"));
+            Assert.That(handwritten, Does.Not.Contain("_blocksById"));
             Assert.That(handwritten, Does.Contain("GetBlock("));
         }
 

@@ -22492,6 +22492,10 @@ R2252 is applied: conversion ownership classification now computes an operand
 region only in the type-parameter branches that consume it, avoiding the
 discarded value-type projection. The full Effects.Test suite passes 323/323.
 
+R2225 is applied: `IrProgram.GetBlock` now validates the scoped index and reads
+the contiguous immutable block array directly; the duplicate block dictionary
+is removed. The full Ir.Test suite passes 115/115.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
