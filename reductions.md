@@ -21332,3 +21332,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2014 | `CompilerLoweredArtifact` and `CompilerCallableLowerer` duplicate IR terminator-to-successor projection; share the graph fact with explicit malformed-terminator policy while retaining throw-versus-fail-closed behavior. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:1119-1133`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:558-570` |
+
+## Second survey, continued: R2015 - Smt.Test and Worker.Test duplicate the global Z3 resolver setup
+
+`SharpProof.Smt.Test/ContainerNativeLibrarySetup.cs` and `SharpProof.Worker.Test/ContainerNativeLibrarySetup.cs` are byte-for-byte identical apart from their namespace: each declares a NUnit `[SetUpFixture]` with `[OneTimeSetUp] InstallVerifiedZ3`, and each calls `ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly)`. The setup is assembly-wide and has no test-specific policy, so a shared linked test-infrastructure file (or one centrally included source with an assembly-neutral setup type) can own it. Keeping the setup duplicated leaves two independent authorities for the same required native resolver initialization; a change to idempotence, assembly selection, or setup timing can update one test assembly and silently leave the other stale. The two namespaces and the assembly-level NUnit discovery boundary must remain explicit if centralization is implemented.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2015 | SharpProof.Smt.Test and SharpProof.Worker.Test repeat the same NUnit one-time Z3 resolver setup; centralize the assembly-neutral fixture while retaining each test assembly's discovery boundary. | SharpProof.Smt.Test/ContainerNativeLibrarySetup.cs:6-14; SharpProof.Worker.Test/ContainerNativeLibrarySetup.cs:6-14; SharpProof.Host/ContainerNativeLibrary.cs:16-26 |
