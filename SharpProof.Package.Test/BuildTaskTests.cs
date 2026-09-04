@@ -405,10 +405,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void UnterminatedVerifierOutputDoesNotCorruptCleanupReceipt()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-receipt-framing-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-receipt-framing-");
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Console.Out.Write(\"partial\");");
@@ -416,11 +413,6 @@ public sealed class BuildTaskTests
 
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.EqualTo(0));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -428,11 +420,8 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void OversizedVerifierOutputTriggersPromptBoundedContainment()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-output-limit-");
+        using var directory = new TempDirectory("sharpproof-output-limit-");
         var containmentFailure = string.Empty;
-        try
-        {
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Console.Out.Write(new string('x', " +
@@ -462,11 +451,6 @@ public sealed class BuildTaskTests
             Assert.That(
                 Volatile.Read(ref containmentFailure),
                 Is.Empty);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -474,10 +458,8 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void OversizedOutputWithIncompleteCleanupReturnsPromptly()
     {
-        var directory = Directory.CreateTempSubdirectory(
+        using var directory = new TempDirectory(
             "sharpproof-output-limit-retained-");
-        try
-        {
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Console.Out.Write(new string('x', " +
@@ -505,11 +487,6 @@ public sealed class BuildTaskTests
                     () => RunVerifier.RetainedCleanupAnchorCount == 0,
                     TimeSpan.FromSeconds(3)),
                 Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [TestCase("missing")]
@@ -519,9 +496,7 @@ public sealed class BuildTaskTests
     [Platform("Linux")]
     public void PublishedResultValidatorRejectsInvalidEvidence(string kind)
     {
-        var directory = Directory.CreateTempSubdirectory("sharpproof-result-binding-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-result-binding-");
             var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
             var request = Path.Combine(directory.FullName, "request.json");
             var result = Path.Combine(directory.FullName, "result.json");
@@ -578,11 +553,6 @@ public sealed class BuildTaskTests
 
             Assert.That(task.Execute(), Is.False);
             Assert.That(engine.Errors, Is.Not.Empty);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [TestCase("invocation-result")]
@@ -593,10 +563,7 @@ public sealed class BuildTaskTests
     public void PublishedResultValidatorRejectsOversizedProtocolFilesBeforeReading(
         string oversizedMember)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-result-size-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-result-size-");
             var manifest = Path.Combine(
                 directory.FullName,
                 "compiler-manifest.json");
@@ -687,21 +654,13 @@ public sealed class BuildTaskTests
                 engine.Errors.Single().Message,
                 Does.Contain(
                     $"exceeds the {WorkerProtocolJson.MaximumJsonBytes} byte limit"));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public void PublishedResultValidatorResolvesRelativePathsAgainstProjectDirectory()
     {
-        var parent = Directory.CreateTempSubdirectory(
-            "sharpproof-result-relative-");
-        try
-        {
+        using var parent = new TempDirectory("sharpproof-result-relative-");
             var project = Directory.CreateDirectory(
                 Path.Combine(parent.FullName, "project"));
             var evidence = Directory.CreateDirectory(
@@ -723,11 +682,6 @@ public sealed class BuildTaskTests
                 Does.Contain(
                         "SharpProof verification did not publish a valid current result")
                     .And.Not.Contain("Could not find file"));
-        }
-        finally
-        {
-            parent.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -879,10 +833,7 @@ public sealed class BuildTaskTests
         int exitCode,
         bool suppressExitDiagnostic)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-structured-exit-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-structured-exit-");
             var diagnostic = VerifierDiagnosticTransport.Serialize(
                 new VerifierDiagnostic(
                     "error",
@@ -920,11 +871,6 @@ public sealed class BuildTaskTests
                     "A partial semantic diagnostic must not suppress an " +
                     "infrastructure exit diagnostic.");
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -934,7 +880,7 @@ public sealed class BuildTaskTests
     {
         var originalHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
         var originalPath = Environment.GetEnvironmentVariable("PATH");
-        var directory = Directory.CreateTempSubdirectory("sharpproof-dotnet-host-");
+        using var directory = new TempDirectory("sharpproof-dotnet-host-");
         try
         {
             var trusted = RunVerifier.ResolveDotNetHost("dotnet");
@@ -990,7 +936,6 @@ public sealed class BuildTaskTests
         {
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", originalHost);
             Environment.SetEnvironmentVariable("PATH", originalPath);
-            directory.Delete(recursive: true);
         }
     }
 
@@ -1106,11 +1051,8 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierTaskBoundsTheWholeLauncherProcess()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-timeout-");
+        using var directory = new TempDirectory("sharpproof-launcher-timeout-");
         var containmentFailure = string.Empty;
-        try
-        {
             const int projectWallTimeMilliseconds = 2000;
             const int terminationGraceMilliseconds = 1000;
             var helper = CreateTimedProcessAssembly(directory.FullName);
@@ -1150,11 +1092,6 @@ public sealed class BuildTaskTests
             Assert.That(
                 Volatile.Read(ref containmentFailure),
                 Is.Empty);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -1162,10 +1099,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierPreLaunchSetupDoesNotConsumeCleanupReserve()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-setup-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-launcher-setup-");
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Threading.Thread.Sleep(900);");
@@ -1174,11 +1108,6 @@ public sealed class BuildTaskTests
 
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.Zero);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -1186,10 +1115,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-overflow-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-launcher-overflow-");
             var marker = Path.Combine(directory.FullName, "started.txt");
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
@@ -1209,11 +1135,6 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.EqualTo(-1));
                 Assert.That(File.Exists(marker), Is.False);
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -1221,8 +1142,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierTaskUsesOneDeadlineAndStopsOutputHoldingDescendants()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-descendant-");
+        using var directory = new TempDirectory("sharpproof-launcher-descendant-");
         int? descendantId = null;
         try
         {
@@ -1264,7 +1184,6 @@ public sealed class BuildTaskTests
             {
                 Process.GetProcessById(descendantId.Value).Kill(entireProcessTree: true);
             }
-            directory.Delete(recursive: true);
         }
     }
 
@@ -1273,8 +1192,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierSupervisorStopsSessionEscapingDescendants()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-daemon-");
+        using var directory = new TempDirectory("sharpproof-launcher-daemon-");
         int? descendantId = null;
         try
         {
@@ -1314,7 +1232,6 @@ public sealed class BuildTaskTests
                 Process.GetProcessById(descendantId.Value)
                     .Kill(entireProcessTree: true);
             }
-            directory.Delete(recursive: true);
         }
     }
 
@@ -1375,10 +1292,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierExecutionRetainsLiveIncompleteCleanupAnchor()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-retained-cleanup-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-retained-cleanup-");
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.Threading; Thread.Sleep(1500);");
@@ -1398,11 +1312,6 @@ public sealed class BuildTaskTests
                     () => RunVerifier.RetainedCleanupAnchorCount == 0,
                     TimeSpan.FromSeconds(3)),
                 Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -1410,10 +1319,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public async System.Threading.Tasks.Task CancellationInterruptsForegroundWait()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-cancel-wait-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-cancel-wait-");
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.Threading; Thread.Sleep(1500);");
@@ -1437,11 +1343,6 @@ public sealed class BuildTaskTests
                     () => RunVerifier.RetainedCleanupAnchorCount == 0,
                     TimeSpan.FromSeconds(3)),
                 Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -1449,8 +1350,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void SupervisorContainsVerifierThatKillsItsImmediateParent()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-supervisor-anchor-");
+        using var directory = new TempDirectory("sharpproof-supervisor-anchor-");
         int? descendantId = null;
         try
         {
@@ -1489,7 +1389,6 @@ public sealed class BuildTaskTests
                 Process.GetProcessById(descendantId.Value)
                     .Kill(entireProcessTree: true);
             }
-            directory.Delete(recursive: true);
         }
     }
 
@@ -1498,10 +1397,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public void VerifierTaskDoesNotReleaseCommandBeforePidFdAcquisition()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-gate-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-launcher-gate-");
             var marker = Path.Combine(directory.FullName, "started.txt");
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
@@ -1518,11 +1414,6 @@ public sealed class BuildTaskTests
                 Assert.That(File.Exists(marker), Is.False);
                 Assert.That(task.HasActiveProcess, Is.False);
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
@@ -1543,9 +1434,7 @@ public sealed class BuildTaskTests
     [NonParallelizable]
     public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
     {
-        var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-cancel-");
             var helper = CreateTimedProcessAssembly(directory.FullName);
             var containmentFailure = string.Empty;
             using var task = CreateVerifier(directory, helper);
@@ -1574,11 +1463,6 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.Not.Zero);
                 Assert.That(containmentFailure, Is.Empty);
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     private static string CreateTimedProcessAssembly(
@@ -1662,10 +1546,7 @@ public sealed class BuildTaskTests
     public void InvalidationRejectsSymmetricIoTopologyBeforeMutation(
         string collision)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-topology-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-topology-");
             var tools = Directory.CreateDirectory(
                 Path.Combine(directory.FullName, "tools"));
             var worker = Path.Combine(tools.FullName, "worker.dll");
@@ -1732,20 +1613,13 @@ public sealed class BuildTaskTests
                         .Select(LinuxPathIdentity.PublicationMarkerPath),
                     Has.None.Matches<string>(File.Exists));
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public void InvalidationDeletesOnlyThePublishedOutputs()
     {
-        var directory = Directory.CreateTempSubdirectory("sharpproof-task-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-task-");
             var publication = Directory.CreateDirectory(
                 Path.Combine(directory.FullName, "publication"));
             var tools = Directory.CreateDirectory(
@@ -1803,21 +1677,13 @@ public sealed class BuildTaskTests
                 Assert.That(File.ReadAllText(protocol), Is.EqualTo("protocol.dll"));
                 Assert.That(engine.Errors, Is.Empty);
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public void EveryPublicationMemberRejectsEveryCompilerOwnedOutput()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-compiler-output-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-compiler-output-");
             var tools = Directory.CreateDirectory(
                 Path.Combine(directory.FullName, "tools"));
             var worker = Path.Combine(tools.FullName, "worker.dll");
@@ -1931,21 +1797,13 @@ public sealed class BuildTaskTests
                     }
                 }
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public async System.Threading.Tasks.Task PublicationResetRemovesOnlyCompleteOwnedSet()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-publication-reset-");
-        try
-        {
+        using var directory = new TempDirectory("sharpproof-publication-reset-");
             var request = Path.Combine(directory.FullName, "request.json");
             var oldResult = Path.Combine(directory.FullName, "result-a.json");
             var newResult = Path.Combine(directory.FullName, "result-b.json");
@@ -2007,21 +1865,14 @@ public sealed class BuildTaskTests
             LinuxPathIdentity.ResetPublicationSet(
                 setB,
                 TimeSpan.FromSeconds(5));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public async System.Threading.Tasks.Task PublicationResetResolvesRelativePathsAgainstProjectDirectory()
     {
-        var parent = Directory.CreateTempSubdirectory(
+        using var parent = new TempDirectory(
             "sharpproof-publication-reset-relative-");
-        try
-        {
             var project = Directory.CreateDirectory(
                 Path.Combine(parent.FullName, "project"));
             var evidence = Directory.CreateDirectory(
@@ -2054,21 +1905,14 @@ public sealed class BuildTaskTests
 
             Assert.That(reset.Execute(), Is.True);
             Assert.That(paths.Any(File.Exists), Is.False);
-        }
-        finally
-        {
-            parent.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public void PublicationResetRejectsPartialOwnershipWithoutDeletingMembers()
     {
-        var directory = Directory.CreateTempSubdirectory(
+        using var directory = new TempDirectory(
             "sharpproof-publication-reset-partial-");
-        try
-        {
             var set = new[]
             {
                 Path.Combine(directory.FullName, "request.json"),
@@ -2092,21 +1936,14 @@ public sealed class BuildTaskTests
                     TimeSpan.FromSeconds(5))),
                 Throws.TypeOf<IOException>());
             Assert.That(set.All(File.Exists), Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public void PublicationResetRecoversInterruptedMarkerCleanupWhenMembersAreAbsent()
     {
-        var directory = Directory.CreateTempSubdirectory(
+        using var directory = new TempDirectory(
             "sharpproof-publication-reset-recovery-");
-        try
-        {
             var set = new[]
             {
                 Path.Combine(directory.FullName, "request.json"),
@@ -2129,21 +1966,14 @@ public sealed class BuildTaskTests
                 set.Any(path => File.Exists(
                     LinuxPathIdentity.PublicationMarkerPath(path))),
                 Is.False);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Test]
     [Platform("Linux")]
     public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
     {
-        var directory = Directory.CreateTempSubdirectory(
+        using var directory = new TempDirectory(
             "sharpproof-invalidation-cancel-");
-        try
-        {
             var tools = Directory.CreateDirectory(
                 Path.Combine(directory.FullName, "tools"));
             var result = Path.Combine(directory.FullName, "result.json");
@@ -2219,15 +2049,10 @@ public sealed class BuildTaskTests
                 releaseLock.Set();
                 await lockTask.WaitAsync(TimeSpan.FromSeconds(5));
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     private static RunVerifier CreateVerifier(
-        DirectoryInfo directory,
+        TempDirectory directory,
         string helper,
         int wallTimeMilliseconds = 300000,
         int graceMilliseconds = 1000,

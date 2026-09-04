@@ -32,29 +32,19 @@ public sealed class AcceptancePerformanceContractTests
         contract[sectionName]!.AsObject()[propertyName] =
             JsonNode.Parse(jsonValue);
 
-        var probeRoot = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Gates.Test",
-            Guid.NewGuid().ToString("N"));
+        using var probeRoot = new TempDirectory("SharpProof.Gates.Test-");
         var probeDirectory = Path.Combine(
-            probeRoot,
+            probeRoot.FullName,
             "eng",
             "acceptance");
         Directory.CreateDirectory(probeDirectory);
         File.WriteAllText(
             Path.Combine(probeDirectory, "contract.json"),
             contract.ToJsonString());
-        try
-        {
-            Assert.That(
-                (Action)(() =>
-                    _ = AcceptancePerformanceContract.Load(probeRoot)),
-                Throws.TypeOf<InvalidDataException>()
-                    .With.Message.Contains(propertyName));
-        }
-        finally
-        {
-            Directory.Delete(probeRoot, recursive: true);
-        }
+        Assert.That(
+            (Action)(() =>
+                _ = AcceptancePerformanceContract.Load(probeRoot.FullName)),
+            Throws.TypeOf<InvalidDataException>()
+                .With.Message.Contains(propertyName));
     }
 }
