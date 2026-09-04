@@ -520,29 +520,64 @@ try {
         })
     }
     else {
-        $fixtureClasses = @(
-            'CompilerProbeInputConsistencyTests',
-            'CompilerProbeSnapshotTests',
-            'DependencyAuditScriptTests',
-            'FinalCompilationProbeTests',
-            'LauncherArgumentTests',
-            'ReleasePublicationScriptTests',
-            'SarifProjectionTests',
-            'VerifierDiagnosticTransportTests',
-            'VerifierProcessSupervisorBug202Tests')
-        foreach ($fixtureClass in $fixtureClasses) {
-            $filter =
-                "FullyQualifiedName~SharpProof.Package.Test.$fixtureClass"
+        $fixtureShards = @(
+            [pscustomobject]@{
+                Name = 'compilerprobeinputconsistencytests'
+                Classes = @('CompilerProbeInputConsistencyTests')
+            },
+            [pscustomobject]@{
+                Name = 'compilerprobesnapshottests'
+                Classes = @('CompilerProbeSnapshotTests')
+            },
+            [pscustomobject]@{
+                Name = 'dependencyauditscripttests'
+                Classes = @('DependencyAuditScriptTests')
+            },
+            [pscustomobject]@{
+                Name = 'finalcompilationprobetests'
+                Classes = @('FinalCompilationProbeTests')
+            },
+            [pscustomobject]@{
+                Name = 'launcherargumenttests'
+                Classes = @('LauncherArgumentTests')
+            },
+            [pscustomobject]@{
+                Name = 'releasepublicationscripttests'
+                Classes = @('ReleasePublicationScriptTests')
+            },
+            [pscustomobject]@{
+                Name = 'sarifprojection-and-verifierdiagnostictransporttests'
+                Classes = @(
+                    'SarifProjectionTests',
+                    'VerifierDiagnosticTransportTests')
+            },
+            [pscustomobject]@{
+                Name = 'verifierprocesssupervisorbug202tests'
+                Classes = @('VerifierProcessSupervisorBug202Tests')
+            })
+        foreach ($fixtureShard in $fixtureShards) {
+            $classFilters = @($fixtureShard.Classes | ForEach-Object {
+                    "FullyQualifiedName~SharpProof.Package.Test.$_"
+                })
+            $filter = $classFilters -join '|'
+            $estimatedMilliseconds = if (
+                $priorFilterMilliseconds.ContainsKey($filter)) {
+                [long]$priorFilterMilliseconds[$filter]
+            }
+            else {
+                [long](@($classFilters | ForEach-Object {
+                            if ($priorFilterMilliseconds.ContainsKey($_)) {
+                                [long]$priorFilterMilliseconds[$_]
+                            }
+                            else {
+                                1L
+                            }
+                        } | Measure-Object -Sum).Sum)
+            }
             $shards.Add([pscustomobject]@{
-                Name = 'fixture-' + $fixtureClass.ToLowerInvariant()
+                Name = 'fixture-' + $fixtureShard.Name
                 Filter = $filter
-                EstimatedMilliseconds =
-                    $(if ($priorFilterMilliseconds.ContainsKey($filter)) {
-                        [long]$priorFilterMilliseconds[$filter]
-                    }
-                    else {
-                        1L
-                    })
+                EstimatedMilliseconds = $estimatedMilliseconds
                 })
         }
         $buildTaskClass = 'SharpProof.Package.Test.BuildTaskTests'
