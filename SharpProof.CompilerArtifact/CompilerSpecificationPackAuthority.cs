@@ -33,7 +33,6 @@ internal static class CompilerSpecificationPackAuthorityValidation
         if (packIds == null ||
             catalogVersion != CompilerSpecificationPackCatalogVersions.Current ||
             catalogSha256 != CompilerSpecificationPackCatalogVersions.Sha256 ||
-            !WorkerProtocolJson.IsSha256(catalogSha256!) ||
             !packIds.All(ValidPackId) ||
             !IsCanonical(packIds))
         {
