@@ -49,26 +49,28 @@ internal sealed partial class LauncherArguments
         "cache-maximum-bytes",
     ];
 
-    internal static string[] LauncherRuntimePaths
-    {
-        get
+    private static readonly System.Lazy<string[]> s_launcherRuntimePaths = new(
+        static () =>
         {
             var path = typeof(LauncherArguments).Assembly.Location;
+            var directory = System.IO.Path.GetDirectoryName(path)!;
             return [
                 path,
                 System.IO.Path.ChangeExtension(path, ".deps.json"),
                 System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.CompilerArtifact.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Host.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Ir.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Specs.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
+                System.IO.Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Host.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Ir.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Specs.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
+                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
+                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
+                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
             ];
-        }
-    }
+        });
+
+    internal static System.Collections.Generic.IReadOnlyList<string> LauncherRuntimePaths =>
+        s_launcherRuntimePaths.Value;
 
     internal string WorkerPath => FullPath("worker");
     internal string RequestPath => FullPath("request");

@@ -220,11 +220,11 @@ foreach ($entry in @($catalog.options)) {
 }
 $lines.Add('    ];')
 $lines.Add('')
-$lines.Add('    internal static string[] LauncherRuntimePaths')
-$lines.Add('    {')
-$lines.Add('        get')
+$lines.Add('    private static readonly System.Lazy<string[]> s_launcherRuntimePaths = new(')
+$lines.Add('        static () =>')
 $lines.Add('        {')
 $lines.Add('            var path = typeof(LauncherArguments).Assembly.Location;')
+$lines.Add('            var directory = System.IO.Path.GetDirectoryName(path)!;')
 $lines.Add('            return [')
 $lines.Add('                path,')
 foreach ($extension in $runtimeCompanionExtensions) {
@@ -248,13 +248,15 @@ foreach ($file in $runtimeCompanionFiles) {
         ConvertTo-CSharpString $file
     }
     $lines.Add(
-        "                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, " +
+        "                System.IO.Path.Combine(directory, " +
         "$fileExpression),")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
 $lines.Add('            ];')
-$lines.Add('        }')
-$lines.Add('    }')
+$lines.Add('        });')
+$lines.Add('')
+$lines.Add('    internal static System.Collections.Generic.IReadOnlyList<string> LauncherRuntimePaths =>')
+$lines.Add('        s_launcherRuntimePaths.Value;')
 $lines.Add('')
 foreach ($entry in @($catalog.options | Where-Object accessor -ne 'none')) {
     $key = ConvertTo-CSharpString $entry.key
