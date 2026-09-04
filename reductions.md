@@ -22443,6 +22443,11 @@ including matching array-element traversal, and `VisitDefaultValue` reuses the
 type it already specialized instead of invoking the injectable specializer a
 second time. The full Frontend.Test suite passes 121/121.
 
+R2326 is applied: conversion lowering now feeds its already-specialized target
+to the value-domain check and type-ID path, avoiding duplicate specialization
+while preserving conversion classification and the injectable-specializer
+contract. The full Frontend.Test suite passes 121/121.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

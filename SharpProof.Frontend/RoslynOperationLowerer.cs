@@ -146,10 +146,11 @@ public sealed class RoslynOperationLowerer
                 CompilerIdentityBridge.CreateTypeDisplay(type));
     }
 
-    internal bool IsSupportedValueDomain(ITypeSymbol? type)
+    internal bool IsSupportedValueDomain(
+        ITypeSymbol? type, bool typeAlreadySpecialized = false)
     {
         return CompilerIdentityBridge.IsSupportedValueDomain(
-            TypeSpecializer(type));
+            typeAlreadySpecialized ? type : TypeSpecializer(type));
     }
 
     internal IrVariableTerm GetVariable(ISymbol symbol, ITypeSymbol? type)
@@ -925,7 +926,8 @@ public sealed class RoslynOperationLowerer
                 _owner.TypeSpecializer(operation.Operand.Type);
             var specializedTargetType =
                 _owner.TypeSpecializer(operation.Type);
-            if (!_owner.IsSupportedValueDomain(specializedTargetType))
+            if (!_owner.IsSupportedValueDomain(
+                    specializedTargetType, typeAlreadySpecialized: true))
             {
                 // Nullable targets are outside the IR value domain, but a
                 // conversion from a non-constant supported operand still has
@@ -960,7 +962,8 @@ public sealed class RoslynOperationLowerer
                     operand.Classification.Abstention);
             }
 
-            var target = _owner.GetTypeId(operation.Type);
+            var target = _owner.GetTypeId(
+                specializedTargetType, typeAlreadySpecialized: true);
             if (SymbolEqualityComparer.Default.Equals(
                     specializedOperandType,
                     specializedTargetType))
