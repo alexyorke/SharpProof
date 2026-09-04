@@ -4,7 +4,7 @@ internal static class ArrayLengthFacts
 {
     internal static bool TryGetConstantLength(
         IOperation? operation,
-        out int length)
+        out long length)
     {
         if (operation is IArrayCreationOperation
             { DimensionSizes.Length: 1 } array &&

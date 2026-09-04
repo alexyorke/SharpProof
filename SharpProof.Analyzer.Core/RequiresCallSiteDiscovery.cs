@@ -1554,12 +1554,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
         instance = instance == null
             ? null
             : DefiniteOperationFacts.UnwrapHarmlessValue(instance);
-        if (instance is IArrayCreationOperation
-            { DimensionSizes.Length: 1 } arrayCreation &&
-            arrayCreation.DimensionSizes[0].ConstantValue is
-            { HasValue: true, Value: int arrayLength })
+        if (SharpProof.Effects.ArrayLengthFacts.TryGetConstantLength(
+                instance,
+                out length))
         {
-            length = arrayLength;
             return true;
         }
         if (pattern.LengthSymbol is not IPropertySymbol
