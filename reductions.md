@@ -21456,3 +21456,17 @@ project.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2028 | **`SharpProof.Dataflow.csproj` retains an inert empty `<ItemGroup>`.** Remove the empty XML without changing the linked guard source or `InternalsVisibleTo` declarations. | `SharpProof.Dataflow/SharpProof.Dataflow.csproj:7-19` |
+
+## Second survey, continued: R2029 - PerformanceGate repeats its no-BOM encoder construction
+
+`PerformanceGate.CreatePerformanceProbeProject` writes two files with the same
+`new UTF8Encoding(false)` expression: the generated `Subject.cs` and the
+generated `Probe.csproj`. Both writes require the same UTF-8-without-BOM policy,
+and the method has no per-file encoding variation. Hoisting one read-only
+encoder to `PerformanceGate` (or using one shared no-BOM encoding helper) removes
+the duplicate construction while preserving the exact text bytes and the
+separate file-generation steps.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2029 | **`PerformanceGate.CreatePerformanceProbeProject` constructs the same no-BOM `UTF8Encoding` twice for adjacent generated-file writes.** Reuse one class-level encoder while retaining the distinct `Subject.cs` and `Probe.csproj` contents. | `SharpProof.Gates/Performance/PerformanceGate.cs:499-508,540-556` |
