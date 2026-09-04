@@ -24,6 +24,7 @@ internal sealed partial class OperationEffectScanner
     private readonly ConversionOwnershipClassifier _conversionOwnership;
     private readonly IMethodSymbol _method;
     private readonly INamedTypeSymbol? _monitorType;
+    private readonly ImmutableArray<IOperation> _operations;
     private readonly IOperation _root;
     private readonly EffectAnalysisSession _session;
     private readonly OperationNullnessEvaluator _nullnessEvaluator;
@@ -97,6 +98,7 @@ internal sealed partial class OperationEffectScanner
             session.KnownSymbols,
             IsKnownNonThrowing);
         var operations = root.DescendantsAndSelf().ToImmutableArray();
+        _operations = operations;
         var useAbstractReachability = true;
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
@@ -165,7 +167,10 @@ internal sealed partial class OperationEffectScanner
     internal EffectSummary ScanLexicalControlEffects(IOperation root)
     {
         var result = EffectSummary.Empty;
-        foreach (var operation in root.DescendantsAndSelf()
+        IEnumerable<IOperation> operations = ReferenceEquals(root, _root)
+            ? _operations
+            : root.DescendantsAndSelf();
+        foreach (var operation in operations
                      .Where(operation =>
                          operation is ILockOperation or IThrowOperation &&
                          !ConversionOwnershipClassifier.IsInsideNestedCallable(operation, root)))
@@ -216,6 +221,9 @@ internal sealed partial class OperationEffectScanner
 
     internal EffectSummary ScanUsingDisposalEffects(IOperation root)
     {
+        var operations = ReferenceEquals(root, _root)
+            ? _operations
+            : default;
         return new UsingDisposalEffectResolver(
             _session.Compilation,
             _method,
@@ -226,7 +234,8 @@ internal sealed partial class OperationEffectScanner
                 _completionEvaluator.CanCompleteNormally,
                 _completionEvaluator.CanMethodCompleteNormally,
                 _handlerReachability.CanMethodThrow,
-                _handlerReachability.CanExitAbruptly);
+                _handlerReachability.CanExitAbruptly,
+                operations);
     }
 
     private EffectSummary Scan(

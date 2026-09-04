@@ -35,10 +35,14 @@ internal sealed class UsingDisposalEffectResolver
         Func<IOperation?, bool> canCompleteNormally,
         Func<IMethodSymbol, bool> canMethodCompleteNormally,
         Func<IMethodSymbol, bool> canMethodThrow,
-        Func<IOperation, IOperation, bool> canExitAbruptly)
+        Func<IOperation, IOperation, bool> canExitAbruptly,
+        ImmutableArray<IOperation> operations = default)
     {
         var summary = EffectSummary.Empty;
-        foreach (var operation in root.DescendantsAndSelf()
+        IEnumerable<IOperation> candidates = operations.IsDefault
+            ? root.DescendantsAndSelf()
+            : operations;
+        foreach (var operation in candidates
                      .Where(static operation =>
                          operation is IUsingOperation or
                              IUsingDeclarationOperation))
