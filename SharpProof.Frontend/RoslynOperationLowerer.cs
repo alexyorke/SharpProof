@@ -108,9 +108,13 @@ public sealed class RoslynOperationLowerer
         return lowered;
     }
 
-    internal IrTypeId GetTypeId(ITypeSymbol? type)
+    internal IrTypeId GetTypeId(
+        ITypeSymbol? type, bool typeAlreadySpecialized = false)
     {
-        type = TypeSpecializer(type);
+        if (!typeAlreadySpecialized)
+        {
+            type = TypeSpecializer(type);
+        }
         if (type == null)
         {
             return _factory.ObjectType;
@@ -125,7 +129,7 @@ public sealed class RoslynOperationLowerer
 
         if (type is IArrayTypeSymbol array)
         {
-            var element = GetTypeId(array.ElementType);
+            var element = GetTypeId(array.ElementType, typeAlreadySpecialized);
             return _factory.GetOrCreateSequenceType(
                 CompilerIdentityBridge.InternType(_factory, array), element,
                 CompilerIdentityBridge.CreateTypeDisplay(array));
@@ -649,7 +653,7 @@ public sealed class RoslynOperationLowerer
                     FrontendAbstention.UnsupportedType);
             }
 
-            var typeId = _owner.GetTypeId(type);
+            var typeId = _owner.GetTypeId(type, typeAlreadySpecialized: true);
             return LoweredExpression.Exact(
                 _owner._factory.Null(typeId));
         }
