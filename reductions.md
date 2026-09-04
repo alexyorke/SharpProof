@@ -21404,3 +21404,19 @@ Assert-SharpProofStandaloneGateResult.ps1 defines Assert-UniqueJsonElementProper
 | ID | Finding | Evidence |
 |---|---|---|
 | R2023 | RunVerifier and VerifierProcessSupervisor duplicate pidfd_open/pidfd_send_signal argument projections; share only the syscall-shape helper while retaining their distinct override, checked-cast, retry, and negative-result policies. | SharpProof.BuildTasks/RunVerifier.cs:1098-1128; SharpProof.BuildTasks/VerifierProcessSupervisor.cs:475-491; related R330, R356 |
+
+## Second survey, continued: R2024 - IrCSharpDifferentialOracle widens a concrete private collection protocol
+
+`TryCollectTerms` is a private method with one call site, and that caller passes a `SortedDictionary<int, IrVarId>`, a `HashSet<IrId>`, and a `List<IrTerm>`. The method uses the concrete operations supplied by those instances - indexed variable assignment, visited-set insertion, and term appending - but exposes them as `IDictionary`, `ISet`, and `ICollection`. The canonical Linux `tooling build` therefore reports CA1859 for all three parameters. Because no alternate implementation can reach this private seam, the interface types add an unused substitution boundary and obscure the actual allocation/performance contract. Narrowing the parameters to the concrete types (or to purpose-specific wrappers with the same single implementation) would remove that accidental abstraction while preserving the explicit-stack traversal, declaration order, and fail-closed checks recorded by R591 and R882.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2024 | `IrCSharpDifferentialOracle.TryCollectTerms` exposes `IDictionary`/`ISet`/`ICollection` parameters even though its sole caller supplies `SortedDictionary`/`HashSet`/`List`; narrow this private protocol to remove an unused abstraction and the three CA1859 diagnostics. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:115-123,202-247`; `SharpProof.Testing/IrCSharpDifferentialOracle.cs:204-206` in the canonical Linux `tooling build` diagnostics; related R591, R882 |
+
+## Second survey, continued: R2025 - Effects regression fixture factories widen concrete Roslyn compilations
+
+Eleven private factories across eight Effects test files return `Microsoft.CodeAnalysis.Compilation` even though every body directly returns `EffectTestHost.CreateCompilation`, whose overloads and core are declared to return `CSharpCompilation`. The factories have no alternate implementation, and their cached fields are only widened later when passed to general Roslyn test helpers. The canonical Linux `tooling build` reports CA1859 at each factory declaration. Returning `CSharpCompilation` at these narrow construction seams preserves the callers' ability to consume `Compilation`, makes the actual immutable fixture type explicit, and removes repeated accidental widening. This is separate from R1522-R1529's repeated parse/bind work and R626's internal factoring of `EffectTestHost` itself.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2025 | Eleven private Effects regression factories unnecessarily return abstract `Compilation` while directly forwarding the concrete `EffectTestHost.CreateCompilation` result; return `CSharpCompilation` to remove the repeated CA1859 widening without changing the shared analysis APIs. | `SharpProof.Effects.Test/BinaryPatternCompletionRegressionTests.cs:29-31`; `AssignableRecursivePatternCompletionRegressionTests.cs:49-51`; `BranchingExpressionEffectRegressionTests.cs:30-32,84-86`; `ConditionalTruthOperatorEffectTests.cs:30-32,140-142`; `ConstantTrueLoopCompletionTests.cs:56-58`; `FalseSwitchGuardPatternRegressionTests.cs:35-37`; `NullablePatternCompletionRegressionTests.cs:36-38`; `IndirectLocalMutationNullnessRegressionTests.cs:34-36,92-94`; `SharpProof.Effects.Test/EffectTestHost.cs:11-41,287-315`; related R1522-R1529, R626 |
