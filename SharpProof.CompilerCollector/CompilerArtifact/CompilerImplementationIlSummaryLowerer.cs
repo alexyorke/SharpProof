@@ -474,6 +474,7 @@ internal static class CompilerImplementationIlSummaryLowerer
         private readonly IMethodSymbol _method;
         private readonly MethodBodyBlock _body;
         private readonly ImmutableArray<IrVarId> _parameters;
+        private readonly ImmutableArray<ScalarType> _parameterTypes;
         private readonly RoslynOperationLowerer _mapper;
         private readonly TryResolveCompilerSummary _resolveSummary;
         private readonly CancellationToken _cancellationToken;
@@ -512,6 +513,13 @@ internal static class CompilerImplementationIlSummaryLowerer
             _method = method;
             _body = body;
             _parameters = parameters;
+            _parameterTypes = method.Parameters
+                .Select(static parameter =>
+                {
+                    ScalarType.TryCreate(parameter.Type, out var type);
+                    return type;
+                })
+                .ToImmutableArray();
             _mapper = mapper;
             _resolveSummary = resolveSummary;
             _cancellationToken = cancellationToken;
@@ -1404,16 +1412,15 @@ internal static class CompilerImplementationIlSummaryLowerer
             Stack<IlValue> stack)
         {
             if (index < 0 || index >= _parameters.Length ||
-                !ScalarType.TryCreate(
-                    _method.Parameters[index].Type,
-                    out var type))
+                index >= _parameterTypes.Length ||
+                !_parameterTypes[index].IsValid)
             {
                 return false;
             }
 
             stack.Push(new IlValue(
                 _factory.Variable(_parameters[index]),
-                type.SpecialType));
+                _parameterTypes[index].SpecialType));
             return true;
         }
 
