@@ -21544,6 +21544,11 @@ with the exported helper; the part that needs a decision is what timeout each of
 the eighteen should carry, and the helper's mandatory parameter is what forces that
 decision to be made rather than defaulted.
 
+R2027 is applied: removed the inert empty `ItemGroup` from
+`SharpProof.Ir.csproj`; package references and `InternalsVisibleTo` declarations
+are unchanged. The canonical `SharpProof.Ir` build passes with zero warnings and
+errors.
+
 ## Second survey, part six hundred thirty-two: positional enum-to-array bindings, censused - eight exist, seven are checked by one production method, and the eighth is R1960
 
 No new ID. R1960 records a 41-entry array bound to a 41-member enum by position
