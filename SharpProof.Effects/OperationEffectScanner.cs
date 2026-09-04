@@ -97,22 +97,26 @@ internal sealed partial class OperationEffectScanner
             session.KnownSymbols,
             IsKnownNonThrowing);
         var operations = root.DescendantsAndSelf().ToImmutableArray();
+        var useAbstractReachability = true;
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
         // operation unreachable after a normally completing handler. The
         // enclosing Roslyn CFG still supplies the outer IsReachable gate.
-        _useAbstractReachability = !operations.Any(
-            static operation => operation is ITryOperation);
-        foreach (var creation in operations
-                     .OfType<IArrayCreationOperation>())
+        foreach (var operation in operations)
         {
-            if (creation.Type is IArrayTypeSymbol type)
+            if (operation is ITryOperation)
+            {
+                useAbstractReachability = false;
+            }
+            if (operation is IArrayCreationOperation creation &&
+                creation.Type is IArrayTypeSymbol type)
             {
                 _freshArrayTypes[
                     (creation.Syntax.SyntaxTree, creation.Syntax.SpanStart)] =
                     type;
             }
         }
+        _useAbstractReachability = useAbstractReachability;
         _conversionOwnership.BuildLocalRegions(root, IsReachable, operations);
     }
 

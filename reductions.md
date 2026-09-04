@@ -22423,6 +22423,11 @@ R2321 is applied: `IrProgramBuilder.ValidateInstruction` now calls the factory's
 operation validation directly; its private single-use pass-through is removed.
 The affected IR program and schema tests pass.
 
+R2322 is applied: `OperationEffectScanner` now derives abstract-reachability and
+fresh-array facts in one pass over its immutable operation snapshot; local-region
+construction and both policies remain unchanged. The full Effects.Test suite
+passes 323/323.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
