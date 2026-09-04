@@ -642,9 +642,6 @@ internal static class WorkerPerformanceProbe
             };
         }
 
-        private string CancellationManifestPath =>
-            Path.Combine(DirectoryPath, "cancellation.compiler-manifest.json");
-
         private static WorkerFileReference Reference(string path)
         {
             return new()
