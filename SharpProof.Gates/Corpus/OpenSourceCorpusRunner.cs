@@ -46,6 +46,9 @@ internal static class OpenSourceCorpusRunner
                 static group => group.Key,
                 static group => group.ToImmutableArray(),
                 StringComparer.Ordinal);
+        var methodsById = document.Methods.ToImmutableDictionary(
+            static method => method.Id,
+            StringComparer.Ordinal);
         var targets = ImmutableDictionary.CreateBuilder<
             TargetKey,
             TargetInfo>();
@@ -96,8 +99,12 @@ internal static class OpenSourceCorpusRunner
                 var id = annotation.Data ??
                     throw new InvalidDataException(
                         $"Instrumented method in {file.Path} has no corpus ID.");
-                var method = document.Methods.Single(candidate =>
-                    string.Equals(candidate.Id, id, StringComparison.Ordinal));
+                if (!methodsById.TryGetValue(id, out var method))
+                {
+                    throw new InvalidDataException(
+                        $"Instrumented method in {file.Path} refers to " +
+                        $"unknown corpus ID {id}.");
+                }
                 targets.Add(
                     new TargetKey(tree, declaration.SpanStart),
                     new TargetInfo(method, tree, declaration.FullSpan));
@@ -124,7 +131,11 @@ internal static class OpenSourceCorpusRunner
                 Environment.NewLine + errors),
             cancellationToken);
 
-        var factory = new RecordingSessionFactory(targets.ToImmutable());
+        var targetMap = targets.ToImmutable();
+        var targetsByMethodId = targetMap.Values.ToImmutableDictionary(
+            static target => target.Method.Id,
+            StringComparer.Ordinal);
+        var factory = new RecordingSessionFactory(targetMap);
         var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
                 compilation,
                 new SharpProofAnalyzer(factory),
@@ -136,7 +147,7 @@ internal static class OpenSourceCorpusRunner
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
         var diagnosticAssignments = new int[diagnostics.Length];
-        var targetsByTree = targets.Values
+        var targetsByTree = targetMap.Values
             .GroupBy(
                 static target => target.Tree,
                 (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance)
@@ -144,7 +155,7 @@ internal static class OpenSourceCorpusRunner
                 static group => group.Key,
                 static group => group.ToArray(),
                 (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance);
-        var diagnosticsByMethod = targets.Values
+        var diagnosticsByMethod = targetMap.Values
             .Select(static target => target.Method.Id)
             .ToDictionary(
                 static id => id,
@@ -181,11 +192,12 @@ internal static class OpenSourceCorpusRunner
                     $"Analyzer did not record an outcome for OSS method {method.Id}.");
             }
 
-            var target = targets.Values.Single(info =>
-                string.Equals(
-                    info.Method.Id,
-                    method.Id,
-                    StringComparison.Ordinal));
+            if (!targetsByMethodId.TryGetValue(method.Id, out var target))
+            {
+                throw new InvalidDataException(
+                    $"Analyzer did not produce a target for OSS method " +
+                    $"{method.Id}.");
+            }
             var canonicalDiagnostics = diagnosticsByMethod[target.Method.Id]
                 .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)
                 .ToImmutableArray();
