@@ -123,18 +123,30 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         foreach (var group in resolved.GroupBy(
                      static candidate => candidate.Symbol, SymbolEqualityComparer.Default))
         {
-            if (group.Count() == 1)
+            using var candidates = group.GetEnumerator();
+            if (!candidates.MoveNext())
             {
-                var candidate = group.Single();
-                specs.Add(candidate.Symbol, new ResolvedApiSpec(candidate.Template, candidate.Symbol));
                 continue;
             }
-            foreach (var candidate in group)
+
+            var first = candidates.Current;
+            if (!candidates.MoveNext())
             {
-                failures.Add(Failure(candidate.Template,
+                specs.Add(first.Symbol,
+                    new ResolvedApiSpec(first.Template, first.Symbol));
+                continue;
+            }
+
+            failures.Add(Failure(first.Template,
+                ApiSpecResolutionFailureKind.DuplicateResolvedSymbol,
+                "Multiple spec rows resolved to the same original symbol."));
+            do
+            {
+                failures.Add(Failure(candidates.Current.Template,
                     ApiSpecResolutionFailureKind.DuplicateResolvedSymbol,
                     "Multiple spec rows resolved to the same original symbol."));
             }
+            while (candidates.MoveNext());
         }
         return new ResolvedApiSpecTable(specs.ToImmutable(), failures.ToImmutable());
     }
