@@ -287,13 +287,29 @@ internal static class CompilationFingerprint
     private static bool ValidDiagnosticOptions(
         CompilerDiagnosticOptionSnapshot[]? values)
     {
-        return values != null &&
-            values.All(static value => value != null &&
-                HasText(value.Id) && Enum.IsDefined(
-                    typeof(CompilerReportDiagnostic), value.ReportDiagnostic)) &&
-            values.Zip(values.Skip(1), static (left, right) =>
-                StringComparer.Ordinal.Compare(left.Id, right.Id) < 0)
-                .All(static ordered => ordered);
+        if (values == null)
+        {
+            return false;
+        }
+
+        CompilerDiagnosticOptionSnapshot? previous = null;
+        foreach (var value in values)
+        {
+            if (value == null ||
+                !HasText(value.Id) ||
+                !Enum.IsDefined(
+                    typeof(CompilerReportDiagnostic),
+                    value.ReportDiagnostic) ||
+                previous != null &&
+                StringComparer.Ordinal.Compare(previous.Id, value.Id) >= 0)
+            {
+                return false;
+            }
+
+            previous = value;
+        }
+
+        return true;
     }
 
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
