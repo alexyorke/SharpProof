@@ -161,11 +161,13 @@ internal sealed class OperationNullnessEvaluator
             return false;
         }
 
-        var aliases = new List<ILocalSymbol> { local.Local };
+        var aliases = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)
+        {
+            local.Local
+        };
         bool IsAlias(ILocalSymbol candidate)
         {
-            return aliases.Any(alias =>
-                SymbolEqualityComparer.Default.Equals(alias, candidate));
+            return aliases.Contains(candidate);
         }
 
         foreach (var operation in _root.DescendantsAndSelf()
