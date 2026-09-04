@@ -19,16 +19,25 @@ public static class DifferentialFormatting
         };
     }
 
-    public static string FormatErrors(IEnumerable<Diagnostic> diagnostics)
+    public static string FormatErrors(
+        IEnumerable<Diagnostic> diagnostics,
+        bool includeIdTieBreak = false)
     {
-        return string.Join(
-            " | ",
-            diagnostics
+        var ordered = diagnostics
                 .Where(static diagnostic =>
                     diagnostic.Severity == DiagnosticSeverity.Error)
                 .OrderBy(static diagnostic =>
-                    diagnostic.Location.SourceSpan.Start)
-                .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
+                    diagnostic.Location.SourceSpan.Start);
+        if (includeIdTieBreak)
+        {
+            ordered = ordered.ThenBy(
+                static diagnostic => diagnostic.Id,
+                StringComparer.Ordinal);
+        }
+
+        return string.Join(
+            " | ",
+            ordered
                 .Select(static diagnostic =>
                     diagnostic.Id +
                     ": " +

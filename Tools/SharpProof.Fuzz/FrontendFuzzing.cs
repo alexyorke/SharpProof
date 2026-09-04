@@ -945,7 +945,9 @@ public sealed class FrontendDifferentialOracle
         {
             var failure = Mismatch(
                 "Generated C# did not compile: " +
-                DifferentialFormatting.FormatErrors(emit.Diagnostics));
+                DifferentialFormatting.FormatErrors(
+                    emit.Diagnostics,
+                    includeIdTieBreak: true));
             if (generatedCases.Count == 1)
             {
                 return [failure];
@@ -1092,7 +1094,9 @@ public sealed class FrontendDifferentialOracle
             return IsolateSemanticEdgeFailure(
                 cases,
                 "Generated semantic-edge C# did not compile: " +
-                DifferentialFormatting.FormatErrors(emit.Diagnostics),
+                DifferentialFormatting.FormatErrors(
+                    emit.Diagnostics,
+                    includeIdTieBreak: true),
                 cancellationToken);
         }
 
