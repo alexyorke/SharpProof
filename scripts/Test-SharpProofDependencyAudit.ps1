@@ -22,6 +22,21 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
+function Resolve-RepositoryPathValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $candidate = if ([IO.Path]::IsPathRooted($Path)) {
+        $Path
+    }
+    else {
+        Join-Path $repositoryRoot $Path
+    }
+    return [IO.Path]::GetFullPath($candidate)
+}
+
 function Resolve-InputPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -31,12 +46,7 @@ function Resolve-InputPath {
         [string]$Description
     )
 
-    $resolved = if ([IO.Path]::IsPathRooted($Path)) {
-        [IO.Path]::GetFullPath($Path)
-    }
-    else {
-        [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
-    }
+    $resolved = Resolve-RepositoryPathValue -Path $Path
     if (-not [IO.File]::Exists($resolved)) {
         throw "$Description is missing: '$Path'."
     }
@@ -49,10 +59,7 @@ function Resolve-OutputPath {
         [string]$Path
     )
 
-    if ([IO.Path]::IsPathRooted($Path)) {
-        return [IO.Path]::GetFullPath($Path)
-    }
-    return [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
+    return Resolve-RepositoryPathValue -Path $Path
 }
 
 function Get-ExactProperty {
