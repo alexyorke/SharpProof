@@ -322,17 +322,11 @@ function ConvertTo-ValidationConditionSource {
     }
 }
 
-$schema = Get-Content -LiteralPath $SchemaPath -Raw |
-    ConvertFrom-Json -Depth 100
-if ([int](Get-RequiredMember $schema 'schemaVersion' 'schema') -ne 1) {
-    throw 'Only protocol-model schema version 1 is supported.'
-}
-$namespace = [string](Get-RequiredMember $schema 'namespace' 'schema')
-$jsonNamingPolicy = [string](
-    Get-RequiredMember $schema 'jsonNamingPolicy' 'schema')
-if ($jsonNamingPolicy -ne 'camelCase') {
-    throw "Unsupported JSON naming policy '$jsonNamingPolicy'."
-}
+$schema = Read-SharpProofSchema `
+    -Path $SchemaPath `
+    -Context 'protocol-model'
+$namespace = [string]$schema.namespace
+$jsonNamingPolicy = [string]$schema.jsonNamingPolicy
 $declarations = @(Get-RequiredMember $schema 'declarations' 'schema')
 $requiredJsonRoots = @(
     Get-RequiredMember $schema 'requiredJsonRoots' 'schema')

@@ -22294,6 +22294,11 @@ base-chain comparison, with Contract API resolution explicitly excluding the
 candidate itself and cancellation analysis retaining include-self semantics.
 Frontend and Meta analyzer tests cover both callers.
 
+R2013 is applied: `GeneratedFileHelpers.ps1` now owns the shared schema
+read/version/JSON-policy validation used by the compiler-artifact and protocol
+generators, with the compiler-specific namespace guard remaining parameterized
+and all schema-specific checks local. Generated outputs verify successfully.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

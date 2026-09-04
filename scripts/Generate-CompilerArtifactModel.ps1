@@ -298,23 +298,15 @@ function Add-RecordMembers {
     }
 }
 
-$schema = Get-Content -LiteralPath $SchemaPath -Raw |
-    ConvertFrom-Json -Depth 100
-if ([int](Get-RequiredMember $schema 'schemaVersion' 'schema') -ne 1) {
-    throw 'Only compiler-artifact model schema version 1 is supported.'
-}
-$namespace = [string](Get-RequiredMember $schema 'namespace' 'schema')
-$jsonNamingPolicy = [string](
-    Get-RequiredMember $schema 'jsonNamingPolicy' 'schema')
-if ($jsonNamingPolicy -ne 'camelCase') {
-    throw "Unsupported JSON naming policy '$jsonNamingPolicy'."
-}
+$schema = Read-SharpProofSchema `
+    -Path $SchemaPath `
+    -Context 'compiler-artifact model' `
+    -ExpectedNamespace 'SharpProof.CompilerArtifact'
+$namespace = [string]$schema.namespace
+$jsonNamingPolicy = [string]$schema.jsonNamingPolicy
 $declarations = @(Get-RequiredMember $schema 'declarations' 'schema')
 $declarationNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
-if ($namespace -ne 'SharpProof.CompilerArtifact') {
-    throw "Unsupported compiler-artifact namespace '$namespace'."
-}
 $modelLines = New-GeneratedOutput `
     'CompilerArtifactModel.generated.cs' `
     @('System.Collections.Immutable', 'SharpProof.Ir', 'SharpProof.Worker.Protocol')

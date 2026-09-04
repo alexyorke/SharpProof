@@ -31,6 +31,35 @@ function Get-MemberArray
     return @($member.Value)
 }
 
+function Read-SharpProofSchema
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Context,
+        [string]$ExpectedNamespace
+    )
+
+    $schema = Get-Content -LiteralPath $Path -Raw |
+        ConvertFrom-Json -Depth 100
+    if ([int](Get-RequiredMember $schema 'schemaVersion' 'schema') -ne 1)
+    {
+        throw "Only $Context schema version 1 is supported."
+    }
+    $namespace = [string](Get-RequiredMember $schema 'namespace' 'schema')
+    $jsonNamingPolicy = [string](
+        Get-RequiredMember $schema 'jsonNamingPolicy' 'schema')
+    if ($jsonNamingPolicy -ne 'camelCase')
+    {
+        throw "Unsupported JSON naming policy '$jsonNamingPolicy'."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedNamespace) -and
+        $namespace -ne $ExpectedNamespace)
+    {
+        throw "Unsupported $Context namespace '$namespace'."
+    }
+    return $schema
+}
+
 function Assert-Properties
 {
     param(
