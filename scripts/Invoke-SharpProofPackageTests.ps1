@@ -542,12 +542,14 @@ try {
             Name = 'postflight-buildtask-main'
             Filter = $remainingBuildTaskFilter
             EstimatedMilliseconds = -1L
+            Exclusive = $true
         })
         foreach ($method in $isolatedBuildTaskMethods) {
             $shards.Add([pscustomobject]@{
                 Name = 'postflight-buildtask-' + $method.ToLowerInvariant()
                 Filter = "FullyQualifiedName~$buildTaskClass.$method"
                 EstimatedMilliseconds = -1L
+                Exclusive = $true
             })
         }
         foreach ($bucket in $packageLayoutBuckets) {
