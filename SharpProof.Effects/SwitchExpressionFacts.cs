@@ -55,6 +55,22 @@ internal static class SwitchExpressionFacts
             : GetCallableListPatternMember(pattern.IndexerSymbol);
     }
 
+    internal static (int RequiredLength, bool HasSlice) GetListPatternShape(
+        IListPatternOperation pattern)
+    {
+        return (
+            pattern.Patterns.Count(static item => item is not ISlicePatternOperation),
+            pattern.Patterns.Any(static item => item is ISlicePatternOperation));
+    }
+
+    internal static bool HasListPatternLengthMismatch(
+        int requiredLength,
+        bool hasSlice,
+        long length)
+    {
+        return hasSlice ? length < requiredLength : length != requiredLength;
+    }
+
     internal static bool IsCompilerIntrinsicListPatternMember(
         Compilation compilation,
         IListPatternOperation pattern,

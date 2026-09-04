@@ -22323,6 +22323,11 @@ by `RunVerifier` and `LinuxWorkerProcess`; their process-group, signal, errno,
 and fail-closed policies remain local. The focused BuildTasks and worker-process
 tests pass.
 
+R2022 is applied: list-pattern shape counting and the known-length mismatch rule
+now live in `SwitchExpressionFacts`; ManagedAbstractFlow and
+OperationCompletionEvaluator retain their distinct length discovery and
+completion behavior. The full Effects suite passes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

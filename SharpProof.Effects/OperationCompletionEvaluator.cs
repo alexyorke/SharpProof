@@ -493,10 +493,8 @@ internal sealed class OperationCompletionEvaluator
 
     private ListPatternShape GetListPatternShape(IListPatternOperation pattern)
     {
-        var requiredLength = pattern.Patterns.Count(
-            static item => item is not ISlicePatternOperation);
-        var hasSlice = pattern.Patterns.Any(
-            static item => item is ISlicePatternOperation);
+        var (requiredLength, hasSlice) =
+            SwitchExpressionFacts.GetListPatternShape(pattern);
         var hasKnownLength = TryGetGoverningListLength(pattern, out var length);
         return new(requiredLength, hasSlice, hasKnownLength, length);
     }
@@ -585,7 +583,10 @@ internal sealed class OperationCompletionEvaluator
     {
         internal bool HasLengthMismatch =>
             HasKnownLength &&
-            (HasSlice ? Length < RequiredLength : Length != RequiredLength);
+            SwitchExpressionFacts.HasListPatternLengthMismatch(
+                RequiredLength,
+                HasSlice,
+                Length);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

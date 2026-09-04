@@ -2579,11 +2579,12 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         if (TryGetListPatternLength(pattern, out var length))
         {
-            var requiredLength = pattern.Patterns.Count(
-                static item => item is not ISlicePatternOperation);
-            var hasSlice = pattern.Patterns.Any(
-                static item => item is ISlicePatternOperation);
-            if (hasSlice ? length < requiredLength : length != requiredLength)
+            var (requiredLength, hasSlice) =
+                SwitchExpressionFacts.GetListPatternShape(pattern);
+            if (SwitchExpressionFacts.HasListPatternLengthMismatch(
+                    requiredLength,
+                    hasSlice,
+                    length))
             {
                 return true;
             }
