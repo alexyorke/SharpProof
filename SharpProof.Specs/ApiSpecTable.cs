@@ -16,14 +16,12 @@ public sealed partial class ApiSpecTable
         SpecEffect.Reflection |
         SpecEffect.Nondeterminism;
     private static long s_nextScope;
-    private readonly ImmutableDictionary<SpecId, ApiSpecTemplate> _byId;
     private readonly ImmutableDictionary<string, ApiSpecTemplate> _byWitness;
     private readonly long _scope;
 
     private ApiSpecTable(long scope, ImmutableArray<ApiSpecTemplate> templates)
     {
         (_scope, Templates) = (scope, templates);
-        _byId = templates.ToImmutableDictionary(static template => template.Id);
         _byWitness = templates.ToImmutableDictionary(
             static template => template.Target.WitnessIdentifier,
             StringComparer.Ordinal);
@@ -89,12 +87,12 @@ public sealed partial class ApiSpecTable
     public ApiSpecTemplate Get(SpecId id)
     {
         EnsureScope(id);
-        if (!_byId.TryGetValue(id, out var template))
+        if ((uint)id.Value >= (uint)Templates.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(id));
         }
 
-        return template;
+        return Templates[id.Value];
     }
 
     public bool TryGetByWitnessIdentifier(
