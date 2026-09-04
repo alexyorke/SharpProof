@@ -22238,6 +22238,11 @@ Effects consumers, while each caller keeps its original-type fallback or
 specialized comparison semantics. The full Effects suite passes 323/323 and
 the full Analyzer suite passes 476/476, with zero warnings or errors.
 
+R2060 is applied: all ten `SPCF` descriptors now link to their existing
+diagnostic-example anchors, and the readme gate requires every descriptor to
+provide a validated help link. The catalog and documentation checks pass with
+the existing anchors unchanged.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

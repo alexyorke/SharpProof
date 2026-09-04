@@ -558,9 +558,10 @@ foreach ($output in @($descriptorCatalog.outputs)) {
     foreach ($descriptor in @($output.diagnostics)) {
         $id = [string]$descriptor.id
         $helpLink = [string]$descriptor.helpLinkUri
-        if (-not [string]::IsNullOrWhiteSpace($helpLink)) {
-            Assert-RepositoryDocumentLink $descriptorCatalogPath $helpLink
+        if ([string]::IsNullOrWhiteSpace($helpLink)) {
+            throw "Diagnostic catalog is missing '$id' help link."
         }
+        Assert-RepositoryDocumentLink $descriptorCatalogPath $helpLink
         if ($id -notmatch '^SP(?:CF)?\d{4}$') {
             continue
         }

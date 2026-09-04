@@ -198,7 +198,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0001",
           "customTags": []
         },
         {
@@ -211,7 +211,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0002",
           "customTags": []
         },
         {
@@ -224,7 +224,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0003",
           "customTags": []
         },
         {
@@ -237,7 +237,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0004",
           "customTags": []
         },
         {
@@ -250,7 +250,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0005",
           "customTags": []
         },
         {
@@ -263,7 +263,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0006",
           "customTags": []
         },
         {
@@ -276,7 +276,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0007",
           "customTags": []
         },
         {
@@ -289,7 +289,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0008",
           "customTags": []
         },
         {
@@ -302,7 +302,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Rejects ContractFor relationships whose companion and target are the same type.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0009",
           "customTags": []
         },
         {
@@ -315,7 +315,7 @@
           "defaultSeverity": "Error",
           "isEnabledByDefault": true,
           "description": "Rejects ContractFor relationships that participate in a cycle of companion and target types.",
-          "helpLinkUri": null,
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0010",
           "customTags": []
         }
       ]
