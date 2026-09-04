@@ -20,13 +20,10 @@ internal static partial class CallableCounterexampleReplayer
             }
 
             var final = model.ToBuilder();
-            var variables = new List<CompilerCanonicalVariable>(
-                target.Variables.Length);
             var results = new List<CompilerCanonicalVariable>();
             var preStateVariables = new List<CompilerCanonicalVariable>();
             foreach (var variable in target.Variables)
             {
-                variables.Add(variable);
                 if (variable.Role == CompilerVariableRole.Result)
                 {
                     results.Add(variable);
@@ -112,7 +109,7 @@ internal static partial class CallableCounterexampleReplayer
                 final[variable.Variable] = value;
             }
 
-            foreach (var variable in variables)
+            foreach (var variable in target.Variables)
             {
                 if (!final.TryGetValue(variable.Variable, out var value))
                 {
