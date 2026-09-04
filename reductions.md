@@ -22404,6 +22404,10 @@ R2242 is applied: `IrProgramBuilder.Build` now validates and freezes each block 
 one traversal, preserving block order, terminal validation, and the immutable
 output boundary. The IR program and schema tests pass.
 
+R2243 is applied: lowered summary-call decoding now relies on
+`SummaryEvidenceIndex.IsValid` for the evidence SHA-256 check instead of scanning
+that same value a second time. Compiler manifest/artifact tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

@@ -881,7 +881,6 @@ internal static class CompilerLoweredArtifact
                 !summaryEvidence.AreValidDependencies(summary.DependencyEvidence) ||
                 !WorkerProtocolJson.IsSha256(summary.InstantiationSha256) ||
                 summary.NormalRelationRoot != clauseRootCount + index ||
-                !WorkerProtocolJson.IsSha256(summary.EvidenceSha256) ||
                 summary.ExistentialVariables == null ||
                 specs.ContainsKey(call.Id) ||
                 summaries.ContainsKey(call.Id))
