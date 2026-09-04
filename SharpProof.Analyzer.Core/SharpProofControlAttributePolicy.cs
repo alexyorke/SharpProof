@@ -111,13 +111,11 @@ internal static class SharpProofControlAttributePolicy
                 continue;
             }
 
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                suppressing.Value
-                    ? "[SharpProofSuppress]"
-                    : "[SharpProofTrusted]",
-                string.IsNullOrEmpty(reason) ? "<empty>" : reason,
-                "expected a non-empty reason",
-                attribute.GetLocation()));
+            ReportInvalidReasonDiagnostic(
+                suppressing.Value,
+                reason,
+                attribute.GetLocation(),
+                reportDiagnostic);
         }
     }
 
@@ -187,6 +185,16 @@ internal static class SharpProofControlAttributePolicy
             attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
             symbol.Locations.FirstOrDefault(static candidate => candidate.IsInSource) ??
             Location.None;
+        ReportInvalidReasonDiagnostic(
+            suppressing, reason, location, reportDiagnostic);
+    }
+
+    private static void ReportInvalidReasonDiagnostic(
+        bool suppressing,
+        string reason,
+        Location location,
+        Action<Diagnostic> reportDiagnostic)
+    {
         reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
             suppressing ? "[SharpProofSuppress]" : "[SharpProofTrusted]",
             string.IsNullOrEmpty(reason) ? "<empty>" : reason,
