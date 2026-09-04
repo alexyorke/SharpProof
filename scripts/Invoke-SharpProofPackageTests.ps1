@@ -483,8 +483,12 @@ try {
             })
     }
 
+    $canonicalPackageFilter =
+        'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+    $useDefaultShardPlan = [string]::IsNullOrWhiteSpace($TestFilter) -or
+        $TestFilter -ceq $canonicalPackageFilter
     $shards = [Collections.Generic.List[object]]::new()
-    if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+    if (-not $useDefaultShardPlan) {
         $shards.Add([pscustomobject]@{
             Name = 'selected'
             Filter = $TestFilter
@@ -575,6 +579,12 @@ try {
                 }) -join '|'
                 EstimatedMilliseconds = $bucket.EstimatedMilliseconds
             })
+        }
+    }
+
+    if ($TestFilter -ceq $canonicalPackageFilter) {
+        foreach ($shard in $shards) {
+            $shard.Filter = "($TestFilter)&($($shard.Filter))"
         }
     }
 
