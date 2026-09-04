@@ -120,12 +120,15 @@ internal sealed class CompilerCallableLowerer
             return Unsupported(out failure);
         }
 
+        var inventory = _contracts.GetClauseInventory(target.Method);
         if (target.Method.ReturnsVoid)
         {
-            failure = ContainsOnlyContractStatements(target) ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody;
+            failure = ContainsOnlyContractStatements(
+                target,
+                inventory) ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody;
             return failure == WorkerClaimReason.None ? CompilerPreparedBody.Trivial() : null;
         }
-        var bodyStart = FindExecutableBodyStart(target);
+        var bodyStart = FindExecutableBodyStart(target, inventory);
         if (!bodyStart.HasValue)
         {
             return Unsupported(out failure);
@@ -147,7 +150,7 @@ internal sealed class CompilerCallableLowerer
             return Unsupported(out failure);
         }
 
-        var elidedClauseSites = _contracts.GetClauseInventory(target.Method).Clauses
+        var elidedClauseSites = inventory.Clauses
             .Where(static clause => !clause.IsValid)
             .Select(static clause => clause.Invocation.Syntax)
             .ToImmutableArray();
@@ -441,7 +444,9 @@ internal sealed class CompilerCallableLowerer
         }
     }
 
-    private int? FindExecutableBodyStart(ManifestCallableTarget target)
+    private static int? FindExecutableBodyStart(
+        ManifestCallableTarget target,
+        ContractClauseInventory inventory)
     {
         var declaration = target.VerifierDeclaration;
         if (declaration.ExpressionBody is { } expressionBody)
@@ -456,7 +461,8 @@ internal sealed class CompilerCallableLowerer
 
         foreach (var statement in body.Statements)
         {
-            if (statement is EmptyStatementSyntax || IsContractStatement(target, statement))
+            if (statement is EmptyStatementSyntax ||
+                IsContractStatement(inventory, statement))
             {
                 continue;
             }
@@ -615,17 +621,21 @@ internal sealed class CompilerCallableLowerer
         return true;
     }
 
-    private bool ContainsOnlyContractStatements(ManifestCallableTarget target)
+    private static bool ContainsOnlyContractStatements(
+        ManifestCallableTarget target,
+        ContractClauseInventory inventory)
     {
         var declaration = target.VerifierDeclaration;
         return declaration.Body is { } body
             ? body.Statements.All(statement =>
-                IsContractStatement(target, statement))
+                IsContractStatement(inventory, statement))
             : declaration.ExpressionBody is { Expression: { } expression } &&
-                IsContractExpression(target, expression);
+                IsContractExpression(inventory, expression);
     }
 
-    private bool IsContractStatement(ManifestCallableTarget target, StatementSyntax statement)
+    private static bool IsContractStatement(
+        ContractClauseInventory inventory,
+        StatementSyntax statement)
     {
         if (statement is EmptyStatementSyntax)
         {
@@ -633,14 +643,14 @@ internal sealed class CompilerCallableLowerer
         }
 
         return statement is ExpressionStatementSyntax expression &&
-            IsContractExpression(target, expression.Expression);
+            IsContractExpression(inventory, expression.Expression);
     }
 
-    private bool IsContractExpression(
-        ManifestCallableTarget target,
+    private static bool IsContractExpression(
+        ContractClauseInventory inventory,
         ExpressionSyntax expression)
     {
-        return _contracts.GetClauseInventory(target.Method).Clauses.Any(
+        return inventory.Clauses.Any(
             clause =>
                 clause.Invocation.Syntax.SyntaxTree ==
                     expression.SyntaxTree &&
