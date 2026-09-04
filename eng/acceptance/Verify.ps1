@@ -130,8 +130,8 @@ function Add-AcceptanceTimingPhase {
 function Start-AcceptanceTimingPhase {
     param([Parameter(Mandatory = $true)][string]$Name)
 
-    if ($null -ne $activeTimingStopwatch) {
-        throw "Acceptance timing phase '$activeTimingName' is still active."
+    if ($null -ne $script:activeTimingStopwatch) {
+        throw "Acceptance timing phase '$script:activeTimingName' is still active."
     }
     $script:activeTimingName = $Name
     $script:activeTimingStartedMilliseconds =
@@ -145,10 +145,10 @@ function Complete-AcceptanceTimingPhase {
         [string]$Status = 'passed'
     )
 
-    if ($null -eq $activeTimingStopwatch) {
+    if ($null -eq $script:activeTimingStopwatch) {
         throw 'No acceptance timing phase is active.'
     }
-    $activeTimingStopwatch.Stop()
+    $script:activeTimingStopwatch.Stop()
     $completedMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
     $elapsedMilliseconds =
         $completedMilliseconds - $activeTimingStartedMilliseconds
@@ -217,7 +217,11 @@ function Write-AcceptanceTimingEvidence {
 }
 
 trap {
-    if ($null -ne $activeTimingStopwatch) {
+    $activePhase = Get-Variable `
+        -Name activeTimingStopwatch `
+        -Scope Script `
+        -ErrorAction SilentlyContinue
+    if ($null -ne $activePhase -and $null -ne $activePhase.Value) {
         Complete-AcceptanceTimingPhase -Status failed
     }
     Write-AcceptanceTimingEvidence `

@@ -748,7 +748,7 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryPolicyRejectsSubstitutedAnalyzerEntryPoint()
     {
-        var (portableProps, portableTargets, verifierProps, verifierTargets) =
+        var (portableProps, portableTargets, portableContract, verifierProps, verifierTargets) =
             LoadPolicyDocuments();
         var entryPoint = portableTargets.Descendants("Analyzer")
             .Single(analyzer => string.Equals(
@@ -764,6 +764,7 @@ public sealed class PerformanceGateTests
                 PerformanceGate.ValidateAdvisoryPackagePolicy(
                     portableProps,
                     portableTargets,
+                    portableContract,
                     verifierProps,
                     verifierTargets)));
     }
@@ -771,7 +772,7 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryPolicyRejectsAWidenedVerifierCondition()
     {
-        var (portableProps, portableTargets, verifierProps, verifierTargets) =
+        var (portableProps, portableTargets, portableContract, verifierProps, verifierTargets) =
             LoadPolicyDocuments();
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
@@ -788,6 +789,7 @@ public sealed class PerformanceGateTests
                 PerformanceGate.ValidateAdvisoryPackagePolicy(
                     portableProps,
                     portableTargets,
+                    portableContract,
                     verifierProps,
                     verifierTargets)));
     }
@@ -795,7 +797,7 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryPolicyRejectsVerifierConditionWithoutOptIn()
     {
-        var (portableProps, portableTargets, verifierProps, verifierTargets) =
+        var (portableProps, portableTargets, portableContract, verifierProps, verifierTargets) =
             LoadPolicyDocuments();
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
@@ -814,6 +816,7 @@ public sealed class PerformanceGateTests
                 PerformanceGate.ValidateAdvisoryPackagePolicy(
                     portableProps,
                     portableTargets,
+                    portableContract,
                     verifierProps,
                     verifierTargets)));
     }
@@ -901,6 +904,7 @@ public sealed class PerformanceGateTests
     private static (
         XDocument PortableProps,
         XDocument PortableTargets,
+        XDocument PortableContract,
         XDocument VerifierProps,
         XDocument VerifierTargets) LoadPolicyDocuments()
     {
@@ -913,6 +917,7 @@ public sealed class PerformanceGateTests
         return (
             Load("SharpProof.Package", "SharpProof.props"),
             Load("SharpProof.Package", "SharpProof.targets"),
+            Load("SharpProof.Package", "SharpProof.ConsumerContract.props"),
             Load("SharpProof.Verifier", "SharpProof.Verifier.props"),
             Load("SharpProof.Verifier", "SharpProof.Verifier.targets"));
     }

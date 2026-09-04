@@ -114,6 +114,36 @@ function Invoke-TestProject([string]$ProjectPath) {
     Invoke-DotNet $arguments
 }
 
+function Invoke-SolutionTests([string]$SolutionPath) {
+    if (-not $NoBuild) {
+        Invoke-DotNet @('restore', $SolutionPath, '--locked-mode')
+    }
+    $testProjectParallelism = Get-SharpProofTestProjectParallelism `
+        -RepositoryRoot $repositoryRoot
+    $arguments = @(
+        'test', $SolutionPath, '--configuration', $Configuration,
+        '--no-restore')
+    $arguments += $fastBuildArguments
+    if ($NoBuild) {
+        $arguments += '--no-build'
+    }
+    $arguments += "/m:$testProjectParallelism"
+    if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+        $arguments += @('--filter', $TestFilter)
+    }
+    Invoke-DotNet $arguments
+}
+
+function Invoke-ForcedTerminationGateTest([string]$BuildConfiguration) {
+    Invoke-DotNet @(
+        'test',
+        'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
+        '--configuration', $BuildConfiguration,
+        '--no-build', '--no-restore',
+        '--filter',
+        'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
+}
+
 function Invoke-SharpProofSolutionBuild(
     [string]$BuildConfiguration,
     [string[]]$AdditionalBuildArguments = @()) {
@@ -272,13 +302,7 @@ switch ($Command) {
             'PR performance validation failed.' `
             @{ Gate = 'performance'; OutputPath = $performanceOutput }
 
-        Invoke-DotNet @(
-            'test',
-            'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
-            '--configuration', $Configuration,
-            '--no-build', '--no-restore',
-            '--filter',
-            'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
+        Invoke-ForcedTerminationGateTest $Configuration
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
         $prTestArguments = @{
             Configuration = $Configuration; NoBuild = $true
@@ -300,6 +324,11 @@ switch ($Command) {
             Invoke-TestProject $Target
             break
         }
+        if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
+            $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
+            Invoke-SolutionTests $Target
+            break
+        }
         if (-not $NoBuild) {
             Invoke-DotNet @('restore', $Target, '--locked-mode')
         }
@@ -308,12 +337,6 @@ switch ($Command) {
         $arguments += $fastBuildArguments
         if ($NoBuild) {
             $arguments += '--no-build'
-        }
-        if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
-            $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
-            $testProjectParallelism = Get-SharpProofTestProjectParallelism `
-                -RepositoryRoot $repositoryRoot
-            $arguments += "/m:$testProjectParallelism"
         }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
@@ -336,23 +359,7 @@ switch ($Command) {
             @semanticArguments
     }
     'portable-tests' {
-        $target = 'SharpProof.Portable.Tests.slnf'
-        if (-not $NoBuild) {
-            Invoke-DotNet @('restore', $target, '--locked-mode')
-        }
-        $testProjectParallelism = Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $repositoryRoot
-        $arguments = @(
-            'test', $target, '--configuration', $Configuration,
-            '--no-restore', "/m:$testProjectParallelism")
-        $arguments += $fastBuildArguments
-        if ($NoBuild) {
-            $arguments += '--no-build'
-        }
-        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('--filter', $TestFilter)
-        }
-        Invoke-DotNet $arguments
+        Invoke-SolutionTests 'SharpProof.Portable.Tests.slnf'
     }
     'worker-tests' {
         $workerTestProject =
@@ -510,11 +517,7 @@ switch ($Command) {
             'Acceptance validation failed.' `
             @{ Configuration = $Configuration }
         if ($Configuration -ceq 'Release') {
-            Invoke-DotNet @(
-                'test', 'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
-                '--configuration', 'Release', '--no-build', '--no-restore',
-                '--filter',
-                'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
+            Invoke-ForcedTerminationGateTest 'Release'
         }
         & (Join-Path $repositoryRoot `
             'scripts/Write-SharpProofQualificationReceipt.ps1') `

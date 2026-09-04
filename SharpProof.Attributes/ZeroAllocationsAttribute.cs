@@ -4,4 +4,8 @@ namespace SharpProof.Attributes;
 [AttributeUsage(SharpProofAttributeTargets.Contract, Inherited = false)]
 public sealed class ZeroAllocationsAttribute : Attribute
 {
+    /// <summary>Initializes a new instance of the <see cref="ZeroAllocationsAttribute"/> class.</summary>
+    public ZeroAllocationsAttribute()
+    {
+    }
 }

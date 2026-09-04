@@ -6,6 +6,10 @@ namespace SharpProof.Attributes;
     Inherited = false)]
 public sealed class NotNullAttribute : Attribute
 {
+    /// <summary>Initializes a new instance of the <see cref="NotNullAttribute"/> class.</summary>
+    public NotNullAttribute()
+    {
+    }
 }
 
 /// <summary>Declares that a parameter or return value is greater than zero.</summary>
@@ -14,6 +18,10 @@ public sealed class NotNullAttribute : Attribute
     Inherited = false)]
 public sealed class PositiveAttribute : Attribute
 {
+    /// <summary>Initializes a new instance of the <see cref="PositiveAttribute"/> class.</summary>
+    public PositiveAttribute()
+    {
+    }
 }
 
 /// <summary>Declares an inclusive integral range for a parameter or return value.</summary>

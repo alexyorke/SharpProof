@@ -1503,20 +1503,6 @@ internal static class PerformanceGate
     internal static void ValidateAdvisoryPackagePolicy(
         XDocument portableProps,
         XDocument portableTargets,
-        XDocument verifierProps,
-        XDocument verifierTargets)
-    {
-        ValidateAdvisoryPackagePolicy(
-            portableProps,
-            portableTargets,
-            portableTargets,
-            verifierProps,
-            verifierTargets);
-    }
-
-    internal static void ValidateAdvisoryPackagePolicy(
-        XDocument portableProps,
-        XDocument portableTargets,
         XDocument portableContract,
         XDocument verifierProps,
         XDocument verifierTargets)
@@ -1712,7 +1698,7 @@ internal static class PerformanceGate
                 StringComparison.Ordinal) ||
             !string.Equals(
                 (string?)verifierTarget?.Attribute("DependsOnTargets"),
-                "_SharpProofInitializeVerify;_SharpProofVerifyCore",
+                "_SharpProofVerifyCore",
                 StringComparison.Ordinal) ||
             verifierCore == null ||
             verifierCore.Attribute("BeforeTargets") != null ||

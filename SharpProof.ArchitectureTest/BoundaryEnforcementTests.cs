@@ -88,6 +88,7 @@ public sealed class BoundaryEnforcementTests
             "SharpProof.Contracts",
             "SharpProof.Effects",
             "SharpProof.Frontend",
+            "SharpProof.Fuzz",
             "SharpProof.Gates",
             "SharpProof.Ir.Test",
             "SharpProof.Smt",

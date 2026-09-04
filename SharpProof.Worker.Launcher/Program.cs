@@ -991,11 +991,11 @@ internal sealed partial class LauncherArguments
         bool pathsAlreadyValidated = false)
     {
         var cacheEnabled = Boolean("cache-enabled", true);
-        var configuredCacheDirectory = cacheEnabled
-            ? OptionalFullPath("cache-directory")
-            : null;
         if (!pathsAlreadyValidated)
         {
+            var configuredCacheDirectory = cacheEnabled
+                ? OptionalFullPath("cache-directory")
+                : null;
             ValidateDistinctPaths(runtimeSnapshot, configuredCacheDirectory);
         }
         var compilerManifest = CreateCompilerManifestReference(

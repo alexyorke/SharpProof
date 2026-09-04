@@ -1111,7 +1111,7 @@ public sealed class ArchitectureTests
                 "scripts",
                 "Invoke-SharpProofTrustedMutationsParallel.ps1"));
             Assert.That(parallelDriver, Does.Contain("MutationShardCount"));
-            Assert.That(parallelDriver, Does.Contain("Test-CompleteShard"));
+            Assert.That(parallelDriver, Does.Contain("Get-CompleteShard"));
             Assert.That(
                 parallelDriver,
                 Does.Contain("weighted-longest-processing-time-first"));
@@ -1136,20 +1136,31 @@ public sealed class ArchitectureTests
             TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
-        var branchStart = container.IndexOf(
+        var auditHelper = container.IndexOf(
+            "function Invoke-DependencyAudit",
+            StringComparison.Ordinal);
+        var restore = container.IndexOf(
+            "Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')",
+            auditHelper,
+            StringComparison.Ordinal);
+        var audit = container.IndexOf(
+            "Test-SharpProofDependencyAudit.ps1",
+            auditHelper,
+            StringComparison.Ordinal);
+        var branch = container.IndexOf(
             "'dependency-audit' {",
             StringComparison.Ordinal);
-        var branchEnd = container.IndexOf(
-            "'acceptance' {",
-            branchStart,
-            StringComparison.Ordinal);
-        var branch = container[branchStart..branchEnd];
 
-        Assert.That(
-            branch.IndexOf("Invoke-DotNet @('restore'", StringComparison.Ordinal),
-            Is.LessThan(branch.IndexOf(
-                "Test-SharpProofDependencyAudit.ps1",
-                StringComparison.Ordinal)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(auditHelper, Is.GreaterThanOrEqualTo(0));
+            Assert.That(restore, Is.GreaterThanOrEqualTo(0));
+            Assert.That(audit, Is.GreaterThan(restore));
+            Assert.That(branch, Is.GreaterThan(auditHelper));
+            Assert.That(
+                container.IndexOf("Invoke-DependencyAudit", branch, StringComparison.Ordinal),
+                Is.GreaterThan(branch));
+        }
     }
 
     [Test]
@@ -1636,7 +1647,7 @@ public sealed class ArchitectureTests
             Is.True);
 
         var handlePublication = host.IndexOf(
-            "Volatile.Write(ref _z3Handle, handle);",
+            "Volatile.Write(ref s_z3Handle, handle);",
             StringComparison.Ordinal);
         var resolverRegistration = host.IndexOf(
             "NativeLibrary.SetDllImportResolver(",

@@ -36,7 +36,7 @@ public sealed class VerifierPublicationTransactionTests
     {
         var source = ReadLauncherSource();
         var mutated = source.Replace(
-            "PublishMember(members[^1]);",
+            "PublishMember(member);",
             "PublishMember(members[0]);",
             StringComparison.Ordinal);
 
@@ -65,10 +65,13 @@ public sealed class VerifierPublicationTransactionTests
         var stage = body.IndexOf(
             "StagePublication(members);",
             StringComparison.Ordinal);
-        var commit = body.IndexOf(
-            "PublishMember(members[^1]);",
+        var loop = body.IndexOf(
+            "foreach (var member in members)",
             StringComparison.Ordinal);
-        return stage >= 0 && commit > stage &&
+        var commit = body.IndexOf(
+            "PublishMember(member);",
+            StringComparison.Ordinal);
+        return stage >= 0 && loop > stage && commit > loop &&
             body.Contains("TryRollbackPublication(members, previous);", StringComparison.Ordinal) &&
             body.Contains("LinuxPathIdentity.SyncDirectory", StringComparison.Ordinal) &&
             atomicFile.Contains("stream.Flush(true);", StringComparison.Ordinal);

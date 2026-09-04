@@ -1,7 +1,9 @@
 using NUnit.Framework;
 using SharpProof.Host;
 
-namespace SharpProof.Testing;
+// Place the fixture in the common parent namespace so NUnit applies it to
+// both SharpProof.Smt.Test and SharpProof.Worker.Test assemblies.
+namespace SharpProof;
 
 [SetUpFixture]
 public sealed class ContainerNativeLibrarySetup

@@ -3,6 +3,12 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <PackageDownload Include="Microsoft.NETFramework.ReferenceAssemblies"
+                    Version="[1.0.3]" />
+    <PackageDownload Include="Microsoft.NETFramework.ReferenceAssemblies.net472"
+                    Version="[1.0.3]" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Build.Framework"
                       PrivateAssets="all" />
     <PackageReference Include="Microsoft.Build.Utilities.Core"

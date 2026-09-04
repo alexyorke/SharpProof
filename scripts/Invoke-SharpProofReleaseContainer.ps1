@@ -39,6 +39,15 @@ function Resolve-RepositoryPath([string]$Path) {
         -ParameterName 'Release path'
 }
 
+function Assert-ReleaseTagVersion(
+    [string]$Tag,
+    [string]$Version,
+    [string]$ErrorMessage) {
+    if ($Tag -cne "v$Version") {
+        throw $ErrorMessage
+    }
+}
+
 function Assert-AnnotatedTagCommit {
     param(
         [Parameter(Mandatory = $true)][string]$TagRef,
@@ -70,9 +79,10 @@ switch ($Mode) {
         if ($ref -cne $expectedRef) {
             throw "Release ref '$ref' does not match '$expectedRef'."
         }
-        if ($refName -cne $expectedTag) {
-            throw "Release tag '$refName' does not match '$version'."
-        }
+        Assert-ReleaseTagVersion `
+            -Tag $refName `
+            -Version $version `
+            -ErrorMessage "Release tag '$refName' does not match '$version'."
         $head = (& git -C $repositoryRoot rev-parse HEAD 2>$null).Trim()
         if ($LASTEXITCODE -ne 0 -or $commit -cne $head) {
             throw "Release commit '$commit' does not match checkout HEAD '$head'."
@@ -137,9 +147,10 @@ switch ($Mode) {
         }
         $version = Get-SharpProofReleaseVersion `
             -RepositoryRoot $repositoryRoot
-        if ($tag -cne "v$version") {
-            throw "Qualification tag '$tag' does not match package version '$version'."
-        }
+        Assert-ReleaseTagVersion `
+            -Tag $tag `
+            -Version $version `
+            -ErrorMessage "Qualification tag '$tag' does not match package version '$version'."
         $tagRef = "refs/tags/$tag"
         Assert-AnnotatedTagCommit `
             -TagRef $tagRef `
@@ -243,9 +254,10 @@ switch ($Mode) {
         $packageRoot = Resolve-RepositoryPath $PackageSource
         $releaseVersion = Get-SharpProofReleaseVersion `
             -RepositoryRoot $repositoryRoot
-        if ($tag -cne "v$releaseVersion") {
-            throw "Release tag '$tag' does not match package version '$releaseVersion'."
-        }
+        Assert-ReleaseTagVersion `
+            -Tag $tag `
+            -Version $releaseVersion `
+            -ErrorMessage "Release tag '$tag' does not match package version '$releaseVersion'."
         $arguments = @{
             PackageSource = $packageRoot
             Source = $source

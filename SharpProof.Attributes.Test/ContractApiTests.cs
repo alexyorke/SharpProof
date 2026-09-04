@@ -35,15 +35,15 @@ internal sealed class ContractApiTests
     public void ContractValuePlaceholdersRejectRuntimeUse()
     {
         var resultException = Assert.Throws<InvalidOperationException>(
-            static () => _ = Contract.Result<int>());
+            (Action)(static () => _ = Contract.Result<int>()));
         var oldException = Assert.Throws<InvalidOperationException>(
-            static () => _ = Contract.Old(1));
+            (Action)(static () => _ = Contract.Old(1)));
 
         Assert.That(
-            resultException.Message,
+            resultException!.Message,
             Does.Contain("Contract.Ensures"));
         Assert.That(
-            oldException.Message,
+            oldException!.Message,
             Does.Contain("Contract.Ensures"));
     }
 
@@ -51,9 +51,9 @@ internal sealed class ContractApiTests
     public void TrustAndSuppressionReasonsAreRequired()
     {
         Assert.Throws<ArgumentException>(
-            static () => _ = new SharpProofTrustedAttribute(" "));
+            (Action)(static () => _ = new SharpProofTrustedAttribute(" ")));
         Assert.Throws<ArgumentException>(
-            static () => _ = new SharpProofSuppressAttribute(""));
+            (Action)(static () => _ = new SharpProofSuppressAttribute("")));
 
         Assert.That(
             new SharpProofTrustedAttribute("reviewed boundary").Reason,
@@ -67,7 +67,7 @@ internal sealed class ContractApiTests
     public void ClosedRangeRejectsAnInvertedBound()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            static () => _ = new InRangeAttribute(2, 1));
+            (Action)(static () => _ = new InRangeAttribute(2, 1)));
         var range = new InRangeAttribute(-1, 3);
         Assert.That(range.Minimum, Is.EqualTo(-1));
         Assert.That(range.Maximum, Is.EqualTo(3));

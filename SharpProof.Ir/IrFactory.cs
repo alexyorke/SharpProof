@@ -433,11 +433,13 @@ public sealed class IrFactory
 
     public IrOpaqueTerm PureOpaque(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
     }
 
     public IrOpaqueTerm ImpureOpaque(OperationId operation, IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         return Opaque(member, receiver, arguments, IrOpaquePurity.Impure, operation);
     }
 

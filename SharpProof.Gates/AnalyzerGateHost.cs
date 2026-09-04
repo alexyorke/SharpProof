@@ -37,6 +37,12 @@ internal static class AnalyzerGateHost
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static id => id, StringComparer.Ordinal)];
 
+    private static readonly ImmutableDictionary<string, ReportDiagnostic>
+        DiagnosticOptions = DiagnosticIds.ToImmutableDictionary(
+            static id => id,
+            static _ => ReportDiagnostic.Warn,
+            StringComparer.Ordinal);
+
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences);
 
@@ -47,11 +53,7 @@ internal static class AnalyzerGateHost
         var options = new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release)
-            .WithSpecificDiagnosticOptions(
-                DiagnosticIds.ToImmutableDictionary(
-                    static id => id,
-                    static _ => ReportDiagnostic.Warn,
-                    StringComparer.Ordinal));
+            .WithSpecificDiagnosticOptions(DiagnosticOptions);
         return CSharpCompilation.Create(
             assemblyName,
             [CSharpSyntaxTree.ParseText(source, ParseOptions, "input.cs")],

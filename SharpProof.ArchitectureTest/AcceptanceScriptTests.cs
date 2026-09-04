@@ -188,6 +188,11 @@ public sealed class AcceptanceScriptTests
                 fixtureScripts, "SharpProof.FuzzEvidenceLifecycle.ps1"));
         File.Copy(
             Path.Combine(
+                root, "scripts", "Assert-SharpProofFuzzRunnerResult.ps1"),
+            Path.Combine(
+                fixtureScripts, "Assert-SharpProofFuzzRunnerResult.ps1"));
+        File.Copy(
+            Path.Combine(
                 root, "scripts", "SharpProof.ContainerExecution.psm1"),
             Path.Combine(
                 fixtureScripts, "SharpProof.ContainerExecution.psm1"));

@@ -63,7 +63,7 @@ public sealed class PublicationDestinationAuthorityTests
         Assert.That(text, Does.Contain("New-SharpProofPublicationDestinationAuthority"));
         Assert.That(text, Does.Contain("publicationDestination ="));
         Assert.That(text, Does.Contain("New-SharpProofPublicationActionAuthority"));
-        Assert.That(text, Does.Contain("Test-SharpProofPublicationActionAuthority"));
+        Assert.That(text, Does.Contain("Test-SharpProofPublicationPlanIdentity"));
         Assert.That(text, Does.Contain("symbolsAction = $action.symbolsAction"));
         Assert.That(text, Does.Contain("-FixtureCatalog $fixtureCatalog"));
         Assert.That(text, Does.Contain("$remote.mainState"));

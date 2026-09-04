@@ -206,12 +206,6 @@ internal static class CompilerLoweredArtifact
                     Target = encoded.VariableIndices[item.Value]
                 };
             })];
-        var encodedInstructions = encoded.Graph.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
-        var programInstructions = body.Program!.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToDictionary(static instruction => instruction.Id);
         var allCalls = body.SpecCalls.Values
             .Select(static call => (
                 call.Instruction,
@@ -221,17 +215,23 @@ internal static class CompilerLoweredArtifact
                 call.CallIdentity)))
             .OrderBy(call => encoded.InstructionIndices[call.Instruction])
             .ToArray();
-        foreach (var call in allCalls)
+        if (allCalls.Length > 0)
         {
-            var instruction = encodedInstructions[
-                encoded.InstructionIndices[call.Instruction]];
-            var member = encoded.Graph.Members[instruction.B];
-            if (member.DocumentationCommentId is { } existing && existing != call.CallIdentity)
+            var encodedInstructions = encoded.Graph.Blocks
+                .SelectMany(static block => block.Instructions)
+                .ToArray();
+            foreach (var call in allCalls)
             {
-                throw new InvalidDataException("A lowered member has conflicting semantic identities.");
-            }
+                var instruction = encodedInstructions[
+                    encoded.InstructionIndices[call.Instruction]];
+                var member = encoded.Graph.Members[instruction.B];
+                if (member.DocumentationCommentId is { } existing && existing != call.CallIdentity)
+                {
+                    throw new InvalidDataException("A lowered member has conflicting semantic identities.");
+                }
 
-            member.DocumentationCommentId = call.CallIdentity;
+                member.DocumentationCommentId = call.CallIdentity;
+            }
         }
         artifact.Body.Calls = [.. allCalls
             .Select(item => new CompilerCallIdentityArtifact {
@@ -242,13 +242,24 @@ internal static class CompilerLoweredArtifact
                 Instruction = encoded.InstructionIndices[item.Instruction], WitnessIdentifier = item.WitnessIdentifier,
                 ConsumesMemoryHavoc = item.ConsumesMemoryHavoc
             })];
-        artifact.Body.SummaryCalls = [.. orderedSummaryCalls.Select((item, index) =>
-            BuildSummaryCallArtifact(item, index))];
+        if (orderedSummaryCalls.Length == 0)
+        {
+            artifact.Body.SummaryCalls = [];
+        }
+        else
+        {
+            var programInstructions = body.Program!.Blocks
+                .SelectMany(static block => block.Instructions)
+                .ToDictionary(static instruction => instruction.Id);
+            artifact.Body.SummaryCalls = [.. orderedSummaryCalls.Select((item, index) =>
+                BuildSummaryCallArtifact(item, index, programInstructions))];
+        }
         return artifact;
 
         CompilerSummaryCallArtifact BuildSummaryCallArtifact(
             CompilerPreparedSummaryCall item,
-            int index)
+            int index,
+            Dictionary<IrInstructionId, IrInstruction> programInstructions)
         {
             if (!programInstructions.TryGetValue(item.Instruction, out var instruction) ||
                 instruction is not IrCallInstruction call)
@@ -755,7 +766,9 @@ internal static class CompilerLoweredArtifact
         }
 
         var programVariables = ValidateExecutableBody(graph.Program, variables);
-        var summaryEvidence = new SummaryEvidenceIndex(compilation);
+        var summaryEvidence = row.SummaryCalls.Length == 0
+            ? null
+            : new SummaryEvidenceIndex(compilation);
 
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
         var parameters = variables
@@ -795,9 +808,6 @@ internal static class CompilerLoweredArtifact
         var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         var callCount = graph.Instructions.Count(static instruction => instruction is IrCallInstruction);
         var summaryVariables = new HashSet<IrVarId>();
-        var portableInstructions = portable.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
         if (row.Calls.Length != callCount ||
             row.SpecCalls.Length + row.SummaryCalls.Length != callCount)
         {
@@ -805,6 +815,11 @@ internal static class CompilerLoweredArtifact
                 "Lowered call evidence does not equal program calls.");
         }
 
+        var portableInstructions = row.Calls.Length == 0
+            ? Array.Empty<PortableIrInstruction>()
+            : portable.Blocks
+                .SelectMany(static block => block.Instructions)
+                .ToArray();
         var identities = new Dictionary<IrInstructionId, string>();
         for (var index = 0; index < row.Calls.Length; index++)
         {
@@ -873,7 +888,7 @@ internal static class CompilerLoweredArtifact
             if (instruction is not IrCallInstruction call ||
                 !identities.TryGetValue(call.Id, out var identity) ||
                 summary.Identity != identity ||
-                !summaryEvidence.IsValid(
+                !summaryEvidence!.IsValid(
                     summary.Origin,
                     summary.Identity,
                     summary.EvidenceSha256,

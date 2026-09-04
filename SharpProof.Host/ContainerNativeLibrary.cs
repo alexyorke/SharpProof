@@ -27,6 +27,7 @@ public static class ContainerNativeLibrary
 
             var handle = NativeLibrary.Load(
                 ContainerContract.ResolveZ3LibraryRequired());
+            var resolverInstalled = false;
             try
             {
                 s_z3Assembly = z3Assembly;
@@ -34,13 +35,16 @@ public static class ContainerNativeLibrary
                 NativeLibrary.SetDllImportResolver(
                     z3Assembly,
                     ResolveZ3Import);
+                resolverInstalled = true;
             }
-            catch
+            finally
             {
-                Volatile.Write(ref s_z3Handle, IntPtr.Zero);
-                s_z3Assembly = null;
-                NativeLibrary.Free(handle);
-                throw;
+                if (!resolverInstalled)
+                {
+                    Volatile.Write(ref s_z3Handle, IntPtr.Zero);
+                    s_z3Assembly = null;
+                    NativeLibrary.Free(handle);
+                }
             }
         }
     }

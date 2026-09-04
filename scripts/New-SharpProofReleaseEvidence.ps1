@@ -394,12 +394,17 @@ foreach ($packageId in $expectedIds) {
                 $_.Identity.Id -eq $packageId
             }
     )[0]
-    Test-SharpProofSymbolPackagePair `
-        -PackagePath $main.File.FullName `
-        -SymbolPackagePath $symbols.File.FullName `
-        -PackageId $packageId `
-        -PackageVersion $versions[0] `
-        -RepositoryCommit $checkoutCommit
+    try {
+        Test-SharpProofSymbolPackagePair `
+            -PackagePath $main.File.FullName `
+            -SymbolPackagePath $symbols.File.FullName `
+            -PackageId $packageId `
+            -PackageVersion $versions[0] `
+            -RepositoryCommit $checkoutCommit
+    }
+    catch {
+        throw "Package payload validation failed: $($_.Exception.Message)"
+    }
 }
 
 $thirdPartyPackages = @(
