@@ -195,13 +195,14 @@ public sealed class SharpProofWorker : IDisposable
             {
                 var lanes = targets.Select(target => Unknown(
                     target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled)).ToArray();
+                var projected = ProjectResults(lanes);
                 return WorkerResultAssembler.Create(
                     snapshot.InputHash,
                     manifest,
                     WorkerRunStatus.Canceled,
                     WorkerRunFailureReason.None,
-                    lanes.Select(static lane => lane.Callable),
-                    lanes.SelectMany(static lane => lane.Claims),
+                    projected.Callables,
+                    projected.Claims,
                     request.Budgets,
                     status,
                     Elapsed(started),
@@ -402,8 +403,9 @@ public sealed class SharpProofWorker : IDisposable
                 }
             }
 
-            var callableResults = results.Select(static result => result.Callable).ToArray();
-            var claimResults = results.SelectMany(static result => result.Claims).ToArray();
+            var projected = ProjectResults(results);
+            var callableResults = projected.Callables;
+            var claimResults = projected.Claims;
             projectBoundary.Token.ThrowIfCancellationRequested();
             var run = WorkerResultAssembler.Classify(callableResults, claimResults);
             var response = Assemble(run.Status, run.Failure, callableResults, claimResults, cacheStatus);
@@ -417,9 +419,10 @@ public sealed class SharpProofWorker : IDisposable
             {
                 var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
                     WorkerCallableCoverageReason.MissingClaimResult)).ToArray();
+                var malformedProjection = ProjectResults(malformed);
                 return Assemble(WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
-                    malformed.Select(static lane => lane.Callable),
-                    malformed.SelectMany(static lane => lane.Claims),
+                    malformedProjection.Callables,
+                    malformedProjection.Claims,
                     WorkerCacheStatus.Rejected, responseValidation.Errors);
             }
             if (cache != null && VerificationCache.IsCacheable(
@@ -599,6 +602,21 @@ public sealed class SharpProofWorker : IDisposable
         IEnumerable<CompilerCallablePreparation> targets)
     {
         return targets.Count(static target => target.IsSuccess);
+    }
+
+    private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
+        ProjectResults(IReadOnlyList<CallableVerificationResult> results)
+    {
+        var callables = new WorkerCallableResult[results.Count];
+        var claims = new List<WorkerClaimResult>();
+        for (var index = 0; index < results.Count; index++)
+        {
+            var result = results[index];
+            callables[index] = result.Callable;
+            claims.AddRange(result.Claims);
+        }
+
+        return (callables, [.. claims]);
     }
 
     private static VerificationLane CreateLane(
