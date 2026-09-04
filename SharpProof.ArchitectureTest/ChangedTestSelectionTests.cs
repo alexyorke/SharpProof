@@ -12,6 +12,7 @@ public sealed class ChangedTestSelectionTests
     [TestCase("SharpProof.AnalyzerConsumer.props")]
     [TestCase("SharpProof.PackageMetadata.props")]
     [TestCase("SharpProof.Release.props")]
+    [TestCase("eng/testing/TestRepository.cs")]
     public async Task RootBuildInputsSelectTheCompleteTestGraph(
         string changedInput)
     {
@@ -67,6 +68,8 @@ public sealed class ChangedTestSelectionTests
         string changedInput)
     {
         var repository = TestRepository.FindRoot();
+        var changedPath = Path.Combine(root, changedInput);
+        Directory.CreateDirectory(Path.GetDirectoryName(changedPath)!);
         foreach (var directory in new[]
                  {
                      "scripts",
@@ -94,9 +97,7 @@ public sealed class ChangedTestSelectionTests
         await File.WriteAllTextAsync(
             Path.Combine(root, "eng", "acceptance", "contract.json"),
             "{\"automation\":{\"testProjectCpuDivisor\":1}}\n");
-        await File.WriteAllTextAsync(
-            Path.Combine(root, changedInput),
-            "<Project />\n");
+        await File.WriteAllTextAsync(changedPath, "<Project />\n");
         await File.WriteAllTextAsync(
             Path.Combine(root, "SharpProof.sln"),
             string.Empty);

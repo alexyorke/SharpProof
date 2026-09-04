@@ -118,6 +118,13 @@ $scriptOrDocumentationImpact = $false
 foreach ($changedPath in $changedPaths) {
     $fullChangedPath = [IO.Path]::GetFullPath(
         (Join-Path $repositoryRoot $changedPath))
+    if ($changedPath.StartsWith('eng/testing/', [StringComparison]::Ordinal)) {
+        # These sources are injected by Directory.Build.props into multiple
+        # test projects, so a path-based project walk cannot identify every
+        # consumer. Treat the shared test infrastructure as global impact.
+        $globalImpact = $true
+        continue
+    }
     if ($changedPath -match '^Directory\.' -or
         $changedPath -match '^[^/]+\.(props|targets)$' -or
         $changedPath -in @('global.json', 'NuGet.Config', 'SharpProof.sln')) {
