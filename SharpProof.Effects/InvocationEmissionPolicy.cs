@@ -10,6 +10,8 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
             FrameworkTypeMetadataNames.ConditionalAttribute);
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
         _definedPreprocessorSymbols = [];
+    private readonly Dictionary<IMethodSymbol, bool>
+        _unimplementedPartials = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<IMethodSymbol, ImmutableArray<string>>
         _conditionalSymbols = new(SymbolEqualityComparer.Default);
 
@@ -17,7 +19,12 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
     {
         var target = invocation.TargetMethod.ReducedFrom ??
             invocation.TargetMethod;
-        if (IsUnimplementedPartial(target))
+        if (!_unimplementedPartials.TryGetValue(target, out var isUnimplementedPartial))
+        {
+            isUnimplementedPartial = IsUnimplementedPartial(target);
+            _unimplementedPartials.Add(target, isUnimplementedPartial);
+        }
+        if (isUnimplementedPartial)
         {
             return true;
         }
