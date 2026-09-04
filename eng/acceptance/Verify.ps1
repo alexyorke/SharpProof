@@ -710,7 +710,8 @@ try {
             '23063',
             '--max-parallelism',
             [string]$contract.fuzz.maximumParallelism
-        )
+        ) `
+            -TimeoutSeconds ([int]$contract.automation.solutionTestWallSeconds)
         Complete-AcceptanceTimingPhase
 
         Start-AcceptanceTimingPhase -Name 'corpus-and-performance'
@@ -723,7 +724,8 @@ try {
             '--no-build',
             '--',
             'all'
-        )
+        ) `
+            -TimeoutSeconds ([int]$contract.automation.solutionTestWallSeconds)
         Complete-AcceptanceTimingPhase
     }
     else {
