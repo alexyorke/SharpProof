@@ -22579,3 +22579,228 @@ confidence than the exact duplicate validations above.
 
 R2223-R2229 are deferred ledger-only observations. No source, test, build,
 script, or generated file was changed; the only appended file is this ledger.
+
+## Second survey, continued: R2238 - generated-code policy queries Roslyn twice
+
+`AnalyzerGeneratedCodePolicy.IsGenerated(ISymbol, ...)` calls the tree
+overload, which already queries `SyntaxTreeOptionsProvider.IsGenerated`.
+When that result is not decisive, the symbol overload queries the same
+provider again before checking the symbol's generated-code attribute. A
+helper returning the generated-kind classification, or carrying it from the
+tree overload, can remove the repeated Roslyn query while preserving the
+marked/generated, fallback path/header, and attribute precedence rules.
+This is distinct from R434, which removed a redundant `IMethodSymbol`
+forwarding overload.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2238 | **`AnalyzerGeneratedCodePolicy.IsGenerated(ISymbol, ...)` repeats the syntax-tree generated-kind query after delegating to the tree overload.** Carry the classification through one helper while preserving marked/generated, fallback path/header, and attribute precedence. | `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:18-33,36-43`; production callers include `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:51-55,88-92,347-351,490-494,555-560,569-573`; R434 concerns a different removed overload |
+
+## Second survey, continued: R2239 - analyzer configuration parsing relies on registry positions
+
+`AnalyzerConfiguration.FromOptions` reads `AnalyzerConfigurationOptionRegistry.All[0]`
+as the profile option and `[1]` as the features option. The same registry
+also exposes named `Profile` and `Features` descriptors, so parsing semantics
+currently depend on an array ordering that is defined elsewhere and can be
+changed without a compile-time signal. Referencing the named descriptors
+directly keeps `All` for enumeration while removing this accidental
+positional coupling.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2239 | **`AnalyzerConfiguration.FromOptions` uses magic positions in `AnalyzerConfigurationOptionRegistry.All` for profile/features parsing.** Reference the named `Profile` and `Features` descriptors directly while retaining `All` for validation/enumeration. | `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:53-59`; named descriptors and array order `SharpProof.Analyzer.Core/Configuration/AnalyzerConfigurationOptionRegistry.cs:5-20` |
+
+## Second survey, continued: R2240 - rejected-contract reporting keeps a thin pipeline forwarder
+
+`AnalyzerFeaturePipeline.ReportRejectedContractApi` only projects a method
+name and callable declaration location before calling
+`SharpProofControlAttributePolicy.ReportRejectedContractApi`. It has three
+pipeline callers, while the policy method is also called directly from
+other analyzer code. Inlining those projections or moving the method-symbol
+adapter to the owning policy can remove the private seam; the three callers'
+distinct rejection detection and ordering remain local.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2240 | **`AnalyzerFeaturePipeline.ReportRejectedContractApi` adds only a forwarding/name-location adapter over `SharpProofControlAttributePolicy`.** Inline its three uses or move the method-symbol adapter to the owning policy without changing rejection detection or diagnostic location. | `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:109-112,366-369,719-764`; direct policy callers include `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:313` and `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:225` |
+
+## Second survey, continued: R2241 - `IrFactory` re-enumerates member and opaque arguments
+
+`IrFactory.GetOrCreateMember` and `IrFactory.Opaque` each materialize an
+immutable argument array and then enumerate that materialized array again to
+project structural-key child IDs. Both the payload array and structural key
+are necessary, but their construction can be fused in one bounded loop,
+retaining canonical argument order and hash-consing behavior without a
+second LINQ/iterator pass.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2241 | **`IrFactory` re-enumerates immutable member/opaque arguments to build structural-key child IDs.** Fuse snapshot and key projection while retaining the canonical payload arrays and structural identity. | `SharpProof.Ir/IrFactory.cs:211-239,676-710` |
+
+## Second survey, continued: R2242 - `IrProgramBuilder.Build` traverses blocks twice
+
+`IrProgramBuilder.Build` first walks every mutable block to validate that it
+contains a terminal instruction, then walks the same blocks again through
+`Select(...Freeze)` when constructing the immutable program. A single loop
+can validate each block and append its frozen representation to a temporary
+immutable builder, assigning `_built` only after all validation succeeds.
+The failed-build retry behavior and immutable output boundary should remain
+unchanged.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2242 | **`IrProgramBuilder.Build` scans `_blocks` once for terminal validation and again for freezing.** Combine the passes while preserving failed-build retry semantics, block order, and immutable output. | `SharpProof.Ir/IrProgramBuilder.cs:144-158` |
+
+## Second survey, continued: R2243 - lowered summary evidence hashes are validated twice
+
+During lowered-body decoding, `SummaryEvidenceIndex.IsValid` already checks
+that `summary.EvidenceSha256` is a valid SHA-256 before looking up the unique
+authority row. The surrounding `DecodeBody` predicate immediately applies
+`WorkerProtocolJson.IsSha256(summary.EvidenceSha256)` again. Removing only
+the second predicate preserves summary identity, dependency, instantiation,
+and authority-row validation.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2243 | **`CompilerLoweredArtifact.DecodeBody` repeats the `summary.EvidenceSha256` SHA-256 check already performed by `SummaryEvidenceIndex.IsValid`.** Remove the subsumed check while retaining row identity and compilation validation. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:48-61,879-884` |
+
+## Second survey, continued: R2244 - release GET helper carries an unreachable output-file mode
+
+`Invoke-V3Get` accepts `$OutputPath` and conditionally adds `OutFile` and
+`PassThru` to the web request. Its service-index caller and package
+preflight caller pass only `-Uri` or `-Uri -Method Head`; no repository call
+supplies `-OutputPath`. The parameter and branch are therefore dead surface
+unless an external script relies on the internal helper. Remove or
+deliberately consume the mode while retaining the GET/HEAD status and JSON
+handling paths.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2244 | **`Publish-SharpProofRelease.ps1` carries an unreachable `$OutputPath`/`OutFile`/`PassThru` mode in `Invoke-V3Get`.** Remove the unused parameter and branch, or add a real consumer, while preserving service-index GET and package-preflight HEAD behavior. | `scripts/Publish-SharpProofRelease.ps1:400-429,446,513-519` |
+
+## Second survey, continued: R2245 - operation classification exposes a single-use default-stage adapter
+
+`OperationSubsetClassifier.Classify(OperationKind)` only forwards to the
+stage-aware overload with
+`ContractExpressionLowering`. Its internal production use is the snapshot
+builder, while effect discovery calls the stage-aware overload directly and
+the other callers are tests. Because this is a public method, external
+compatibility may justify retaining it; absent that contract, inlining or
+internalizing the adapter removes a thin API seam while preserving the
+default classification behavior.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2245 | **`OperationSubsetClassifier.Classify(OperationKind)` is a public single-use default-stage adapter over the stage-aware overload.** Remove or internalize it only after checking external compatibility, retaining contract-expression default classification and snapshot behavior. | `SharpProof.Frontend/OperationSubsetClassifier.cs:11-16,52-57`; production stage-aware caller `SharpProof.Effects/OperationEffectScanner.Expressions.cs:846-848`; test callers `SharpProof.Frontend.Test/FrontendLoweringTests.cs:947,961,980` |
+
+## Second survey, continued: R2246 - cacheability checks the expected input hash twice
+
+`VerificationCache.IsCacheable` first scans `expectedInputHash` with
+`WorkerProtocolJson.IsSha256`. Once that succeeds, it calls the validating
+overload that invokes `RequireSha256`, which scans the same 64-character
+value again before validating the response. An internal validator entry
+that accepts the already-checked hash can preserve the public exception and
+fail-closed behavior while removing the repeated hash-shape scan.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2246 | **`VerificationCache.IsCacheable` validates `expectedInputHash` twice.** Reuse a private response-validation path after the existing fail-closed precheck while preserving invalid-input behavior and response validation. | `SharpProof.Worker/VerificationCache.cs:570-597`; `SharpProof.Worker.Protocol/ProtocolJson.cs:174-178,1184-1189` |
+
+## Second survey, continued: R2247 - cache-status validation re-traverses validated response collections
+
+`ProtocolJson.ValidateResponse` validates the manifest, callable results,
+claim results, and run state, then `ValidateCacheForRequest` independently
+walks the response and manifest collections to derive `storableShape`. The
+second projection is needed for cache-status policy, but it repeats
+collection traversal and predicate work over objects that have just passed
+validation. Carrying the shape bits through a validation snapshot can
+preserve independent cache-mismatch diagnostics without rescanning all
+callables, claims, and manifest claims.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2247 | **`ProtocolJson.ValidateCacheForRequest` re-traverses already-validated response and manifest collections to compute storable shape.** Carry policy bits through validation while retaining independent cache-status diagnostics. | `SharpProof.Worker.Protocol/ProtocolJson.cs:345-370,396,422-470` |
+
+## Second survey, continued: R2248 - `VerificationCache` ships test-only global fault hooks
+
+`VerificationCache.PathValidationOverride` and
+`TransactionRollbackOverride` are mutable static hooks in the production
+type. Repository assignments are confined to Worker test fault-injection
+scenarios; production code only checks/invokes them around path validation
+and rollback. An injected test policy or test-only adapter can preserve the
+failure and rollback coverage without compiling mutable global test seams
+into the production cache implementation.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2248 | **`VerificationCache` ships two mutable static test-only fault-injection hooks.** Isolate them behind test infrastructure or an explicit injected policy while preserving path-failure and rollback tests. | `SharpProof.Worker/VerificationCache.cs:29-30,156-160,240-241,545-549`; assignments in `SharpProof.Worker.Test/WorkerTests.cs:1649-1677,4866-4885` and `WorkerTcbEdgeCaseTests.cs:1003-1272` |
+
+## Second survey, continued: R2249 - IL method-definition lookup extracts a row number twice
+
+`TryGetMethodDefinition` converts the same immutable method handle to a row
+number in both sides of one bounds condition. Caching that scalar before
+checking the lower and upper bounds removes a repeated metadata-token
+projection while preserving zero-row and upper-bound rejection.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2249 | **`CompilerImplementationIlSummaryLowerer.TryGetMethodDefinition` repeats `MetadataTokens.GetRowNumber(handle)`.** Cache the validated row number before checking the method-definition count. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:443-454` |
+
+## Second survey, continued: R2250 - Effects recomputes lifted-operator skipping
+
+The Effects scanner asks `ConversionEffectClassifier.SkipsLiftedOperator`
+to decide operator-effect admission, then calls `CheckedOverflow`, which
+asks the classifier for the same operation and flow-state fact again. The
+same structure appears in checked increment, binary, and unary paths;
+conversion paths also combine operator and overflow effects. Carrying the
+Boolean through the local result projection can remove repeated lifted-null
+classification without merging the surrounding operator, division, and
+overflow policies.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2250 | **`OperationEffectScanner` recomputes lifted-null skipping during overflow classification after already computing it for operator-effect admission.** Carry the shared fact through checked unary, binary, increment, and conversion paths while retaining their distinct effect policies. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:505-513,580-598,767-778,795-808`; classifier `SharpProof.Effects/ConversionEffectClassifier.cs:115-131` |
+
+## Second survey, continued: R2251 - array access projects discarded ownership before a null guard
+
+`ScanArrayElement` computes conversion ownership and builds the read/write
+access summary before checking whether the array receiver is definitely
+null. On that null path the method returns only evaluated effects plus a
+`NullReferenceException`, so both the ownership classification and access
+summary are discarded. Defer those projections until after the definite-null
+guard while preserving unknown-null, bounds, and array-store checks.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2251 | **`OperationEffectScanner.ScanArrayElement` performs ownership/access projection before a definitely-null receiver guard that discards both results.** Defer the projections until the guard is passed without changing null, bounds, or store-compatibility effects. | `SharpProof.Effects/OperationEffectScanner.cs:502-549` |
+
+## Second survey, continued: R2252 - value-type-constrained boxing classifies an unused operand
+
+For a boxing conversion whose operand is a type parameter,
+`ClassifyConversionRegion` first classifies the operand. It returns that
+classification for reference-type parameters and unions it for
+unconstrained parameters, but returns only the fresh boxed region for a
+value-type-constrained parameter. Defer the operand classification in that
+branch while preserving reference-instantiation ownership and the
+unconstrained union.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2252 | **`ConversionOwnershipClassifier.ClassifyConversionRegion` eagerly classifies an operand whose result is discarded for value-type-constrained type parameters.** Defer the classification to branches that consume it while retaining the boxing ownership policy. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:831-851` |
+
+## Second survey, continued: R2253 - nullness proof repeats its static predicate
+
+`OperationNullnessEvaluator` already owns `IsStaticallyNonNull`, which
+combines null, instance-reference, non-nullable-value, and definite-non-null
+checks. `IsProvenNonNull` repeats those same four terms inline before adding
+the abstract-flow proof. Calling the private helper and retaining the flow
+fallback removes a duplicate nullness policy that could otherwise drift.
+
+| ID | Finding | Evidence |
+|---|---|
+| R2253 | **`OperationNullnessEvaluator.IsProvenNonNull` duplicates the complete `IsStaticallyNonNull` predicate.** Reuse the helper and retain the abstract-flow fallback. | `SharpProof.Effects/OperationNullnessEvaluator.cs:117-124,223-231` |
+
+### Status (second survey, part six hundred forty-six)
+
+R2238-R2253 are deferred ledger-only observations. No source, test, build,
+script, or generated file was changed; the only appended file is this ledger.
