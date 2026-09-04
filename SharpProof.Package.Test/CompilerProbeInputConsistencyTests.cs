@@ -1,10 +1,10 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.CompilerProbe.TestAsset;
+using SharpProof.Testing;
 
 namespace SharpProof.Package.Test;
 
@@ -96,42 +96,26 @@ public sealed class CompilerProbeInputConsistencyTests
         AdditionalText input,
         string metadataValue) : AnalyzerConfigOptionsProvider
     {
-        private readonly AnalyzerConfigOptions _global = new DictionaryOptions(
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [CompilerProbeContract.OutputPathOptionKey] = outputPath
-            });
-        private readonly AnalyzerConfigOptions _input = new DictionaryOptions(
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [CompilerProbeContract.AdditionalFileMetadataOptionKey] =
-                    metadataValue
-            });
+        private readonly AnalyzerConfigOptions _global =
+            new DictionaryAnalyzerConfigOptions(
+                (CompilerProbeContract.OutputPathOptionKey, outputPath));
+        private readonly AnalyzerConfigOptions _input =
+            new DictionaryAnalyzerConfigOptions(
+                (CompilerProbeContract.AdditionalFileMetadataOptionKey,
+                    metadataValue));
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
-            return DictionaryOptions.Empty;
+            return DictionaryAnalyzerConfigOptions.Empty;
         }
 
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
             return ReferenceEquals(textFile, input)
                 ? _input
-                : DictionaryOptions.Empty;
-        }
-    }
-
-    private sealed class DictionaryOptions(
-        IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
-    {
-        internal static DictionaryOptions Empty { get; } = new(
-            ImmutableDictionary<string, string>.Empty);
-
-        public override bool TryGetValue(string key, out string value)
-        {
-            return values.TryGetValue(key, out value!);
+                : DictionaryAnalyzerConfigOptions.Empty;
         }
     }
 }

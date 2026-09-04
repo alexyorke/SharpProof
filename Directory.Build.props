@@ -130,7 +130,8 @@
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.Gates'">
+                        '$(MSBuildProjectName)' == 'SharpProof.Gates' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Package.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\DictionaryAnalyzerConfigOptions.cs"
              Link="DictionaryAnalyzerConfigOptions.cs" />
   </ItemGroup>

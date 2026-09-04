@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.CompilerProbe.TestAsset;
+using SharpProof.Testing;
 
 namespace SharpProof.Package.Test;
 
@@ -157,7 +158,9 @@ public sealed class CompilerProbeSnapshotTests
     {
         var analyzerOptions = new AnalyzerOptions(
             [],
-            new OutputPathOptionsProvider(outputPath));
+            new DictionaryAnalyzerConfigOptionsProvider(
+                new DictionaryAnalyzerConfigOptions(
+                    (CompilerProbeContract.OutputPathOptionKey, outputPath))));
         var withAnalyzers = compilation.WithAnalyzers(
             [new CompilerProbeAnalyzer()],
             new CompilationWithAnalyzersOptions(
@@ -172,42 +175,4 @@ public sealed class CompilerProbeSnapshotTests
         return await File.ReadAllTextAsync(outputPath);
     }
 
-    private sealed class OutputPathOptionsProvider(string outputPath)
-        : AnalyzerConfigOptionsProvider
-    {
-        private readonly AnalyzerConfigOptions _options =
-            new OutputPathOptions(outputPath);
-
-        public override AnalyzerConfigOptions GlobalOptions => _options;
-
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
-            return _options;
-        }
-
-        public override AnalyzerConfigOptions GetOptions(
-            AdditionalText textFile)
-        {
-            return _options;
-        }
-    }
-
-    private sealed class OutputPathOptions(string outputPath)
-        : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (string.Equals(
-                    key,
-                    CompilerProbeContract.OutputPathOptionKey,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                value = outputPath;
-                return true;
-            }
-
-            value = string.Empty;
-            return false;
-        }
-    }
 }

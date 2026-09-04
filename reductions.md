@@ -22363,6 +22363,11 @@ by production `ValidateExecutableBody` for reachable-block variable validation,
 so the collector is not test-only. The public test projection remains in place
 because removing it would either duplicate the traversal or weaken that test.
 
+R2232 is applied: `SharpProof.Package.Test` now links the shared
+`DictionaryAnalyzerConfigOptions` helper; the two compiler-probe tests reuse its
+uniform map-backed options while `ProbeOptionsProvider` retains its stateful
+additional-file identity routing. The focused six-test probe set passes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
