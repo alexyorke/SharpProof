@@ -22347,6 +22347,12 @@ header frame from `New-SharpProofGeneratedHeader`; generator-specific notes and
 nullable policy remain local. Regenerated outputs pass the deterministic
 generated-output verification gate.
 
+R2100 collector half is applied: `CompilerEffectReplayLowerer` now resolves its
+five replay wire guards through `EffectDirectEventKinds.ToWireName` and the
+generated Effects catalog. The Worker emitter remains deferred because its
+assembly boundary cannot currently reference the Effects catalog without a
+dependency-shape decision; compiler-collector build and replay tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

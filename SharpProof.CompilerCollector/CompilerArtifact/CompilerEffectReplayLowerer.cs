@@ -117,7 +117,8 @@ internal static class CompilerEffectReplayLowerer
                     Constructor: { } constructor,
                     Type: INamedTypeSymbol type
                 } creation)
-                when witness.Kind == "managed-allocation" &&
+                when witness.Kind == EffectDirectEventKinds.ToWireName(
+                         EffectDirectEventKind.ManagedObjectAllocation) &&
                      IsDefiniteObjectAllocation(
                          creation,
                          apiSpecs,
@@ -139,7 +140,8 @@ internal static class CompilerEffectReplayLowerer
             case (
                 EffectDirectEventKind.ManagedArrayAllocation,
                 IArrayCreationOperation { Type: IArrayTypeSymbol type } array)
-                when witness.Kind == "managed-array-allocation" &&
+                 when witness.Kind == EffectDirectEventKinds.ToWireName(
+                          EffectDirectEventKind.ManagedArrayAllocation) &&
                      DefiniteOperationFacts.IsDirectArrayCreationComplete(
                          array):
                 eventKind =
@@ -157,7 +159,8 @@ internal static class CompilerEffectReplayLowerer
             case (
                 EffectDirectEventKind.ExplicitThrow,
                 IThrowOperation { Exception: { } exception }) when
-                witness.Kind == "explicit-throw" &&
+                witness.Kind == EffectDirectEventKinds.ToWireName(
+                    EffectDirectEventKind.ExplicitThrow) &&
                 witness.ExceptionType is { } exactExceptionType &&
                 DefiniteOperationFacts.UnwrapHarmlessValue(exception) is
                     IObjectCreationOperation
@@ -191,7 +194,8 @@ internal static class CompilerEffectReplayLowerer
             case (
                 EffectDirectEventKind.MonitorCall,
                 IInvocationOperation invocation) when
-                witness.Kind == "synchronization-call" &&
+                witness.Kind == EffectDirectEventKinds.ToWireName(
+                    EffectDirectEventKind.MonitorCall) &&
                 IsDefiniteMonitorCall(compilation, invocation):
                 eventKind = CompilerEffectReplayEventKind.MonitorCall;
                 memberIdentity = CompilerIdentityBridge.CreateSymbolDisplay(
@@ -211,7 +215,8 @@ internal static class CompilerEffectReplayLowerer
             case (
                 EffectDirectEventKind.EmptyLock,
                 ILockOperation @lock) when
-                witness.Kind == "synchronization-lock" &&
+                witness.Kind == EffectDirectEventKinds.ToWireName(
+                    EffectDirectEventKind.EmptyLock) &&
                 IsDefiniteEmptyLock(
                     @lock,
                     apiSpecs,
