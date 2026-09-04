@@ -57,11 +57,6 @@ internal static class OpenSourceCorpusCatalog
                 $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
     }
 
-    internal static string ComputeSha256(string value)
-    {
-        return ComputeNormalizedSha256(NormalizeLineEndings(value));
-    }
-
     internal static string ComputeNormalizedSha256(string normalizedValue)
     {
         return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(normalizedValue));
