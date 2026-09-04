@@ -200,45 +200,36 @@ public sealed class ApiSpecInstantiationCoverageTests
         var factory = new IrFactory();
         var foreignFactory = new IrFactory();
 
-        var foreignVariable =
-            ApiSpecInstantiator.InstantiatePostconditions(
-                template,
-                factory,
-                new Dictionary<SpecVarId, IrTerm>
-                {
-                    [otherTemplate.Parameters.Single()] =
-                        factory.Integer(0)
-                });
-        var foreignTerm =
-            ApiSpecInstantiator.InstantiatePostconditions(
-                template,
-                factory,
-                new Dictionary<SpecVarId, IrTerm>
-                {
-                    [template.Parameters.Single()] =
-                        foreignFactory.Integer(0)
-                });
-        var wrongType =
-            ApiSpecInstantiator.InstantiatePostconditions(
-                template,
-                factory,
-                new Dictionary<SpecVarId, IrTerm>
-                {
-                    [template.Parameters.Single()] =
-                        factory.Boolean(false)
-                });
+        var cases = new[]
+        {
+            (
+                Variable: otherTemplate.Parameters.Single(),
+                Value: (IrTerm)factory.Integer(0),
+                Failure: SpecInstantiationFailureKind.ForeignVariable),
+            (
+                Variable: template.Parameters.Single(),
+                Value: (IrTerm)foreignFactory.Integer(0),
+                Failure: SpecInstantiationFailureKind.ForeignIrTerm),
+            (
+                Variable: template.Parameters.Single(),
+                Value: (IrTerm)factory.Boolean(false),
+                Failure: SpecInstantiationFailureKind.TypeMismatch)
+        };
 
         using (Assert.EnterMultipleScope())
         {
-            AssertFailure(
-                foreignVariable,
-                SpecInstantiationFailureKind.ForeignVariable);
-            AssertFailure(
-                foreignTerm,
-                SpecInstantiationFailureKind.ForeignIrTerm);
-            AssertFailure(
-                wrongType,
-                SpecInstantiationFailureKind.TypeMismatch);
+            foreach (var testCase in cases)
+            {
+                var instantiated =
+                    ApiSpecInstantiator.InstantiatePostconditions(
+                        template,
+                        factory,
+                        new Dictionary<SpecVarId, IrTerm>
+                        {
+                            [testCase.Variable] = testCase.Value
+                        });
+                AssertFailure(instantiated, testCase.Failure);
+            }
         }
     }
 

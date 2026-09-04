@@ -188,13 +188,7 @@ public sealed class ApiSpecValidationTests
     [Test]
     public void StaticallyUnreachablePartialBranchesAreTotal()
     {
-        var partial = Equal(
-            new SpecBinaryDeclaration(
-                IrBinaryOperator.Divide,
-                new SpecIntegerDeclaration(1),
-                new SpecIntegerDeclaration(0),
-                IrTypeKind.Integer),
-            new SpecIntegerDeclaration(0));
+        var partial = PartialDivision();
         var declaration = Declaration(
             "unreachable-partial",
             resultType: null,
@@ -231,13 +225,7 @@ public sealed class ApiSpecValidationTests
     [Test]
     public void StaticallyReachablePartialBranchesRemainNonTotal()
     {
-        var partial = Equal(
-            new SpecBinaryDeclaration(
-                IrBinaryOperator.Divide,
-                new SpecIntegerDeclaration(1),
-                new SpecIntegerDeclaration(0),
-                IrTypeKind.Integer),
-            new SpecIntegerDeclaration(0));
+        var partial = PartialDivision();
         var reached = new SpecTermDeclaration[]
         {
             new SpecBinaryDeclaration(
@@ -318,6 +306,17 @@ public sealed class ApiSpecValidationTests
             left,
             right,
             IrTypeKind.Boolean);
+    }
+
+    private static SpecBinaryDeclaration PartialDivision()
+    {
+        return Equal(
+            new SpecBinaryDeclaration(
+                IrBinaryOperator.Divide,
+                new SpecIntegerDeclaration(1),
+                new SpecIntegerDeclaration(0),
+                IrTypeKind.Integer),
+            new SpecIntegerDeclaration(0));
     }
 
     private static ApiSpecDeclaration Declaration(
