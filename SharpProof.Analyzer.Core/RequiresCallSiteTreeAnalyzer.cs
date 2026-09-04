@@ -1396,6 +1396,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 ILocalSymbol Local,
                 SyntaxNode Definition,
                 string[]? TuplePath)>();
+            var seenLocals = new HashSet<ILocalSymbol>(
+                SymbolEqualityComparer.Default);
             var pending = new Stack<(IPatternOperation Pattern, string[]? Path)>();
             pending.Push((match.Pattern, tuplePath));
             while (pending.Count != 0)
@@ -1412,10 +1414,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     _ => null
                 };
                 if (declared is ILocalSymbol local &&
-                    !result.Any(candidate =>
-                        SymbolEqualityComparer.Default.Equals(
-                            candidate.Local,
-                            local)))
+                    seenLocals.Add(local))
                 {
                     result.Add((local, match.Syntax, path));
                 }
