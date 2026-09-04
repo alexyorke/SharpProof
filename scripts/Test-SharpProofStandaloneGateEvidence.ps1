@@ -80,19 +80,11 @@ function Write-Fixture([object]$Value, [string]$Name) {
     return $path
 }
 
-function Assert-Accepted([object]$Value, [string]$Gate, [string]$Name) {
-    Invoke-SharpProofFixtureAssertion `
-        -Name $Name `
-        -Write { Write-Fixture $Value $Name } `
-        -Validate {
-            param($path)
-            Assert-SharpProofStandaloneGateResult `
-                -Path $path -ExpectedGate $Gate `
-                -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
-        }
-}
-
-function Assert-Rejected([object]$Value, [string]$Gate, [string]$Name) {
+function Assert-Envelope(
+    [object]$Value,
+    [string]$Gate,
+    [string]$Name,
+    [switch]$ExpectRejected) {
     Invoke-SharpProofFixtureAssertion `
         -Name $Name `
         -Write { Write-Fixture $Value $Name } `
@@ -102,7 +94,15 @@ function Assert-Rejected([object]$Value, [string]$Gate, [string]$Name) {
                 -Path $path -ExpectedGate $Gate `
                 -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
         } `
-        -ExpectRejected
+        -ExpectRejected:$ExpectRejected
+}
+
+function Assert-Accepted([object]$Value, [string]$Gate, [string]$Name) {
+    Assert-Envelope $Value $Gate $Name
+}
+
+function Assert-Rejected([object]$Value, [string]$Gate, [string]$Name) {
+    Assert-Envelope $Value $Gate $Name -ExpectRejected
 }
 
 try {
