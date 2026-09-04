@@ -82,15 +82,9 @@ internal static class PackageBuildSdkPin
         string workingDirectory,
         CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            "dotnet",
+            workingDirectory);
         startInfo.ArgumentList.Add("--version");
         var result = await GateProcess.RunCapturedAsync(
                 startInfo,

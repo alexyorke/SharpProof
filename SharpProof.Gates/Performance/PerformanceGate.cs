@@ -622,15 +622,9 @@ internal static class PerformanceGate
                 "The process timeout must be positive.");
         }
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            WorkingDirectory = Path.GetDirectoryName(project)!,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            "dotnet",
+            Path.GetDirectoryName(project)!);
         startInfo.ArgumentList.Add(restore ? "restore" : "build");
         startInfo.ArgumentList.Add(project);
         startInfo.ArgumentList.Add("--nologo");
@@ -1326,15 +1320,9 @@ internal static class PerformanceGate
                     Import(verifierRoot, "SharpProof.Verifier.targets")))
                 .Save(project);
 
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = temporary.FullName,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
+            var startInfo = GateProcess.CreateCaptured(
+                "dotnet",
+                temporary.FullName);
             startInfo.ArgumentList.Add("msbuild");
             startInfo.ArgumentList.Add(project);
             startInfo.ArgumentList.Add("--nologo");

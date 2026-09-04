@@ -298,15 +298,9 @@ internal static class WorkerPerformanceProbe
         var launcherPath = FindBuiltAssembly(
             repositoryRoot,
             "SharpProof.Worker.Launcher");
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = ResolveDotNetHost(),
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            WorkingDirectory = workspace.DirectoryPath
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            ResolveDotNetHost(),
+            workspace.DirectoryPath);
         AddArgument(startInfo, launcherPath);
         AddArgument(startInfo, "verify");
         AddOption(startInfo, "worker", workerPath);

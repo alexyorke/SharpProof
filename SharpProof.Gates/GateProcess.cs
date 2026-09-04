@@ -4,6 +4,21 @@ namespace SharpProof.Gates;
 
 internal static class GateProcess
 {
+    internal static ProcessStartInfo CreateCaptured(
+        string fileName,
+        string workingDirectory)
+    {
+        return new ProcessStartInfo
+        {
+            FileName = fileName,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+    }
+
     internal static async Task<GateProcessResult> RunCapturedAsync(
         ProcessStartInfo startInfo,
         CancellationToken cancellationToken)

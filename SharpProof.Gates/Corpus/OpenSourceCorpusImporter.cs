@@ -415,14 +415,9 @@ SOFTWARE.
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
-        var startInfo = new ProcessStartInfo(gitExecutable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            gitExecutable,
+            workingDirectory);
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
@@ -448,14 +443,9 @@ SOFTWARE.
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
-        var startInfo = new ProcessStartInfo(gitExecutable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            gitExecutable,
+            workingDirectory);
         startInfo.ArgumentList.Add("cat-file");
         startInfo.ArgumentList.Add("blob");
         startInfo.ArgumentList.Add($"{commit}:{relativePath}");
