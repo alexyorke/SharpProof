@@ -109,18 +109,8 @@ public static partial class ApiSpecInstantiator
             return false;
         }
 
-        return IsSupportedSpecType(expected) &&
+        return ApiSpecTable.IsSupportedSpecType(expected) &&
                info.Kind == expected;
-    }
-
-    private static bool IsSupportedSpecType(IrTypeKind type)
-    {
-        return type is
-            IrTypeKind.Boolean or
-            IrTypeKind.Integer or
-            IrTypeKind.String or
-            IrTypeKind.Reference or
-            IrTypeKind.Sequence;
     }
 
     private static SpecInstantiationResult Failed(

@@ -22207,3 +22207,8 @@ R2029 is applied: `PerformanceGate` now reuses one class-level UTF-8
 encoding without a BOM for both generated probe files. The focused
 performance-probe tests pass (2/2); the broader Gates performance filter has
 two unrelated pre-existing advisory-package-policy failures.
+
+R2221 is applied: the Specs layer now owns one internal five-kind
+`IrTypeKind` allowlist helper, while instantiation retains its fail-closed
+boolean result and table validation retains its argument exception. The full
+`SharpProof.Specs.Test` project passes 82/82 with zero warnings or errors.

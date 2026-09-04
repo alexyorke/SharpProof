@@ -401,15 +401,20 @@ public sealed partial class ApiSpecTable
 
     private static void ValidateSpecType(IrTypeKind value, string parameterName)
     {
-        if (value is not (
+        if (!IsSupportedSpecType(value))
+        {
+            throw new ArgumentOutOfRangeException(parameterName);
+        }
+    }
+
+    internal static bool IsSupportedSpecType(IrTypeKind value)
+    {
+        return value is
             IrTypeKind.Boolean or
             IrTypeKind.Integer or
             IrTypeKind.String or
             IrTypeKind.Reference or
-            IrTypeKind.Sequence))
-        {
-            throw new ArgumentOutOfRangeException(parameterName);
-        }
+            IrTypeKind.Sequence;
     }
 
     private void EnsureScope(SpecId id)
