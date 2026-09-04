@@ -22496,6 +22496,16 @@ R2225 is applied: `IrProgram.GetBlock` now validates the scoped index and reads
 the contiguous immutable block array directly; the duplicate block dictionary
 is removed. The full Ir.Test suite passes 115/115.
 
+R2228 is applied: analyzer suppression handling now records the semantic outcome
+through one shared helper at each early-return site, preserving the existing
+selection behavior and session bookkeeping. The full Analyzer.Test suite passes
+476/476.
+
+R2229 is applied: contract-clause kind lookup now uses the owning clause-symbol
+set directly from `ContractApiSymbols`, removing a forwarding wrapper while
+preserving inventory-builder compatibility. The full Contracts.Test suite passes
+142/142.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

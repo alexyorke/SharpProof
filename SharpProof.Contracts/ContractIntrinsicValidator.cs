@@ -134,7 +134,7 @@ internal sealed class ContractIntrinsicValidator
                     insideOld = true;
                 }
 
-                if (_api.GetClauseKind(invocation.TargetMethod) is { } kind)
+                if (_api.Clauses.GetClauseKind(invocation.TargetMethod) is { } kind)
                 {
                     return new(kind, insideOld);
                 }

@@ -116,11 +116,8 @@ internal static partial class AnalyzerFeaturePipeline
         if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
             selection.Any)
         {
-            if (selection.IsSuppressed)
+            if (TryRecordSuppressed(method, selection, session))
             {
-                session.RecordSemanticOutcome(
-                    method,
-                    AnalyzerSemanticOutcome.Suppressed);
                 return;
             }
             session.RegisterSelectedSemicolonAccessor(method);
@@ -130,9 +127,8 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        if (selection.IsSuppressed)
+        if (TryRecordSuppressed(method, selection, session))
         {
-            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
         if (TryRecordRejectedContractAbstention(
@@ -249,9 +245,8 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        if (selection.IsSuppressed)
+        if (TryRecordSuppressed(method, selection, session))
         {
-            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
 
@@ -386,11 +381,8 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        if (selection.IsSuppressed)
+        if (TryRecordSuppressed(method, selection, session))
         {
-            session.RecordSemanticOutcome(
-                method,
-                AnalyzerSemanticOutcome.Suppressed);
             return;
         }
 
@@ -832,6 +824,22 @@ internal static partial class AnalyzerFeaturePipeline
         var suppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             method, session, reportDiagnostic, cancellationToken);
         return new(features, suppressed);
+    }
+
+    private static bool TryRecordSuppressed(
+        IMethodSymbol method,
+        MethodSelection selection,
+        AnalyzerSession session)
+    {
+        if (!selection.IsSuppressed)
+        {
+            return false;
+        }
+
+        session.RecordSemanticOutcome(
+            method,
+            AnalyzerSemanticOutcome.Suppressed);
+        return true;
     }
 
     private static void ReportSelectedAnalysisIncomplete(

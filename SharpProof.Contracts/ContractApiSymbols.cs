@@ -6,7 +6,7 @@ internal sealed class ContractApiSymbols(
     IMethodSymbol old,
     ContractSelectionInventory selections)
 {
-    private ContractClauseSymbols Clauses { get; } = clauses;
+    internal ContractClauseSymbols Clauses { get; } = clauses;
     internal IMethodSymbol Result { get; } = result;
     internal IMethodSymbol Old { get; } = old;
     internal ContractSelectionInventory Selections { get; } = selections;
@@ -69,11 +69,6 @@ internal sealed class ContractApiSymbols(
             result,
             old,
             selections);
-    }
-
-    internal BoundContractKind? GetClauseKind(IMethodSymbol method)
-    {
-        return Clauses.GetClauseKind(method);
     }
 
     internal bool IsResult(IMethodSymbol method)
