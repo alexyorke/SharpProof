@@ -644,18 +644,10 @@ internal sealed class OperationCompletionEvaluator
         {
             return false;
         }
-        try
-        {
-            value = Convert.ToInt64(
-                constant.Value,
-                System.Globalization.CultureInfo.InvariantCulture);
-            return value >= 0;
-        }
-        catch (Exception exception) when (exception is
-            FormatException or InvalidCastException or OverflowException)
-        {
-            return false;
-        }
+        return EffectContractMetadata.TryConvertInt64(
+                   constant.Value,
+                   out value) &&
+            value >= 0;
     }
 
     private bool IsPatternInputDefinitelyNonNull(IPatternOperation pattern)

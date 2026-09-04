@@ -1598,19 +1598,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
             length = 0;
             return false;
         }
-        try
-        {
-            length = Convert.ToInt64(
-                constant.Value,
-                System.Globalization.CultureInfo.InvariantCulture);
-            return length >= 0;
-        }
-        catch (Exception exception) when (exception is
-            FormatException or InvalidCastException or OverflowException)
-        {
-            length = 0;
-            return false;
-        }
+        return SharpProof.Effects.EffectContractMetadata.TryConvertInt64(
+                   constant.Value,
+                   out length) &&
+            length >= 0;
     }
 
     internal static ImmutableArray<RequiresCallSiteCandidate>
