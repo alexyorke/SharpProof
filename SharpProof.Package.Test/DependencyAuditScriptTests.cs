@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace SharpProof.Package.Test;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class DependencyAuditScriptTests
 {
     private const string AuditSource =
