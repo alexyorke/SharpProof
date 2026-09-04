@@ -4938,6 +4938,11 @@ public sealed class EffectAnalysisTests
                     }
                 }
 
+                public static void ForFalseWithHeaders() {
+                    for (Stored = new object(); false; Stored = new object()) {
+                    }
+                }
+
                 public static void WhileTrue() {
                     while (true) {
                     }
@@ -4980,6 +4985,8 @@ public sealed class EffectAnalysisTests
         var session = new EffectAnalysisSession(compilation);
         var whileFalse = session.Analyze(Method(compilation, "WhileFalse")).Summary;
         var forFalse = session.Analyze(Method(compilation, "ForFalse")).Summary;
+        var forFalseWithHeaders = session.Analyze(
+            Method(compilation, "ForFalseWithHeaders")).Summary;
         var whileTrue = session.Analyze(Method(compilation, "WhileTrue")).Summary;
         var whileUnknown = session.Analyze(Method(compilation, "WhileUnknown")).Summary;
         var doFalse = session.Analyze(Method(compilation, "DoFalse")).Summary;
@@ -4994,6 +5001,13 @@ public sealed class EffectAnalysisTests
             AssertNoEffectsAndTerminates(whileFalse);
             AssertNoEffectsAndTerminates(forFalse);
             AssertNoEffectsAndTerminates(unknownInsideFalse);
+            Assert.That(
+                forFalseWithHeaders.Termination,
+                Is.EqualTo(EffectTermination.Terminates));
+            Assert.That(forFalseWithHeaders.Writes.IsEmpty, Is.False);
+            Assert.That(
+                forFalseWithHeaders.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
             Assert.That(whileTrue.Termination, Is.EqualTo(EffectTermination.MayDiverge));
             Assert.That(whileUnknown.Termination, Is.EqualTo(EffectTermination.MayDiverge));
             Assert.That(doTrue.Termination, Is.EqualTo(EffectTermination.MayDiverge));

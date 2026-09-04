@@ -33,7 +33,7 @@ internal sealed class ManagedAbstractFlow
     private static readonly ConditionalWeakTable<
         Compilation,
         ConcurrentDictionary<(SyntaxTree Tree, int Start, int Length), bool>>
-        CompileTimeUnreachableCache = new();
+        CompileTimeUnreachableStatementCache = new();
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _contractApi;
@@ -1144,12 +1144,12 @@ internal sealed class ManagedAbstractFlow
             statement.SyntaxTree,
             statement.SpanStart,
             statement.Span.Length);
-        var cache = CompileTimeUnreachableCache.GetValue(
+        var cache = CompileTimeUnreachableStatementCache.GetValue(
             compilation,
             static _ => new());
-        if (cache.TryGetValue(key, out var cached))
+        if (cache.ContainsKey(key))
         {
-            return cached;
+            return true;
         }
 
         var unreachable = false;
@@ -1202,7 +1202,6 @@ internal sealed class ManagedAbstractFlow
             }
         }
 
-        cache.TryAdd(key, unreachable);
         return unreachable;
     }
 
