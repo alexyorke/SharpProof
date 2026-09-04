@@ -17,12 +17,10 @@ public sealed class ProofKernel(ISmtBackend backend)
             result = await _backend.CheckAsync(query, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception exception) when (
-            exception is not OutOfMemoryException and not StackOverflowException)
+            exception is not OperationCanceledException and
+            not OutOfMemoryException and
+            not StackOverflowException)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Unknown(AbstentionReason.InfrastructureFailure);
