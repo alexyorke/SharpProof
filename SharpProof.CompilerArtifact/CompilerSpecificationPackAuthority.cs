@@ -5,6 +5,14 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerSpecificationPackAuthorityValidation
 {
     private static readonly char[] PackIdentitySeparators = [';'];
+    private static readonly string[] KnownPackIds =
+        CompilerSpecificationPackCatalogVersions.PackIds.Split(
+            PackIdentitySeparators,
+            StringSplitOptions.RemoveEmptyEntries);
+    private static readonly string[] KnownPackIdentities =
+        CompilerSpecificationPackCatalogVersions.PackIdentities.Split(
+            PackIdentitySeparators,
+            StringSplitOptions.RemoveEmptyEntries);
 
     internal static string? GetSummaryPrefix(CompilerSummaryOrigin origin)
     {
@@ -32,10 +40,8 @@ internal static class CompilerSpecificationPackAuthorityValidation
             return false;
         }
 
-        var knownPackIds = CompilerSpecificationPackCatalogVersions.PackIds
-            .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries);
         return packIds.All(packId =>
-            knownPackIds.Contains(packId, StringComparer.Ordinal));
+            KnownPackIds.Contains(packId, StringComparer.Ordinal));
     }
 
     internal static bool Matches(
@@ -55,9 +61,7 @@ internal static class CompilerSpecificationPackAuthorityValidation
     {
         if (identity is not { Length: > 0 and <= 128 } ||
             selectedPackIds == null ||
-            !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries)
-                .Contains(identity, StringComparer.Ordinal))
+            !KnownPackIdentities.Contains(identity, StringComparer.Ordinal))
         {
             return false;
         }
