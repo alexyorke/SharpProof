@@ -351,16 +351,20 @@ public sealed class FinalCompilationProbeTests
 
     private sealed class ProbeArtifact
     {
+        private readonly SyntaxTreeRow[] _syntaxTreeRows;
+
         private ProbeArtifact(
             string targetFramework,
             string options,
             string[] syntaxTrees,
+            SyntaxTreeRow[] syntaxTreeRows,
             string[] portableReferences,
             string[] additionalFiles)
         {
             TargetFramework = targetFramework;
             Options = options;
             SyntaxTrees = syntaxTrees;
+            _syntaxTreeRows = syntaxTreeRows;
             PortableReferences = portableReferences;
             AdditionalFiles = additionalFiles;
         }
@@ -386,11 +390,7 @@ public sealed class FinalCompilationProbeTests
             get;
         }
         internal string[] SyntaxTreePaths =>
-            [.. SyntaxTrees.Select(static tree => {
-                using var document = JsonDocument.Parse(tree);
-                return document.RootElement.GetProperty("path").GetString() ??
-                    string.Empty;
-            })];
+            [.. _syntaxTreeRows.Select(static tree => tree.Path)];
         internal string[] FrameworkReferences =>
             [.. PortableReferences.Where(static reference =>
                     !reference.Contains(
@@ -439,10 +439,12 @@ public sealed class FinalCompilationProbeTests
                 targetFramework,
                 Is.EqualTo(pathTargetFramework).And.Not.Empty,
                 path);
+            var syntaxTreeRows = GetCanonicalSyntaxTrees(root, path);
             return new ProbeArtifact(
                 targetFramework!,
                 root.GetProperty("options").GetRawText(),
-                GetCanonicalSyntaxTrees(root, path),
+                [.. syntaxTreeRows.Select(static tree => tree.Raw)],
+                syntaxTreeRows,
                 GetCanonicalRawRows(
                     root,
                     "portableReferences",
@@ -452,25 +454,19 @@ public sealed class FinalCompilationProbeTests
 
         internal string GetTreeChecksum(string pathSuffix)
         {
-            var matches = SyntaxTrees
-                .Where(tree =>
-                {
-                    using var document = JsonDocument.Parse(tree);
-                    return document.RootElement.GetProperty("path").GetString()?
-                        .EndsWith(pathSuffix, StringComparison.OrdinalIgnoreCase) ==
-                        true;
-                })
+            var matches = _syntaxTreeRows
+                .Where(tree => tree.Path.EndsWith(
+                    pathSuffix,
+                    StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             Assert.That(
                 matches,
                 Has.Length.EqualTo(1),
                 "syntax tree suffix: " + pathSuffix);
-            using var match = JsonDocument.Parse(matches[0]);
-            return match.RootElement.GetProperty("textSha256").GetString() ??
-                string.Empty;
+            return matches[0].TextSha256;
         }
 
-        private static string[] GetCanonicalSyntaxTrees(
+        private static SyntaxTreeRow[] GetCanonicalSyntaxTrees(
             JsonElement root,
             string path)
         {
@@ -480,6 +476,8 @@ public sealed class FinalCompilationProbeTests
                 {
                     Path = tree.GetProperty("path").GetString() ?? "",
                     Ordinal = tree.GetProperty("ordinal").GetInt32(),
+                    TextSha256 = tree.GetProperty("textSha256").GetString() ??
+                        string.Empty,
                     Raw = tree.GetRawText()
                 })
                 .ToArray();
@@ -496,7 +494,11 @@ public sealed class FinalCompilationProbeTests
                     .Count(),
                 Is.EqualTo(trees.Length),
                 path + ": syntaxTrees");
-            return [.. trees.Select(static tree => tree.Raw)];
+            return [.. trees.Select(static tree => new SyntaxTreeRow(
+                tree.Path,
+                tree.Ordinal,
+                tree.TextSha256,
+                tree.Raw))];
         }
 
         private static string[] GetCanonicalRawRows(
@@ -518,6 +520,12 @@ public sealed class FinalCompilationProbeTests
                 path + ": " + propertyName);
             return rows;
         }
+
+        private sealed record SyntaxTreeRow(
+            string Path,
+            int Ordinal,
+            string TextSha256,
+            string Raw);
     }
 
     private sealed record CompilerManifestArtifact(
