@@ -10,8 +10,7 @@ public sealed class SharpProofWorker : IDisposable
     private readonly Func<ISmtBackend>? _backendFactory;
     private readonly uint? _configuredQueryRlimit;
     private readonly Func<long>? _readConsumedResourceCount;
-    private readonly Channel<byte> _injectedBackendRunGate =
-        CreateInjectedBackendRunGate();
+    private readonly Channel<byte>? _injectedBackendRunGate;
     private bool _disposed;
     // An injected backend cannot be renewed after interruption.  Once a run
     // has timed out or been cancelled, fail closed rather than handing the
@@ -26,6 +25,7 @@ public sealed class SharpProofWorker : IDisposable
         ArgumentNullException.ThrowIfNull(backend);
         _backend = backend;
         _readConsumedResourceCount = readConsumedResourceCount;
+        _injectedBackendRunGate = CreateInjectedBackendRunGate();
     }
     internal SharpProofWorker(Func<ISmtBackend> backendFactory)
     {
@@ -245,7 +245,10 @@ public sealed class SharpProofWorker : IDisposable
             }
             if (_backend != null)
             {
-                await _injectedBackendRunGate.Reader.ReadAsync(
+                var injectedBackendRunGate = _injectedBackendRunGate ??
+                    throw new InvalidOperationException(
+                        "The injected backend run gate was not initialized.");
+                await injectedBackendRunGate.Reader.ReadAsync(
                         projectBoundary.Token)
                     .ConfigureAwait(false);
                 ownsInjectedBackendRunGate = true;
@@ -444,7 +447,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             if (ownsInjectedBackendRunGate)
             {
-                _ = _injectedBackendRunGate.Writer.TryWrite(0);
+                _ = _injectedBackendRunGate!.Writer.TryWrite(0);
             }
         }
     }
