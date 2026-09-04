@@ -74,13 +74,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         var tested = EvaluateCondition(
                             testedCondition,
                             values,
-                            cancellationToken);
+                            cancellationToken,
+                            out var testedValue);
                         if (tested.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(tested, instruction, values, steps);
                         }
 
-                        if (!tested.Value!.Boolean)
+                        if (!testedValue)
                         {
                             return Result(instruction is IrAssumeInstruction
                                 ? IrProgramExecutionStatus.AssumptionViolated
@@ -92,13 +93,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         var condition = EvaluateCondition(
                             branch.Condition,
                             values,
-                            cancellationToken);
+                            cancellationToken,
+                            out var conditionValue);
                         if (condition.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(condition, branch, values, steps);
                         }
 
-                        current = condition.Value!.Boolean ? branch.WhenTrue : branch.WhenFalse;
+                        current = conditionValue ? branch.WhenTrue : branch.WhenFalse;
                         goto NextBlock;
                     case IrGotoInstruction go:
                         current = go.Target;
@@ -258,19 +260,25 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     private IrEvaluationResult EvaluateCondition(
         IrTerm condition,
         IReadOnlyDictionary<IrVarId, IrValue> values,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        out bool value)
     {
+        value = false;
         var result = _terms.Evaluate(condition, values, cancellationToken);
         if (result.Status != IrEvaluationStatus.Value)
         {
             return result;
         }
 
-        return result.Value!.Kind == IrValueKind.Boolean
-            ? result
-            : IrEvaluationResult.FromUnsupported(
+        if (result.Value!.Kind != IrValueKind.Boolean)
+        {
+            return IrEvaluationResult.FromUnsupported(
                 IrUnsupportedReason.InvalidVariableValue,
                 "Program conditions require boolean values.");
+        }
+
+        value = (bool)result.Value.Payload!;
+        return result;
     }
 
     private static IrProgramExecutionResult Unsupported(IrInstruction instruction,

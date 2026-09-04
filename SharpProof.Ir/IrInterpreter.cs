@@ -412,24 +412,27 @@ public sealed class IrInterpreter(IrFactory factory)
             return Fault(IrExceptionKind.NullReference,
                 "Null cannot be unboxed to a non-nullable IR type.");
         }
-        if (target.Kind == IrTypeKind.String &&
-            operand.Value.Kind == IrValueKind.Reference)
+        if (operand.Value.Kind != IrValueKind.Reference)
+        {
+            return Unsupported(IrUnsupportedReason.UnsupportedCast,
+                "The interpreter has no runtime type relation for this cast.");
+        }
+
+        if (target.Kind == IrTypeKind.String)
         {
             return operand.Value.Reference is string value
                 ? Text(value)
                 : Fault(IrExceptionKind.InvalidCast,
                     "The concrete reference is not a string.");
         }
-        if (target.Kind == IrTypeKind.Integer &&
-            operand.Value.Kind == IrValueKind.Reference)
+        if (target.Kind == IrTypeKind.Integer)
         {
             return operand.Value.Reference is long value
                 ? Integer(value)
                 : Fault(IrExceptionKind.InvalidCast,
                     "The concrete reference does not contain a boxed integer.");
         }
-        if (target.Kind == IrTypeKind.Boolean &&
-            operand.Value.Kind == IrValueKind.Reference)
+        if (target.Kind == IrTypeKind.Boolean)
         {
             return operand.Value.Reference is bool value
                 ? Boolean(value)
