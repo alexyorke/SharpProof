@@ -963,29 +963,6 @@ internal static class CompilerManifestArtifactJson
             {
                 return false;
             }
-
-            foreach (var effectEvent in effectClaim.Replay?.Events ?? [])
-            {
-                if (effectEvent == null ||
-                    effectEvent.SyntaxTreeOrdinal < 0 ||
-                    effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
-                {
-                    return false;
-                }
-
-                var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
-                if (tree == null ||
-                    effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
-                    effectEvent.SyntaxTreeSnapshotSha256 !=
-                        CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
-                    effectEvent.SyntaxStart < 0 ||
-                    effectEvent.SyntaxLength <= 0 ||
-                    effectEvent.SyntaxStart > tree.TextLength ||
-                    effectEvent.SyntaxLength > tree.TextLength - effectEvent.SyntaxStart)
-                {
-                    return false;
-                }
-            }
         }
 
         return true;
