@@ -23080,3 +23080,108 @@ unused for the generator list.
 
 Nothing filed. Project membership, shared-source distribution and sample enumeration
 are closed, with a fourth false-positive mechanism recorded.
+
+## Second survey, continued: R2321 - builder operation validation adds a single-use wrapper
+
+IrProgramBuilder.ValidateOperation contains no policy of its own: it only
+forwards to _factory.GetOperationInfo. Its sole call is from
+ValidateInstruction, so the call can be inlined while preserving the
+factory's existing invalid-operation exceptions and the surrounding instruction
+validation order.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2321 | **IrProgramBuilder.ValidateOperation is a private single-use pass-through to _factory.GetOperationInfo.** Inline the factory call while preserving invalid-operation exceptions and instruction-validation order. | SharpProof.Ir/IrProgramBuilder.cs:161-182,318-321; ValidateOperation has one call site |
+
+## Second survey, continued: R2322 - effect-scanner construction traverses the operation snapshot twice
+
+The effect scanner materializes root.DescendantsAndSelf() once, then runs
+Any over the immutable snapshot to decide abstract-reachability mode and a
+second traversal to populate _freshArrayTypes. Both outputs can be built in
+one loop over the same snapshot, retaining the immutable operation array passed
+to local-region construction and the independent reachability/type facts.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2322 | **OperationEffectScanner scans its immutable operation snapshot once for ITryOperation and again for fresh array types.** Fuse the two projections while preserving _useAbstractReachability, _freshArrayTypes, and the later local-region pass. | SharpProof.Effects/OperationEffectScanner.cs:99-116; _freshArrayTypes consumer SharpProof.Effects/OperationEffectScanner.cs:581-591; _useAbstractReachability consumer :1559-1561 |
+
+## Second survey, continued: R2323 - member-name interning precedes the IR key hit check
+
+GetOrCreateMember validates the supplied name, interns it, and only then
+checks the structural key. The key is based on identity, declaring/return
+types, staticness, and parameter IDs; it does not contain the name. On a
+duplicate key hit, the method returns the existing member and never uses the
+new nameId. Keep name validation before the lookup, but defer interning until
+after the miss so duplicate calls do not perform or create an unreferenced
+string-table entry.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2323 | **IrFactory.GetOrCreateMember interns name before its structural-key hit check, leaving nameId unused on duplicate calls.** Defer only InternStringCore(name) until after the miss while retaining name validation and canonical member identity. | SharpProof.Ir/IrFactory.cs:211-240; production callers include SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:712 and SharpProof.Frontend/RoslynOperationLowerer.cs:222,358,1159; related but distinct argument-pass reduction R2241 |
+
+## Second survey, continued: R2324 - purity exposes a single-use default-depth adapter
+
+IsDemonstrablyPure(IOperation) only calls the depth-aware overload with
+depth = 0. The Opaque path is its sole caller; recursive purity checks
+already call the two-argument overload with their computed child depth. Inline
+the default-depth call or collapse the seam while preserving the per-operation
+cache and recursive depth policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2324 | **RoslynOperationLowerer.IsDemonstrablyPure(IOperation) is a private single-use default-depth adapter.** Inline IsDemonstrablyPure(operation, 0) or remove the seam while retaining purity caching and recursive depth semantics. | SharpProof.Frontend/RoslynOperationLowerer.cs:340-345,367-397,408-440; one production call at Opaque |
+
+## Second survey, continued: R2325 - default-value lowering re-specializes an already specialized type
+
+VisitDefaultValue calls the injectable TypeSpecializer and uses the
+specialized result for scalar/reference decisions. For the reference case it
+passes that result to GetTypeId, whose first operation is another
+TypeSpecializer call. Carrying the known-specialized type into an internal
+ID projection can remove the duplicate projection without changing the
+specializer's injectable behavior or null-term type.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2325 | **RoslynOperationLowerer.VisitDefaultValue re-specializes type through GetTypeId after already specializing operation.Type.** Add a specialized-type ID path or carry the projection through while preserving scalar/reference decisions and injectable-specializer semantics. | SharpProof.Frontend/RoslynOperationLowerer.cs:111-114,633-659 |
+
+## Second survey, continued: R2326 - conversion lowering re-specializes its target type
+
+VisitConversion first computes specializedTargetType. The subsequent
+IsSupportedValueDomain(specializedTargetType) applies TypeSpecializer again,
+and the later GetTypeId(operation.Type) applies it once more to the original
+target. Carrying the specialized target and, after the conversion is known to
+need an ID, its projected ID can remove those repeated calls while retaining
+nullable handling, constant folding, operand comparison, and value-preserving
+conversion behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2326 | **RoslynOperationLowerer.VisitConversion re-specializes the target through both IsSupportedValueDomain and GetTypeId after computing specializedTargetType.** Thread the specialized target/ID through the path while preserving conversion classification and injectable-specializer behavior. | SharpProof.Frontend/RoslynOperationLowerer.cs:925-975; helper re-specialization :111-114,145-149 |
+
+### Status (second survey, part six hundred forty-seven)
+
+R2321-R2326 are deferred ledger-only observations. No source, test, build,
+script, or generated file was changed; the only appended file is this ledger.
+
+## Second survey, continued: R2327 - buildTransitive props repeat values overwritten by targets
+
+The package props and targets are shipped as a paired buildTransitive surface.
+SharpProof.Package/buildTransitive/SharpProof.props initializes the private
+analyzer directory, analyzer path, and collector directory before
+SharpProof.Package/buildTransitive/SharpProof.targets assigns those same
+private values again unconditionally. The verifier props similarly initializes
+_SharpProofToolsDirectory before SharpProof.Verifier/buildTransitive/
+SharpProof.Verifier.targets overwrites it before its consumers. The props-side
+derived paths are not a separate consumer contract: the targets-side values
+feed the actual Analyzer items and verifier tasks. Removing only these
+superseded private assignments preserves the public override properties and
+the late target normalization, subject to the paired-import ordering.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2327 | **The shipped package props files initialize private directory/path properties that their paired buildTransitive targets overwrite before consumption.** Remove the superseded props-side assignments while retaining public override defaults, late normalization, and paired import ordering. | SharpProof.Package/buildTransitive/SharpProof.props:5-6,11; SharpProof.Package/buildTransitive/SharpProof.targets:3-4,7,10-16; SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:10; SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:3,6-10; package pairing SharpProof.Package/SharpProof.nuspec:23 and SharpProof.Verifier/SharpProof.Verifier.nuspec:23 |
+
+### Status (second survey, part six hundred forty-eight)
+
+R2327 is a deferred build-ledger observation. No source, test, build, script,
+or generated file was changed; the only appended file is this ledger.
