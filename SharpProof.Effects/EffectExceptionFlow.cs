@@ -74,8 +74,7 @@ internal static class EffectExceptionFlow
     {
         var known = thrown.Types;
         var includesUnknown = thrown.IncludesUnknown;
-        var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(compilation, origin.SyntaxTree);
+        SemanticModel? model = null;
         // Stop at a lambda or local-function boundary, as ContainsRethrow does.
         // A throw inside a nested callable does not unwind into a try that
         // lexically encloses the callable -- it unwinds wherever the callable is
@@ -97,6 +96,8 @@ internal static class EffectExceptionFlow
             var inHandler = @try.Catches.Any(@catch => @catch.Block.Span.Contains(origin.Span));
             if (inBody)
             {
+                model ??= SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(compilation, origin.SyntaxTree);
                 ApplyCatches(
                     @try,
                     model,
@@ -105,15 +106,18 @@ internal static class EffectExceptionFlow
                     includeRethrows: true);
             }
 
-            if ((inBody || inHandler) &&
-                @try.Finally is { } @finally &&
-                model.AnalyzeControlFlow(@finally.Block) is
-                {
-                    Succeeded: true,
-                    EndPointIsReachable: false
-                })
+            if ((inBody || inHandler) && @try.Finally is { } @finally)
             {
-                return EffectThrowSet.Empty;
+                model ??= SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(compilation, origin.SyntaxTree);
+                if (model.AnalyzeControlFlow(@finally.Block) is
+                    {
+                        Succeeded: true,
+                        EndPointIsReachable: false
+                    })
+                {
+                    return EffectThrowSet.Empty;
+                }
             }
         }
         return EffectThrowSet.Create(known, includesUnknown);
