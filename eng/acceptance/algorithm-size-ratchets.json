@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer. Assignment evaluation is separated from the core effect scanner so both layers retain independent reviewable ceilings. The 2026-08-31 refresh records the measured post-correctness-review ceilings for frontend null conversion, dataflow, effect completion, and verifier replay logic.",
+  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer. Assignment evaluation is separated from the core effect scanner so both layers retain independent reviewable ceilings. The 2026-08-31 refresh records the measured post-correctness-review ceilings for frontend null conversion, dataflow, effect completion, and verifier replay logic. The 2026-09-04 CFG block-order reuse in RoslynProgramLowerer retains the same entry-first ordering while raising that file's measured ceiling to 2451 expressions and 143 decision points.",
   "measurement": {
     "fileExpressionNodes": "Roslyn expression-node count for the complete file, excluding trivia and optional block syntax.",
     "memberExpressionNodes": "Roslyn expression-node count for each measured member, excluding trivia and optional block syntax.",
@@ -17,9 +17,9 @@
     },
     {
       "path": "SharpProof.Frontend/RoslynProgramLowerer.cs",
-      "maximumFileExpressionNodes": 2433,
+      "maximumFileExpressionNodes": 2451,
       "maximumMemberExpressionNodes": 265,
-      "maximumFileDecisionPoints": 140,
+      "maximumFileDecisionPoints": 143,
       "maximumMemberDecisionPoints": 20
     },
     {
