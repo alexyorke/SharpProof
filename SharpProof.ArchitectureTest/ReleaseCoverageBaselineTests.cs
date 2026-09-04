@@ -258,56 +258,44 @@ public sealed class ReleaseCoverageBaselineTests
         string? expectedReceipt = null)
     {
         var root = TestRepository.FindRoot();
-        var workspace = Path.Combine(
-            root,
-            "artifacts",
-            "qualification-fixtures",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workspace);
-        try
+        using var workspace = new TempDirectory(
+            "qualification-fixtures-",
+            Path.Combine(root, "artifacts", "qualification-fixtures"));
+        var workspacePath = workspace.FullName;
+        var head = (await RunAsync(root, "git", "rev-parse", "HEAD"))
+            .Output.Trim();
+        var evidencePath = Path.Combine(workspacePath, evidenceFileName);
+        var receiptDirectory = Path.Combine(workspacePath, "receipts");
+        foreach (var fixture in createFixtures(head))
         {
-            var head = (await RunAsync(root, "git", "rev-parse", "HEAD"))
-                .Output.Trim();
-            var evidencePath = Path.Combine(workspace, evidenceFileName);
-            var receiptDirectory = Path.Combine(workspace, "receipts");
-            foreach (var fixture in createFixtures(head))
-            {
-                await File.WriteAllTextAsync(evidencePath, fixture.Content);
-                var result = await RunAsync(
+            await File.WriteAllTextAsync(evidencePath, fixture.Content);
+            var result = await RunAsync(
+                root,
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(
                     root,
-                    "pwsh",
-                    "-NoLogo",
-                    "-NoProfile",
-                    "-File",
-                    Path.Combine(
-                        root,
-                        "scripts",
-                        "Write-SharpProofQualificationReceipt.ps1"),
-                    "-Gate",
-                    gate,
-                    "-EvidencePath",
-                    evidencePath,
-                    "-ReceiptDirectory",
-                    receiptDirectory);
-                Assert.That(
-                    result.ExitCode == 0,
-                    Is.EqualTo(fixture.Valid),
-                    result.Output + result.Error);
-            }
-
-            if (expectedReceipt is not null)
-            {
-                Assert.That(
-                    File.Exists(Path.Combine(receiptDirectory, expectedReceipt)),
-                    Is.True);
-            }
+                    "scripts",
+                    "Write-SharpProofQualificationReceipt.ps1"),
+                "-Gate",
+                gate,
+                "-EvidencePath",
+                evidencePath,
+                "-ReceiptDirectory",
+                receiptDirectory);
+            Assert.That(
+                result.ExitCode == 0,
+                Is.EqualTo(fixture.Valid),
+                result.Output + result.Error);
         }
-        finally
+
+        if (expectedReceipt is not null)
         {
-            if (Directory.Exists(workspace))
-            {
-                Directory.Delete(workspace, recursive: true);
-            }
+            Assert.That(
+                File.Exists(Path.Combine(receiptDirectory, expectedReceipt)),
+                Is.True);
         }
     }
 
