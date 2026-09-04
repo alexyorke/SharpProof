@@ -186,13 +186,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     return indexResult;
                 }
 
-                if (storedValue != null)
+                if (EvaluateOptionalStoredValue(
+                        storedValue, values, cancellationToken) is { } storedValueResult)
                 {
-                    var storedValueResult = _terms.Evaluate(storedValue, values, cancellationToken);
-                    if (storedValueResult.Status != IrEvaluationStatus.Value)
-                    {
-                        return storedValueResult;
-                    }
+                    return storedValueResult;
                 }
                 return IrInterpreter.ValidateSequenceAccess(sequenceResult.Value!, indexResult.Value!);
             default:
@@ -224,18 +221,30 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 return argumentResult;
             }
         }
-        if (storedValue != null)
+        if (EvaluateOptionalStoredValue(
+                storedValue, values, cancellationToken) is { } storedValueResult)
         {
-            var storedValueResult = _terms.Evaluate(storedValue, values, cancellationToken);
-            if (storedValueResult.Status != IrEvaluationStatus.Value)
-            {
-                return storedValueResult;
-            }
+            return storedValueResult;
         }
         return receiverValue?.Kind == IrValueKind.Null
             ? IrEvaluationResult.FromException(IrExceptionKind.NullReference, nullReceiverDetail)
             : null;
     }
+
+    private IrEvaluationResult? EvaluateOptionalStoredValue(
+        IrTerm? storedValue,
+        IReadOnlyDictionary<IrVarId, IrValue> values,
+        CancellationToken cancellationToken)
+    {
+        if (storedValue == null)
+        {
+            return null;
+        }
+
+        var result = _terms.Evaluate(storedValue, values, cancellationToken);
+        return result.Status == IrEvaluationStatus.Value ? null : result;
+    }
+
     private static IrProgramExecutionResult FromEvaluation(IrEvaluationResult evaluation, IrInstruction instruction,
         ImmutableDictionary<IrVarId, IrValue>.Builder values, int steps)
     {

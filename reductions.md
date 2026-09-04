@@ -22258,6 +22258,11 @@ enum-key projections once from the generated catalog, so both directions share
 the same lookup tables and retain their existing out-of-domain exceptions. The
 full Effects suite passes 323/323 with zero warnings or errors.
 
+R2016 is applied: `IrProgramInterpreter` now shares one optional stored-value
+evaluation helper between sequence locations and call operands, preserving the
+existing operand order and returning only non-value evaluation failures. The
+full `SharpProof.Ir.Test` project passes with zero failures.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
