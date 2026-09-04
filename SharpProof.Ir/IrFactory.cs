@@ -467,7 +467,7 @@ public sealed class IrFactory
 
             return Intern(
                 new StructuralKey(IrTermKind.Unary, expectedType.Value, semantics.Key,
-                    children: [operand.Id.Value]),
+                    second: operand.Id.Value),
                 id => new IrUnaryTerm(id, expectedType, @operator, operand));
         }
     }
@@ -497,7 +497,7 @@ public sealed class IrFactory
 
             return Intern(
                 new StructuralKey(IrTermKind.Binary, resultType.Value, semantics.Key,
-                    children: [left.Id.Value, right.Id.Value]),
+                    second: left.Id.Value, third: right.Id.Value),
                 id => new IrBinaryTerm(id, resultType, @operator, left, right));
         }
     }
@@ -531,7 +531,8 @@ public sealed class IrFactory
 
             return Intern(new StructuralKey(
                     IrTermKind.Conditional, whenTrue.Type.Value,
-                    children: [condition.Id.Value, whenTrue.Id.Value, whenFalse.Id.Value]),
+                    first: condition.Id.Value, second: whenTrue.Id.Value,
+                    third: whenFalse.Id.Value),
                 id => new IrConditionalTerm(id, whenTrue.Type, condition, whenTrue, whenFalse));
         }
     }
@@ -574,7 +575,8 @@ public sealed class IrFactory
             }
 
             return Intern(
-                new StructuralKey(IrTermKind.Cast, targetType.Value, children: [operand.Id.Value]),
+                new StructuralKey(IrTermKind.Cast, targetType.Value,
+                    first: operand.Id.Value),
                 id => new IrCastTerm(id, targetType, operand));
         }
     }
@@ -599,7 +601,8 @@ public sealed class IrFactory
             }
 
             return Intern(
-                new StructuralKey(IrTermKind.Length, IntegerType.Value, children: [value.Id.Value]),
+                new StructuralKey(IrTermKind.Length, IntegerType.Value,
+                    first: value.Id.Value),
                 id => new IrLengthTerm(id, IntegerType, value));
         }
     }
@@ -621,7 +624,7 @@ public sealed class IrFactory
                 nameof(index));
             return Intern(
                 new StructuralKey(IrTermKind.SequenceAccess, elementType.Value,
-                    children: [sequence.Id.Value, index.Id.Value]),
+                    first: sequence.Id.Value, second: index.Id.Value),
                 id => new IrSequenceAccessTerm(id, elementType, sequence, index));
         }
     }
