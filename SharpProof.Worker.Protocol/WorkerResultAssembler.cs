@@ -324,7 +324,6 @@ internal static class WorkerResultAssembler
         out WorkerRunStatus status,
         out WorkerRunFailureReason failure)
     {
-        var evidence = Classify(callables, claims);
         var errorCount = 0;
         var errorStatus = WorkerRunStatus.Unspecified;
         var errorFailure = WorkerRunFailureReason.Unspecified;
@@ -359,6 +358,7 @@ internal static class WorkerResultAssembler
             return true;
         }
 
+        var evidence = Classify(callables, claims);
         status = evidence.Status;
         failure = evidence.Failure;
         return true;

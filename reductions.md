@@ -22353,6 +22353,11 @@ generated Effects catalog. The Worker emitter remains deferred because its
 assembly boundary cannot currently reference the Effects catalog without a
 dependency-shape decision; compiler-collector build and replay tests pass.
 
+R2230 is applied: `WorkerResultAssembler.TryProjectRunState` now checks and
+projects protocol errors before classifying callable and claim evidence, so
+error-bearing responses skip discarded evidence traversal. Protocol JSON tests
+pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
