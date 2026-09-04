@@ -22308,6 +22308,11 @@ R2015 is applied: the identical NUnit Z3-resolver setup is now one linked test
 fixture compiled into both Smt.Test and Worker.Test, preserving one-time
 assembly setup and each test assembly's discovery boundary. Both suites pass.
 
+R2019 is applied: the standalone gate and generated-file helpers now dot-source
+one dependency-neutral recursive JSON property-uniqueness validator. Their
+surrounding UTF-8/document and schema validation boundaries remain local, and
+the generator and standalone validation paths pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

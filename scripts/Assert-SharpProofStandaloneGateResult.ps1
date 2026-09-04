@@ -1,32 +1,6 @@
 Set-StrictMode -Version Latest
 
-function Assert-UniqueJsonElementProperties {
-    param(
-        [Parameter(Mandatory = $true)][Text.Json.JsonElement]$Value,
-        [Parameter(Mandatory = $true)][string]$Description
-    )
-
-    if ($Value.ValueKind -eq [Text.Json.JsonValueKind]::Array) {
-        $index = 0
-        foreach ($item in $Value.EnumerateArray()) {
-            Assert-UniqueJsonElementProperties $item "$Description[$index]"
-            $index++
-        }
-        return
-    }
-    if ($Value.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
-        return
-    }
-    $names = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
-    foreach ($property in $Value.EnumerateObject()) {
-        if (-not $names.Add($property.Name)) {
-            throw "$Description contains duplicate property '$($property.Name)'."
-        }
-        Assert-UniqueJsonElementProperties `
-            $property.Value "$Description.$($property.Name)"
-    }
-}
+. (Join-Path $PSScriptRoot 'Assert-SharpProofJsonProperties.ps1')
 
 function Assert-ExactJsonProperties {
     param(
@@ -68,7 +42,7 @@ function Assert-SharpProofStandaloneGateResult {
                 [Text.Json.JsonValueKind]::Object) {
             throw 'The standalone gate result must be an object.'
         }
-        Assert-UniqueJsonElementProperties `
+        Assert-UniqueJsonProperties `
             $jsonDocument.RootElement 'Standalone gate result'
         $document = $json | ConvertFrom-Json -ErrorAction Stop
     }
