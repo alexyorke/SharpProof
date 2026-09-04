@@ -203,22 +203,22 @@ internal static class PackageBuildEstimator
         return NearestRankPercentileSorted(sorted, rank);
     }
 
-    private static double MedianSorted(IReadOnlyList<double> sorted)
+    private static double MedianSorted(double[] sorted)
     {
-        var upperIndex = sorted.Count / 2;
-        return (sorted.Count & 1) != 0
+        var upperIndex = sorted.Length / 2;
+        return (sorted.Length & 1) != 0
             ? sorted[upperIndex]
             : Midpoint(sorted[upperIndex - 1], sorted[upperIndex]);
     }
 
     private static double NearestRankPercentileSorted(
-        IReadOnlyList<double> sorted,
+        double[] sorted,
         double rank)
     {
         var index = Math.Clamp(
-            (int)Math.Ceiling(rank * sorted.Count) - 1,
+            (int)Math.Ceiling(rank * sorted.Length) - 1,
             0,
-            sorted.Count - 1);
+            sorted.Length - 1);
         return sorted[index];
     }
 

@@ -14,14 +14,16 @@ public sealed class SharpProofSoundnessAnalyzerTests
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
         CreatePlatformReferences();
 
-    private static string SemanticCacheWriteFixture(string body) =>
-        """
+    private static string SemanticCacheWriteFixture(string body)
+    {
+        return """
         namespace SharpProof.Verify;
         enum Answer { Unknown, Proven }
         sealed class ProofCache {
             internal void Write(Answer answer) { }
         }
         """ + body;
+    }
 
     [TestCase(
         """

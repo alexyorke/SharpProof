@@ -985,62 +985,62 @@ public sealed class FrontendDifferentialOracle
             "SharpProofGeneratedFrontend",
             runtimeType =>
             {
-            var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
-                generatedCases.Count);
-            for (var index = 0; index < generatedCases.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var methodSyntax = methodSyntaxes[index];
-                var methodSymbol = (IMethodSymbol?)model.GetDeclaredSymbol(
-                    methodSyntax,
-                    cancellationToken);
-                var operation = GetExpressionOperation(
-                    model,
-                    methodSyntax.ExpressionBody!.Expression,
-                    cancellationToken);
-                if (methodSymbol == null || operation == null)
+                var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
+                    generatedCases.Count);
+                for (var index = 0; index < generatedCases.Count; index++)
                 {
-                    results.Add(
-                        Mismatch(
-                            "Roslyn did not expose the generated method operation."));
-                    continue;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var methodSyntax = methodSyntaxes[index];
+                    var methodSymbol = (IMethodSymbol?)model.GetDeclaredSymbol(
+                        methodSyntax,
+                        cancellationToken);
+                    var operation = GetExpressionOperation(
+                        model,
+                        methodSyntax.ExpressionBody!.Expression,
+                        cancellationToken);
+                    if (methodSymbol == null || operation == null)
+                    {
+                        results.Add(
+                            Mismatch(
+                                "Roslyn did not expose the generated method operation."));
+                        continue;
+                    }
 
-                var factory = new IrFactory();
-                var lowering = new RoslynOperationLowerer(factory).Lower(operation);
-                if (!lowering.IsExact)
-                {
-                    results.Add(
-                        Mismatch(
-                            "Generated supported C# closed the frontend subset: " +
-                            lowering.Classification.Abstention +
-                            "."));
-                    continue;
-                }
+                    var factory = new IrFactory();
+                    var lowering = new RoslynOperationLowerer(factory).Lower(operation);
+                    if (!lowering.IsExact)
+                    {
+                        results.Add(
+                            Mismatch(
+                                "Generated supported C# closed the frontend subset: " +
+                                lowering.Classification.Abstention +
+                                "."));
+                        continue;
+                    }
 
-                var generated = generatedCases[index];
-                var environment = CreateEnvironment(
-                    factory,
-                    methodSymbol,
-                    lowering,
-                    generated);
-                var interpreted = new IrInterpreter(factory).Evaluate(
-                    lowering.Term,
-                    environment.Variables,
-                    cancellationToken);
-                var runtimeMethod = runtimeType.GetMethod(
-                    MethodName(index),
-                    BindingFlags.Public | BindingFlags.Static)!;
-                var actual = InvokeMethod(
-                    runtimeMethod,
-                    generated,
-                    cancellationToken);
-                results.Add(CompareOutcomes(
-                    interpreted,
-                    actual,
-                    environment.SequenceOrigins));
-            }
-            return results.ToImmutable();
+                    var generated = generatedCases[index];
+                    var environment = CreateEnvironment(
+                        factory,
+                        methodSymbol,
+                        lowering,
+                        generated);
+                    var interpreted = new IrInterpreter(factory).Evaluate(
+                        lowering.Term,
+                        environment.Variables,
+                        cancellationToken);
+                    var runtimeMethod = runtimeType.GetMethod(
+                        MethodName(index),
+                        BindingFlags.Public | BindingFlags.Static)!;
+                    var actual = InvokeMethod(
+                        runtimeMethod,
+                        generated,
+                        cancellationToken);
+                    results.Add(CompareOutcomes(
+                        interpreted,
+                        actual,
+                        environment.SequenceOrigins));
+                }
+                return results.ToImmutable();
             });
     }
 
@@ -1157,21 +1157,21 @@ public sealed class FrontendDifferentialOracle
             "SharpProofGeneratedFrontendEdges",
             runtimeType =>
             {
-            var results =
-                ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
-                    cases.Count);
-            for (var index = 0; index < cases.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                results.Add(CompareSemanticEdge(
-                    cases[index],
-                    methods[index],
-                    model,
-                    runtimeType,
-                    index,
-                    cancellationToken));
-            }
-            return results.ToImmutable();
+                var results =
+                    ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
+                        cases.Count);
+                for (var index = 0; index < cases.Count; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    results.Add(CompareSemanticEdge(
+                        cases[index],
+                        methods[index],
+                        model,
+                        runtimeType,
+                        index,
+                        cancellationToken));
+                }
+                return results.ToImmutable();
             });
     }
 

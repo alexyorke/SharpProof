@@ -646,7 +646,9 @@ public sealed class ManagedAbstractFlowTests
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(sinks, Has.Length.EqualTo(2));
         foreach (var sink in sinks)
+        {
             AssertIntegerInterval(analysis, sink, 0, expected);
+        }
     }
 
     [Test]

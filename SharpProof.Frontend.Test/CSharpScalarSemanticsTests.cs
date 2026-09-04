@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -123,7 +124,11 @@ public sealed class CSharpScalarSemanticsTests
         return (
             typeCode is TypeCode.SByte or TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64,
             bitWidth,
-            Convert.ToInt64(type.GetField("MinValue")!.GetValue(null)),
-            Convert.ToInt64(type.GetField("MaxValue")!.GetValue(null)));
+            Convert.ToInt64(
+                type.GetField("MinValue")!.GetValue(null),
+                CultureInfo.InvariantCulture),
+            Convert.ToInt64(
+                type.GetField("MaxValue")!.GetValue(null),
+                CultureInfo.InvariantCulture));
     }
 }

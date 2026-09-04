@@ -53,11 +53,11 @@ public sealed class FiniteDomainSmtDifferentialOracle
             factory,
             formula,
             variables,
-            cancellationToken,
             static evaluated =>
                 evaluated.Status == IrEvaluationStatus.Value &&
                 evaluated.Value is { Kind: IrValueKind.Boolean },
-            requireMatch: true);
+            requireMatch: true,
+            cancellationToken: cancellationToken);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -132,7 +132,6 @@ public sealed class FiniteDomainSmtDifferentialOracle
             factory,
             formula,
             variables,
-            cancellationToken,
             static evaluated =>
                 evaluated.Status == IrEvaluationStatus.Value &&
                 evaluated.Value is
@@ -140,7 +139,8 @@ public sealed class FiniteDomainSmtDifferentialOracle
                     Kind: IrValueKind.Boolean,
                     Boolean: true
                 },
-            requireMatch: false)
+            requireMatch: false,
+            cancellationToken: cancellationToken)
             ? FiniteDomainSatisfiability.Satisfiable
             : FiniteDomainSatisfiability.Unsatisfiable;
         var query = new VerificationQuery(
@@ -215,9 +215,9 @@ public sealed class FiniteDomainSmtDifferentialOracle
         IrFactory factory,
         IrTerm formula,
         ImmutableArray<IrVarId> variables,
-        CancellationToken cancellationToken,
         Func<IrEvaluationResult, bool> matches,
-        bool requireMatch)
+        bool requireMatch,
+        CancellationToken cancellationToken)
     {
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();

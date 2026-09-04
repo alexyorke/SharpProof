@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -28,9 +29,13 @@ public sealed class CompilerCallableLowererTests
             Is.EqualTo(Enum.GetNames<IrSummaryOrigin>()));
         Assert.That(
             Enum.GetValues<CompilerSummaryOrigin>()
-                .Select(static value => Convert.ToInt32(value)),
+                .Select(static value => Convert.ToInt32(
+                    value,
+                    CultureInfo.InvariantCulture)),
             Is.EqualTo(Enum.GetValues<IrSummaryOrigin>()
-                .Select(static value => Convert.ToInt32(value))));
+                .Select(static value => Convert.ToInt32(
+                    value,
+                    CultureInfo.InvariantCulture))));
     }
 
     [TestCase(ContractBindingFailure.UnsupportedExpression,

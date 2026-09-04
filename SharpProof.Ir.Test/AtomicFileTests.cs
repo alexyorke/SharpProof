@@ -5,6 +5,10 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1849",
+    Justification = "These tests intentionally exercise AtomicFile's synchronous API.")]
 public sealed class AtomicFileTests
 {
     private string _root = null!;

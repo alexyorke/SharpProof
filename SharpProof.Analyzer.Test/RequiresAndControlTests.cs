@@ -615,9 +615,13 @@ public sealed class RequiresAndControlTests
             ["SP0027"]);
 
         if (expectedDiagnostic)
+        {
             AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+        }
         else
+        {
             Assert.That(diagnostics, Is.Empty);
+        }
     }
 
     [Test]
@@ -891,7 +895,9 @@ public sealed class RequiresAndControlTests
     [Test]
     public async Task UnflowedCallDiscoverySkipsNonexecutedOperations()
     {
-        static string SwitchArmSource(string expression) =>
+        static string SwitchArmSource(string expression)
+        {
+            return
             $$"""
             using SharpProof.Attributes;
             public static class Guard {
@@ -904,6 +910,7 @@ public sealed class RequiresAndControlTests
             public sealed class Derived(int marker) : Base(
                 {{expression}}) { }
             """;
+        }
 
         var lambda = await AnalyzerTestHost.AnalyzeAsync(
             """

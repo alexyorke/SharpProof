@@ -772,7 +772,7 @@ public sealed class PortableIrGraphCodecTests
         return term;
     }
 
-    private static IrTerm DeepTypeTerm(IrFactory factory)
+    private static IrVariableTerm DeepTypeTerm(IrFactory factory)
     {
         var type = factory.IntegerType;
         for (var index = 0;
