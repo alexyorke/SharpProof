@@ -341,7 +341,7 @@ public sealed class RoslynOperationLowerer
             (symbol?.ContainingType == null
                 ? _factory.ObjectType
                 : GetTypeId(symbol.ContainingType));
-        var isPure = !depthLimited && IsDemonstrablyPure(operation);
+        var isPure = !depthLimited && IsDemonstrablyPure(operation, 0);
         var identity = CompilerIdentityBridge.InternOperation(
             _factory, operation, symbol, isPure);
         var displayName =
@@ -362,11 +362,6 @@ public sealed class RoslynOperationLowerer
                 member, receiverTerm, argumentTerms);
         return new LoweredExpression(
             term, FrontendSubsetClassification.Abstain(abstention));
-    }
-
-    private bool IsDemonstrablyPure(IOperation operation)
-    {
-        return IsDemonstrablyPure(operation, 0);
     }
 
     private bool IsDemonstrablyPure(IOperation operation, int depth)

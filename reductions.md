@@ -22433,6 +22433,11 @@ after the structural-key lookup misses, so duplicate requests avoid creating an
 unused string entry while validation and canonical member identity remain
 unchanged. The full Ir.Test suite passes 115/115.
 
+R2324 is applied: `RoslynOperationLowerer` now calls the depth-aware purity
+checker directly for its default-depth case; the single-use adapter is removed
+while recursive depth semantics and purity caching remain unchanged. The full
+Frontend.Test suite passes 121/121.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
