@@ -282,8 +282,9 @@ internal sealed partial class SharpProofAnalyzerEngine
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            if (text[index] == '[' ||
-                (text[index] == '\\' &&
+            var character = text[index];
+            if (character == '[' ||
+                (character == '\\' &&
                  index + 1 < text.Length &&
                  text[index + 1] is 'u' or 'U'))
             {
@@ -291,52 +292,32 @@ internal sealed partial class SharpProofAnalyzerEngine
                 // compares decoded Identifier.ValueText before activation.
                 return true;
             }
-        }
-
-        foreach (var candidate in
-                 ContractApiMetadata.ContractMethodCandidateNames)
-        {
-            if (ContainsOrdinal(
-                    text,
-                    candidate,
-                    cancellationToken))
+            foreach (var candidate in
+                     ContractApiMetadata.ContractMethodCandidateNames)
             {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsOrdinal(
-        SourceText text,
-        string value,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var lastStart = text.Length - value.Length;
-        for (var start = 0; start <= lastStart; start++)
-        {
-            if (start % ActivationCancellationCheckInterval == 0)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            var matches = true;
-            for (var offset = 0; offset < value.Length; offset++)
-            {
-                if (text[start + offset] == value[offset])
+                if (candidate.Length == 0 ||
+                    candidate[0] != character ||
+                    candidate.Length > text.Length - index)
                 {
                     continue;
                 }
 
-                matches = false;
-                break;
-            }
+                var matches = true;
+                for (var offset = 1; offset < candidate.Length; offset++)
+                {
+                    if (text[index + offset] == candidate[offset])
+                    {
+                        continue;
+                    }
 
-            if (matches)
-            {
-                return true;
+                    matches = false;
+                    break;
+                }
+
+                if (matches)
+                {
+                    return true;
+                }
             }
         }
 
