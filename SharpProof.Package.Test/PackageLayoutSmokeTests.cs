@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Reflection;
@@ -21,6 +22,9 @@ namespace SharpProof.Package.Test;
 [Parallelizable(ParallelScope.Children)]
 public sealed class PackageLayoutSmokeTests
 {
+    private static readonly ConcurrentDictionary<string, string>
+        s_sharedCompilationServerIds = new(StringComparer.Ordinal);
+
     internal static void DisposeSharedPackageCache()
     {
         PackageWorkspace.DisposeSharedPackageCache();
@@ -2371,7 +2375,7 @@ public sealed class PackageLayoutSmokeTests
             fileName,
             arguments);
         startInfo.Environment["SharedCompilationId"] =
-            CreateSharedCompilationServerId();
+            GetSharedCompilationServerId(workingDirectory);
 
         var result = await ProcessRunner.RunCapturedAsync(
             startInfo,
@@ -2381,10 +2385,14 @@ public sealed class PackageLayoutSmokeTests
             result.Output + Environment.NewLine + result.Error);
     }
 
-    private static string CreateSharedCompilationServerId()
+    private static string GetSharedCompilationServerId(
+        string workingDirectory)
     {
-        return "sharpproof-package-layout-" +
-            Guid.NewGuid().ToString("N");
+        var fullPath = Path.GetFullPath(workingDirectory);
+        return s_sharedCompilationServerIds.GetOrAdd(
+            fullPath,
+            static _ => "sharpproof-package-layout-" +
+                Guid.NewGuid().ToString("N"));
     }
 
     private static PackagedAnalyzerItem[]
