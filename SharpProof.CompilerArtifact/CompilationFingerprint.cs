@@ -342,8 +342,6 @@ internal static class CompilationFingerprint
         return value != null &&
         value.Kind is "Assembly" or "Module" &&
         All(value.Aliases, HasText) &&
-        (value.Kind == "Assembly" ||
-            !value.EmbedInteropTypes && value.Aliases.Length == 0) &&
         IsOrdered(value.Aliases, unique: false) &&
         (value.Kind == "Assembly"
             ? CompilerCaptureAuthority.IsCanonicalAssemblyIdentity(

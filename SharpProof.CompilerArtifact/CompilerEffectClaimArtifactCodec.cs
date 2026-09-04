@@ -177,7 +177,6 @@ internal static class CompilerEffectClaimArtifactCodec
             string.IsNullOrWhiteSpace(value.TypeIdentity) ||
             !HasOptionalText(value.MemberDocumentationId) ||
             !HasOptionalText(value.TypeDocumentationId) ||
-            !HasOptionalText(value.SpecWitnessIdentifier) ||
             value.ScalarOperands is not { Length: 0 } ||
             value.ExactExceptionTypeHierarchy is not { } ||
             !WorkerProtocolJson.HasValidLocation(value.Location) ||

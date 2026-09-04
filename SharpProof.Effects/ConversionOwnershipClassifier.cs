@@ -838,14 +838,14 @@ internal sealed class ConversionOwnershipClassifier
                 EffectRegionId.Fresh(operation.Syntax.SpanStart));
             if (operation.Operand.Type is ITypeParameterSymbol typeParameter)
             {
-                var operand = ClassifyRegion(operation.Operand, aliasSource);
                 if (typeParameter.IsReferenceType)
                 {
-                    return operand;
+                    return ClassifyRegion(operation.Operand, aliasSource);
                 }
                 if (!typeParameter.IsValueType)
                 {
-                    return fresh.Union(operand);
+                    return fresh.Union(
+                        ClassifyRegion(operation.Operand, aliasSource));
                 }
             }
             return fresh;

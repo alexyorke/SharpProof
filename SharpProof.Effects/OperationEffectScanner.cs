@@ -517,9 +517,6 @@ internal sealed partial class OperationEffectScanner
             return evaluation.Summary;
         }
 
-        var region = _conversionOwnership.ClassifyRegion(element.ArrayReference);
-        var accessSummary = access == EffectAccess.Write
-            ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         var exceptions = EffectSummary.Empty;
         if (_nullnessEvaluator.IsProvenNull(element.ArrayReference, element))
         {
@@ -539,6 +536,10 @@ internal sealed partial class OperationEffectScanner
         {
             exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.IndexOutOfRangeException));
         }
+
+        var region = _conversionOwnership.ClassifyRegion(element.ArrayReference);
+        var accessSummary = access == EffectAccess.Write
+            ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
 
         if (access == EffectAccess.Write &&
             element.ArrayReference.Type is IArrayTypeSymbol arrayType &&

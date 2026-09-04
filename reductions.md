@@ -22476,6 +22476,22 @@ claim-refutation, and manifest-postcondition facts from its existing validation
 loops into cache-shape validation, avoiding a second traversal of those
 collections. ProtocolJsonTests pass 108/108.
 
+R2223 is applied: module-only reference validation now keeps the interop/alias
+restriction in its module-shape branch instead of checking it twice. The
+focused Worker protocol and compiler-artifact tests pass 199/199.
+
+R2224 is applied: replay-event validation no longer performs a text-shape check
+for `SpecWitnessIdentifier` that its following null-only contract subsumes.
+The focused Worker protocol and compiler-artifact tests pass 199/199.
+
+R2251 is applied: array-element effect scanning now waits until a definitely
+null receiver has been ruled out before projecting ownership and access facts.
+The full Effects.Test suite passes 323/323.
+
+R2252 is applied: conversion ownership classification now computes an operand
+region only in the type-parameter branches that consume it, avoiding the
+discarded value-type projection. The full Effects.Test suite passes 323/323.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
