@@ -1047,8 +1047,8 @@ internal static class CompilerImplementationIlSummaryLowerer
                 return false;
             }
 
-            var arguments = new IlValue[target.Parameters.Length];
-            for (var index = arguments.Length - 1; index >= 0; index--)
+            var terms = new IrTerm[target.Parameters.Length];
+            for (var index = terms.Length - 1; index >= 0; index--)
             {
                 if (!TryPop(stack, out var argument) ||
                     !TryCoerce(
@@ -1059,11 +1059,9 @@ internal static class CompilerImplementationIlSummaryLowerer
                     return false;
                 }
 
-                arguments[index] = argument;
+                terms[index] = argument.Term;
             }
 
-            var terms = arguments.Select(static value => value.Term)
-                .ToArray();
             IrTerm? receiver = null;
             var member = _mapper.GetMember(
                 target,
