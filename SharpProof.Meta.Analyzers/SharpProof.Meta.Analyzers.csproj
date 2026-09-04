@@ -5,6 +5,8 @@
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\eng\RoslynSymbolFacts.cs"
+             Link="RoslynSymbolFacts.cs" />
     <Compile Include="..\eng\RoslynCfgFactory.cs"
              Link="RoslynCfgFactory.cs" />
     <Compile Include="..\eng\RoslynCfgThrowFacts.cs"

@@ -5,6 +5,7 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using SharpProof.Roslyn;
 
 namespace SharpProof.Frontend;
 
@@ -546,19 +547,10 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol candidate,
         INamedTypeSymbol expectedBase)
     {
-        for (var current = candidate.BaseType;
-             current != null;
-             current = current.BaseType)
-        {
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    expectedBase.OriginalDefinition))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return RoslynSymbolFacts.IsOrDerivesFrom(
+            candidate,
+            expectedBase,
+            includeSelf: false);
     }
 
     private bool TryGetKnownAttributeMetadataName(

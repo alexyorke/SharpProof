@@ -9,6 +9,8 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\eng\RoslynSymbolFacts.cs"
+             Link="RoslynSymbolFacts.cs" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />

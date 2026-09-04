@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Roslyn;
 using static SharpProof.Meta.Analyzers.SharpProofSoundnessAnalyzer;
 
 namespace SharpProof.Meta.Analyzers;
@@ -407,24 +408,7 @@ internal static class CancellationBoundaryAnalyzer
         ITypeSymbol? type,
         ITypeSymbol? possibleBase)
     {
-        if (possibleBase == null)
-        {
-            return false;
-        }
-
-        for (var current = type as INamedTypeSymbol;
-             current != null;
-             current = current.BaseType)
-        {
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    possibleBase.OriginalDefinition))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return RoslynSymbolFacts.IsOrDerivesFrom(type, possibleBase);
     }
 
     private static bool IsAssignableTo(

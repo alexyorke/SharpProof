@@ -22289,6 +22289,11 @@ by worker feasibility and verification queries, while both callers retain their
 independent assumptions, replay variables, and outcome handling. The canonical
 Worker and Verify test builds will exercise the shared goal factory.
 
+R2011 is applied: the linked `RoslynSymbolFacts` utility now owns the named-type
+base-chain comparison, with Contract API resolution explicitly excluding the
+candidate itself and cancellation analysis retaining include-self semantics.
+Frontend and Meta analyzer tests cover both callers.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
