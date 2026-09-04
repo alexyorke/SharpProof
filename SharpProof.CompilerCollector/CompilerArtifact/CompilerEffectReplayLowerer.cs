@@ -299,11 +299,7 @@ internal static class CompilerEffectReplayLowerer
         ResolvedApiSpecTable apiSpecs)
     {
         return creation.Constructor is { } constructor &&
-            apiSpecs.TryGet(constructor, out var spec) &&
-            spec.Template.Facets.Throws.Behavior ==
-                SpecThrowBehavior.DoesNotThrow &&
-            spec.Template.Facets.Termination?.Behavior ==
-                SpecTerminationBehavior.Terminates;
+            apiSpecs.IsNonThrowingAndTerminating(constructor);
     }
 
     private static bool IsExactFrameworkException(

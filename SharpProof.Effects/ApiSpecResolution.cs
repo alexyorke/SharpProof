@@ -56,6 +56,15 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
             spec.Template.Facets.Effects.Effects == SpecEffect.None;
     }
 
+    internal bool IsNonThrowingAndTerminating(IMethodSymbol method)
+    {
+        return TryGet(method, out var spec) &&
+            spec.Template.Facets.Throws.Behavior ==
+                SpecThrowBehavior.DoesNotThrow &&
+            spec.Template.Facets.Termination?.Behavior ==
+                SpecTerminationBehavior.Terminates;
+    }
+
     public ApiSpecLookupResult Lookup(ISymbol symbol)
     {
         symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));

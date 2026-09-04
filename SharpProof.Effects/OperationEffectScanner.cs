@@ -1486,11 +1486,7 @@ internal sealed partial class OperationEffectScanner
 
     private bool HasNonThrowingMethodSpec(IMethodSymbol method)
     {
-        return _session.ApiSpecs.TryGet(method, out var spec) &&
-               spec.Template.Facets.Throws.Behavior ==
-               SpecThrowBehavior.DoesNotThrow &&
-               spec.Template.Facets.Termination?.Behavior ==
-               SpecTerminationBehavior.Terminates;
+        return _session.ApiSpecs.IsNonThrowingAndTerminating(method);
     }
 
     private bool IsKnownNonThrowing(IMethodSymbol method)
