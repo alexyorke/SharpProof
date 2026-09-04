@@ -560,20 +560,21 @@ try {
             $remainingBuildTaskFilter +=
                 "&FullyQualifiedName!~$buildTaskClass.$method"
         }
+        $isolatedBuildTaskFilter = @($isolatedBuildTaskMethods | ForEach-Object {
+                "FullyQualifiedName~$buildTaskClass.$_"
+            }) -join '|'
         $shards.Add([pscustomobject]@{
             Name = 'postflight-buildtask-main'
             Filter = $remainingBuildTaskFilter
             EstimatedMilliseconds = -1L
             Exclusive = $true
         })
-        foreach ($method in $isolatedBuildTaskMethods) {
-            $shards.Add([pscustomobject]@{
-                Name = 'postflight-buildtask-' + $method.ToLowerInvariant()
-                Filter = "FullyQualifiedName~$buildTaskClass.$method"
-                EstimatedMilliseconds = -1L
-                Exclusive = $true
-            })
-        }
+        $shards.Add([pscustomobject]@{
+            Name = 'postflight-buildtask-containment'
+            Filter = $isolatedBuildTaskFilter
+            EstimatedMilliseconds = -1L
+            Exclusive = $true
+        })
         foreach ($bucket in $packageLayoutBuckets) {
             $filter = @($bucket.Methods | ForEach-Object {
                     "FullyQualifiedName~$packageLayoutClass.$_"
