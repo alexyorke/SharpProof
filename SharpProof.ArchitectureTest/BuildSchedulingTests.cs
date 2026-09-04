@@ -89,6 +89,8 @@ public sealed class BuildSchedulingTests
             Assert.That(packageTests,
                 Does.Contain("FullyQualifiedName!~$buildTaskClass.$method"));
             Assert.That(packageTests,
+                Does.Match("Name = 'postflight-buildtask-main'[\\s\\S]*?Slots = 1"));
+            Assert.That(packageTests,
                 Does.Contain("Exclusive = $true"));
             Assert.That(packageTests,
                 Does.Contain("$nextIsExclusive"));

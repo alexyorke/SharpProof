@@ -567,6 +567,10 @@ try {
             Name = 'postflight-buildtask-main'
             Filter = $remainingBuildTaskFilter
             EstimatedMilliseconds = -1L
+            # Keep the fresh dotnet test host required by BuildTaskTests, but
+            # do not reserve the whole wave while this independent process
+            # runs.
+            Slots = 1
             Exclusive = $true
         })
         $shards.Add([pscustomobject]@{
