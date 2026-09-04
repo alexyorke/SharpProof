@@ -3615,6 +3615,7 @@ public sealed class WorkerMsBuildIntegrationTests
     private sealed class ConsumerProject : IDisposable
     {
         private readonly string _root;
+        private bool _defaultRestoreCompleted;
 
         private ConsumerProject(string root)
         {
@@ -3965,15 +3966,29 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            var restoreSensitive = properties.Any(
+                static property => IsRestoreSensitiveProperty(property.Name));
+            if (restoreSensitive)
+            {
+                _defaultRestoreCompleted = false;
+            }
+            var skipRestore = _defaultRestoreCompleted &&
+                !restoreSensitive &&
+                File.Exists(Path.Combine(_root, "obj", "project.assets.json"));
             var arguments = new List<string> {
                 "build",
                 ProjectPath,
                 "-c",
                 "Release",
                 "--nologo",
+                "/m:1",
                 "/nodeReuse:false",
                 "-p:GeneratePackageOnBuild=false"
             };
+            if (skipRestore)
+            {
+                arguments.Add("--no-restore");
+            }
             if (verify.HasValue)
             {
                 arguments.Add(
@@ -3983,12 +3998,23 @@ public sealed class WorkerMsBuildIntegrationTests
 
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
-            return await RunDotNetAsync(arguments);
+            var result = await RunDotNetAsync(arguments);
+            if (result.ExitCode == 0 && !restoreSensitive)
+            {
+                _defaultRestoreCompleted = true;
+            }
+            return result;
         }
 
-        internal Task<BuildResult> RestoreAsync(
+        internal async Task<BuildResult> RestoreAsync(
             params (string Name, string Value)[] properties)
         {
+            var restoreSensitive = properties.Any(
+                static property => IsRestoreSensitiveProperty(property.Name));
+            if (restoreSensitive)
+            {
+                _defaultRestoreCompleted = false;
+            }
             var arguments = new List<string>
             {
                 "restore",
@@ -3999,12 +4025,38 @@ public sealed class WorkerMsBuildIntegrationTests
             };
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
-            return RunDotNetAsync(arguments);
+            var result = await RunDotNetAsync(arguments);
+            if (result.ExitCode == 0 && !restoreSensitive)
+            {
+                _defaultRestoreCompleted = true;
+            }
+            return result;
+        }
+
+        private static bool IsRestoreSensitiveProperty(string name)
+        {
+            return name.Equals(
+                       "BaseIntermediateOutputPath",
+                       StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(
+                    "MSBuildProjectExtensionsPath",
+                    StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("TargetFramework", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("TargetFrameworks", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(
+                    "RuntimeIdentifier",
+                    StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(
+                    "RuntimeIdentifiers",
+                    StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("Restore", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("Package", StringComparison.OrdinalIgnoreCase);
         }
 
         internal Task<BuildResult> CleanAsync(
             params (string Name, string Value)[] properties)
         {
+            _defaultRestoreCompleted = false;
             var arguments = new List<string>
             {
                 "clean",
