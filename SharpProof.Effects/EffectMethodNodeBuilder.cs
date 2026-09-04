@@ -1006,15 +1006,45 @@ internal sealed class EffectMethodNodeBuilder
                     finallyOperations[index]);
             }
         }
+        var finallyByEnclosingRegion =
+            new Dictionary<ControlFlowRegion, ControlFlowRegion>();
+        ControlFlowRegion? rootFinallyRegion = null;
+        foreach (var region in regions)
+        {
+            if (region.Kind != ControlFlowRegionKind.Finally)
+            {
+                continue;
+            }
+
+            if (region.EnclosingRegion is { } parent)
+            {
+                if (!finallyByEnclosingRegion.ContainsKey(parent))
+                {
+                    finallyByEnclosingRegion.Add(parent, region);
+                }
+            }
+            else
+            {
+                rootFinallyRegion ??= region;
+            }
+        }
         var result = new Dictionary<ControlFlowRegion, FinallyEntry>();
         foreach (var tryRegion in regions.Where(static region =>
                      region.Kind == ControlFlowRegionKind.Try))
         {
-            var finallyRegion = regions.FirstOrDefault(region =>
-                region.Kind == ControlFlowRegionKind.Finally &&
-                ReferenceEquals(
-                    region.EnclosingRegion,
-                    tryRegion.EnclosingRegion));
+            ControlFlowRegion? finallyRegion;
+            if (tryRegion.EnclosingRegion is { } parent)
+            {
+                finallyRegion = finallyByEnclosingRegion.TryGetValue(
+                        parent,
+                        out var indexedFinally)
+                    ? indexedFinally
+                    : null;
+            }
+            else
+            {
+                finallyRegion = rootFinallyRegion;
+            }
             if (finallyRegion != null)
             {
                 result.Add(
