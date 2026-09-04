@@ -7,11 +7,12 @@ internal static partial class ContractApiMetadata
 {
     internal const string AttributesAssemblyMvidMetadataKey =
         "SharpProof.Attributes.MVID";
+    private static readonly HashSet<string> ContractMethodCandidateNameSet =
+        new(ContractMethodCandidateNames, StringComparer.Ordinal);
+
     internal static bool IsContractMethodCandidateName(string name)
     {
-        return ContractMethodCandidateNames.Contains(
-            name,
-            StringComparer.Ordinal);
+        return ContractMethodCandidateNameSet.Contains(name);
     }
 
     internal static bool TryGetMethod(
