@@ -520,62 +520,32 @@ try {
         })
     }
     else {
-        $fixtureShards = @(
-            [pscustomobject]@{
-                Name = 'compilerprobeinputconsistencytests'
-                Classes = @('CompilerProbeInputConsistencyTests')
-            },
-            [pscustomobject]@{
-                Name = 'compilerprobesnapshottests'
-                Classes = @('CompilerProbeSnapshotTests')
-            },
-            [pscustomobject]@{
-                Name = 'dependencyauditscripttests'
-                Classes = @('DependencyAuditScriptTests')
-            },
-            [pscustomobject]@{
-                Name = 'finalcompilationprobetests'
-                Classes = @('FinalCompilationProbeTests')
-            },
-            [pscustomobject]@{
-                Name = 'launcherargumenttests'
-                Classes = @('LauncherArgumentTests')
-            },
-            [pscustomobject]@{
-                Name = 'releasepublicationscripttests'
-                Classes = @('ReleasePublicationScriptTests')
-            },
-            [pscustomobject]@{
-                Name = 'sarifprojection-and-verifierdiagnostictransporttests'
-                Classes = @(
-                    'SarifProjectionTests',
-                    'VerifierDiagnosticTransportTests')
-            },
-            [pscustomobject]@{
-                Name = 'verifierprocesssupervisorbug202tests'
-                Classes = @('VerifierProcessSupervisorBug202Tests')
-            })
-        foreach ($fixtureShard in $fixtureShards) {
-            $classFilters = @($fixtureShard.Classes | ForEach-Object {
+        $fixtureClasses = @(
+            'CompilerProbeInputConsistencyTests',
+            'CompilerProbeSnapshotTests',
+            'DependencyAuditScriptTests',
+            'FinalCompilationProbeTests',
+            'LauncherArgumentTests',
+            'ReleasePublicationScriptTests',
+            'SarifProjectionTests|VerifierDiagnosticTransportTests',
+            'VerifierProcessSupervisorBug202Tests')
+        foreach ($fixtureClass in $fixtureClasses) {
+            $classNames = $fixtureClass -split '\|'
+            $classFilters = @($classNames | ForEach-Object {
                     "FullyQualifiedName~SharpProof.Package.Test.$_"
                 })
             $filter = $classFilters -join '|'
-            $estimatedMilliseconds = if (
-                $priorFilterMilliseconds.ContainsKey($filter)) {
-                [long]$priorFilterMilliseconds[$filter]
-            }
-            else {
-                [long](@($classFilters | ForEach-Object {
-                            if ($priorFilterMilliseconds.ContainsKey($_)) {
-                                [long]$priorFilterMilliseconds[$_]
-                            }
-                            else {
-                                1L
-                            }
-                        } | Measure-Object -Sum).Sum)
-            }
+            $estimatedMilliseconds = [long](@($classFilters | ForEach-Object {
+                        if ($priorFilterMilliseconds.ContainsKey($_)) {
+                            [long]$priorFilterMilliseconds[$_]
+                        }
+                        else {
+                            1L
+                        }
+                    } | Measure-Object -Sum).Sum)
             $shards.Add([pscustomobject]@{
-                Name = 'fixture-' + $fixtureShard.Name
+                Name = 'fixture-' + ($fixtureClass.ToLowerInvariant() -replace
+                    '\|', '-and-')
                 Filter = $filter
                 EstimatedMilliseconds = $estimatedMilliseconds
                 })
