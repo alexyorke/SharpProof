@@ -643,7 +643,7 @@ public sealed class RoslynProgramLowerer(
             HavocKnownState(block, operation);
         }
 
-        private IrTerm LowerUnsupportedMutationResult(
+        private IrVariableTerm LowerUnsupportedMutationResult(
             IrBlockId block,
             OperationId operation,
             IOperation target,
