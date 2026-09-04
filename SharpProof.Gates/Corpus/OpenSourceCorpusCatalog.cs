@@ -137,9 +137,7 @@ internal static class OpenSourceCorpusCatalog
             ValidateSource(source, corpusDirectory);
         }
 
-        var files = new Dictionary<
-            string,
-            (OpenSourceCorpusFile File, CompilationUnitSyntax Root)>(
+        var files = new Dictionary<string, CompilationUnitSyntax>(
             StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
@@ -173,12 +171,12 @@ internal static class OpenSourceCorpusCatalog
                     AnalyzerGateHost.ParseOptions,
                     file.Path)
                 .GetCompilationUnitRoot();
-            files.Add(key, (file, root));
+            files.Add(key, root);
         }
 
         var declarationIndexes = files.ToDictionary(
             static pair => pair.Key,
-            static pair => BuildDeclarationIndex(pair.Value.Root),
+            static pair => BuildDeclarationIndex(pair.Value),
             StringComparer.Ordinal);
 
         var locations = new HashSet<string>(StringComparer.Ordinal);
@@ -195,7 +193,7 @@ internal static class OpenSourceCorpusCatalog
             }
 
             var fileKey = GetSourceFileKey(method.SourceId, method.Path);
-            if (!files.TryGetValue(fileKey, out var sourceFile))
+            if (!files.ContainsKey(fileKey))
             {
                 throw new InvalidDataException(
                     $"OSS corpus method {method.Id} refers to missing source " +
