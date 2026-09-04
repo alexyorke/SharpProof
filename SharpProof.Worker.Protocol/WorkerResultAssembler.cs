@@ -107,7 +107,19 @@ internal static class WorkerResultAssembler
     internal static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims,
         out bool conflictingKinds)
     {
-        var summary = Summarize(callables, claims);
+        var assumptions = new Dictionary<string, AssumptionAggregate>(
+            StringComparer.Ordinal);
+        foreach (var callable in callables)
+        {
+            AddAssumptionEvidence(assumptions, callable.Assumptions);
+        }
+
+        foreach (var claim in claims)
+        {
+            AddAssumptionEvidence(assumptions, claim.Assumptions);
+        }
+
+        var summary = CreateAssumptionSummary(assumptions);
         conflictingKinds = summary.ConflictingAssumptionKinds;
         return summary.Assumptions;
     }
@@ -146,38 +158,12 @@ internal static class WorkerResultAssembler
 
         internal void AddAssumptions(IEnumerable<WorkerAssumptionEvidence>? assumptions)
         {
-            foreach (var value in assumptions ?? [])
-            {
-                if (value is null || string.IsNullOrWhiteSpace(value.Id))
-                {
-                    continue;
-                }
-
-                if (_assumptions.TryGetValue(value.Id, out var existing))
-                {
-                    existing.Used |= value.Used;
-                    existing.ConflictingKinds |= existing.FirstKind != value.Kind;
-                    _assumptions[value.Id] = existing;
-                }
-                else
-                {
-                    _assumptions.Add(value.Id, new AssumptionAggregate(value.Kind, value.Used));
-                }
-            }
+            AddAssumptionEvidence(_assumptions, assumptions);
         }
 
         internal SummarySnapshot CreateSnapshot()
         {
-            var assumptions = new WorkerAssumptionSummary();
-            var conflictingAssumptionKinds = false;
-            foreach (var aggregate in _assumptions.Values)
-            {
-                assumptions.Total++;
-                assumptions.Used += aggregate.Used ? 1 : 0;
-                assumptions.User += aggregate.FirstKind == WorkerAssumptionKind.UserAssume ? 1 : 0;
-                assumptions.Trusted += aggregate.FirstKind == WorkerAssumptionKind.TrustedBoundary ? 1 : 0;
-                conflictingAssumptionKinds |= aggregate.ConflictingKinds;
-            }
+            var assumptionSummary = CreateAssumptionSummary(_assumptions);
 
             return new SummarySnapshot(
                 [.. _outcomes.Select(static pair => new WorkerClaimOutcomeCount
@@ -190,8 +176,8 @@ internal static class WorkerResultAssembler
                     Reason = pair.Key,
                     Count = pair.Value
                 })],
-                assumptions,
-                conflictingAssumptionKinds);
+                assumptionSummary.Assumptions,
+                assumptionSummary.ConflictingAssumptionKinds);
         }
 
         private static void Increment<TKey>(Dictionary<TKey, int> counts, TKey key)
@@ -199,6 +185,49 @@ internal static class WorkerResultAssembler
         {
             counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
         }
+    }
+
+    private static void AddAssumptionEvidence(
+        Dictionary<string, AssumptionAggregate> assumptions,
+        IEnumerable<WorkerAssumptionEvidence>? values)
+    {
+        foreach (var value in values ?? [])
+        {
+            if (value is null || string.IsNullOrWhiteSpace(value.Id))
+            {
+                continue;
+            }
+
+            if (assumptions.TryGetValue(value.Id, out var existing))
+            {
+                existing.Used |= value.Used;
+                existing.ConflictingKinds |= existing.FirstKind != value.Kind;
+                assumptions[value.Id] = existing;
+            }
+            else
+            {
+                assumptions.Add(value.Id, new AssumptionAggregate(value.Kind, value.Used));
+            }
+        }
+    }
+
+    private static (
+        WorkerAssumptionSummary Assumptions,
+        bool ConflictingAssumptionKinds) CreateAssumptionSummary(
+        Dictionary<string, AssumptionAggregate> assumptions)
+    {
+        var summary = new WorkerAssumptionSummary();
+        var conflictingKinds = false;
+        foreach (var aggregate in assumptions.Values)
+        {
+            summary.Total++;
+            summary.Used += aggregate.Used ? 1 : 0;
+            summary.User += aggregate.FirstKind == WorkerAssumptionKind.UserAssume ? 1 : 0;
+            summary.Trusted += aggregate.FirstKind == WorkerAssumptionKind.TrustedBoundary ? 1 : 0;
+            conflictingKinds |= aggregate.ConflictingKinds;
+        }
+
+        return (summary, conflictingKinds);
     }
 
     private struct AssumptionAggregate(WorkerAssumptionKind firstKind, bool used)
