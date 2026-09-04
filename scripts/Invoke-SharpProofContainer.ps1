@@ -124,6 +124,10 @@ function Invoke-SolutionTests([string]$SolutionPath) {
     if (-not $NoBuild) {
         Invoke-DotNet @('restore', $SolutionPath, '--locked-mode')
     }
+    $isMainSolution = [IO.Path]::GetFileName($SolutionPath) -ceq
+        'SharpProof.sln'
+    $runPackageTestsSeparately = $isMainSolution -and
+        [string]::IsNullOrWhiteSpace($TestFilter)
     $testProjectParallelism = Get-SharpProofTestProjectParallelism `
         -RepositoryRoot $repositoryRoot
     $arguments = @(
@@ -134,10 +138,32 @@ function Invoke-SolutionTests([string]$SolutionPath) {
         $arguments += '--no-build'
     }
     $arguments += "/m:$testProjectParallelism"
-    if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+    if ($runPackageTestsSeparately) {
+        $arguments += @(
+            '--filter', 'FullyQualifiedName!~SharpProof.Package.Test')
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
         $arguments += @('--filter', $TestFilter)
     }
     Invoke-DotNet $arguments
+
+    if ($runPackageTestsSeparately) {
+        $packageArguments = @{
+            Configuration = $Configuration
+            PackageSource = $PackageSource
+        }
+        if ($NoBuild) {
+            $packageArguments.NoBuild = $true
+        }
+        else {
+            $packageArguments.ReuseTestHarness = $true
+        }
+        if ($Fast) {
+            $packageArguments.Fast = $true
+        }
+        Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1' `
+            'Package tests failed.' $packageArguments
+    }
 }
 
 function Invoke-ForcedTerminationGateTest([string]$BuildConfiguration) {

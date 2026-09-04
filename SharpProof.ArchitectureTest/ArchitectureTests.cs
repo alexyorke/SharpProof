@@ -1759,7 +1759,7 @@ public sealed class ArchitectureTests
         var semanticTestsIndex = containerCommands.IndexOf(
             "scripts/Invoke-SharpProofSemanticTests.ps1",
             StringComparison.Ordinal);
-        var packageTestsIndex = containerCommands.IndexOf(
+        var packageTestsIndex = containerCommands.LastIndexOf(
             "scripts/Invoke-SharpProofPackageTests.ps1",
             StringComparison.Ordinal);
         using (Assert.EnterMultipleScope())

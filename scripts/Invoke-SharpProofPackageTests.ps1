@@ -504,10 +504,15 @@ try {
     }
     else {
         $fixtureClasses = @(
+            'CompilerProbeInputConsistencyTests',
+            'CompilerProbeSnapshotTests',
             'DependencyAuditScriptTests',
             'FinalCompilationProbeTests',
             'LauncherArgumentTests',
-            'ReleasePublicationScriptTests')
+            'ReleasePublicationScriptTests',
+            'SarifProjectionTests',
+            'VerifierDiagnosticTransportTests',
+            'VerifierProcessSupervisorBug202Tests')
         foreach ($fixtureClass in $fixtureClasses) {
             $filter =
                 "FullyQualifiedName~SharpProof.Package.Test.$fixtureClass"

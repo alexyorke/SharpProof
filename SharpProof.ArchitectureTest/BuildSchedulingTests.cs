@@ -652,6 +652,64 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void MainSolutionTestsRunPackageQualificationThroughDedicatedRunner()
+    {
+        var container = File.ReadAllText(Path.Combine(
+            TestRepository.FindRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(container, Does.Contain(
+                "$runPackageTestsSeparately = $isMainSolution -and"));
+            Assert.That(container, Does.Contain(
+                "'FullyQualifiedName!~SharpProof.Package.Test'"));
+            Assert.That(container, Does.Contain(
+                "Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1'"));
+            Assert.That(container, Does.Contain(
+                "$packageArguments.ReuseTestHarness = $true"));
+            Assert.That(container, Does.Contain(
+                "$packageArguments.NoBuild = $true"));
+        }
+    }
+
+    [Test]
+    public void PackageRunnerCoversEveryPackageTestFixture()
+    {
+        var root = TestRepository.FindRoot();
+        var packageTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+        var fixtureNames = Directory.EnumerateFiles(
+                Path.Combine(root, "SharpProof.Package.Test"),
+                "*.cs")
+            .Select(path => File.ReadAllText(path))
+            .Where(contents => contents.Contains(
+                "[TestFixture]",
+                StringComparison.Ordinal))
+            .Select(contents => Regex.Match(
+                contents,
+                @"\[TestFixture\][\s\S]*?class\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)")
+                .Groups["name"].Value)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(fixtureNames, Is.Not.Empty);
+            foreach (var fixtureName in fixtureNames)
+            {
+                Assert.That(
+                    packageTests,
+                    Does.Contain(fixtureName),
+                    "Package runner does not schedule " + fixtureName);
+            }
+        }
+    }
+
+    [Test]
     public void FastTestBuildsSkipAnalyzersWithoutWeakeningQualification()
     {
         var root = TestRepository.FindRoot();
