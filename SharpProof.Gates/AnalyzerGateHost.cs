@@ -42,6 +42,12 @@ internal static class AnalyzerGateHost
             static id => id,
             static _ => ReportDiagnostic.Warn,
             StringComparer.Ordinal);
+    private static readonly AnalyzerOptions EmptyAnalyzerOptions =
+        new(
+            [],
+            new DictionaryAnalyzerConfigOptionsProvider(
+                DictionaryAnalyzerConfigOptions.Empty,
+                globalForFiles: false));
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences);
@@ -110,16 +116,22 @@ internal static class AnalyzerGateHost
         bool concurrentAnalysis,
         CancellationToken cancellationToken = default)
     {
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-        if (mode != null)
+        AnalyzerOptions options;
+        if (mode == null)
         {
-            values.Add("sharpproof_features", mode);
+            options = EmptyAnalyzerOptions;
         }
-
-        var options = new AnalyzerOptions(
-            [],
-            new DictionaryAnalyzerConfigOptionsProvider(values));
+        else
+        {
+            var values = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["sharpproof_features"] = mode
+            };
+            options = new AnalyzerOptions(
+                [],
+                new DictionaryAnalyzerConfigOptionsProvider(values));
+        }
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer],
             new CompilationWithAnalyzersOptions(
