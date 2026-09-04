@@ -20,7 +20,7 @@ if ([int]$catalog.schemaVersion -ne 1) {
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-EffectContractMappings.ps1' `
+    -Generator 'scripts/Generate-EffectContractMappings.ps1' `
     -Source 'SharpProof.Effects/EffectContractMappings.catalog.json.' `
     -Nullable
 $lines.Add('')

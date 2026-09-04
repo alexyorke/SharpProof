@@ -423,7 +423,7 @@ $constantNames = [Collections.Generic.HashSet[string]]::new(
 $enumMemberNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-ProtocolModel.ps1' `
+    -Generator 'scripts/Generate-ProtocolModel.ps1' `
     -Source 'SharpProof.Worker.Protocol/ProtocolModel.schema.json.' `
     -Nullable
 foreach ($using in @(Get-RequiredMember $schema 'usings' 'schema')) {
@@ -1054,7 +1054,7 @@ foreach ($role in $versionMembers.PSObject.Properties) {
 }
 
 $producerLines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-ProtocolModel.ps1' `
+    -Generator 'scripts/Generate-ProtocolModel.ps1' `
     -Source 'SharpProof.Worker.Protocol/ProtocolModel.schema.json.' `
     -Nullable
 $producerLines.Add('')

@@ -20,7 +20,7 @@ if ([int]$catalog.schemaVersion -ne 1) {
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-OperationSupportCatalog.ps1' `
+    -Generator 'scripts/Generate-OperationSupportCatalog.ps1' `
     -Source 'SharpProof.Frontend/OperationSupport.catalog.json.' `
     -Nullable
 $lines.Add('')

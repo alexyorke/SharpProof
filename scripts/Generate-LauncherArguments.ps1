@@ -189,7 +189,7 @@ if ($seenCache.Count -ne $cacheDefaults.Count) {
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-LauncherArguments.ps1' `
+    -Generator 'scripts/Generate-LauncherArguments.ps1' `
     -Source 'SharpProof.Worker.Launcher/LauncherArguments.catalog.json.' `
     -Notes @(
         'Declarative option inventories and request projections only.',
@@ -320,7 +320,7 @@ $lines.Add('    }')
 $lines.Add('}')
 
 $buildTaskLines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-LauncherArguments.ps1' `
+    -Generator 'scripts/Generate-LauncherArguments.ps1' `
     -Source 'SharpProof.Worker.Launcher/LauncherArguments.catalog.json.' `
     -Nullable
 $buildTaskLines.Add('')

@@ -25,7 +25,7 @@ if ([string](Required $schema 'namespace' 'Bound contract model') -ne
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-BoundContractModel.ps1' `
+    -Generator 'scripts/Generate-BoundContractModel.ps1' `
     -Source 'SharpProof.Contracts/BoundContractModel.schema.json.' `
     -Notes @('Declarative bound-contract vocabulary and storage only.') `
     -Nullable

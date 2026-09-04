@@ -22387,6 +22387,11 @@ classification once for the symbol overload, then applies the existing
 marked/path/header/attribute precedence without a second provider query. The
 generated-code and advisory analyzer tests pass.
 
+R2300 is applied: `New-SharpProofGeneratedHeader` now accepts the full
+repository-relative generator path instead of hard-coding `scripts/`; all 15
+generators use it with correct provenance, and generated outputs remain byte-
+stable under verification.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
@@ -22926,3 +22931,45 @@ settle. Almost all are correct or are dated historical notes. One is not.
 R2320 is `pending` and is one word. It is filed at that size because it is the third
 independent instance of the same gap in the same document family, and because the two
 gates that read this file on every acceptance run are what make the error surprising.
+
+## Second survey, part six hundred forty-six: every test project reference is load-bearing, and the two ways a naive audit says otherwise
+
+Auditing the test-side reference graph the way applied R734 audited
+`InternalsVisibleTo`: **19** test projects, every `ProjectReference` checked for use
+in the referring project. A first pass flagged **five** references whose assembly
+name never appears in the referring project's own sources. **All five are genuine**,
+and the two reasons they looked otherwise are worth recording because both will trap
+the next measurement.
+
+**Trap one: the project name is not the namespace.** Three of the five dissolve
+here. `SharpProof.Effects` declares 46 files under `namespace SharpProof.Effects`
+and **2 under `namespace SharpProof.Specs`**, which is why `SharpProof.Specs.Test`
+must reference the Effects project while never writing that name.
+`SharpProof.Analyzer.Core` declares **zero** files under its own name - 27 under
+`SharpProof.Analyzer`, 3 under `SharpProof.ContractForValidation`, 2 under
+`SharpProof.Analyzer.Configuration` - so both `SharpProof.Worker.Test` and
+`SharpProof.ContractForGenerator.Test` reference it while naming only
+`SharpProof.Analyzer`. And `SharpProof.CompilerCollector` declares 13 of its 15
+files under `namespace SharpProof.CompilerArtifact`, which explains
+`SharpProof.Worker.Test`. R1520 already files the namespace half of this.
+
+**Trap two: linked sources carry dependencies the project's own files do not
+name.** The fifth, `SharpProof.Smt.Test -> SharpProof.Host`, survives trap one -
+`SharpProof.Host` declares only its own namespace and the test's own sources never
+mention it. The reference is still required: `SharpProof.Smt.Test.csproj:6-7` links
+`..\eng\testing\ContainerNativeLibrarySetup.cs`, whose line 2 is `using
+SharpProof.Host;`. Any audit that walks a project's directory rather than its
+compiled item set will miss every `Compile Include ... Link` dependency, and this
+repository has many.
+
+**The convention behind trap one is otherwise exact.** Of 25 production projects,
+**24** declare at least one file under their own name; `SharpProof.Analyzer.Core` is
+the only one that never does. Four projects contribute files to a namespace another
+assembly is named after - Effects to `SharpProof.Specs`, Analyzer.Core and
+CompilerCollector to `SharpProof.Analyzer`, CompilerCollector to
+`SharpProof.CompilerArtifact` - and R1520 covers exactly that set.
+
+### Status (part six hundred forty-six)
+
+Nothing filed. Nineteen test projects carry no unused reference, and the axis is
+closed with both false-positive mechanisms documented.

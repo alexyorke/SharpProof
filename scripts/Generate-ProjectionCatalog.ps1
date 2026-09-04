@@ -46,7 +46,7 @@ foreach ($output in @(Required $catalog 'outputs' 'Projection catalog')) {
         })
     $name = Identifier ([string](Required $output 'name' "output '$relativePath'") ) "output '$relativePath' name"
     $lines = New-SharpProofGeneratedHeader `
-        -Generator 'Generate-ProjectionCatalog.ps1' `
+        -Generator 'scripts/Generate-ProjectionCatalog.ps1' `
         -Source 'SharpProof.Projection.catalog.json.' `
         -Notes @('Declarative projection tables only; analysis remains handwritten.') `
         -Nullable

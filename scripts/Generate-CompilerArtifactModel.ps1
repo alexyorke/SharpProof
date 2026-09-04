@@ -64,7 +64,7 @@ function New-GeneratedOutput {
     )
 
     $result = New-SharpProofGeneratedHeader `
-        -Generator 'Generate-CompilerArtifactModel.ps1' `
+        -Generator 'scripts/Generate-CompilerArtifactModel.ps1' `
         -Source 'SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json.' `
         -Notes @("Output: $OutputName.") `
         -Nullable

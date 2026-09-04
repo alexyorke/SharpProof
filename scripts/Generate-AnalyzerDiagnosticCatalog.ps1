@@ -33,7 +33,7 @@ if ([int]$catalog.schemaVersion -ne 1) {
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-AnalyzerDiagnosticCatalog.ps1' `
+    -Generator 'scripts/Generate-AnalyzerDiagnosticCatalog.ps1' `
     -Source 'SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json.' `
     -Notes @('Declarative diagnostic projections only; analysis remains handwritten.') `
     -Nullable

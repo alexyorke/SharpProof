@@ -650,7 +650,7 @@ foreach ($declaration in $declarations) {
 }
 
 $source = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-ApiSpecCatalog.ps1' `
+    -Generator 'scripts/Generate-ApiSpecCatalog.ps1' `
     -Source 'SharpProof.Specs/DefaultApiSpecCatalog.json.' `
     -Nullable
 $source.Add('namespace SharpProof.Specs;')

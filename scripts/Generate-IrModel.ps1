@@ -148,7 +148,7 @@ foreach ($declaration in $declarations)
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-IrModel.ps1' `
+    -Generator 'scripts/Generate-IrModel.ps1' `
     -Source 'SharpProof.Ir/IrModel.schema.json (schema version 1).' `
     -Notes @(
         'Only declarative IR vocabulary and storage are generated here.',
@@ -534,7 +534,7 @@ Update-SharpProofGeneratedFile `
     -Verify:$Verify
 
 $aliasLines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-IrModel.ps1' `
+    -Generator 'scripts/Generate-IrModel.ps1' `
     -Notes @('IR identifier aliases are declarative projections.')
 $aliasLines.Add('')
 foreach ($tag in $identifierTags) {

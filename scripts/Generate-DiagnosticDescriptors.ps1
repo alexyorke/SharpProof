@@ -117,7 +117,7 @@ foreach ($output in $outputs) {
         [StringComparer]::Ordinal)
     $orderedSymbols = [Collections.Generic.List[string]]::new()
     $lines = New-SharpProofGeneratedHeader `
-        -Generator 'Generate-DiagnosticDescriptors.ps1' `
+        -Generator 'scripts/Generate-DiagnosticDescriptors.ps1' `
         -Source 'eng/diagnostics/diagnostic-descriptors.v1.json.' `
         -Nullable
     foreach ($using in @(

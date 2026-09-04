@@ -183,7 +183,7 @@ foreach ($output in @(Required $catalog 'outputs' 'Declarative-model catalog')) 
     $path = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $relativePath))
     $namespace = NamespaceName ([string](Required $output 'namespace' "output '$relativePath'") ) "output '$relativePath' namespace"
     $lines = New-SharpProofGeneratedHeader `
-        -Generator 'Generate-DeclarativeModels.ps1' `
+        -Generator 'scripts/Generate-DeclarativeModels.ps1' `
         -Source 'SharpProof.DeclarativeModels.catalog.json.' `
         -Notes @('Declarative record storage only; analysis remains handwritten.') `
         -Nullable

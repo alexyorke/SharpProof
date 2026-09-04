@@ -162,7 +162,7 @@ if (@($attributes | Where-Object Id -eq 'ContractFor').Count -ne 1 -or
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-ContractApiCatalog.ps1' `
+    -Generator 'scripts/Generate-ContractApiCatalog.ps1' `
     -Source 'SharpProof.Frontend/ContractApi.catalog.json.'
 $lines.Add('')
 $lines.Add('namespace SharpProof.Frontend;')

@@ -641,7 +641,7 @@ if (@($equalityTypes | Select-Object -Unique).Count -ne $equalityTypes.Count) {
 }
 
 $lines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-CSharpScalarSemantics.ps1' `
+    -Generator 'scripts/Generate-CSharpScalarSemantics.ps1' `
     -Source 'SharpProof.Frontend/CSharpScalarSemantics.json.' `
     -Nullable
 $lines.AddRange([string[]]@(
@@ -961,7 +961,7 @@ Add-Lines -Lines $lines -Values @(
     '}')
 
 $irLines = New-SharpProofGeneratedHeader `
-    -Generator 'Generate-CSharpScalarSemantics.ps1' `
+    -Generator 'scripts/Generate-CSharpScalarSemantics.ps1' `
     -Source 'SharpProof.Frontend/CSharpScalarSemantics.json.' `
     -Nullable
 Add-Lines -Lines $irLines -Values @(
