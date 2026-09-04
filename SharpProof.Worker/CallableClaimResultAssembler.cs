@@ -9,11 +9,11 @@ internal static class CallableClaimResultAssembler
         WorkerClaimReason replayFailure,
         WorkerVacuityKind vacuity)
     {
-        var record = Unknown(
-            target,
-            contractOrdinal,
-            WorkerClaimReason.InfrastructureFailure,
-            projectAssumptions: false);
+        var claimId = target.Entry.ClaimIds[contractOrdinal];
+        var effectCertainty = target.EffectClaims.Any(evidence => evidence.ClaimId == claimId)
+            ? WorkerEffectEvidenceCertainty.Unavailable
+            : WorkerEffectEvidenceCertainty.Unspecified;
+        WorkerClaimResult record;
         var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
         switch (outcome)
         {
@@ -38,30 +38,62 @@ internal static class CallableClaimResultAssembler
                 if (hasMalformedEvidence)
                 {
                     usedUserAssumptions.Clear();
-                    record.Reason = WorkerClaimReason.MalformedBackendResult;
+                    record = Create(
+                        target,
+                        claimId,
+                        WorkerClaimOutcome.Unknown,
+                        WorkerClaimReason.MalformedBackendResult,
+                        effectCertainty,
+                        projectAssumptions: false);
                     break;
                 }
 
-                (record.Outcome, record.Reason, record.Vacuity) =
-                    (WorkerClaimOutcome.Proven, WorkerClaimReason.None, vacuity);
+                record = Create(
+                    target,
+                    claimId,
+                    WorkerClaimOutcome.Proven,
+                    WorkerClaimReason.None,
+                    effectCertainty,
+                    projectAssumptions: false);
+                record.Vacuity = vacuity;
                 record.ProofCore = [.. proofCore];
                 break;
             case RefutedOutcome when replayFailure != WorkerClaimReason.None:
-                record.Reason = replayFailure;
+                record = Create(
+                    target,
+                    claimId,
+                    WorkerClaimOutcome.Unknown,
+                    replayFailure,
+                    effectCertainty,
+                    projectAssumptions: false);
                 break;
             case RefutedOutcome refuted:
-                (record.Outcome, record.Reason) =
-                    (WorkerClaimOutcome.Refuted, WorkerClaimReason.None);
+                record = Create(
+                    target,
+                    claimId,
+                    WorkerClaimOutcome.Refuted,
+                    WorkerClaimReason.None,
+                    effectCertainty,
+                    projectAssumptions: false);
                 record.Model = CreateModel(refuted, variables);
                 break;
             case UnknownOutcome unknown:
-                (record.Outcome, record.Reason) =
-                    (WorkerClaimOutcome.Unknown,
-                        WorkerProjections.MapAbstention(unknown.Reason));
+                record = Create(
+                    target,
+                    claimId,
+                    WorkerClaimOutcome.Unknown,
+                    WorkerProjections.MapAbstention(unknown.Reason),
+                    effectCertainty,
+                    projectAssumptions: false);
                 break;
             default:
-                (record.Outcome, record.Reason) =
-                    (WorkerClaimOutcome.Unknown, WorkerClaimReason.MalformedBackendResult);
+                record = Create(
+                    target,
+                    claimId,
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimReason.MalformedBackendResult,
+                    effectCertainty,
+                    projectAssumptions: false);
                 break;
         }
         record.Assumptions = ProjectAssumptions(
