@@ -220,14 +220,7 @@ internal static class EffectExceptionFlow
             return CatchSelection.Maybe;
         }
 
-        if (EffectTypeFacts.IsDerivedFrom(thrown, caught))
-        {
-            return CatchSelection.Always;
-        }
-
-        return EffectTypeFacts.IsDerivedFrom(caught, thrown)
-            ? CatchSelection.Maybe
-            : CatchSelection.Never;
+        return EffectTypeFacts.GetExceptionCatchSelection(thrown, caught);
     }
 
     private static CatchSelection GetFilterSelection(
@@ -280,10 +273,4 @@ internal static class EffectExceptionFlow
         CatchSelection Filter,
         bool ContainsRethrow);
 
-    private enum CatchSelection
-    {
-        Never,
-        Maybe,
-        Always
-    }
 }

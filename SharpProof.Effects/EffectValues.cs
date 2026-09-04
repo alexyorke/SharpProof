@@ -312,6 +312,13 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
     }
 }
 
+internal enum CatchSelection
+{
+    Never,
+    Maybe,
+    Always
+}
+
 internal static class EffectTypeFacts
 {
     internal static bool IsDerivedFrom(INamedTypeSymbol type, INamedTypeSymbol expectedBase)
@@ -325,5 +332,19 @@ internal static class EffectTypeFacts
         }
 
         return false;
+    }
+
+    internal static CatchSelection GetExceptionCatchSelection(
+        INamedTypeSymbol thrown,
+        INamedTypeSymbol caught)
+    {
+        if (IsDerivedFrom(thrown, caught))
+        {
+            return CatchSelection.Always;
+        }
+
+        return IsDerivedFrom(caught, thrown)
+            ? CatchSelection.Maybe
+            : CatchSelection.Never;
     }
 }

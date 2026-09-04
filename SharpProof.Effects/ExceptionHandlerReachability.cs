@@ -3298,13 +3298,7 @@ internal sealed class ExceptionHandlerReachability(
         {
             return CatchSelection.Maybe;
         }
-        if (EffectTypeFacts.IsDerivedFrom(thrown, caught))
-        {
-            return CatchSelection.Always;
-        }
-        return EffectTypeFacts.IsDerivedFrom(caught, thrown)
-            ? CatchSelection.Maybe
-            : CatchSelection.Never;
+        return EffectTypeFacts.GetExceptionCatchSelection(thrown, caught);
     }
 
     private bool CatchesAllExceptions(
@@ -3351,13 +3345,6 @@ internal sealed class ExceptionHandlerReachability(
         ImmutableHashSet<INamedTypeSymbol> Known,
         bool Unknown);
 
-
-    private enum CatchSelection
-    {
-        Never,
-        Maybe,
-        Always
-    }
 
     private enum SwitchSelection
     {
