@@ -22396,6 +22396,10 @@ R2320 is applied: corrected the ContractFor diagnostic documentation from eight
 rules to ten, matching the catalog and its gated anchors. The documentation gate
 passes.
 
+R2239 is applied: `AnalyzerConfiguration.FromOptions` now reads the named
+`Profile` and `Features` descriptors directly while retaining `All` for iteration
+and validation. Analyzer configuration tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

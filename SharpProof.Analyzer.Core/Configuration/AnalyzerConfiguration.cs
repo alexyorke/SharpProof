@@ -50,9 +50,14 @@ internal sealed class AnalyzerConfiguration
                 return new(SharpProofProfile.Off, SharpProofFeatures.All, invalidConfigurationValues);
             }
 
-            var optionsByKind = AnalyzerConfigurationOptionRegistry.All;
-            var hasProfile = TryGet(options, optionsByKind[0], out var profile);
-            var hasFeatures = TryGet(options, optionsByKind[1], out var features);
+            var hasProfile = TryGet(
+                options,
+                AnalyzerConfigurationOptionRegistry.Profile,
+                out var profile);
+            var hasFeatures = TryGet(
+                options,
+                AnalyzerConfigurationOptionRegistry.Features,
+                out var features);
             return new(
                 ParseProfile(hasProfile ? profile : "advisory"),
                 ParseFeatures(hasFeatures ? features : "all"),
