@@ -228,11 +228,6 @@ public sealed class RoslynOperationLowerer
             [.. arguments.Select(static argument => argument.Type)]);
     }
 
-    internal static bool IsIntrinsicLength(IPropertyReferenceOperation property)
-    {
-        return CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
-    }
-
     private static bool TryGetNullComparisonValue(
         IBinaryOperation operation,
         IOperation left,
@@ -1023,7 +1018,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitPropertyReference(
             IPropertyReferenceOperation operation, LoweringContext argument)
         {
-            if (IsIntrinsicLength(operation))
+            if (CompilerIdentityBridge.IsIntrinsicSequenceLength(operation))
             {
                 var instance = _owner.LowerCore(operation.Instance!);
                 if (!instance.Classification.IsExact)
