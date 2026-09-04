@@ -21348,3 +21348,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2016 | IrProgramInterpreter.EvaluateLocationOperands and EvaluateCallOperands repeat optional stored-value evaluation and failure propagation; share only that narrow helper while retaining each operand order and terminal policy. | SharpProof.Ir/IrProgramInterpreter.cs:189-196,227-234 |
+
+## Second survey, continued: R2017 - Two PowerShell build scripts retain dead repository-root assignments
+
+`scripts/Test-SharpProofCoverage.ps1` assigns `$repositoryPrefix` from the resolved repository root and a directory separator, but a parser-backed variable census and an exact source search find only that assignment; every later containment operation uses other variables and the prefix is never read. `scripts/Test-SharpProofPilotAuthorityFixtures.ps1` likewise assigns `$root` from the parent of `$PSScriptRoot`, but the value has one occurrence and all subsequent fixture/package paths use `$fixture`, `$packages`, or `$PSScriptRoot` directly. Both assignments are residual scaffolding rather than policy: deleting them removes dead state without changing the coverage or pilot-fixture paths. Keep the repository-root resolution in the coverage script where it is actually consumed; only the unused derived locals are candidates.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2017 | Test-SharpProofCoverage and Test-SharpProofPilotAuthorityFixtures contain one-occurrence, never-read repository-root locals; delete only those dead assignments. | scripts/Test-SharpProofCoverage.ps1:26-28; scripts/Test-SharpProofPilotAuthorityFixtures.ps1:5; parser-backed variable census and exact source search |
