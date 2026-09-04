@@ -22373,6 +22373,10 @@ overloads now share one validated rewrite core, retaining replacement-specific
 type checks, dictionary snapshots, and empty-map behavior. The focused IR kernel
 and argument-guard tests pass.
 
+R2235 is applied: `IrRelationalSummaryBuilder.ConstrainNonNullReceiver` now uses
+the generated `IrOperatorCatalog.IsNullable` domain fact instead of restating the
+nullable IR kinds. The full Summaries.Test suite passes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

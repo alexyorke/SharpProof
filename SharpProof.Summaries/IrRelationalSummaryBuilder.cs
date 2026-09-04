@@ -497,10 +497,8 @@ public static class IrRelationalSummaryBuilder
             IrTerm predicate,
             IrTerm receiver)
         {
-            if (Factory.GetTypeInfo(receiver.Type).Kind is not (
-                    IrTypeKind.String or
-                    IrTypeKind.Reference or
-                    IrTypeKind.Sequence))
+            if (!IrOperatorCatalog.IsNullable(
+                    Factory.GetTypeInfo(receiver.Type).Kind))
             {
                 return predicate;
             }
