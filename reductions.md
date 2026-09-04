@@ -21372,3 +21372,11 @@ Assert-SharpProofStandaloneGateResult.ps1 defines Assert-UniqueJsonElementProper
 | ID | Finding | Evidence |
 |---|---|---|
 | R2019 | Assert-SharpProofStandaloneGateResult and GeneratedFileHelpers repeat the same recursive ordinal JSON duplicate-property walk; extract a dependency-neutral helper while retaining the standalone validator's lightweight boundary. | scripts/Assert-SharpProofStandaloneGateResult.ps1:3-28,71-72; scripts/GeneratedFileHelpers.ps1:59-92 |
+
+## Second survey, continued: R2020 - OperationNullnessEvaluator and OperationEffectScanner repeat Monitor symbol identity checks
+
+`OperationNullnessEvaluator.IsImplicitLockEnterWithNullValue`, `OperationEffectScanner.IsMonitorCall`, and `OperationEffectScanner.IsSynthesizedLockMonitorCall` each compare `invocation.TargetMethod.ContainingType.OriginalDefinition` with `_monitorType.OriginalDefinition` using `SymbolEqualityComparer.Default` after checking `_monitorType != null`. The surrounding policies are intentionally different: one recognizes an implicit `Monitor.Enter` with a null lock argument, one recognizes explicit calls with harmless/non-null arguments and a six-name allowlist, and one recognizes compiler-generated lock calls only under a lock syntax ancestor. A small Effects-local `IsMonitorMethod` predicate can centralize only the Roslyn symbol identity test while preserving those input-kind, argument, name, and syntax policies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2020 | `OperationNullnessEvaluator.IsImplicitLockEnterWithNullValue`, `OperationEffectScanner.IsMonitorCall`, and `IsSynthesizedLockMonitorCall` repeat the `_monitorType`/`OriginalDefinition` monitor identity check; extract only that predicate. | SharpProof.Effects/OperationNullnessEvaluator.cs:126-135; SharpProof.Effects/OperationEffectScanner.cs:1448-1471 |
