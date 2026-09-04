@@ -82,7 +82,7 @@ internal static class EffectCallGraph
         return recursive;
     }
 
-    private static IReadOnlyList<IMethodSymbol> OrderMethods(
+    private static List<IMethodSymbol> OrderMethods(
         IEnumerable<IMethodSymbol> methods,
         IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
         bool requireKnownNode,
