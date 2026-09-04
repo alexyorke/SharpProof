@@ -50,6 +50,7 @@ internal static partial class VerifierProcessSupervisor
                     LinuxProcessControlConstants.SignalNone) != 0)
             {
                 CloseDescriptors(cleanupDescriptorReserves);
+                cleanupDescriptorReserves = [];
                 return 125;
             }
         }

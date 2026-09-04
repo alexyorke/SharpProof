@@ -1485,18 +1485,6 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
             return true;
         }
 
-        var unwrapped =
-            DefiniteOperationFacts.UnwrapHarmlessValue(value);
-        if (unwrapped is ISimpleAssignmentOperation assignment &&
-            !HasMutation(assignment.Value) &&
-            TryGetState(assignment.Value, out var valueState))
-        {
-            result = flow.Evaluate(
-                assignment.Value,
-                valueState);
-            return true;
-        }
-
         result = Unknown;
         return false;
     }
