@@ -99,20 +99,27 @@ internal sealed class CompilerSpecificationPackProvider
         IEnumerable<string>? enabledPacks,
         Catalog catalog)
     {
-        var values = (enabledPacks ?? [])
-            .Select(static value => value?.Trim() ?? string.Empty)
-            .Where(static value => value.Length != 0)
-            .ToArray();
-        if (values.Distinct(StringComparer.Ordinal).Count() != values.Length)
+        var values = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in enabledPacks ?? [])
         {
-            throw new InvalidOperationException(
-                "SharpProof specification-pack identifiers must be unique.");
+            var normalized = value?.Trim() ?? string.Empty;
+            if (normalized.Length == 0)
+            {
+                continue;
+            }
+
+            if (!seen.Add(normalized))
+            {
+                throw new InvalidOperationException(
+                    "SharpProof specification-pack identifiers must be unique.");
+            }
+
+            values.Add(normalized);
         }
 
-        var selected = values
-            .OrderBy(static value => value, StringComparer.Ordinal)
-            .ToArray();
-        foreach (var packId in selected)
+        values.Sort(StringComparer.Ordinal);
+        foreach (var packId in values)
         {
             if (!catalog.Packs.ContainsKey(packId))
             {
@@ -122,7 +129,7 @@ internal sealed class CompilerSpecificationPackProvider
             }
         }
 
-        return selected;
+        return values.ToArray();
     }
 
     internal bool CanResolve(IMethodSymbol method)
