@@ -41,7 +41,7 @@ with `[EnforcePure]`, unsupported methods can now carry SP0047 while remaining
 explicit `Abstained` semantic entries; they are never omitted or counted as
 proofs. The separate silent-Unknown metric still covers unannotated/internal
 cases. Gate output reports explicit Unknown, silent Unknown, and their combined
-semantic Unknown count and rate. The checked-in ratchet requires at least 171
+semantic Unknown count and rate. The checked-in ratchet requires at least 163
 supported cases overall and one supported OSS method, while capping total and
 per-reason Unknown counts. These starting floors expose the current narrow OSS
 coverage and can only move upward as support expands.

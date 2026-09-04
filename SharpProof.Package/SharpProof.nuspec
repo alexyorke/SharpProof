@@ -10,7 +10,7 @@
     <projectUrl>$projecturl$</projectUrl>
     <description>Portable SharpProof Roslyn analysis and contract generation for bounded effect contracts, compiler-bound preconditions, and accountable postcondition verification. Unsupported selected code remains visibly incomplete.</description>
     <releaseNotes>SharpProof 1.0 preview with opt-in effect analysis, compiler-bound contracts, accountable bounded postcondition verification, fail-closed language gating, and conservative external boundaries.</releaseNotes>
-    <copyright>Copyright (c) Alex Yorke</copyright>
+    <copyright>$copyright$</copyright>
     <tags>SharpProof Roslyn Analyzer Purity StaticAnalysis MethodEffects Capabilities ZeroAllocations ExceptionContracts Preconditions Contracts</tags>
     <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>

@@ -10,7 +10,7 @@
     <projectUrl>$projecturl$</projectUrl>
     <description>Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.</description>
     <releaseNotes>Initial container-first Linux amd64 verifier package for the soundness-first SharpProof preview.</releaseNotes>
-    <copyright>Copyright (c) Alex Yorke</copyright>
+    <copyright>$copyright$</copyright>
     <tags>SharpProof Verifier Contracts SMT Z3 Linux Container x64</tags>
     <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>

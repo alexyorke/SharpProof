@@ -1885,6 +1885,17 @@ public sealed class PackageLayoutSmokeTests
                 metadata.Elements().Single(element =>
                     element.Name.LocalName == "version").Value,
                 Is.EqualTo(feed.Version));
+            var authors = metadata.Elements().Single(element =>
+                element.Name.LocalName == "authors").Value;
+            if (package.Id is PackagedProductFeed.PortablePackageId or
+                PackagedProductFeed.VerifierPackageId)
+            {
+                Assert.That(
+                    metadata.Elements().Single(element =>
+                        element.Name.LocalName == "copyright").Value,
+                    Is.EqualTo("Copyright (c) " + authors),
+                    package.Id);
+            }
             var dependencies = metadata.Descendants()
                 .Where(element =>
                     element.Name.LocalName == "dependency")

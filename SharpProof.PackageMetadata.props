@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <Authors>$(SharpProofPublisher)</Authors>
+    <PackageCopyright>Copyright (c) $(SharpProofPublisher)</PackageCopyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>
     <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>

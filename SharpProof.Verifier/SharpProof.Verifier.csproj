@@ -43,7 +43,7 @@
            Text="SharpProof.Verifier packages must be built inside the canonical Linux amd64 container." />
     <PropertyGroup>
       <_SharpProofNativePayloadRoot Condition="'$(_SharpProofNativePayloadRoot)' == ''">$(SHARPPROOF_NATIVE_ROOT)</_SharpProofNativePayloadRoot>
-      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit);nativeroot=$(_SharpProofNativePayloadRoot);authors=$(Authors);license=$(PackageLicenseExpression);readme=$(PackageReadmeFile);projecturl=$(PackageProjectUrl);repositorytype=$(RepositoryType);repositoryurl=$(RepositoryUrl)</NuspecProperties>
+      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit);nativeroot=$(_SharpProofNativePayloadRoot);authors=$(Authors);license=$(PackageLicenseExpression);readme=$(PackageReadmeFile);copyright=$(PackageCopyright);projecturl=$(PackageProjectUrl);repositorytype=$(RepositoryType);repositoryurl=$(RepositoryUrl)</NuspecProperties>
     </PropertyGroup>
   </Target>
 </Project>

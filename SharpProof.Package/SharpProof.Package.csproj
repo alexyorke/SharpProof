@@ -35,7 +35,7 @@
   <Target Name="_SharpProofPrepareNuspecProperties"
           BeforeTargets="GenerateNuspec">
     <PropertyGroup>
-      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit);authors=$(Authors);license=$(PackageLicenseExpression);readme=$(PackageReadmeFile);projecturl=$(PackageProjectUrl);repositorytype=$(RepositoryType);repositoryurl=$(RepositoryUrl)</NuspecProperties>
+      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit);authors=$(Authors);license=$(PackageLicenseExpression);readme=$(PackageReadmeFile);copyright=$(PackageCopyright);projecturl=$(PackageProjectUrl);repositorytype=$(RepositoryType);repositoryurl=$(RepositoryUrl)</NuspecProperties>
     </PropertyGroup>
   </Target>
 </Project>
