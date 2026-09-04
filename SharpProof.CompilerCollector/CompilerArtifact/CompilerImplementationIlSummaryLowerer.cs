@@ -119,6 +119,13 @@ internal static class CompilerImplementationIlSummaryLowerer
     {
         method = SemanticClaimIdentity.NormalizeCandidate(method)
             .OriginalDefinition;
+        return IsNormalizedCandidate(compilation, method);
+    }
+
+    private static bool IsNormalizedCandidate(
+        CSharpCompilation compilation,
+        IMethodSymbol method)
+    {
         return method.MethodKind == MethodKind.Ordinary &&
             method.IsStatic &&
             !method.IsAbstract &&
@@ -152,7 +159,7 @@ internal static class CompilerImplementationIlSummaryLowerer
         reason = CompilerImplementationIlAbstentionReason.None;
         method = SemanticClaimIdentity.NormalizeCandidate(method)
             .OriginalDefinition;
-        if (!IsCandidate(compilation, method))
+        if (!IsNormalizedCandidate(compilation, method))
         {
             reason = CompilerImplementationIlAbstentionReason.NotCandidate;
             return false;
