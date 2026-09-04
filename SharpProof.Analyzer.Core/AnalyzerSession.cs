@@ -163,16 +163,16 @@ internal sealed class AnalyzerSession
         IMethodSymbol method)
     {
         method = EffectAnalysisSession.NormalizeMethod(method);
-        if (GetValue(_callPreconditions).HasPotentialPreconditions(method) ||
-            ResolveEffectContract(method) is
-            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })
+        if (method is
+        { ContainingType: { StaticConstructors.Length: > 0 } } and
+            ({ IsStatic: true } or { MethodKind: MethodKind.Constructor }))
         {
             return true;
         }
 
-        if (method is
-        { ContainingType: { StaticConstructors.Length: > 0 } } and
-            ({ IsStatic: true } or { MethodKind: MethodKind.Constructor }))
+        if (GetValue(_callPreconditions).HasPotentialPreconditions(method) ||
+            ResolveEffectContract(method) is
+            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })
         {
             return true;
         }

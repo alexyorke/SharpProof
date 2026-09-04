@@ -175,6 +175,9 @@ internal sealed partial class OperationEffectScanner
                 continue;
             }
 
+            var canReachThrow = operation is IThrowOperation throwOperation &&
+                CanReachThrow(throwOperation);
+
             if (IsDirectSyntax(operation))
             {
                 if (operation is ILockOperation directLock)
@@ -182,7 +185,7 @@ internal sealed partial class OperationEffectScanner
                     RecordDirectLock(directLock);
                 }
                 else if (operation is IThrowOperation thrown &&
-                         CanReachThrow(thrown))
+                         canReachThrow)
                 {
                     RecordDirect(operation);
                 }
@@ -196,7 +199,7 @@ internal sealed partial class OperationEffectScanner
                             EffectSummaryOperations.Capability(
                                 EffectCapabilityKind.Synchronization)),
                 IThrowOperation thrown when IsSourceThrow(thrown) &&
-                    CanReachThrow(thrown) => EffectExceptionFlow.KeepEscaping(
+                    canReachThrow => EffectExceptionFlow.KeepEscaping(
                     IsUnmodeledExternalExceptionConstruction(thrown.Exception)
                         ? EffectSummaryOperations.ExceptionConstructionThrow(
                             EffectSummary.Empty,
@@ -568,11 +571,17 @@ internal sealed partial class OperationEffectScanner
         IArrayTypeSymbol arrayType,
         IOperation? assignedValue)
     {
-        if (arrayType.ElementType.IsSealed ||
-            assignedValue != null &&
-            (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
-             _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
-             value.IsDefinitelyNull))
+        if (arrayType.ElementType.IsSealed)
+        {
+            return true;
+        }
+        if (assignedValue == null)
+        {
+            return false;
+        }
+        if (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
+            _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
+            value.IsDefinitelyNull)
         {
             return true;
         }
@@ -580,8 +589,7 @@ internal sealed partial class OperationEffectScanner
         var regions = _conversionOwnership.ClassifyRegion(
             element.ArrayReference,
             aliasSource: true);
-        if (assignedValue == null ||
-            regions.Regions.Length != 1 ||
+        if (regions.Regions.Length != 1 ||
             regions.Regions[0] is not { Kind: EffectRegionKind.Fresh } fresh ||
             !_freshArrayTypes.TryGetValue(
                 (element.Syntax.SyntaxTree, fresh.Ordinal),
@@ -807,16 +815,16 @@ internal sealed partial class OperationEffectScanner
         {
             return EffectSummary.Empty;
         }
-        var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
         var arguments = ScanSequence(
             creation.Arguments.Select(static argument => argument.Value));
-        var allocation = creation.Type?.IsValueType == true
-            ? EffectSummary.Empty
-            : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         if (!arguments.CompletesNormally)
         {
             return arguments.Summary;
         }
+        var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
+        var allocation = creation.Type?.IsValueType == true
+            ? EffectSummary.Empty
+            : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
 
         var argumentProjection = ProjectArguments(
             creation.Arguments,

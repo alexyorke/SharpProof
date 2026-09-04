@@ -708,13 +708,12 @@ internal sealed partial class SharpProofAnalyzerEngine
                     AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
                         options,
                         analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
-                var location = Location.Create(tree, new TextSpan(0, 0));
                 foreach (var invalidValue in invalidValues)
                 {
                     diagnostics.Add(
                         CreateInvalidConfigurationDiagnostic(
                             invalidValue,
-                            location));
+                            Location.Create(tree, new TextSpan(0, 0))));
                 }
             }
         }

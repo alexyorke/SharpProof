@@ -22531,6 +22531,35 @@ R432 is already satisfied on the current tree: `AnalyzerGateHost` no longer has
 the cited redundant `Cast<MetadataReference>()` call. The remaining separate
 parse-options setup crosses an assembly-host boundary and is not duplicate code.
 
+R2331 is applied: `LowerInvocation` now computes the supported-result predicate
+only when its caller requests a result, preserving the void/unsupported-result
+fallbacks and mutation lowering. The full Frontend.Test suite passes 121/121.
+
+R2333 is applied: member-initializer analysis now rejects generated members and
+empty constructor sets before binding the initializer operation, preserving the
+eligible-constructor and reachability checks. The full Analyzer.Test suite passes
+476/476.
+
+R2334 is applied: array-element compatibility now handles sealed element types,
+null assigned values, and definitely-null values before classifying the array
+region. The full Effects.Test suite passes 323/323.
+
+R2335 is applied: object-creation analysis now scans arguments before creating
+the receiver region and allocation summary, so non-completing arguments avoid
+discarded projections. The full Effects.Test suite passes 323/323.
+
+R2337 is applied: lexical throw analysis now computes `CanReachThrow` once per
+reachable throw operation and reuses that fact for direct and lexical effects.
+The full Effects.Test suite passes 323/323.
+
+R2378 is applied: the static-constructor fast path now precedes potential
+precondition and effect-contract analysis, retaining the same positive result
+while avoiding discarded work. The full Analyzer.Test suite passes 476/476.
+
+R2382 is applied: invalid tree-configuration diagnostics now create a source
+location only for entries that will actually be reported. The full Analyzer.Test
+suite passes 476/476.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

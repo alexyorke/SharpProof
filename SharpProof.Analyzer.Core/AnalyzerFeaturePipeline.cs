@@ -532,6 +532,14 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
         var isStatic = symbol.IsStatic;
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                symbol,
+                initializer.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
         var constructors = (isStatic
                 ? type.StaticConstructors
                 : type.InstanceConstructors)
@@ -555,14 +563,13 @@ internal static partial class AnalyzerFeaturePipeline
                     context.CancellationToken))
             .Select(static item => item.Candidate)
             .ToArray();
+        if (constructors.Length == 0)
+        {
+            return;
+        }
         var root = context.SemanticModel.GetOperation(
             initializer.Value, context.CancellationToken);
-        if (constructors.Length == 0 || root == null ||
-            AnalyzerGeneratedCodePolicy.IsGenerated(
-                symbol,
-                initializer.SyntaxTree,
-                context.Compilation,
-                context.CancellationToken))
+        if (root == null)
         {
             return;
         }
