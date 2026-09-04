@@ -168,6 +168,7 @@ public sealed class ContractBinder
             return ContractBindingResult.Fail(
                 ContractBindingFailure.UnsupportedTarget);
         }
+        var directIntrinsicsValidated = false;
         if (!resolution.HasValidDirectClause &&
             target.MethodKind == MethodKind.Ordinary)
         {
@@ -179,6 +180,8 @@ public sealed class ContractBinder
             {
                 return ContractBindingResult.Fail(directFailure);
             }
+
+            directIntrinsicsValidated = true;
         }
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly ||
@@ -196,7 +199,12 @@ public sealed class ContractBinder
             _api,
             source,
             _canonicalization.CreateTypeSpecializer(source));
-        var invocationResult = BindInvocations(expressionBinder, inventory, usesCompanion, requiresOnly);
+        var invocationResult = BindInvocations(
+            expressionBinder,
+            inventory,
+            usesCompanion,
+            requiresOnly,
+            directIntrinsicsValidated && !usesCompanion);
         if (invocationResult.Failure != ContractBindingFailure.None)
         {
             return ContractBindingResult.Fail(invocationResult.Failure);
@@ -256,7 +264,8 @@ public sealed class ContractBinder
         ContractExpressionBinder expressionBinder,
         ContractClauseInventory inventory,
         bool usesCompanion,
-        bool requiresOnly)
+        bool requiresOnly,
+        bool intrinsicsAlreadyValidated)
     {
         var body = inventory.ImplementationBody;
         if (body == null)
@@ -264,7 +273,9 @@ public sealed class ContractBinder
             return ClauseBindingResult.Empty;
         }
 
-        var failure = ValidateIntrinsics(inventory.Callable, body, requiresOnly);
+        var failure = intrinsicsAlreadyValidated
+            ? ContractBindingFailure.None
+            : ValidateIntrinsics(inventory.Callable, body, requiresOnly);
         if (failure != ContractBindingFailure.None)
         {
             return new ClauseBindingResult([], failure);
