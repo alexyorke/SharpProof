@@ -383,18 +383,22 @@ public sealed class SharpProofWorker : IDisposable
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
 
+            WorkerCallableCoverageReason completedRetirementCallableReason;
+            WorkerClaimReason completedRetirementClaimReason;
+            lock (retirementSynchronization)
+            {
+                completedRetirementCallableReason = retirementCallableReason;
+                completedRetirementClaimReason = retirementClaimReason;
+            }
             for (var index = 0; index < results.Length; index++)
             {
                 projectBoundary.Token.ThrowIfCancellationRequested();
                 if (results[index] == null)
                 {
-                    lock (retirementSynchronization)
-                    {
-                        results[index] = Unknown(
-                            orderedTargets[index],
-                            retirementClaimReason,
-                            retirementCallableReason);
-                    }
+                    results[index] = Unknown(
+                        orderedTargets[index],
+                        completedRetirementClaimReason,
+                        completedRetirementCallableReason);
                 }
             }
 
