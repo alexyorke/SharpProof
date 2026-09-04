@@ -21442,3 +21442,17 @@ friend-assembly edge; the same residue was already removed from
 | ID | Finding | Evidence |
 |---|---|---|
 | R2027 | **`SharpProof.Ir.csproj` retains an inert empty `<ItemGroup>`.** Remove the empty XML without changing the adjacent package reference or `InternalsVisibleTo` declarations. | `SharpProof.Ir/SharpProof.Ir.csproj:8-13`; related applied R1153 in `SharpProof.Smt/SharpProof.Smt.csproj` |
+
+## Second survey, continued: R2028 - SharpProof.Dataflow.csproj retains an empty build group
+
+`SharpProof.Dataflow/SharpProof.Dataflow.csproj` contains an empty
+`<ItemGroup>` between the linked `ArgumentNullGuard.cs` compile item and its
+populated `InternalsVisibleTo` group. The empty group has no items, conditions,
+metadata, or comments, so it contributes no MSBuild state. Removing it is an
+inert build-file cleanup that leaves both the linked source and friend-assembly
+edges unchanged; it is distinct from R2027's equivalent residue in the IR
+project.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2028 | **`SharpProof.Dataflow.csproj` retains an inert empty `<ItemGroup>`.** Remove the empty XML without changing the linked guard source or `InternalsVisibleTo` declarations. | `SharpProof.Dataflow/SharpProof.Dataflow.csproj:7-19` |
