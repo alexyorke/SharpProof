@@ -30,14 +30,16 @@ internal static class EffectClaimResultAssembler
         WorkerClaimResult CreateResult(
             WorkerClaimOutcome outcome,
             WorkerClaimReason reason,
-            WorkerEffectEvidenceCertainty certainty)
+            WorkerEffectEvidenceCertainty certainty,
+            bool projectAssumptions = true)
         {
             return CallableClaimResultAssembler.Create(
                 target,
                 evidence.ClaimId,
                 outcome,
                 reason,
-                certainty);
+                certainty,
+                projectAssumptions);
         }
 
         if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
@@ -92,7 +94,9 @@ internal static class EffectClaimResultAssembler
         var result = CreateResult(
             evidence.Outcome,
             evidence.Reason,
-            evidence.Certainty);
+            evidence.Certainty,
+            projectAssumptions: evidence.Certainty !=
+                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary);
         result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
             ? ["compiler-effect:" + evidence.EvidenceSha256]
             : [];

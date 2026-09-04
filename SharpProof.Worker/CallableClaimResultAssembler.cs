@@ -220,7 +220,8 @@ internal static class CallableClaimResultAssembler
             claimId,
             WorkerClaimOutcome.Proven,
             WorkerClaimReason.None,
-            certainty);
+            certainty,
+            projectAssumptions: false);
         record.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
         record.ProofCore = [.. proofCore];
         record.Assumptions = MarkAssumptionsUsed(target, usedAssumptionIds);
