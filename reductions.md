@@ -22283,3 +22283,107 @@ R2160 is deferred: the proposed accessibility narrowing reaches public
 `EffectSummary` properties and other public data contracts, while the
 remaining candidates require new friend-assembly/API decisions. No public
 surface is narrowed merely for line count.
+
+## Second survey, continued: R2223 - `CompilationFingerprint.ValidReference` repeats a module restriction
+
+`ValidReference` first applies `!EmbedInteropTypes && Aliases.Length == 0`
+through a disjunction that is only relevant to module references. Its later
+module-only branch repeats the same restriction before checking the required
+single module and identity match. The first guard is therefore subsumed by
+the later module branch; the assembly branch already makes the disjunction
+true. Removing or folding the earlier copy preserves the separate assembly
+identity validation, module count, alias ordering, and per-module checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2223 | **`CompilationFingerprint.ValidReference` repeats the module-only `!EmbedInteropTypes && Aliases.Length == 0` restriction.** Fold the restriction into the module-shape branch and retain the distinct assembly/module identity, ordering, and module-validation rules. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:340-358` |
+
+## Second survey, continued: R2224 - replay validation checks `SpecWitnessIdentifier` twice
+
+`HasValidReplayEvent` accepts a null optional text value through
+`HasOptionalText`, but immediately rejects every non-null
+`SpecWitnessIdentifier` in the next statement. Consequently, the
+`HasOptionalText` conjunct only repeats a condition whose non-null cases are
+already rejected, while null remains valid for the later event-kind policy.
+The null-only policy should remain explicit if the optional-text conjunct is
+removed.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2224 | **`CompilerEffectClaimArtifactCodec.HasValidReplayEvent` performs redundant `HasOptionalText` validation for `SpecWitnessIdentifier`.** Its following null check rejects every non-null value, so remove only the subsumed text check while retaining the null-only replay-event contract. | `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:178-180,190-193,217-220` |
+
+## Second survey, continued: R2225 - `IrProgram` duplicates contiguous block storage
+
+`IrProgramBuilder.CreateBlock` assigns block values from zero through the
+current block count, and the only internal `IrProgram` constructor receives
+the frozen blocks in that same order. `IrProgram.GetBlock` then scope-checks
+the identifier and performs a second identity lookup in an immutable
+dictionary whose only purpose is to recover the corresponding array item.
+Checked array indexing can preserve the scope and out-of-range validation
+while eliminating the duplicate immutable storage. The handwritten-model
+test currently pins the field name, so that expectation would need to move
+with the representation rather than treating the field as public behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2225 | **`IrProgram` duplicates its contiguous immutable block storage in `_blocksById`.** Replace the dictionary lookup with scope validation plus checked `Blocks[id.Value]` (preserving the existing argument exceptions), and update the representation-focused test; `IrProgramBuilder` is the sole constructor path and creates contiguous IDs. | `SharpProof.Ir/IrProgram.cs:16-39`; `SharpProof.Ir/IrProgramBuilder.cs:14-18,154-158`; `SharpProof.Ir.Test/IrModelSchemaTests.cs:210-215` |
+
+## Second survey, continued: R2226 - production Dataflow ships a test-only worklist hook
+
+The public `Analyze` entry point always passes `null` for the optional
+worklist-order callback. The only repository callers of
+`AnalyzeWithWorklistOrderForTesting` are Dataflow tests, and
+`ValidatePermutation` is reachable only from that callback path. This makes
+the hook and its validator test instrumentation embedded in the production
+assembly. A test adapter or test-only partial surface can retain worklist
+permutation coverage without shipping a second production entry point.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2226 | **`ForwardDataflowAnalysis` ships an internal worklist-order test hook and validator with no production callers.** Isolate `AnalyzeWithWorklistOrderForTesting` and `ValidatePermutation` from production code while retaining the existing order-invariance and argument-guard tests. | `SharpProof.Dataflow/ForwardDataflowAnalysis.cs:82-102,133-138,232-243`; test-only callers in `SharpProof.Dataflow.Test/ForwardDataflowAnalysisTests.cs:156`, `FiniteCfgConcreteOracleTests.cs:156`, and `ArgumentNullGuardBoundaryTests.cs:53-62` |
+
+## Second survey, continued: R2227 - `CallableVerifier.VerifyAsync` is a production-unreferenced forwarding wrapper
+
+`CallableVerifier.VerifyAsync` only awaits
+`VerifyWithEntryFeasibilityAsync` and returns its `Postconditions`. The
+production policy already calls the richer method directly; the remaining
+repository calls are test fixtures. Since the type and wrapper are internal,
+tests can call the richer method and project postconditions locally, or a
+test helper can own the compatibility projection without keeping a
+production entry path that has no production consumer.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2227 | **`CallableVerifier.VerifyAsync` is a production-unreferenced forwarding wrapper over `VerifyWithEntryFeasibilityAsync`.** Remove or test-isolate the projection while preserving the richer production verification path and the tests' postcondition assertions. | `SharpProof.Worker/CallableVerifier.cs:16-27`; production caller `SharpProof.Worker/CallableVerificationPolicy.cs:24-27`; test callers such as `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:102-105` |
+
+## Second survey, continued: R2228 - `AnalyzerFeaturePipeline` repeats suppressed-outcome bookkeeping
+
+Three pipeline entry points independently test `selection.IsSuppressed`,
+record `AnalyzerSemanticOutcome.Suppressed`, and return. Their surrounding
+guards and ordering are not identical, so the selection computation and
+control-flow policy should remain local. A narrow bookkeeping helper can
+centralize only the repeated outcome recording and return decision, reducing
+drift if the suppressed semantic outcome changes.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2228 | **`AnalyzerFeaturePipeline` repeats the `selection.IsSuppressed` outcome-and-return branch in three entry points.** Share only the suppressed bookkeeping while retaining each caller's distinct guards and ordering. | `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:116-136,247-255,384-395` |
+
+## Second survey, continued: R2229 - `ContractApiSymbols.GetClauseKind` adds a forwarding seam
+
+`ContractApiSymbols.GetClauseKind` is a one-line forwarder to the nested
+`ContractClauseSymbols.GetClauseKind` predicate. The aggregate wrapper is
+used by `ContractIntrinsicValidator`, while other inventory code already
+operates on the nested symbol set. Because this is an internal type, the
+wrapper can be removed or merged into the aggregate only if the façade is
+not intentionally preserving a future API boundary; the candidate is lower
+confidence than the exact duplicate validations above.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2229 | **`ContractApiSymbols.GetClauseKind` is a redundant forwarding wrapper over `ContractClauseSymbols.GetClauseKind`.** Review removing the seam or exposing the nested predicate directly, while retaining its existing symbol-shape checks and treating the façade boundary as an intentional-policy possibility. | `SharpProof.Contracts/ContractApiSymbols.cs:74-77,103-126`; caller `SharpProof.Contracts/ContractIntrinsicValidator.cs:137-139` |
+
+### Status (second survey, part six hundred forty-four)
+
+R2223-R2229 are deferred ledger-only observations. No source, test, build,
+script, or generated file was changed; the only appended file is this ledger.
