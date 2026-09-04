@@ -34,6 +34,18 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     private const string ProcessGroupLauncher = "/usr/bin/setsid";
     private static readonly ConcurrentDictionary<long, CleanupAnchor>
         RetainedCleanupAnchors = new();
+    private static readonly (string Severity, string Code, string Marker)[]
+        LegacyDiagnosticMarkers =
+        [
+            ("warning", VerifierDiagnosticCodes.IncompleteSelectedCallable,
+                $": warning {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
+            ("warning", VerifierDiagnosticCodes.AssumptionsDeclared,
+                $": warning {VerifierDiagnosticCodes.AssumptionsDeclared}: "),
+            ("error", VerifierDiagnosticCodes.IncompleteSelectedCallable,
+                $": error {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
+            ("error", VerifierDiagnosticCodes.AssumptionsDeclared,
+                $": error {VerifierDiagnosticCodes.AssumptionsDeclared}: ")
+        ];
     private static long s_nextCleanupAnchor;
     private readonly object _gate = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
@@ -1177,20 +1189,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         string line,
         out VerifierDiagnostic diagnostic)
     {
-        (string Severity, string Code, string Marker)[] markers =
-        {
-            ("warning", VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                $": warning {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
-            ("warning", VerifierDiagnosticCodes.AssumptionsDeclared,
-                $": warning {VerifierDiagnosticCodes.AssumptionsDeclared}: "),
-            ("error", VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                $": error {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
-            ("error", VerifierDiagnosticCodes.AssumptionsDeclared,
-                $": error {VerifierDiagnosticCodes.AssumptionsDeclared}: ")
-        };
         diagnostic = null!;
         var selectedIndex = -1;
-        foreach (var candidate in markers)
+        foreach (var candidate in LegacyDiagnosticMarkers)
         {
             var marker = line.LastIndexOf(
                 candidate.Marker,
