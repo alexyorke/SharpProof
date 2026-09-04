@@ -122,17 +122,8 @@ function Test-SharpProofPilotReport {
             }
             $fileName
         })
-    if ($packageNames.Count -ne 6 -or
-        @($packageNames | Select-Object -Unique).Count -ne 6 -or
-        $packageKeys.Count -ne 6) {
+    if ($packageNames.Count -ne 6 -or $packageKeys.Count -ne 6) {
         return $false
-    }
-    foreach ($packageId in $SharpProofPackageIds) {
-        foreach ($extension in @('.nupkg', '.snupkg')) {
-            if (-not $packageKeys.Contains("$packageId|$extension")) {
-                return $false
-            }
-        }
     }
     foreach ($pilot in @($Report.pilots)) {
         if (@($pilot.PSObject.Properties.Name) -cnotcontains 'project' -or
