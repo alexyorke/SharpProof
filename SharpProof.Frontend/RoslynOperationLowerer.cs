@@ -165,26 +165,32 @@ public sealed class RoslynOperationLowerer
             typeAlreadySpecialized ? type : TypeSpecializer(type));
     }
 
-    internal IrVariableTerm GetVariable(ISymbol symbol, ITypeSymbol? type)
+    internal IrVariableTerm GetVariable(
+        ISymbol symbol,
+        ITypeSymbol? type,
+        bool typeAlreadySpecialized = false)
     {
         if (!_variables.TryGetValue(symbol, out var variable))
         {
             variable = _factory.CreateVariable(
                 symbol.Kind + ":" + symbol.MetadataName,
-                GetTypeId(type));
+                GetTypeId(type, typeAlreadySpecialized));
             _variables.Add(symbol, variable);
         }
         return _factory.Variable(variable);
     }
 
-    internal IrVariableTerm GetCapture(CaptureId id, ITypeSymbol? type)
+    internal IrVariableTerm GetCapture(
+        CaptureId id,
+        ITypeSymbol? type,
+        bool typeAlreadySpecialized = false)
     {
         if (!_captures.TryGetValue(id, out var variable))
         {
             variable = _factory.CreateVariable(
                 "capture:" +
                 _captureOrder.Count.ToString(CultureInfo.InvariantCulture),
-                GetTypeId(type));
+                GetTypeId(type, typeAlreadySpecialized));
             _captures.Add(id, variable);
             _captureOrder.Add(variable);
         }
@@ -294,30 +300,34 @@ public sealed class RoslynOperationLowerer
         return operation.ConstantValue is { HasValue: true, Value: null };
     }
 
-    private IrVariableTerm GetInstance(IInstanceReferenceOperation operation)
+    private IrVariableTerm GetInstance(
+        IInstanceReferenceOperation operation,
+        ITypeSymbol? specializedType)
     {
         var type = operation.Type;
         if (type == null)
         {
-            return GetSyntheticInstance(operation);
+            return GetSyntheticInstance(operation, specializedType);
         }
 
         if (!_instances.TryGetValue(type, out var variable))
         {
             variable = _factory.CreateVariable(
                 "instance:" + type.MetadataName,
-                GetTypeId(type));
+                GetTypeId(specializedType, typeAlreadySpecialized: true));
             _instances.Add(type, variable);
         }
         return _factory.Variable(variable);
     }
 
-    private IrVariableTerm GetSyntheticInstance(IOperation operation)
+    private IrVariableTerm GetSyntheticInstance(
+        IOperation operation,
+        ITypeSymbol? specializedType)
     {
         var symbol = operation.SemanticModel?.GetEnclosingSymbol(operation.Syntax.SpanStart);
         if (symbol != null)
         {
-            return GetVariable(symbol, operation.Type);
+            return GetVariable(symbol, specializedType, typeAlreadySpecialized: true);
         }
 
         _missingInstance ??= _factory.CreateVariable(
@@ -608,7 +618,10 @@ public sealed class RoslynOperationLowerer
 
             return LowerSupportedReference(
                 operation,
-                () => _owner.GetVariable(operation.Local, operation.Type));
+                type => _owner.GetVariable(
+                    operation.Local,
+                    type,
+                    typeAlreadySpecialized: true));
         }
 
         public override LoweredExpression VisitParameterReference(
@@ -616,7 +629,10 @@ public sealed class RoslynOperationLowerer
         {
             return LowerSupportedReference(
                 operation,
-                () => _owner.GetVariable(operation.Parameter, operation.Type));
+                type => _owner.GetVariable(
+                    operation.Parameter,
+                    type,
+                    typeAlreadySpecialized: true));
         }
 
         public override LoweredExpression VisitFlowCapture(
@@ -631,7 +647,10 @@ public sealed class RoslynOperationLowerer
         {
             return LowerSupportedReference(
                 operation,
-                () => _owner.GetCapture(operation.Id, operation.Type));
+                type => _owner.GetCapture(
+                    operation.Id,
+                    type,
+                    typeAlreadySpecialized: true));
         }
 
         public override LoweredExpression VisitInstanceReference(
@@ -639,7 +658,7 @@ public sealed class RoslynOperationLowerer
         {
             return LowerSupportedReference(
                 operation,
-                () => _owner.GetInstance(operation));
+                type => _owner.GetInstance(operation, type));
         }
 
         public override LoweredExpression VisitDefaultValue(
@@ -1122,10 +1141,14 @@ public sealed class RoslynOperationLowerer
         }
 
         private LoweredExpression LowerSupportedReference(
-            IOperation operation, Func<IrTerm> exact)
+            IOperation operation,
+            Func<ITypeSymbol?, IrTerm> exact)
         {
-            return _owner.IsSupportedValueDomain(operation.Type)
-                ? LoweredExpression.Exact(exact())
+            var specializedType = _owner.TypeSpecializer(operation.Type);
+            return _owner.IsSupportedValueDomain(
+                    specializedType,
+                    typeAlreadySpecialized: true)
+                ? LoweredExpression.Exact(exact(specializedType))
                 : _owner.Opaque(operation, FrontendAbstention.UnsupportedType);
         }
 
