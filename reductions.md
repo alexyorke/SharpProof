@@ -21388,3 +21388,11 @@ Assert-SharpProofStandaloneGateResult.ps1 defines Assert-UniqueJsonElementProper
 | ID | Finding | Evidence |
 |---|---|---|
 | R2021 | `RunVerifier` and `LinuxWorkerProcess` repeat the same libc `kill` P/Invoke; centralize only the binding and preserve their distinct process-group, signal, and errno policies. | SharpProof.BuildTasks/RunVerifier.cs:1080-1085,1394-1398; SharpProof.Host/LinuxWorkerProcess.cs:181-193,266-273,339-347 |
+
+## Second survey, continued: R2022 - ManagedAbstractFlow and OperationCompletionEvaluator duplicate list-pattern mismatch predicate
+
+`ManagedAbstractFlow.MayCompleteListPattern` and `OperationCompletionEvaluator` independently count non-slice patterns and detect a slice, then apply the identical `hasSlice ? length < requiredLength : length != requiredLength` mismatch rule. R1997 already covers their separate constant-array length projections, and R1161 covers shape recomputation inside `OperationCompletionEvaluator`, but neither records this cross-class arity predicate. The surrounding policies differ: `ManagedAbstractFlow` uses mismatch to declare normal completion after its null and length-member checks, while `OperationCompletionEvaluator` packages shape with known/unknown length and has special total-slice handling. A shared parameterized `ListPatternShape`/`HasLengthMismatch` fact can remove this drift without merging those completion policies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2022 | `ManagedAbstractFlow.MayCompleteListPattern` and `OperationCompletionEvaluator` duplicate list-pattern non-slice counting, slice detection, and the known-length mismatch rule; share only that shape fact. | SharpProof.Effects/ManagedAbstractFlow.cs:2556-2589; SharpProof.Effects/OperationCompletionEvaluator.cs:349-383,494-501,580-588; related R1161 and R1997 |
