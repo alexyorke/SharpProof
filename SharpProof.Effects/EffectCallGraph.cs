@@ -82,7 +82,7 @@ internal static class EffectCallGraph
         return recursive;
     }
 
-    private static ImmutableArray<IMethodSymbol> OrderMethods(
+    private static IReadOnlyList<IMethodSymbol> OrderMethods(
         IEnumerable<IMethodSymbol> methods,
         IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
         bool requireKnownNode,
@@ -104,6 +104,6 @@ internal static class EffectCallGraph
 
         ordered.Sort(EffectSymbolComparer<IMethodSymbol>.Instance);
         cancellationToken.ThrowIfCancellationRequested();
-        return [.. ordered];
+        return ordered;
     }
 }
