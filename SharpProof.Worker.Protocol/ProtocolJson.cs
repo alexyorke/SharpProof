@@ -357,7 +357,11 @@ public static partial class WorkerProtocolJson
         }
 
         var manifestErrorCount = errors.Count;
-        ValidateManifestCore(response.Manifest, "manifest", errors);
+        ValidateManifestCore(
+            response.Manifest,
+            "manifest",
+            errors,
+            out var allManifestClaimsPostconditions);
         ValidateExpectedManifest(
             response.Manifest,
             expectedManifest,
@@ -368,11 +372,13 @@ public static partial class WorkerProtocolJson
         var callables = ValidateCallableResults(
             response.CallableResults,
             manifestIndexes,
-            errors);
+            errors,
+            out var allCallableResultsComplete);
         var claims = ValidateClaimResults(
             response.ClaimResults,
             manifestIndexes,
-            errors);
+            errors,
+            out var allClaimResultsRefuted);
         ValidateRun(
             response,
             callables,
@@ -407,7 +413,13 @@ public static partial class WorkerProtocolJson
             errors.Check(response.Summary?.Budgets != null &&
                 BudgetsEqual(response.Summary.Budgets, expectedRequest.Budgets),
                 "response.budgets_mismatch");
-            ValidateCacheForRequest(response, expectedRequest, errors);
+            ValidateCacheForRequest(
+                response,
+                expectedRequest,
+                allCallableResultsComplete,
+                allClaimResultsRefuted,
+                allManifestClaimsPostconditions,
+                errors);
         }
 
         if (evidenceAuthority != null)
@@ -436,6 +448,9 @@ public static partial class WorkerProtocolJson
     private static void ValidateCacheForRequest(
         WorkerVerifyResponse response,
         WorkerVerifyRequest request,
+        bool allCallableResultsComplete,
+        bool allClaimResultsRefuted,
+        bool allManifestClaimsPostconditions,
         Validator errors)
     {
         if (response.Summary == null)
@@ -457,18 +472,12 @@ public static partial class WorkerProtocolJson
             RunStatus: WorkerRunStatus.Complete,
             FailureReason: WorkerRunFailureReason.None,
             Errors.Length: 0,
-            CallableResults: { Length: > 0 } callables,
-            ClaimResults: { Length: > 0 } claims,
-            Manifest.Claims: { Length: > 0 } manifestClaims
+            CallableResults: { Length: > 0 },
+            ClaimResults: { Length: > 0 }
         } &&
-            callables.All(static result => result is
-            {
-                Coverage: WorkerCallableCoverage.Complete,
-                Reason: WorkerCallableCoverageReason.None
-            }) &&
-            claims.All(static result => result?.Outcome == WorkerClaimOutcome.Refuted) &&
-            manifestClaims.All(static claim =>
-                claim?.Kind == WorkerClaimKind.Postcondition);
+            allCallableResultsComplete &&
+            allClaimResultsRefuted &&
+            allManifestClaimsPostconditions;
         var valid = status switch
         {
             WorkerCacheStatus.Hit or WorkerCacheStatus.Written => storableShape,
@@ -518,7 +527,11 @@ public static partial class WorkerProtocolJson
         }
 
         var expectedErrors = new Validator();
-        ValidateManifestCore(expected, "expected_manifest", expectedErrors);
+        ValidateManifestCore(
+            expected,
+            "expected_manifest",
+            expectedErrors,
+            out _);
         if (expectedErrors.Count != 0)
         {
             errors.Add("response.expected_manifest");
@@ -529,8 +542,13 @@ public static partial class WorkerProtocolJson
             ManifestsEqual(actual, expected), "response.manifest_mismatch");
         }
     }
-    private static void ValidateManifestCore(WorkerClaimManifest? manifest, string prefix, Validator errors)
+    private static void ValidateManifestCore(
+        WorkerClaimManifest? manifest,
+        string prefix,
+        Validator errors,
+        out bool allClaimsPostconditions)
     {
+        allClaimsPostconditions = false;
         if (manifest == null)
         {
             errors.Add(prefix + ".null");
@@ -540,6 +558,8 @@ public static partial class WorkerProtocolJson
         errors.Check(manifest.SchemaVersion == WorkerManifestVersions.Current, prefix + ".schema");
         var callables = Present(manifest.Callables, prefix + ".callables", errors);
         var claims = Present(manifest.Claims, prefix + ".claims", errors);
+        allClaimsPostconditions = manifest.Claims is { Length: > 0 } &&
+            claims.Length == manifest.Claims.Length;
         var callableIdValues = ValidateUniqueIds(
             callables.Select(static value => value.CallableId),
             prefix + ".callable_id", errors);
@@ -569,6 +589,8 @@ public static partial class WorkerProtocolJson
         ValidateManifestAssumptionIdentity(callables, prefix, errors);
         foreach (var claim in claims)
         {
+            allClaimsPostconditions &=
+                claim.Kind == WorkerClaimKind.Postcondition;
             errors.Check(callableIds.Contains(claim.CallableId), prefix + ".claim_callable")
                 .Rules(claim, WorkerProtocolMetadata.ManifestClaimRules, prefix + ".")
                 .Check(HasValidLocation(claim.Location), prefix + ".claim_location");
@@ -621,14 +643,19 @@ public static partial class WorkerProtocolJson
     private static WorkerCallableResult[] ValidateCallableResults(
         WorkerCallableResult[]? values,
         ManifestIdentityIndexes manifestIndexes,
-        Validator errors)
+        Validator errors,
+        out bool allResultsComplete)
     {
         var valid = ValidateResultSet(values,
             manifestIndexes.Callables.Select(static value => value.CallableId),
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
+        allResultsComplete = values is { Length: > 0 } &&
+            valid.Length == values.Length;
         foreach (var value in valid)
         {
+            allResultsComplete &= value.Coverage == WorkerCallableCoverage.Complete &&
+                value.Reason == WorkerCallableCoverageReason.None;
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
             var declared = manifestIndexes.CallablesById.Find(value.CallableId);
             errors.Check(declared != null &&
@@ -640,14 +667,18 @@ public static partial class WorkerProtocolJson
     private static WorkerClaimResult[] ValidateClaimResults(
         WorkerClaimResult[]? values,
         ManifestIdentityIndexes manifestIndexes,
-        Validator errors)
+        Validator errors,
+        out bool allResultsRefuted)
     {
         var valid = ValidateResultSet(values,
             manifestIndexes.Claims.Select(static value => value.ClaimId),
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
+        allResultsRefuted = values is { Length: > 0 } &&
+            valid.Length == values.Length;
         foreach (var value in valid)
         {
+            allResultsRefuted &= value.Outcome == WorkerClaimOutcome.Refuted;
             ValidateClaimResult(value, manifestIndexes, errors);
         }
 

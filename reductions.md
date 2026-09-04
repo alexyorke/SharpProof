@@ -22471,6 +22471,11 @@ argument payloads while building their structural-key child IDs, avoiding a
 second enumeration while retaining immutable payloads and validation order.
 The full Ir.Test suite passes 115/115.
 
+R2247 is applied: response validation now carries callable-completeness,
+claim-refutation, and manifest-postcondition facts from its existing validation
+loops into cache-shape validation, avoiding a second traversal of those
+collections. ProtocolJsonTests pass 108/108.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
