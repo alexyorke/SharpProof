@@ -518,11 +518,17 @@ internal static partial class RequiresCallSiteAnalyzer
                 }
 
                 var lowered = lowerer.Lower(actual);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!lowered.IsExact ||
+                    lowered.Term.Type !=
+                        _factory.GetVariableInfo(variable.Variable).Type)
+                {
+                    return null;
+                }
+
                 var value = interpreter.Evaluate(
                     lowered.Term, cancellationToken: cancellationToken);
-                if (!lowered.IsExact ||
-                    lowered.Term.Type != _factory.GetVariableInfo(variable.Variable).Type ||
-                    value.Status != IrEvaluationStatus.Value ||
+                if (value.Status != IrEvaluationStatus.Value ||
                     variable.Role == BoundContractVariableRole.Receiver &&
                     value.Value?.Kind == IrValueKind.Null)
                 {
