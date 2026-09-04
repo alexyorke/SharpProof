@@ -239,15 +239,6 @@ internal sealed class ExceptionHandlerReachability(
                             Potential(type),
                             thrown);
                     }
-                    else if (unwrappedException.Type is
-                                 ITypeParameterSymbol typeParameter &&
-                             _exceptionType is { } exceptionType &&
-                             compilation.ClassifyCommonConversion(
-                                 typeParameter,
-                                 exceptionType).IsImplicit)
-                    {
-                        Add(UnknownPotential, thrown);
-                    }
                     else
                     {
                         Add(UnknownPotential, thrown);
