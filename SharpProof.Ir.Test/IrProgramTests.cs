@@ -430,27 +430,7 @@ public sealed class IrProgramTests
     public void InterpreterFailsClosedAtVariableHavocAfterInvalidatingValues(
         IrHavocKind havocKind)
     {
-        var factory = new IrFactory();
-        var value =
-            factory.CreateVariable("value", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        var havoc = builder.Havoc(
-            entry,
-            factory.CreateOperation("havoc"),
-            havocKind,
-            value);
-        builder.Return(
-            entry,
-            factory.CreateOperation("return"),
-            factory.Variable(value));
-
-        var result = new IrProgramInterpreter(factory).Execute(
-            builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = factory.CreateIntegerValue(7)
-            });
+        var (result, havoc, value) = ExecuteHavoc(havocKind);
 
         Assert.That(
             result.Status,
@@ -465,15 +445,28 @@ public sealed class IrProgramTests
     [Test]
     public void InterpreterPreservesVariablesAtMemoryOnlyHavoc()
     {
+        var (result, havoc, value) = ExecuteHavoc(IrHavocKind.Memory);
+
+        Assert.That(
+            result.Status,
+            Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(result.Instruction, Is.SameAs(havoc));
+        Assert.That(result.GetCurrentValue(value)!.Integer, Is.EqualTo(7));
+    }
+
+    private static (
+        IrProgramExecutionResult Result,
+        IrHavocInstruction Havoc,
+        IrVarId Value) ExecuteHavoc(IrHavocKind havocKind)
+    {
         var factory = new IrFactory();
-        var value =
-            factory.CreateVariable("value", factory.IntegerType);
+        var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
-        var havoc = builder.Havoc(
-            entry,
-            factory.CreateOperation("havoc"),
-            IrHavocKind.Memory);
+        var havocOperation = factory.CreateOperation("havoc");
+        var havoc = havocKind == IrHavocKind.Memory
+            ? builder.Havoc(entry, havocOperation, havocKind)
+            : builder.Havoc(entry, havocOperation, havocKind, value);
         builder.Return(
             entry,
             factory.CreateOperation("return"),
@@ -485,12 +478,7 @@ public sealed class IrProgramTests
             {
                 [value] = factory.CreateIntegerValue(7)
             });
-
-        Assert.That(
-            result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        Assert.That(result.Instruction, Is.SameAs(havoc));
-        Assert.That(result.GetCurrentValue(value)!.Integer, Is.EqualTo(7));
+        return (result, havoc, value);
     }
 
     [Test]
