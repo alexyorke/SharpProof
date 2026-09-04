@@ -120,6 +120,15 @@ function Invoke-TestProject([string]$ProjectPath) {
     Invoke-DotNet $arguments
 }
 
+function Invoke-PackageTests {
+    $packageArguments = New-TestInvocationArguments -Additional @{
+        TestFilter = $TestFilter
+        PackageSource = $PackageSource
+    }
+    Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1' `
+        'Package tests failed.' $packageArguments
+}
+
 function Invoke-SolutionTests([string]$SolutionPath) {
     if (-not $NoBuild) {
         Invoke-DotNet @('restore', $SolutionPath, '--locked-mode')
@@ -347,6 +356,18 @@ switch ($Command) {
             'PR package validation failed.' $prTestArguments
     }
     'test' {
+        $targetName = [IO.Path]::GetFileName($Target)
+        $isPackageTestTarget = $targetName -in @(
+            'SharpProof.Package.Test',
+            'SharpProof.Package.Test.csproj')
+        $canUsePackageScheduler = -not $NoBuild -or
+            -not [string]::IsNullOrWhiteSpace($PackageSource)
+        if ($isPackageTestTarget -and
+            [string]::IsNullOrWhiteSpace($TestFilter) -and
+            $canUsePackageScheduler) {
+            Invoke-PackageTests
+            break
+        }
         $directProjectTest =
             $Target.EndsWith(
                 '.csproj', [StringComparison]::OrdinalIgnoreCase) -and
@@ -399,12 +420,7 @@ switch ($Command) {
         Invoke-TestProject $workerTestProject
     }
     'package-tests' {
-        $packageArguments = New-TestInvocationArguments -Additional @{
-            TestFilter = $TestFilter
-            PackageSource = $PackageSource
-        }
-        Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1' `
-            'Package tests failed.' $packageArguments
+        Invoke-PackageTests
     }
     'package-consumers' {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {

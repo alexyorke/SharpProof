@@ -176,7 +176,10 @@ feed once, reuses the already-built test harness, and shards the package tests
 instead of running the package project as one serial solution test process.
 For a single test project, `sp test` performs the required incremental build
 and then runs the built assembly directly through VSTest, avoiding a second
-MSBuild project-graph evaluation. `-NoBuild` skips that build as well.
+MSBuild project-graph evaluation. `-NoBuild` skips that build as well. An
+unfiltered `SharpProof.Package.Test` target uses the dedicated package
+scheduler so its isolated consumer-build shards have the same behavior locally
+as they do in the solution and acceptance lanes; filtered runs stay direct.
 `sp worker-tests` uses the same build-then-VSTest path.
 `sp test-changed` also uses it when the dependency analysis selects exactly
 one test project. When that project is `SharpProof.ArchitectureTest`, it reuses
