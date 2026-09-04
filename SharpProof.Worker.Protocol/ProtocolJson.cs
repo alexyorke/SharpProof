@@ -178,6 +178,20 @@ public static partial class WorkerProtocolJson
         return ValidateResponse(response, expectedInputHash, expectedManifest, null, null, null);
     }
 
+    internal static WorkerProtocolValidationResult ValidateKnownInputHash(
+        WorkerVerifyResponse? response,
+        string expectedInputHash,
+        WorkerClaimManifest expectedManifest)
+    {
+        return ValidateResponse(
+            response,
+            expectedInputHash,
+            expectedManifest,
+            null,
+            null,
+            null);
+    }
+
     internal static WorkerProtocolValidationResult Validate(
         WorkerVerifyResponse? response, string expectedInputHash,
         WorkerClaimManifest? expectedManifest,

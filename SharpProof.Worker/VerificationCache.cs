@@ -593,7 +593,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         claimCount == claims.Length &&
         expectedManifest.Claims.All(static claim =>
             claim.Kind == WorkerClaimKind.Postcondition) &&
-        WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid &&
+        WorkerProtocolJson.ValidateKnownInputHash(
+            response,
+            expectedInputHash,
+            expectedManifest).IsValid &&
         ReplayCachedClaims(claims, expectedManifest, targets, cancellationToken);
     }
 

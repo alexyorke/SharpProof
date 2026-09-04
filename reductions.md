@@ -22414,6 +22414,11 @@ remain unchanged. The script parses and 33 release-authority architecture tests
 pass. The broader packaging-backed release group remains blocked by the
 pre-existing `SPMETA003` violation in `SharpProof.Host/ContainerNativeLibrary.cs`.
 
+R2246 is applied: `VerificationCache.IsCacheable` now uses an internal
+`ProtocolJson.ValidateKnownInputHash` path after its existing fail-closed hash
+precheck, avoiding a second shape scan while preserving full response validation.
+The WorkerTests cache/worker suite passes 148/148.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
