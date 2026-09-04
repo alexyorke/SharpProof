@@ -15,6 +15,8 @@ param(
 
     [switch]$NoBuild,
 
+    [switch]$ReuseTestHarness,
+
     [switch]$Fast
 )
 
@@ -52,6 +54,9 @@ if ($Fast -and $Command -notin $reusableTestCommands) {
 if ($Fast -and $NoBuild) {
     throw '-Fast and -NoBuild cannot be combined.'
 }
+if ($ReuseTestHarness -and $Command -ne 'package-tests') {
+    throw '-ReuseTestHarness is supported only for package-tests.'
+}
 $fastBuildArguments = if ($Fast) {
     @('-p:RunAnalyzersDuringBuild=false')
 }
@@ -74,6 +79,7 @@ function New-TestInvocationArguments([hashtable]$Additional = @{}) {
         $arguments[$entry.Key] = $entry.Value
     }
     if ($NoBuild) { $arguments.NoBuild = $true }
+    if ($ReuseTestHarness) { $arguments.ReuseTestHarness = $true }
     if ($Fast) { $arguments.Fast = $true }
     return $arguments
 }

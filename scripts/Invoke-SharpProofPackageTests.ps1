@@ -9,6 +9,8 @@ param(
 
     [switch]$NoBuild,
 
+    [switch]$ReuseTestHarness,
+
     [switch]$Fast,
 
     [int]$TimeoutSeconds,
@@ -65,7 +67,8 @@ $coverage = New-SharpProofCoverageContext `
 $coverageEnabled = [bool]$coverage.Enabled
 $resolvedCoverageSettings = [string]$coverage.Settings
 $resolvedCoverageResults = [string]$coverage.Results
-$testAssembly = if ($NoBuild -and -not $coverageEnabled) {
+$testAssembly = if (($NoBuild -or $ReuseTestHarness) -and
+    -not $coverageEnabled) {
     Get-SharpProofTestAssemblyPath `
         -ProjectPath $testProject `
         -Configuration $Configuration
@@ -318,7 +321,7 @@ foreach ($priorTimingPath in $(if ($Fast) {
 }
 
 try {
-    if (-not $NoBuild) {
+    if (-not $NoBuild -and -not $ReuseTestHarness) {
         Invoke-SharpProofTimedPhase -Name 'restore' `
             -Timings $phaseTimings -RecordOnFailure -Action {
             Invoke-SharpProofRequiredDotnet `
@@ -331,7 +334,7 @@ try {
     }
 
     $builds = [Collections.Generic.List[object]]::new()
-    if (-not $NoBuild) {
+    if (-not $NoBuild -and -not $ReuseTestHarness) {
         $testHarnessBuildArguments = @(
             'build', $testProject, '-c', $Configuration,
             '--no-restore')

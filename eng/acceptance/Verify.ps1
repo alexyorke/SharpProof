@@ -682,6 +682,9 @@ try {
         if ($Configuration -eq 'Release') {
             $packageTestArguments.NoBuild = $true
         }
+        else {
+            $packageTestArguments.ReuseTestHarness = $true
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
             @packageTestArguments
