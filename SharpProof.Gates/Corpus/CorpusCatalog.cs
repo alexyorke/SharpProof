@@ -19,9 +19,16 @@ internal static class CorpusCatalog
     public static ImmutableArray<CorpusCase> CreateCases(
         string repositoryRoot)
     {
+        return CreateCases(OpenSourceCorpusCatalog.Load(repositoryRoot));
+    }
+
+    internal static ImmutableArray<CorpusCase> CreateCases(
+        OpenSourceCorpusDocument openSourceDocument)
+    {
+        ArgumentNullException.ThrowIfNull(openSourceDocument);
         return [
             .. CreateSyntheticCases(),
-            .. OpenSourceCorpusCatalog.CreateCases(repositoryRoot)
+            .. OpenSourceCorpusCatalog.CreateCases(openSourceDocument)
         ];
     }
 

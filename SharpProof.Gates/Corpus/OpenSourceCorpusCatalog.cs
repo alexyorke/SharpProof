@@ -44,7 +44,14 @@ internal static class OpenSourceCorpusCatalog
     internal static ImmutableArray<CorpusCase> CreateCases(
         string repositoryRoot)
     {
-        return [.. Load(repositoryRoot).Methods.Select(static method =>
+        return CreateCases(Load(repositoryRoot));
+    }
+
+    internal static ImmutableArray<CorpusCase> CreateCases(
+        OpenSourceCorpusDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return [.. document.Methods.Select(static method =>
             new CorpusCase(
                 $"{method.Id}.baseline",
                 method.Id,

@@ -40,7 +40,7 @@ internal static class CorpusGate
         CancellationToken cancellationToken = default)
     {
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
-        var cases = CorpusCatalog.CreateCases(repositoryRoot);
+        var cases = CorpusCatalog.CreateCases(openSourceDocument);
         var openSourceCases = cases
             .Where(static item => item.Origin == CorpusOrigin.OpenSource)
             .ToImmutableArray();
