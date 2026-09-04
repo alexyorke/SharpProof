@@ -2,7 +2,6 @@
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('sp-pilot-' + [Guid]::NewGuid().ToString('N'))

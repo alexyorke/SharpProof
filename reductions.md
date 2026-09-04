@@ -22248,6 +22248,11 @@ the concrete `SortedDictionary`, `HashSet`, and `List` instances supplied by
 its sole caller instead of widening them to unused collection interfaces. The
 canonical `SharpProof.Testing` build passes with zero warnings or errors.
 
+R2017 is applied: removed the two never-read repository-root locals from the
+coverage and pilot-authority fixture scripts. The fixture script completes
+successfully in the canonical container, and the coverage script retains the
+repository-root value that its downstream path logic actually consumes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
