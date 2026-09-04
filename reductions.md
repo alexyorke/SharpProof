@@ -21300,3 +21300,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2010 | CallableEntryFeasibility and CallableVerifier repeat the same `InternalConsistency` false `Goal` construction; share only the sentinel-goal projection while preserving their distinct query and outcome policies. | `SharpProof.Worker/CallableEntryFeasibility.cs:123-128`; `SharpProof.Worker/CallableVerifier.cs:360-365` |
+
+## Second survey, continued: R2011 - ContractApiIdentityResolver and CancellationBoundaryAnalyzer duplicate base-type traversal
+
+`ContractApiIdentityResolver.InheritsFrom` and `CancellationBoundaryAnalyzer.IsOrDerivesFrom` both walk Roslyn named-type `BaseType` links and compare each `OriginalDefinition` with `SymbolEqualityComparer.Default`. The helpers live in different assemblies and have different admission policies: the former starts at `candidate.BaseType` because the attribute contract has already been identified separately, while the latter starts at the nullable input type itself and is also used as the first arm of interface assignability. A small shared Roslyn type-hierarchy predicate (with an explicit include-self policy) could remove the duplicated traversal while preserving those caller-specific semantics; do not merge the broader assignability or attribute-resolution logic.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2011 | `ContractApiIdentityResolver.InheritsFrom` and `CancellationBoundaryAnalyzer.IsOrDerivesFrom` duplicate the `BaseType`/`OriginalDefinition` hierarchy walk; share only a parameterized narrow predicate and retain include-self and interface/attribute policies. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:545-560`; `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:406-424` |
