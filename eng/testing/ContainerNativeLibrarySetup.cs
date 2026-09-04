@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Host;
 
-namespace SharpProof.Worker.Test;
+namespace SharpProof.Testing;
 
 [SetUpFixture]
 public sealed class ContainerNativeLibrarySetup

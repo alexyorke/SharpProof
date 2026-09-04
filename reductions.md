@@ -22304,6 +22304,10 @@ artifact validation still throws for malformed terminators, while callable
 preparation still fails closed with no successors. The canonical IR and worker
 test suites cover both policies.
 
+R2015 is applied: the identical NUnit Z3-resolver setup is now one linked test
+fixture compiled into both Smt.Test and Worker.Test, preserving one-time
+assembly setup and each test assembly's discovery boundary. Both suites pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

@@ -3,6 +3,8 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\eng\testing\ContainerNativeLibrarySetup.cs"
+             Link="ContainerNativeLibrarySetup.cs" />
     <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Smt\SharpProof.Smt.csproj" />
   </ItemGroup>
