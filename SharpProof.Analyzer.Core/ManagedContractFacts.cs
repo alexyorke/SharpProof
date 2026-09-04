@@ -12,15 +12,32 @@ internal static class ManagedContractFacts
             return state;
         }
 
-        var variables = contracts.Variables
-            .Where(static variable =>
-                variable.Symbol != null &&
-                variable.Role is BoundContractVariableRole.Receiver or BoundContractVariableRole.Parameter)
-            .ToDictionary(static variable => variable.Variable, static variable => variable.Symbol!);
-        return contracts.Clauses
-            .Where(static clause => clause.Kind == BoundContractKind.Requires)
-            .Aggregate(state, (current, clause) =>
-                current.IsBottom ? current : Assume(current, clause.Condition, true, variables));
+        if (state.IsBottom)
+        {
+            return state;
+        }
+
+        Dictionary<IrVarId, ISymbol>? variables = null;
+        foreach (var clause in contracts.Clauses)
+        {
+            if (clause.Kind != BoundContractKind.Requires)
+            {
+                continue;
+            }
+
+            variables ??= contracts.Variables
+                .Where(static variable =>
+                    variable.Symbol != null &&
+                    variable.Role is BoundContractVariableRole.Receiver or BoundContractVariableRole.Parameter)
+                .ToDictionary(static variable => variable.Variable, static variable => variable.Symbol!);
+            state = Assume(state, clause.Condition, true, variables);
+            if (state.IsBottom)
+            {
+                return state;
+            }
+        }
+
+        return state;
     }
 
     internal static ManagedAbstractValue Evaluate(
