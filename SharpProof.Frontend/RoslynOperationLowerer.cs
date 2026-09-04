@@ -104,11 +104,7 @@ public sealed class RoslynOperationLowerer
 
     private LoweredExpression LowerCore(IOperation operation)
     {
-        var results = _currentLoweringResults;
-        if (results == null)
-        {
-            return _visitor.Visit(operation, default);
-        }
+        var results = _currentLoweringResults!;
 
         if (results.TryGetValue(operation, out var existing))
         {
@@ -398,24 +394,20 @@ public sealed class RoslynOperationLowerer
             return false;
         }
 
-        if (_currentPurityResults is { } purityResults)
+        var purityResults = _currentPurityResults!;
+        if (!purityResults.TryGetValue(operation, out var depths))
         {
-            if (!purityResults.TryGetValue(operation, out var depths))
-            {
-                depths = [];
-                purityResults.Add(operation, depths);
-            }
-            if (depths.TryGetValue(depth, out var cached))
-            {
-                return cached;
-            }
-
-            var result = IsDemonstrablyPureCore(operation, depth);
-            depths.Add(depth, result);
-            return result;
+            depths = [];
+            purityResults.Add(operation, depths);
+        }
+        if (depths.TryGetValue(depth, out var cached))
+        {
+            return cached;
         }
 
-        return IsDemonstrablyPureCore(operation, depth);
+        var result = IsDemonstrablyPureCore(operation, depth);
+        depths.Add(depth, result);
+        return result;
     }
 
     private bool IsDemonstrablyPureCore(IOperation operation, int depth)
