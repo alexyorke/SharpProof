@@ -5,14 +5,21 @@ internal static class ApiSpecContentDigest
     internal static string Compute(ImmutableArray<ApiSpecTemplate> templates)
     {
         using var hash = new CanonicalHashWriter();
-        hash.Add("api-spec-content-v2", templates.Length);
+        hash.Add("api-spec-content-v2").Add(templates.Length);
         foreach (var template in templates)
         {
             var target = template.Target;
-            hash.Add("target", target.WitnessIdentifier, target.DocumentationCommentId,
-                target.ContainingTypeMetadataName, target.MemberKind, target.MemberName,
-                target.IsStatic, target.GenericArity, target.ReceiverType, target.ResultType,
-                target.ParameterTypes.Length);
+            hash.Add("target")
+                .Add(target.WitnessIdentifier)
+                .Add(target.DocumentationCommentId)
+                .Add(target.ContainingTypeMetadataName)
+                .Add(target.MemberKind)
+                .Add(target.MemberName)
+                .Add(target.IsStatic)
+                .Add(target.GenericArity)
+                .Add(target.ReceiverType)
+                .Add(target.ResultType)
+                .Add(target.ParameterTypes.Length);
             foreach (var type in target.ParameterTypes)
             {
                 hash.Add(type);
@@ -23,50 +30,60 @@ internal static class ApiSpecContentDigest
                          .ThenBy(static item => item.PublicKeyToken, StringComparer.OrdinalIgnoreCase)
                          .ThenBy(static item => item.ReferenceFamily))
             {
-                hash.Add("assembly", assembly.Name, assembly.PublicKeyToken.ToUpperInvariant(),
-                    assembly.ReferenceFamily);
+                hash.Add("assembly")
+                    .Add(assembly.Name)
+                    .Add(assembly.PublicKeyToken.ToUpperInvariant())
+                    .Add(assembly.ReferenceFamily);
             }
 
             var facets = template.Facets;
-            Add(hash, facets.Effects.Evidence, facets.Effects.Effects);
-            Add(hash, facets.Allocation.Evidence, facets.Allocation.Behavior);
+            hash.Add(facets.Effects.Effects)
+                .Add(facets.Effects.Evidence.Kind)
+                .Add(facets.Effects.Evidence.Source);
+            hash.Add(facets.Allocation.Behavior)
+                .Add(facets.Allocation.Evidence.Kind)
+                .Add(facets.Allocation.Evidence.Source);
             var exceptionMetadataNames = facets.Throws.ExceptionMetadataNames
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static name => name, StringComparer.Ordinal)
                 .ToImmutableArray();
-            Add(
-                hash,
-                facets.Throws.Evidence,
-                facets.Throws.Behavior,
-                exceptionMetadataNames.Length);
+            hash.Add(facets.Throws.Behavior)
+                .Add(exceptionMetadataNames.Length)
+                .Add(facets.Throws.Evidence.Kind)
+                .Add(facets.Throws.Evidence.Source);
             foreach (var exception in exceptionMetadataNames)
             {
                 hash.Add(exception);
             }
 
-            Add(hash, facets.Nullness.Evidence, facets.Nullness.Result);
-            Add(hash, facets.Cardinality.Evidence, facets.Cardinality.Result, facets.Cardinality.ExactCount);
+            hash.Add(facets.Nullness.Result)
+                .Add(facets.Nullness.Evidence.Kind)
+                .Add(facets.Nullness.Evidence.Source);
+            hash.Add(facets.Cardinality.Result)
+                .Add(facets.Cardinality.ExactCount)
+                .Add(facets.Cardinality.Evidence.Kind)
+                .Add(facets.Cardinality.Evidence.Source);
             if (facets.Termination == null)
             {
-                hash.Add("termination", null);
+                hash.Add("termination").Add((string?)null);
             }
             else
             {
-                Add(
-                    hash,
-                    facets.Termination.Evidence,
-                    facets.Termination.Behavior);
+                hash.Add(facets.Termination.Behavior)
+                    .Add(facets.Termination.Evidence.Kind)
+                    .Add(facets.Termination.Evidence.Source);
             }
-            hash.Add("variables", template.Variables.Length);
+            hash.Add("variables").Add(template.Variables.Length);
             foreach (var variable in template.Variables)
             {
-                hash.Add(variable.Role, variable.Ordinal, variable.Type);
+                hash.Add(variable.Role).Add(variable.Ordinal).Add(variable.Type);
             }
 
-            hash.Add("postconditions", template.Postconditions.Length);
+            hash.Add("postconditions").Add(template.Postconditions.Length);
             foreach (var postcondition in template.Postconditions)
             {
-                Add(hash, postcondition.Evidence);
+                hash.Add(postcondition.Evidence.Kind)
+                    .Add(postcondition.Evidence.Source);
                 Add(hash, postcondition.Condition, template.Variables);
             }
         }
@@ -74,19 +91,11 @@ internal static class ApiSpecContentDigest
     }
 
     private static void Add(
-        CanonicalHashWriter hash, SpecEvidence evidence,
-        params object?[] values)
-    {
-        hash.Add(values).Add(evidence.Kind, evidence.Source);
-    }
-
-    private static void Add(
         CanonicalHashWriter hash, SpecTermDeclaration term,
         ImmutableArray<SpecVariableInfo> variables)
     {
-        hash.Add(
-            term.GetType().Name.Replace("Declaration", "Term"),
-            term.Type);
+        hash.Add(term.GetType().Name.Replace("Declaration", "Term"))
+            .Add(term.Type);
         (object? Payload, SpecTermDeclaration[] Children) parts = term switch
         {
             SpecVariableDeclaration variable => (

@@ -248,8 +248,11 @@ internal static class CompilerEffectClaimArtifactCodec
         constraint = ArgumentNullGuard.NotNull(constraint, nameof(constraint));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(CompilerEffectEvidenceCatalog.ConstraintDomain, CompilerEffectEvidenceCatalog.ConstraintVersion, kind,
-            constraint.AllowedEffects, constraint.AllowedCapabilities);
+        hash.Add(CompilerEffectEvidenceCatalog.ConstraintDomain)
+            .Add(CompilerEffectEvidenceCatalog.ConstraintVersion)
+            .Add(kind)
+            .Add(constraint.AllowedEffects)
+            .Add(constraint.AllowedCapabilities);
         AddSortedStrings(hash, constraint.AllowedExceptionTypes ?? []);
 
         return hash.Finish();
@@ -261,8 +264,8 @@ internal static class CompilerEffectClaimArtifactCodec
         value = ArgumentNullGuard.NotNull(value, nameof(value));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(CompilerEffectEvidenceCatalog.OperationDomain,
-            CompilerEffectEvidenceCatalog.OperationVersion);
+        hash.Add(CompilerEffectEvidenceCatalog.OperationDomain)
+            .Add(CompilerEffectEvidenceCatalog.OperationVersion);
         AddReplayEvent(hash, value, includeOrdinal: false, includeOperationIdentity: false);
         return hash.Finish();
     }
@@ -272,26 +275,39 @@ internal static class CompilerEffectClaimArtifactCodec
         var witness = value.Witness;
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();
-        hash.Add(CompilerEffectEvidenceCatalog.EvidenceDomain, CompilerEffectEvidenceCatalog.EvidenceVersion, value.ClaimId,
-            value.ContractKind, value.Outcome, value.Reason, value.Certainty,
-            constraint.AllowedEffects, constraint.AllowedCapabilities);
+        hash.Add(CompilerEffectEvidenceCatalog.EvidenceDomain)
+            .Add(CompilerEffectEvidenceCatalog.EvidenceVersion)
+            .Add(value.ClaimId)
+            .Add(value.ContractKind)
+            .Add(value.Outcome)
+            .Add(value.Reason)
+            .Add(value.Certainty)
+            .Add(constraint.AllowedEffects)
+            .Add(constraint.AllowedCapabilities);
         AddSortedStrings(hash, constraint.AllowedExceptionTypes);
 
-        hash.Add(witness?.Kind, witness?.Detail, witness?.Effects ?? WorkerEffectSet.None,
-            witness?.Capabilities ?? WorkerEffectCapabilitySet.None);
+        hash.Add(witness?.Kind)
+            .Add(witness?.Detail)
+            .Add(witness?.Effects ?? WorkerEffectSet.None)
+            .Add(witness?.Capabilities ?? WorkerEffectCapabilitySet.None);
         AddSortedStrings(hash, witness?.ExactExceptionTypeHierarchy ?? []);
 
         var replay = value.Replay;
-        hash.Add(replay != null,
-            replay?.PathKind ?? CompilerEffectReplayPathKind.Unspecified,
-            replay?.ConstraintSha256, replay?.Events?.Length ?? -1);
+        hash.Add(replay != null)
+            .Add(replay?.PathKind ?? CompilerEffectReplayPathKind.Unspecified)
+            .Add(replay?.ConstraintSha256)
+            .Add(replay?.Events?.Length ?? -1);
         foreach (var effectEvent in replay?.Events ?? [])
         {
             AddReplayEvent(hash, effectEvent, includeOrdinal: true, includeOperationIdentity: true);
         }
-        return hash.Add(witness?.Location.Path, witness?.Location.Start ?? -1,
-            witness?.Location.Length ?? -1, witness?.Location.Line ?? -1,
-            witness?.Location.Column ?? -1, value.Evidence).Finish();
+        return hash.Add(witness?.Location.Path)
+            .Add(witness?.Location.Start ?? -1)
+            .Add(witness?.Location.Length ?? -1)
+            .Add(witness?.Location.Line ?? -1)
+            .Add(witness?.Location.Column ?? -1)
+            .Add(value.Evidence)
+            .Finish();
     }
 
     private static void AddSortedStrings(
@@ -315,9 +331,13 @@ internal static class CompilerEffectClaimArtifactCodec
             hash.Add(value.Ordinal);
         }
 
-        hash.Add(value.Kind, value.SyntaxTreeOrdinal, value.SyntaxTreeSha256,
-            value.SyntaxTreeSnapshotSha256, value.SyntaxTreeLineMapSha256,
-            value.SyntaxStart, value.SyntaxLength);
+        hash.Add(value.Kind)
+            .Add(value.SyntaxTreeOrdinal)
+            .Add(value.SyntaxTreeSha256)
+            .Add(value.SyntaxTreeSnapshotSha256)
+            .Add(value.SyntaxTreeLineMapSha256)
+            .Add(value.SyntaxStart)
+            .Add(value.SyntaxLength);
         if (includeOperationIdentity)
         {
             hash.Add(value.OperationIdentitySha256);
@@ -326,11 +346,15 @@ internal static class CompilerEffectClaimArtifactCodec
         // Array-allocation events canonically have no member identity. Treat
         // the wire-level null and empty representations as the same value so
         // replay semantics and operation hashes cannot diverge.
-        hash.Add(value.MemberIdentity ?? string.Empty, value.MemberDocumentationId,
-            value.TypeIdentity, value.TypeDocumentationId,
-            value.SpecWitnessIdentifier);
-        hash.Add(value.SourceTreeOrdinal, value.SourceTreePath,
-            value.SourceTreeSha256, value.SourceLineMapSha256);
+        hash.Add(value.MemberIdentity ?? string.Empty)
+            .Add(value.MemberDocumentationId)
+            .Add(value.TypeIdentity)
+            .Add(value.TypeDocumentationId)
+            .Add(value.SpecWitnessIdentifier);
+        hash.Add(value.SourceTreeOrdinal)
+            .Add(value.SourceTreePath)
+            .Add(value.SourceTreeSha256)
+            .Add(value.SourceLineMapSha256);
         var operands = value.ScalarOperands ?? [];
         hash.Add(operands.Length);
         foreach (var operand in operands)
@@ -346,8 +370,10 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         var location = value.Location;
-        hash.Add(location?.Path, location?.Start ?? -1,
-            location?.Length ?? -1, location?.Line ?? -1,
-            location?.Column ?? -1);
+        hash.Add(location?.Path)
+            .Add(location?.Start ?? -1)
+            .Add(location?.Length ?? -1)
+            .Add(location?.Line ?? -1)
+            .Add(location?.Column ?? -1);
     }
 }

@@ -14,8 +14,11 @@ internal static class CompilerFeatureScopeFingerprint
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(Domain, Version, (int)artifact.Features,
-            "budget.expression_depth", artifact.MaximumExpressionDepth);
+        hash.Add(Domain)
+            .Add(Version)
+            .Add((int)artifact.Features)
+            .Add("budget.expression_depth")
+            .Add(artifact.MaximumExpressionDepth);
         AddJson(hash, artifact.Manifest);
 
         var callables = artifact.Callables;
@@ -38,10 +41,9 @@ internal static class CompilerFeatureScopeFingerprint
             return;
         }
 
-        hash.Add(
-            callable.CallableId,
-            callable.FailureReason,
-            callable.Graph != null);
+        hash.Add(callable.CallableId)
+            .Add(callable.FailureReason)
+            .Add(callable.Graph != null);
         AddJson(hash, callable.Graph);
         AddJson(hash, callable.Body);
 
@@ -55,12 +57,11 @@ internal static class CompilerFeatureScopeFingerprint
                 continue;
             }
 
-            hash.Add(
-                clause.Kind,
-                clause.Evidence,
-                clause.ClaimId,
-                clause.AssumptionId,
-                clause.PredicateSha256);
+            hash.Add(clause.Kind)
+                .Add(clause.Evidence)
+                .Add(clause.ClaimId)
+                .Add(clause.AssumptionId)
+                .Add(clause.PredicateSha256);
         }
 
         var variables = callable.Variables;
@@ -73,18 +74,17 @@ internal static class CompilerFeatureScopeFingerprint
                 continue;
             }
 
-            hash.Add(
-                variable.Role,
-                variable.Ordinal,
-                variable.Variable,
-                variable.CurrentStateVariable,
-                variable.SourceOrdinal,
-                variable.Minimum.HasValue,
-                variable.Minimum ?? 0L,
-                variable.Maximum.HasValue,
-                variable.Maximum ?? 0L,
-                variable.ScalarDomain,
-                variable.ModelLabel);
+            hash.Add(variable.Role)
+                .Add(variable.Ordinal)
+                .Add(variable.Variable)
+                .Add(variable.CurrentStateVariable)
+                .Add(variable.SourceOrdinal)
+                .Add(variable.Minimum.HasValue)
+                .Add(variable.Minimum ?? 0L)
+                .Add(variable.Maximum.HasValue)
+                .Add(variable.Maximum ?? 0L)
+                .Add(variable.ScalarDomain)
+                .Add(variable.ModelLabel);
         }
 
         var effects = callable.EffectClaims;

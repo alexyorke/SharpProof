@@ -24,17 +24,34 @@ internal static class CompilerArtifactInputHash
         artifactBytes = ArgumentNullGuard.NotNull(artifactBytes, nameof(artifactBytes));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(
-            "protocol", request.ProtocolVersion,
-            "cache_schema", WorkerCacheVersions.Current,
-            "tool.identity", toolIdentity, "tool.version", toolVersion,
-            "tool.binary_sha256", workerBinarySha256, "api_spec.identity", apiSpecIdentity,
-            "api_spec.version", apiSpecVersion, "api_spec.content_sha256", apiSpecContentSha256,
-            "budget.query_rlimit", request.Budgets.QueryRlimit, "budget.method_rlimit", request.Budgets.MethodRlimit,
-            "budget.method_wall_ms", request.Budgets.MethodWallTimeMilliseconds,
-            "budget.project_wall_ms", request.Budgets.ProjectWallTimeMilliseconds,
-            "budget.max_parallelism", request.Budgets.MaxParallelism,
-            "budget.expression_depth", request.Budgets.MaximumExpressionDepth);
+        hash.Add("protocol")
+            .Add(request.ProtocolVersion)
+            .Add("cache_schema")
+            .Add(WorkerCacheVersions.Current)
+            .Add("tool.identity")
+            .Add(toolIdentity)
+            .Add("tool.version")
+            .Add(toolVersion)
+            .Add("tool.binary_sha256")
+            .Add(workerBinarySha256)
+            .Add("api_spec.identity")
+            .Add(apiSpecIdentity)
+            .Add("api_spec.version")
+            .Add(apiSpecVersion)
+            .Add("api_spec.content_sha256")
+            .Add(apiSpecContentSha256)
+            .Add("budget.query_rlimit")
+            .Add(request.Budgets.QueryRlimit)
+            .Add("budget.method_rlimit")
+            .Add(request.Budgets.MethodRlimit)
+            .Add("budget.method_wall_ms")
+            .Add(request.Budgets.MethodWallTimeMilliseconds)
+            .Add("budget.project_wall_ms")
+            .Add(request.Budgets.ProjectWallTimeMilliseconds)
+            .Add("budget.max_parallelism")
+            .Add(request.Budgets.MaxParallelism)
+            .Add("budget.expression_depth")
+            .Add(request.Budgets.MaximumExpressionDepth);
         return hash.Add("compiler_manifest").Add(artifactBytes).Finish();
     }
 }
@@ -67,7 +84,7 @@ internal static class WorkerBinaryIdentity
                 MaximumDependenciesBytes);
             stagedHandles = new FileStream[components.Count];
             using var hash = new CanonicalHashWriter();
-            hash.Add("SharpProof.WorkerBinarySet", 1);
+            hash.Add("SharpProof.WorkerBinarySet").Add(1);
             long totalBytes = 0;
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)

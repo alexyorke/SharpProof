@@ -254,12 +254,11 @@ internal static class EffectCounterexampleReplayer
     {
         ArgumentNullException.ThrowIfNull(constraint);
         using var hash = new CanonicalHashWriter();
-        hash.Add(
-            "SharpProof.CompilerEffectReplayConstraint",
-            1,
-            kind,
-            constraint.AllowedEffects,
-            constraint.AllowedCapabilities);
+        hash.Add("SharpProof.CompilerEffectReplayConstraint")
+            .Add(1)
+            .Add(kind)
+            .Add(constraint.AllowedEffects)
+            .Add(constraint.AllowedCapabilities);
         foreach (var type in constraint.AllowedExceptionTypes
                      .OrderBy(static item => item, StringComparer.Ordinal))
         {
@@ -275,26 +274,24 @@ internal static class EffectCounterexampleReplayer
         ArgumentNullException.ThrowIfNull(effectEvent);
         var location = effectEvent.Location;
         using var hash = new CanonicalHashWriter();
-        hash.Add(
-            "SharpProof.CompilerEffectReplayOperation",
-            1,
-            effectEvent.Kind,
-            effectEvent.SyntaxTreeOrdinal,
-            effectEvent.SyntaxTreeSha256,
-            effectEvent.SyntaxTreeSnapshotSha256,
-            effectEvent.SyntaxTreeLineMapSha256,
-            effectEvent.SyntaxStart,
-            effectEvent.SyntaxLength,
-            effectEvent.MemberIdentity,
-            effectEvent.MemberDocumentationId,
-            effectEvent.TypeIdentity,
-            effectEvent.TypeDocumentationId,
-            effectEvent.SpecWitnessIdentifier);
-        hash.Add(
-            effectEvent.SourceTreeOrdinal,
-            effectEvent.SourceTreePath,
-            effectEvent.SourceTreeSha256,
-            effectEvent.SourceLineMapSha256);
+        hash.Add("SharpProof.CompilerEffectReplayOperation")
+            .Add(1)
+            .Add(effectEvent.Kind)
+            .Add(effectEvent.SyntaxTreeOrdinal)
+            .Add(effectEvent.SyntaxTreeSha256)
+            .Add(effectEvent.SyntaxTreeSnapshotSha256)
+            .Add(effectEvent.SyntaxTreeLineMapSha256)
+            .Add(effectEvent.SyntaxStart)
+            .Add(effectEvent.SyntaxLength)
+            .Add(effectEvent.MemberIdentity)
+            .Add(effectEvent.MemberDocumentationId)
+            .Add(effectEvent.TypeIdentity)
+            .Add(effectEvent.TypeDocumentationId)
+            .Add(effectEvent.SpecWitnessIdentifier);
+        hash.Add(effectEvent.SourceTreeOrdinal)
+            .Add(effectEvent.SourceTreePath)
+            .Add(effectEvent.SourceTreeSha256)
+            .Add(effectEvent.SourceLineMapSha256);
         hash.Add(effectEvent.ScalarOperands.Length);
         foreach (var operand in effectEvent.ScalarOperands)
         {
@@ -307,12 +304,11 @@ internal static class EffectCounterexampleReplayer
             hash.Add(type);
         }
 
-        return hash.Add(
-                location?.Path,
-                location?.Start ?? -1,
-                location?.Length ?? -1,
-                location?.Line ?? -1,
-                location?.Column ?? -1)
+        return hash.Add(location?.Path)
+            .Add(location?.Start ?? -1)
+            .Add(location?.Length ?? -1)
+            .Add(location?.Line ?? -1)
+            .Add(location?.Column ?? -1)
             .Finish();
     }
 

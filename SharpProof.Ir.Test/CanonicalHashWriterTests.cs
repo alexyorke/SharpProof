@@ -9,7 +9,7 @@ public sealed class CanonicalHashWriterTests
         "f11c5f9ada1e3d32677b90b80baee7ffe826e1abb68161e4c3474fd57a103c17";
 
     [Test]
-    public void TypedAndBatchWritesPreserveTheCanonicalByteFormat()
+    public void TypedWritesPreserveTheCanonicalByteFormat()
     {
         using var typed = new CanonicalHashWriter();
         typed.Add("domain")
@@ -18,15 +18,8 @@ public sealed class CanonicalHashWriterTests
             .Add(uint.MaxValue)
             .Add(long.MinValue)
             .Add(new byte[] { 0, 1, 255 });
-        using var batch = new CanonicalHashWriter();
-        batch.Add("domain", true, 42, uint.MaxValue, long.MinValue,
-            new byte[] { 0, 1, 255 });
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
-            Assert.That(batch.Finish(), Is.EqualTo(GoldenHash));
-        }
+        Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
     }
 
     [Test]

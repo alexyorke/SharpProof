@@ -22,10 +22,9 @@ internal static class CompilationFingerprint
         entries = ArgumentNullGuard.NotNull(entries, nameof(entries));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(
-            SourceLineMapDomain,
-            SourceLineMapVersion,
-            JsonSerializer.SerializeToUtf8Bytes(
+        hash.Add(SourceLineMapDomain)
+            .Add(SourceLineMapVersion)
+            .Add(JsonSerializer.SerializeToUtf8Bytes(
                 entries,
                 WorkerProtocolJson.SharedOptions));
         return hash.Finish();
@@ -37,10 +36,9 @@ internal static class CompilationFingerprint
         snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(
-            SyntaxTreeSnapshotDomain,
-            SyntaxTreeSnapshotVersion,
-            JsonSerializer.SerializeToUtf8Bytes(
+        hash.Add(SyntaxTreeSnapshotDomain)
+            .Add(SyntaxTreeSnapshotVersion)
+            .Add(JsonSerializer.SerializeToUtf8Bytes(
                 snapshot,
                 WorkerProtocolJson.SharedOptions));
         return hash.Finish();
@@ -54,12 +52,12 @@ internal static class CompilationFingerprint
         snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(
-            "SharpProof.CompilerCompilationSnapshot",
-            10,
-            "budget.expression_depth", maximumExpressionDepth,
-            JsonSerializer.Serialize(snapshot, WorkerProtocolJson.SharedOptions),
-            JsonSerializer.Serialize(
+        hash.Add("SharpProof.CompilerCompilationSnapshot")
+            .Add(10)
+            .Add("budget.expression_depth")
+            .Add(maximumExpressionDepth)
+            .Add(JsonSerializer.Serialize(snapshot, WorkerProtocolJson.SharedOptions))
+            .Add(JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
                     ArgumentNullGuard.NotNull(diagnostics, nameof(diagnostics))),
                 WorkerProtocolJson.SharedOptions));

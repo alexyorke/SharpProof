@@ -1292,7 +1292,10 @@ internal static class CompilerLoweredArtifact
     {
         var graph = PortableIrGraphCodec.Encode(factory, null, [clause.Condition]).Graph;
         using var hash = new CanonicalHashWriter();
-        return hash.Add("SharpProofClausePredicate/v1", clause.Kind, clause.Evidence, clause.ClaimId ?? clause.AssumptionId)
+        return hash.Add("SharpProofClausePredicate/v1")
+            .Add(clause.Kind)
+            .Add(clause.Evidence)
+            .Add(clause.ClaimId ?? clause.AssumptionId)
             .Add(JsonSerializer.SerializeToUtf8Bytes(graph, WorkerProtocolJson.SharedOptions)).Finish();
     }
     private static T At<T>(IReadOnlyList<T> items, int index, string kind)
