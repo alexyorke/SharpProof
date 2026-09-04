@@ -13,6 +13,7 @@ public sealed class PackagedProductFeedLifecycle
     public void RemoveFeed()
     {
         PackagedProductFeed.DisposeShared();
+        PackageLayoutSmokeTests.DisposeSharedPackageCache();
     }
 }
 

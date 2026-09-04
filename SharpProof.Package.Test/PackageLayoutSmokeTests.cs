@@ -21,6 +21,11 @@ namespace SharpProof.Package.Test;
 [Parallelizable(ParallelScope.Children)]
 public sealed class PackageLayoutSmokeTests
 {
+    internal static void DisposeSharedPackageCache()
+    {
+        PackageWorkspace.DisposeSharedPackageCache();
+    }
+
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
@@ -2553,12 +2558,16 @@ public sealed class PackageLayoutSmokeTests
 
     private sealed class PackageWorkspace : IDisposable
     {
+        private static readonly string s_sharedPackageCache = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Package.Layout.Test",
+            "package-cache-" + Guid.NewGuid().ToString("N"));
         private readonly string _root;
 
         private PackageWorkspace(string root)
         {
             _root = root;
-            PackageCache = Path.Combine(root, "package cache");
+            PackageCache = s_sharedPackageCache;
             ConsumerDirectory = Path.Combine(root, "consumer project");
             ConsumerProject = Path.Combine(
                 ConsumerDirectory,
@@ -2655,6 +2664,14 @@ public sealed class PackageLayoutSmokeTests
                 Path.Combine(TestRepository.FindRoot(), "global.json"),
                 Path.Combine(root, "global.json"));
             return new PackageWorkspace(root);
+        }
+
+        internal static void DisposeSharedPackageCache()
+        {
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                s_sharedPackageCache,
+                "SharpProof.Package.Layout.Test",
+                "Refusing to remove an unexpected shared package cache.");
         }
 
         internal void WriteConsumer(string version, string packageId)
