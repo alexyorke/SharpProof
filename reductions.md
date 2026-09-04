@@ -21324,3 +21324,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2013 | `Generate-CompilerArtifactModel.ps1` and `Generate-ProtocolModel.ps1` repeat the schema read/version/namespace/JSON naming-policy preamble; share only the parameterized baseline reader and retain schema-specific validation. | `scripts/Generate-CompilerArtifactModel.ps1:306-323`; `scripts/Generate-ProtocolModel.ps1:258-276` |
+
+## Second survey, continued: R2014 - CompilerLoweredArtifact and CompilerCallableLowerer duplicate IR terminator successor projection
+
+`CompilerLoweredArtifact.ValidateExecutableBody` and `CompilerCallableLowerer.TryValidateAcyclicBody` each translate an `IrInstruction` terminator into an `ImmutableArray<IrBlockId>`: a same-target branch becomes one successor, a normal branch becomes two, a goto becomes its target, and a return has no successors. Their edge policies intentionally differ at malformed instructions - the artifact validator throws `InvalidDataException`, while the preparation path fails closed with an empty array - so the error boundary must remain explicit. A shared IR graph fact that returns the successor set plus a caller-selected malformed-terminator policy would remove the duplicated branch/goto/return taxonomy without coupling validation and preparation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2014 | `CompilerLoweredArtifact` and `CompilerCallableLowerer` duplicate IR terminator-to-successor projection; share the graph fact with explicit malformed-terminator policy while retaining throw-versus-fail-closed behavior. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:1119-1133`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:558-570` |
