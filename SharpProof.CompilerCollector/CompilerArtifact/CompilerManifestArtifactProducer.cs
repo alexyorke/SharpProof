@@ -86,15 +86,20 @@ internal static class CompilerManifestArtifactProducer
         ManifestCallableTarget target,
         CompilerCompilationSnapshot snapshot)
     {
-        artifact.EffectClaims = [.. target.EffectClaims.Select(
-            static claim => claim.Evidence)];
-        artifact.EffectAuthorities = [.. target.EffectClaims.Select(claim =>
+        var claims = target.EffectClaims;
+        var evidence = new CompilerEffectClaimArtifact[claims.Length];
+        var authorities = new CompilerEffectAuthorityArtifact[claims.Length];
+        for (var index = 0; index < claims.Length; index++)
         {
+            var claim = claims[index];
             CompilerEffectAuthority.BindSourceTree(
                 claim.Authority,
                 snapshot);
-            return claim.Authority;
-        })];
+            evidence[index] = claim.Evidence;
+            authorities[index] = claim.Authority;
+        }
+        artifact.EffectClaims = evidence;
+        artifact.EffectAuthorities = authorities;
         return artifact;
     }
 
