@@ -34,6 +34,8 @@ public sealed class EffectAnalysisSession
     private readonly object _gate = new();
     private ImmutableArray<EffectModuleInitializer> _moduleInitializers;
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<INamedTypeSymbol, bool>
+        _staticInitializationFailureCache = new(SymbolEqualityComparer.Default);
     private ImmutableDictionary<IMethodSymbol, EffectSummary> _bodySummaries =
         ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(
             SymbolEqualityComparer.Default);
@@ -408,14 +410,22 @@ public sealed class EffectAnalysisSession
 
     private bool StaticInitializationCannotComplete(INamedTypeSymbol type)
     {
+        type = type.OriginalDefinition;
+        if (_staticInitializationFailureCache.TryGetValue(type, out var cached))
+        {
+            return cached;
+        }
+
         var facts = new DefiniteOperationFacts(
             _compilation,
             CancellationToken.None);
-        return !EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
+        var result = !EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
                 type, _compilation, facts.MayCompleteNormally) ||
             type.StaticConstructors.Any(
             constructor => constructor.DeclaringSyntaxReferences.Length != 0 &&
                 !facts.MethodCanCompleteNormally(constructor));
+        _staticInitializationFailureCache.Add(type, result);
+        return result;
     }
 
     private void EnsureAnalyzed(
