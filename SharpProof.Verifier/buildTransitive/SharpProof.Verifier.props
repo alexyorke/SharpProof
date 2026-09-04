@@ -7,7 +7,6 @@
     <_SharpProofPackageToolsDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net9'))</_SharpProofPackageToolsDirectory>
     <_SharpProofPackageNativeZ3Path>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/linux-x64/libz3.so'))</_SharpProofPackageNativeZ3Path>
     <SharpProofToolsDirectory Condition="'$(SharpProofToolsDirectory)' == ''">$(_SharpProofPackageToolsDirectory)</SharpProofToolsDirectory>
-    <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
     <_SharpProofBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofBuildTasksPath>
     <_SharpProofBuildTasksPath Condition="'$(_SharpProofTestBuildTasksPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestBuildTasksPath)'))</_SharpProofBuildTasksPath>
     <_SharpProofPackageWorkerPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.dll'))</_SharpProofPackageWorkerPath>

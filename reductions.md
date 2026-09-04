@@ -22448,6 +22448,11 @@ to the value-domain check and type-ID path, avoiding duplicate specialization
 while preserving conversion classification and the injectable-specializer
 contract. The full Frontend.Test suite passes 121/121.
 
+R2327 is applied: the package props files no longer initialize private analyzer,
+collector, or verifier-tools paths that their paired targets recompute before
+consumption; public override defaults remain in props and late normalization
+remains in targets. The late-override MSBuild integration test passes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

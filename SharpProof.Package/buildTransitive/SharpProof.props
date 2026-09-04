@@ -2,13 +2,10 @@
   <PropertyGroup>
     <_SharpProofPortablePackagePresent>true</_SharpProofPortablePackagePresent>
     <SharpProofAnalyzerDirectory Condition="'$(SharpProofAnalyzerDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</SharpProofAnalyzerDirectory>
-    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-    <_SharpProofAnalyzerPath Condition="'$(_SharpProofAnalyzerPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll</_SharpProofAnalyzerPath>
     <_SharpProofContractForGeneratorPathWasDefault Condition="'$(_SharpProofContractForGeneratorPath)' == ''">true</_SharpProofContractForGeneratorPathWasDefault>
     <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofContractForGeneratorPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
     <_SharpProofSharedDirectory Condition="'$(_SharpProofSharedDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/shared/netstandard2.0'))</_SharpProofSharedDirectory>
     <SharpProofCollectorDirectory Condition="'$(SharpProofCollectorDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/collector'))</SharpProofCollectorDirectory>
-    <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;SharpProofSpecificationPacks" />
