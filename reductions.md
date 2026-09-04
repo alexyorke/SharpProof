@@ -20711,7 +20711,7 @@ more elements.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1960 | **`SharpProofSoundnessAnalyzer` maps a 41-entry array of metadata names onto a 41-member enum by array position, resolves each name with an API that returns `null` on failure, and nothing checks either the alignment or the resolution - so a renamed type or a misplaced insertion silently disables or rekeys the soundness rules that consult it.** `:14-26` declares `private static readonly ImmutableArray<string> KnownTypeNames` with 41 entries; `:1027-1040` declares `internal enum KnownType` with 41 members in the same order. `:1052-1059` binds them **positionally** - `types[index] = compilation.GetTypeByMetadataName(KnownTypeNames[index])` in an index loop - and `:1081` reads them back as `internal INamedTypeSymbol? this[KnownType type] => _types[(int)type]`. **Both failure modes are silent.** `GetTypeByMetadataName` returns `null` for a name it cannot resolve, the indexer's return type is nullable, and the rules consume it through `IsSameType(candidate, symbols[KnownType.X])` - at `:208`, `:216-217`, `:224`, `:237`, `:249`, `:262` and beyond - where a null right-hand side simply never matches. A type that moves assembly, gets renamed, or drops out of the referenced set turns its rule into a no-op that reports nothing and fails nothing. The insertion hazard is worse: adding a name to the array without adding the enum member at the same position shifts every later pairing, so rules silently key on the **wrong** types while both lists remain 41 long. **Nothing checks either property.** No assertion compares `KnownTypeNames.Length` to `Enum.GetNames(typeof(KnownType)).Length`, and none requires any entry to resolve. The one test that touches the array, `SharpProofSoundnessAnalyzerTests.ForbiddenCatalogIncludesInternalCSharpSpeculativeVariants:3023-3050`, reaches it by reflection and asserts `Does.Contain("Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel")` - one entry's presence, by containment. **What is at stake is the checker rather than the product.** This analyzer enforces `SPMETA001` through `SPMETA011` over SharpProof's own soundness-critical layers - the banned-API boundary, semantic-cache classification, cancellation handling - so a rule that quietly stops firing is a hole in the thing that watches for holes. **The technique to fix it is in the repository twice.** `BuildSchedulingTests.SemanticArchitectureShardsCoverEveryFixture` compares a hand-written roster to a reflected type set; `SharpProof.Gates/AnalyzerGateHost.cs:34-38` avoids the problem entirely by *deriving* its diagnostic-id list from `GeneratedDiagnosticDescriptors.SupportedDiagnostics` under a comment saying a descriptor "cannot be silently omitted from the gate". Two assertions - lengths equal, and every resolved type non-null against the analyzer's own compilation - would close both modes. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:14-26,1027-1040,1052-1059,1081` and the rule sites at `:208,216-217,224,237,249,262`; `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:3023-3050`; `SharpProof.ArchitectureTest/BuildSchedulingTests.cs` and `SharpProof.Gates/AnalyzerGateHost.cs:34-38,50-54` for the two working techniques; related R1720, R1860, R1640, R362 |
+| R1960 | **`SharpProofSoundnessAnalyzer` maps a 41-entry array of metadata names onto a 41-member enum by array position, resolves each name with an API that returns `null` on failure, and nothing checks either the alignment or the resolution - so a renamed type or a misplaced insertion silently disables or rekeys the soundness rules that consult it.** `:14-26` declares `private static readonly ImmutableArray<string> KnownTypeNames` with 41 entries; `:1027-1040` declares `internal enum KnownType` with 41 members in the same order. `:1052-1059` binds them **positionally** - `types[index] = compilation.GetTypeByMetadataName(KnownTypeNames[index])` in an index loop - and `:1081` reads them back as `internal INamedTypeSymbol? this[KnownType type] => _types[(int)type]`. **Both failure modes are silent.** `GetTypeByMetadataName` returns `null` for a name it cannot resolve, the indexer's return type is nullable, and the rules consume it through `IsSameType(candidate, symbols[KnownType.X])` - at `:208`, `:216-217`, `:224`, `:237`, `:249`, `:262` and beyond - where a null right-hand side simply never matches. A type that moves assembly, gets renamed, or drops out of the referenced set turns its rule into a no-op that reports nothing and fails nothing. The insertion hazard is worse: adding a name to the array without adding the enum member at the same position shifts every later pairing, so rules silently key on the **wrong** types while both lists remain 41 long. **Nothing checks either property.** No assertion compares `KnownTypeNames.Length` to `Enum.GetNames(typeof(KnownType)).Length`, and none requires any entry to resolve. The one test that touches the array, `SharpProofSoundnessAnalyzerTests.ForbiddenCatalogIncludesInternalCSharpSpeculativeVariants:3023-3050`, reaches it by reflection and asserts `Does.Contain("Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel")` - one entry's presence, by containment. **What is at stake is the checker rather than the product.** This analyzer enforces `SPMETA001` through `SPMETA011` over SharpProof's own soundness-critical layers - the banned-API boundary, semantic-cache classification, cancellation handling - so a rule that quietly stops firing is a hole in the thing that watches for holes. **The exact assertion already exists in production, applied seven times, and this is the one table it does not cover.** `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:38-44` declares `IsCompleteSlots(IReadOnlyList<PortableIrSlotMapping> mappings, Type enumType)` as `mappings.Select(mapping => mapping.Kind).SequenceEqual(Enum.GetNames(enumType), StringComparer.Ordinal)` - an ordered name-for-name comparison between a catalog and its enum - and `:26-32` applies it to three catalogs (`PortableIrSlotCatalog.Terms` against `IrTermKind`, `Locations` against `IrLocationKind`, `Instructions` against `IrInstructionKind`), while a sibling `IsComplete<T>` covers four more enum-backed arrays. Seven positional correspondences checked by one four-line method; `KnownTypeNames` is the eighth and the only one unchecked. **The technique is also in the repository twice more.** `BuildSchedulingTests.SemanticArchitectureShardsCoverEveryFixture` compares a hand-written roster to a reflected type set; `SharpProof.Gates/AnalyzerGateHost.cs:34-38` avoids the problem entirely by *deriving* its diagnostic-id list from `GeneratedDiagnosticDescriptors.SupportedDiagnostics` under a comment saying a descriptor "cannot be silently omitted from the gate". Two assertions - lengths equal, and every resolved type non-null against the analyzer's own compilation - would close both modes. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:14-26,1027-1040,1052-1059,1081` and the rule sites at `:208,216-217,224,237,249,262`; `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:3023-3050`; `SharpProof.ArchitectureTest/BuildSchedulingTests.cs` and `SharpProof.Gates/AnalyzerGateHost.cs:34-38,50-54` for the two working techniques; related R1720, R1860, R1640, R362 |
 
 ### Checked and not proposed (part six hundred twenty-nine)
 
@@ -21470,7 +21470,6 @@ separate file-generation steps.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2029 | **`PerformanceGate.CreatePerformanceProbeProject` constructs the same no-BOM `UTF8Encoding` twice for adjacent generated-file writes.** Reuse one class-level encoder while retaining the distinct `Subject.cs` and `Probe.csproj` contents. | `SharpProof.Gates/Performance/PerformanceGate.cs:499-508,540-556` |
-
 ## Second survey, continued: R2030 - explicit Monitor-call admission is duplicated across compiler replay and Effects scanning
 
 `CompilerEffectReplayLowerer.IsDefiniteMonitorCall` and
@@ -21492,3 +21491,681 @@ source and downstream behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2030 | **`CompilerEffectReplayLowerer.IsDefiniteMonitorCall` and `OperationEffectScanner.IsMonitorCall` duplicate the full explicit `Monitor`-call admission predicate.** Share only the static/argument/harmless-value/non-null/name/type-identity checks, preserving the lowerer's compilation-scoped lookup and replay policy, the scanner's cached symbol and effect policy, and the separate synthesized-lock path. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:322-342`; `SharpProof.Effects/OperationEffectScanner.cs:1448-1459`; `SharpProof.Effects/SharpProof.Effects.csproj:26`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:20`; related R915, R2020 |
+## Second survey, part six hundred thirty-one: R2030 - the container dispatcher runs eighteen dotnet commands with no timeout, through a local wrapper, while importing the module that exports a timeout-capable one
+
+The compiler-invocation surface, measured for the first time: every way the
+repository starts a `dotnet` process, and what each guarantees.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2030 | **`Invoke-SharpProofContainer.ps1` - the entry point every one of the repository's thirty-six commands passes through - defines a three-line local `Invoke-DotNet` with no timeout and routes eighteen `dotnet` invocations through it, while importing the module that exports `Invoke-SharpProofRequiredDotnet`, whose `TimeoutSeconds` parameter is mandatory.** The dispatcher imports `SharpProof.ContainerExecution.psm1` at `:27` and then declares at `:62-69` `function Invoke-DotNet([string[]]$Arguments)` which applies `Add-SharpProofStaticGraphArgument` and forwards to `Invoke-SharpProofCheckedCommand`. That helper, at `ContainerExecution.psm1:169-182`, is `& $Command @Arguments` followed by an exit-code check - **no timeout, no output capture, no process-tree termination**. The eighteen calls it carries are the long-running ones: **10 `restore`, 4 `build`, 2 `test`, 1 `run`, 1 `pack`**. A search of the whole dispatcher for `TimeoutSeconds` returns **nothing**. **The alternative is exported, adjacent, and already the convention elsewhere.** `Invoke-SharpProofRequiredDotnet` at `:128-166` takes `[Parameter(Mandatory = $true)][int]$TimeoutSeconds` - so a caller cannot omit one - plus an optional `-Quiet` that captures output to a temporary log and prints it only on failure, and delegates to `Invoke-SharpProofDotnetInvocation`, the hardened path that kills the process tree on timeout, exits 124, and cleans up in a `finally`. It has **eleven call sites in four scripts**: `eng/acceptance/Verify.ps1` (4), `Invoke-SharpProofChangedTests.ps1` (3), `Invoke-SharpProofPackageTests.ps1` (2) and `Invoke-SharpProofSemanticTests.ps1` (2). **The ledger already treats it as the intended path for a smaller case.** R568 asks `eng/acceptance/Verify.ps1` to drop its own forwarding wrapper in favour of this helper "and passing its existing timeout parameter"; the dispatcher is the same bypass at nearly twice the scale and in the file that fronts every command. **What the asymmetry costs.** The repository is otherwise careful about hangs - `Invoke-SharpProofGateEvidence.ps1` and `Test-SharpProofDependencyAudit.ps1` both take `[ValidateRange(1, 86400)][int]$TimeoutSeconds = 600`, the worker protocol carries `TerminationGraceMilliseconds` and `ForcedTerminationMilliseconds`, and R958 is about four process-tree killers disagreeing. Against that, `sp build`, `sp test`, `sp pack` and `sp run` have no bound at all and rely on the container or the CI job being killed from outside. | `scripts/Invoke-SharpProofContainer.ps1:27,62-69` and its eighteen `Invoke-DotNet` call sites; `scripts/SharpProof.ContainerExecution.psm1:128-166,169-182,1118-1140`; the eleven existing `Invoke-SharpProofRequiredDotnet` call sites; `scripts/Invoke-SharpProofDotnet.ps1:1-87` for the hardened invoker's contract; related R568, R958, R740, R975 |
+
+### Checked and not proposed (part six hundred thirty-one)
+
+- **There are four dotnet-invocation mechanisms and the count is not itself the
+  problem.** `Invoke-DotNet` (25 uses, dispatcher-local),
+  `Invoke-SharpProofRequiredDotnet` (11 uses, exported),
+  `Invoke-SharpProofParallelDotnetBuilds` and `Invoke-SharpProofParallelDotnetTests`
+  (`ContainerExecution.psm1:619,742`, 4 uses each) plus the standalone
+  `Invoke-SharpProofDotnet.ps1` that the last three ultimately reach. The two
+  parallel wrappers exist because scheduling several dotnet processes across lanes
+  is genuinely different work, and R788 already covers their shared parameter
+  plumbing. R2030 is about the one mechanism that drops a guarantee the others
+  keep, not about consolidating four into one.
+- **The direct `& dotnet` calls outside all four mechanisms are few and
+  justified.** `CSharpSourceMetrics.ps1:8,13` runs `dotnet --version` and
+  `--list-sdks` to validate the toolchain before anything else loads;
+  `Get-SharpProofProductionInventory.ps1:118` captures MSBuild property output;
+  `Invoke-SharpProofPackageTests.ps1:184` runs `dotnet vstest ... /ListTests`, which
+  is a discovery call the wrappers do not model; and
+  `Publish-SharpProofRelease.ps1:26,117` treats `dotnet` as a parameterised
+  executable path. `eng/container/Dockerfile:33-37` runs `--version`,
+  `--list-sdks` and `--list-runtimes` as image assertions. None is a build, test or
+  pack.
+- **The dotnet subcommand vocabulary is small and consistent**: across every
+  PowerShell script the quoted subcommands are `restore` (32), `build` (31), `test`
+  (16), `pack` (7), `run` (3), `msbuild` (3), `nuget` (2), `format` (2), `clean`
+  (2), `publish` (1) and `list` (1). There is no stray or one-off subcommand and no
+  place where two scripts spell the same operation differently.
+- **`Add-SharpProofStaticGraphArgument` is applied by both wrappers**, so the
+  static-graph behaviour that `BuildSchedulingTests` pins is not part of this
+  asymmetry - `Invoke-DotNet:63-65` and `Invoke-SharpProofDotnet.ps1:22-24` each
+  call it before dispatching.
+
+### Status (part six hundred thirty-one)
+
+R2030 is `pending`. The mechanical part is replacing eighteen `Invoke-DotNet` calls
+with the exported helper; the part that needs a decision is what timeout each of
+the eighteen should carry, and the helper's mandatory parameter is what forces that
+decision to be made rather than defaulted.
+
+## Second survey, part six hundred thirty-two: positional enum-to-array bindings, censused - eight exist, seven are checked by one production method, and the eighth is R1960
+
+No new ID. R1960 records a 41-entry array bound to a 41-member enum by position
+with nothing checking the alignment. The obvious question is whether that pattern
+is a family; measuring it bounds the finding and turns up the assertion the
+repository already wrote for it.
+
+### The census
+
+Three shapes were searched across every tracked `.cs` file:
+
+- **An enum cast used as an array index** - `[(int)SomeEnum...]` - returns **five**
+  sites, none generated. Two are unrelated: `IrInterpreter.cs:481` indexes a
+  sequence by a computed integer value, and
+  `FiniteCfgConcreteOracleTests.cs:477` indexes a truth table by a boolean-ish
+  input. Two are `SharpProofSoundnessAnalyzer.cs:1058,1081` - R1960's subject. Two
+  are `PortableIrGraphCodecTests.cs:314,324`, reading
+  `PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque]` and
+  `Instructions[(int)IrInstructionKind.Call]`.
+- **An array sized by `Enum.GetValues(...).Length`** - one site, in
+  `SchemaModelTestHelpers.cs`, which is the schema test comparing an enum to its
+  declaration rather than binding to it.
+- **An array sized by another array's `Length`** - nine sites, of which eight are
+  ordinary scratch buffers (`new byte[_terms.Length]`, `new bool[successors.Length]`)
+  and one is `SharpProofSoundnessAnalyzer.cs:1052`, again R1960.
+
+The 75 parallel index loops the search also returns are single-collection
+iteration, not two-collection correspondence.
+
+### The assertion R1960 asks for is already written and used seven times
+
+Following the `PortableIrSlotCatalog` sites into production finds
+`PortableIrGraphCodec.cs:38-44`:
+
+> `mappings.Select(static mapping => mapping.Kind).SequenceEqual(Enum.GetNames(enumType), StringComparer.Ordinal)`
+
+`:26-32` applies it to three catalogs - `Terms` against `IrTermKind`, `Locations`
+against `IrLocationKind`, `Instructions` against `IrInstructionKind` - and the
+sibling `IsComplete<T>` at `:34` covers four more enum-backed arrays:
+`OpaquePurities`, `UnaryOperators`, `BinaryOperators`, `HavocKinds`. Seven
+positional correspondences, one four-line method, evaluated in production rather
+than in a test.
+
+**So the repository has eight positional enum-to-array bindings, seven of which are
+checked by name-for-name ordered comparison, and the eighth is a hand-written table
+inside the analyzer that enforces the product's soundness rules.** R1960's row has
+been updated to name `IsCompleteSlots` as the implementation to copy - it is a
+closer model than the two the finding originally cited, being production code, the
+same shape, and already proven against seven tables.
+
+### Checked and not proposed (part six hundred thirty-two)
+
+- **The distinction between the checked seven and the unchecked one is generated
+  versus hand-written, and that is the whole of it.** `PortableIrSlotCatalog` is
+  emitted by `Generate-CompilerArtifactModel.ps1` from
+  `CompilerArtifactModel.schema.json`'s `portableIrSlotDomains`,
+  `portableIrSlotRoles` and `portableIrSlotMappings` - the tables R255 is about -
+  so it has both a schema authority and a runtime completeness check.
+  `KnownTypeNames` has neither: it is the only hand-written table of its size in
+  production, as part six hundred twenty-nine measured, and it is the only one
+  outside the generated-model gate.
+- **`IsCompleteSlots` compares names, not resolution**, so copying it to
+  `KnownTypeNames` closes R1960's alignment mode but not its resolution mode - a
+  name can align with the enum and still fail `GetTypeByMetadataName`. R1960 asks
+  for both assertions and the second has no existing model; it is one `Assert.That`
+  over the analyzer's own compilation.
+
+## Second survey, part six hundred thirty-three: R2040 - the fixture container is named six ways across 543 declarations, and one project of six has no convention at all
+
+The embedded-fixture surface, censused by the identifier a reader greps for first:
+the `static class` that holds the methods under test. Restricting to that one
+unambiguous role - not instance types like `readonly struct Target`, whose shape is
+itself the subject - gives **543 declarations across 93 files in 6 test projects**,
+spelled **six** different ways: `Sample` 212, `Subject` 174, `Fixture` 107,
+`Target` 47, `Probe` 2, `Consumer` 1.
+
+Per project the convention is real and defensible, and the finding is not that six
+names exist:
+
+| Project | Declarations | Names |
+|---|---|---|
+| `SharpProof.Effects.Test` | 220 | `Sample` 212, `Subject` 6, `Probe` 2 |
+| `SharpProof.Analyzer.Test` | 160 | `Fixture` 107, `Subject` 51, `Target` 2 |
+| `SharpProof.Worker.Test` | 90 | `Subject` 90 |
+| `SharpProof.Contracts.Test` | 45 | `Target` 44, `Consumer` 1 |
+| `SharpProof.Package.Test` | 17 | `Subject` 17 |
+| `SharpProof.Frontend.Test` | 11 | `Subject` 10, `Target` 1 |
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2040 | **Four of the six test projects hold their fixture-container convention to within one or two declarations, one holds it exactly, and `SharpProof.Analyzer.Test` has no convention at all - 107 `Fixture` against 51 `Subject`, spread over 12 and 11 files respectively, with three files using both.** The repository's per-suite idiom is otherwise sound: `Worker.Test` is 90 of 90 `Subject`, `Package.Test` 17 of 17, `Effects.Test` 212 of 220 `Sample`, `Contracts.Test` 44 of 45 `Target`. Against that uniformity two things stand out. **First, twelve singleton deviations**, each one declaration adrift of the suite around it: `Effects.Test` writes `Subject` at `ConstructorRuntimeOrderRegressionTests.cs:24`, `EffectLatticeTests.cs:70`, `ReducedExtensionReceiverCompletionTests.cs:20`, `RefConditionalArgumentHavocTests.cs:15`, `UsingInitializerUnwindRegressionTests.cs:26` and `UsingInterfaceReimplementationDispatchRegressionTests.cs:26`, and `Probe` twice in `StaticFieldTypeInitializationTests.cs:22,69` - a file whose other three fixtures are `Sample`; `Contracts.Test` writes `Consumer` once at `PartialMethodContractTests.cs:278` among 44 `Target`; `Frontend.Test` writes `Target` once at `ContractApiIdentityResolverTests.cs:161` among 10 `Subject`; and `Analyzer.Test` writes `Target` at `RequiresCallSiteDiscoveryTests.cs:1580,1601`, in a file that uses `Subject` 27 times. **Second, and the larger half, `Analyzer.Test`'s 107/51 split is not a tail - it is two conventions of comparable weight inside one project**, with `FinalCompilationCollectorTests.cs` carrying both (`Fixture` 2, `Subject` 1) and no file-level rule that predicts which a given test will use. **What it costs is grep.** The container name is the one identifier that answers "what is under test here", and no single search returns the repository's fixtures; a test author opening a new file in the analyzer suite has two equally attested names and no basis to choose between them. **The remedy is twelve renames and one decision.** Renaming the twelve singletons to their suite's name is mechanical and touches no assertion - these classes are referenced only from inside their own fixture string, so the rename is confined to the raw literal. `Analyzer.Test` needs a choice between `Fixture` and `Subject` first; the wider repository leans `Subject`, at 174 declarations across four projects against 107 `Fixture` in one, and R1654 - which asks `Frontend.Test`'s two lowering helpers to share a `WrapSubjectMembers` envelope built on `public static class Subject` - is the only place the repository has so far written the envelope down. | The 543-declaration census over 93 files and 6 projects; the twelve cited deviation sites; `SharpProof.Analyzer.Test` `Fixture` in 12 files against `Subject` in 11; `SharpProof.Analyzer.Test/FinalCompilationCollectorTests.cs` and `RequiresCallSiteDiscoveryTests.cs:1580,1601` for the self-contradicting files; related R1654, R1600, R309, R1664, R306, R749 |
+
+### Checked and not proposed (part six hundred thirty-three)
+
+- **The cross-project variation is a legitimate per-suite idiom and is not part of
+  the finding.** `Sample` in the effects suite, `Target` in the contracts suite and
+  `Subject` in the worker suite each read correctly in context - a contracts test
+  really is about the *target* of a contract, an effects test really does analyse a
+  *sample* body. Four of six projects hold their choice to within one declaration.
+  R2040 is about the twelve that drift and the one project that never chose, not
+  about unifying 543 names on a single word.
+- **`Target` paired with `ITarget` is a genuine interface-plus-companion shape, not
+  a sixth synonym.** Of the fixture blocks declaring `Target`, only three *files*
+  also declare `ITarget` - `ContractForValidatorGeneratorTests.cs` (40 `ITarget`, 12
+  `Target`), `ContractBinderTests.cs` (37/15) and `ConstructedGenericContractTests.cs`
+  (5/4) - and in those the interface is the declared surface and `Target` its
+  implementation, which is exactly what the generator and the binder are for. R1646
+  and R1647 already cover the source-template duplication inside two of them.
+- **Instance-typed fixtures named `Target` are a different role and are correctly
+  named differently.** `EffectAnalysisTests.cs:1232,8484` declare `public readonly
+  struct Target`, `:3567` `public sealed class Target<T>` and `:8836` `public sealed
+  class Target` - fixtures whose *type shape* is the subject, in a file that
+  otherwise uses `Sample` 137 times for the static-container role. Counting these as
+  deviations would have been wrong; an earlier pass of this measurement did count
+  them, which is why the raw figure of 717 declarations over seven names falls to
+  543 over six once the role is held fixed.
+- **Near-duplicate fixture *bodies* are a much weaker signal than the naming.** Over
+  1,106 fixture blocks of five or more lines, Jaccard similarity in [0.80, 1.0)
+  finds 79 pairs in 33 clusters - the largest being 11 blocks spanning
+  `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs` (7) and
+  `CompilerCallableLowererTests.cs` (4), all sharing the `using SharpProof.Attributes;`
+  plus `internal static class Subject` envelope and differing in the method body that
+  is the entire point of each test. The shared part is the two-line envelope; the
+  differing part is the test. The one place the repository proposes a helper for that
+  envelope is R1654, in a different project, so no finding beyond it is warranted
+  here - and the exact-duplicate census in part six hundred six had already bounded
+  the truly identical blocks at 21 blocks and 186 lines out of 1,182.
+
+### Status (part six hundred thirty-three)
+
+R2040 is `pending`. The twelve renames are mechanical and independently applicable;
+the `Analyzer.Test` half needs one decision, and R1654's `WrapSubjectMembers`
+envelope is the nearest thing the repository has to a place to record it.
+
+## Second survey, part six hundred thirty-four: R2060 - ten shipped diagnostics have documentation the repository's own gate guarantees exists, and no help link pointing at it
+
+The diagnostic catalog measured as user-facing text rather than as a code
+generator's input: 34 descriptors across three generated outputs - `analyzer` 13,
+`contractForGenerator` 10, `metaAnalyzer` 11 - checked for message-format arity,
+duplicate wording, and help-link resolution.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2060 | **All ten `SPCF` generator diagnostics ship to consumers with an empty `helpLinkUri`, while `docs/diagnostic-examples.md` documents every one of them at an explicit anchor that a repository gate throws if it cannot find.** The catalog's `helpLinkUri` is populated for 24 of 34 descriptors and empty for exactly ten - `SPCF0001` through `SPCF0010`, the whole `contractForGenerator` output. The documentation is not missing: `docs/diagnostic-examples.md:298-359` carries `<a id="spcf0001"></a>` through `<a id="spcf0010"></a>`, each above its own `### SPCF000n - ...` section, and `scripts/Test-SharpProofReadme.ps1:566-574` iterates every catalog id matching `^SP(?:CF)?\d{4}$` and throws `"Diagnostic catalog is missing '$id' and its help anchor."` unless the exact `<a id="...">` tag is present. So the repository already *proves*, on every readme-gate run, that the destination for all ten links exists - and then ships descriptors that do not point at it. **The gate is one-sided by construction.** Two lines above that check, `:561-563` reads `if (-not [string]::IsNullOrWhiteSpace($helpLink)) { Assert-RepositoryDocumentLink ... }` - every link that is present is validated, and no descriptor is ever required to have one. That asymmetry is why ten empty fields have survived: the anchor half is enforced and the link half is opt-in. **The ten are consumer-visible, not internal.** `SharpProof.Package/buildTransitive/SharpProof.targets:19` adds `SharpProof.ContractForGenerator.dll` as an `<Analyzer>` item for every package consumer, so `SPCF` diagnostics appear in downstream IDEs and build logs; `DiagnosticDescriptor.HelpLinkUri` is what fills the "learn more" affordance there and the `helpUri` field in SARIF, which this repository does emit (`SharpProofVerifySarifFile` in `eng/acceptance/preview-interface.v1.json:27`, `sarifProduced` in the pilot reports). The other 24 descriptors carry links and so surface their documentation; these ten silently do not. **The fix is ten fields in one JSON file, in the form already used thirteen times.** The analyzer output writes `https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0002` and so on for each of its thirteen ids, against the same document that holds the `SPCF` anchors; the ten new values differ only in the fragment. Tightening the gate's `IsNullOrWhiteSpace` guard into a requirement afterwards keeps the eleventh from recurring. | `eng/diagnostics/diagnostic-descriptors.v1.json` (34 descriptors; 24 with a help link, the 10 empty ones exactly `SPCF0001`-`SPCF0010`); `docs/diagnostic-examples.md:298,305,311,317,324,331,337,344,352,359` for the ten anchors and their sections; `scripts/Test-SharpProofReadme.ps1:558-574` for the enforced-anchor / optional-link asymmetry; `SharpProof.Package/buildTransitive/SharpProof.targets:19`; `eng/testing/DiagnosticDescriptorCatalogAssertions.cs:146-150`; related R273, R743, R744, R326, R506 |
+
+### Checked and not proposed (part six hundred thirty-four)
+
+- **Message-format arity is sound everywhere it can be checked.** Extracting the
+  `{n}` placeholders from all 34 `messageFormat` strings gives an arity
+  distribution of 5 formats with none, 15 with one, 7 with two, 6 with three and 1
+  with four, **no gaps** - no format uses `{0}` and `{2}` without `{1}` - and the 20
+  direct `Diagnostic.Create(Descriptor, location, ...)` sites that resolve to a
+  catalog descriptor pass **exactly** the required argument count in all 20 cases.
+  The remaining descriptors are reported through `Report(context, descriptor,
+  location, ...)` in `SharpProofSoundnessAnalyzer`, `Diagnose(descriptor, target,
+  ...)` in `ContractForCompanionValidator` and an array-argument helper in
+  `EffectContractDiagnostics`; those take `params`/array arguments, so nothing is
+  compile-time checked at any of the sites - but nothing is *wrong* at them either,
+  and a finding asking for an arity assertion would be speculative rather than
+  evidenced.
+- **No two descriptors share a title or a message format.** All 34 titles are
+  distinct and all 34 message formats are distinct, which for a catalog that
+  three separate analyzers draw from is a stronger result than it sounds - the
+  `metaAnalyzer` and `analyzer` outputs cover overlapping subject matter
+  (cancellation, purity, boundaries) without converging on the same words.
+- **The eleven `SPMETA` descriptors sharing one anchor is defensible and is not
+  part of R2060.** They all point at `docs/architecture.md#mechanized-boundaries`,
+  a heading that exists, rather than at per-diagnostic sections. These rules fire
+  only inside this repository against its own soundness-critical layers - they are
+  never shipped to a consumer - and one architectural section is the right
+  granularity for them. The contrast with the thirteen per-id analyzer links is a
+  deliberate difference in audience, not drift.
+- **`<a id="sp0048"></a>` exists in the reference with no catalog descriptor behind
+  it, and that is correct.** SP0048 is a verifier-launcher code rather than an
+  analyzer rule - `docs/diagnostic-examples.md:220-222` says so in the section
+  itself, and R743 and R744 already cover the launcher vocabulary. The document
+  carries 14 `sp####` anchors against the catalog's 13 analyzer descriptors for
+  exactly this reason.
+
+### Status (part six hundred thirty-four)
+
+R2060 is `pending` and is ten string values plus one loosened guard turned strict.
+It is filed because the destination already exists and is already gated: the work
+is not writing documentation but connecting descriptors to documentation the
+repository has proven it has.
+
+## Second survey, part six hundred thirty-five: R2080 - every generator can redirect its inputs and outputs, three do so for a test, and twelve carry twenty-three unused overrides
+
+The generator parameter surface, censused for the first time: what each of the
+fifteen generators lets a caller control, and what any caller actually controls.
+
+| | Count |
+|---|---|
+| Generators | 15 (14 under `scripts/`, plus `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1`) |
+| Path/directory parameters across them | 36 |
+| Overridden by at least one caller | 13 |
+| **Never overridden by anything tracked** | **23, on 12 of the 15 generators** |
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2080 | **Every generator exposes each of its inputs and outputs as an overridable path parameter defaulted to a fixed repository location, exactly three generators have a caller that overrides one, and the other twelve carry twenty-three overrides that nothing has ever passed.** The uniform shape is `[Parameter()][string]$XPath` in the `param` block followed by `$XPath = Resolve-SharpProofPath $XPath (Join-Path $repositoryRoot '...')` - two lines per parameter, 36 parameters, one helper. **The three that are used are used for one purpose, and it is a good one**: redirecting a generator's output into a temporary location so generation can be tested in isolation. `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs` passes all four of `Generate-ApiSpecCatalog.ps1`'s paths; `scripts/Test-CompilerArtifactModelGenerator.ps1` passes five of `Generate-CompilerArtifactModel.ps1`'s six; `SharpProof.Frontend.Test/ContractApiCatalogParityTests.cs` passes both of `Generate-ContractApiCatalog.ps1`'s. A fourth site is internal plumbing rather than a test - `Generate-ApiSpecCatalog.ps1:1211-1214` passes `-CatalogPath`, `-OutputPath` and `-Verify:$Verify` to the fifteenth generator it delegates to. **The other twelve have the seam and no test standing on it**: `Generate-ProtocolModel` 3, `Generate-CSharpScalarSemantics` 3, `Generate-LauncherArguments` 3, and 2 each for `AnalyzerDiagnosticCatalog`, `BoundContractModel`, `EffectContractMappings`, `IrModel` and `OperationSupportCatalog`, 1 each for `DeclarativeModels`, `DiagnosticDescriptors` and `ProjectionCatalog`, plus `ProtocolSchemaPath` on `CompilerArtifactModel` - 23 in all. Their only exercise is `Test-SharpProofGeneratedOutputs.ps1`, which runs all fourteen `scripts/` generators as `& <script> -Verify` with **no path arguments at all**, so every one of the 23 is always its default. **Two remedies, and the repository has already demonstrated both halves.** Deleting the 23 removes roughly 46 lines and narrows twelve command surfaces to the `-Verify` switch that is the only control anyone uses. Keeping them means writing the isolation test that justifies them, in the form the three existing ones already establish. What should not persist is the present state, where a capability with a real purpose is uniformly declared and selectively honoured, and nothing records which of the twelve were meant to get a test. | The 36-parameter census over 15 generators; `scripts/Generate-ProtocolModel.ps1:1-20`, `Generate-CompilerArtifactModel.ps1:1-31`, `Generate-LauncherArguments.ps1:1-19` and `Generate-CSharpScalarSemantics.ps1:1-29` for the declare-then-`Resolve-SharpProofPath` shape; `scripts/Test-SharpProofGeneratedOutputs.ps1:8-27` for the fourteen argument-free `-Verify` invocations; the three override sites `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs`, `SharpProof.Frontend.Test/ContractApiCatalogParityTests.cs`, `scripts/Test-CompilerArtifactModelGenerator.ps1`; `scripts/Generate-ApiSpecCatalog.ps1:1211-1214`; related R1122, R1129, R980, R463, R342 |
+
+### Checked and not proposed (part six hundred thirty-five)
+
+- **The fifteenth generator is genuinely verified, through a delegation that
+  propagates correctly.** `Generate-ApiSpecCatalog.ps1:1211-1214` invokes
+  `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1` with `-Verify:$Verify`,
+  so the fourteen-entry roster in `Test-SharpProofGeneratedOutputs.ps1` reaches all
+  fifteen. The correction recorded earlier in this ledger - that there are fifteen
+  generators, not fourteen - could have implied a gap in that loop, and there is
+  none.
+- **`Test-SharpProofGeneratedOutputs.ps1`'s hand-written fourteen-name roster is
+  currently exact.** Its `$generatorScripts` list matches `scripts/Generate-*.ps1`
+  one for one, and `Get-SharpProofProductionInventory.ps1:159` shows the repository
+  already knows the `Get-ChildItem -Filter 'Generate-*.ps1'` form that would derive
+  it. It is not filed because R980 already covers where that loop runs and R1121
+  already corrected its one duplicate entry; the derivation question is a third
+  observation about the same eight lines, and the list being right today makes it
+  the weakest of the three.
+- **Central package management has no dead entries.** All 14 `PackageVersion`
+  entries in `Directory.Packages.props` have at least one matching
+  `PackageReference`. The nine referenced names with no central version - `Serilog`,
+  `Polly`, `FluentValidation`, `OneOf`, `Ardalis.GuardClauses`,
+  `NETStandard.Library` and the three `SharpProof*` self-references - are corpus and
+  consumer fixtures outside the CPM tree, which is what R491 already assumes when it
+  audits third-party versions.
+- **The other never-passed script parameters are operator-facing and correctly
+  optional.** The full 246-parameter census over 60 scripts with a `param` block
+  finds 17 never passed by any tracked file; beyond the generator paths these are
+  `-ApiKey`, `-ReadApiKey` and `-SymbolApiKey` on `Publish-SharpProofRelease.ps1`,
+  which a release operator or a CI secret supplies and which must never appear in a
+  tracked file, and `-Resume`/`-KeepWorkspace` on
+  `Test-SharpProofTrustedMutations.ps1`, which exist for a human resuming a long
+  mutation run. Those are the correct shape for a parameter no caller passes.
+
+### Status (part six hundred thirty-five)
+
+R2080 is `pending` and needs a decision before any edit: whether the twelve
+generators without an isolation test should get one or should stop advertising the
+seam. Either answer is a small change; the present state is the only one that
+carries the cost of both.
+
+## Second survey, part six hundred thirty-six: R2100 - the effect wire vocabulary is generated from a catalog and then hand-restated in three more places, two of them across the assembly boundary it describes
+
+A duplicate-literal census over hand-written production code: every string of
+fourteen or more characters appearing in more than one file. 306 files, **81** such
+literals. Most are what the ledger already covers - `TRUSTED_PLATFORM_ASSEMBLIES`
+and its error message in five files each is R341, R729 and R730; the analyzer
+suppression justifications are style. One cluster is new, and it sits on a wire.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2100 | **The eight `(EffectDirectEventKind, wire name)` pairs are declared in a catalog and generated into `SharpProof.Effects`, and then written out by hand three more times - including at both ends of the replay wire the vocabulary exists to describe, so the emitter and the matcher agree with each other rather than with the catalog.** The authority is `SharpProof.Effects/EffectContractMappings.catalog.json:185`, generated into `EffectContractMappings.generated.cs:227-236` as `internal static readonly (EffectDirectEventKind Event, string WireName)[] DirectEvents`. **The producer** `SharpProof.Worker/EffectCounterexampleReplayer.cs:137,148,161,173,185` switches on `CompilerEffectReplayEventKind` and emits `"managed-allocation"`, `"managed-array-allocation"`, `"explicit-throw"`, `"synchronization-call"` and `"synchronization-lock"` as literals. **The consumer** `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:120,142,160,194,214` switches on `EffectDirectEventKind` - the generated enum, the exact left-hand column of `DirectEvents` - and then guards each case with `when witness.Kind == "managed-allocation"` and the other four literals. That file has the enum member in hand and re-asserts its mapping from memory. **One of the two can reach the authority and does not.** `SharpProof.CompilerCollector.csproj` carries `<ProjectReference Include="..\SharpProof.Effects\...">` and `SharpProof.Effects.csproj:26` grants it `InternalsVisibleTo`, so `DirectEvents` is visible at those five sites. `SharpProof.Worker` references neither - its eight project references do not include `SharpProof.Effects` - so its five literals are forced by the assembly graph unless a reference is added or the pairs move to a lower assembly. **What the split costs is the direction of agreement.** The replay path works because the worker's spelling and the collector's spelling happen to match, not because either consults the catalog. A rename in `EffectContractMappings.catalog.json` regenerates `DirectEvents`, leaves both hand-written mirrors on the old spelling, and leaves them agreeing with each other - the wire keeps working while diverging from the declared vocabulary. The mutation catalog's `effect-direct-event-wire-catalog` entry (`scripts/Test-SharpProofTrustedMutations.ps1:390-396`) proves the *table* is watched, but the test it names, `EffectContractWireParityTests.DirectEventWireCatalogIsClosedAndBijective:270-300`, pins the table against **a fourth hand-written copy of all eight pairs** inside `SharpProof.Effects.Test` - a closure-and-bijection oracle over the catalog, which never observes the ten replay literals. | `SharpProof.Effects/EffectContractMappings.catalog.json:185` and `EffectContractMappings.generated.cs:227-236`; `SharpProof.Worker/EffectCounterexampleReplayer.cs:137,148,161,173,185`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:120,142,160,194,214`; `SharpProof.Effects.Test/EffectContractWireParityTests.cs:270-300`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj` and `SharpProof.Effects/SharpProof.Effects.csproj:26` for the reachable half; `SharpProof.Worker/SharpProof.Worker.csproj` for the unreachable half; `eng/testing/AllocationWitnessKinds.cs` and `Directory.Build.props:118-122`; related R1673, R362, R548, R1118, R953 |
+
+### Checked and not proposed (part six hundred thirty-six)
+
+- **`eng/testing/AllocationWitnessKinds.cs` is justified, not a fourth careless
+  copy.** It declares two of the eight wire names for `SharpProof.Package.Test` and
+  `SharpProof.Worker.Test` through a `Directory.Build.props:118-122` `Compile
+  Include ... Link` pair. Neither test project references `SharpProof.Effects`, and
+  `InternalsVisibleTo` does not flow transitively through
+  `SharpProof.CompilerCollector`, so those two projects genuinely cannot see
+  `DirectEvents`. R1673 already asks the Worker fixtures to adopt this helper rather
+  than re-spelling the strings, which is the right direction given the boundary.
+  The helper stops being necessary only if R2100's visibility half is addressed.
+- **The pinning test's hand-written table is the correct design and is not part of
+  the finding.** `DirectEventWireCatalogIsClosedAndBijective` restating all eight
+  pairs is what an oracle is *for* - deriving the expectation from the thing under
+  test would assert nothing. It is the ledger's tier-B correspondence shape done
+  deliberately, and the mutation entry that targets it confirms it bites.
+- **Three of the eight wire names have no production literal at all.**
+  `direct-field-read`, `direct-field-write` and `volatile-field-access` appear only
+  in tests (three sites each). The replay pair covers five of eight because those
+  three events are not replayed, so the ten sites are the complete production
+  exposure rather than a sample.
+- **The other multi-file production literals are already covered or are not
+  duplication.** `TRUSTED_PLATFORM_ASSEMBLIES` and `"Trusted platform assemblies are
+  unavailable."` in five files each are R341/R729/R730; `", EntryPoint = "` in
+  fifteen P/Invoke declarations across six files is the C# attribute syntax, not a
+  shared value; `"CA1508:Avoid dead conditional code"` and three sibling suppression
+  justifications repeated across four files are the analyzer's own rule text, which
+  must be spelled exactly; and `".runtimeconfig.json"` in five files is a framework
+  file-name suffix. None is a candidate.
+
+### Status (part six hundred thirty-six)
+
+R2100 is `pending` and splits cleanly. The collector's five `when` guards can consult
+`DirectEvents` today with no build change - that half is a small edit in one file.
+The worker's five require a decision about where the pairs should live so that both
+ends of the wire and the two test projects can see them; the present arrangement is
+the one where nobody but the catalog's own oracle can.
+
+## Second survey, part six hundred thirty-seven: R2120 and R2140 - three documented abstention boundaries the verifier cannot reach, and the meta-analyzer's one dead known type
+
+An enum-member reachability census over hand-written and generated production code:
+**146 enums, 853 members**, each checked for a qualified `Type.Member` reference
+anywhere in the tracked C# tree. **25 members** are never referenced. Most of the 25
+are correctly unreferenced; two groups are not.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2120 | **`docs/unknown-reasons.md` documents twelve `AbstentionReason` values with a per-value boundary description, three of them are never constructed anywhere in the repository, and its value list - like two of the three other enums the same document declares exact - is checked against nothing.** `SharpProof.Verify/Outcomes.cs:3-17` declares twelve members. Counting qualified references across every tracked C# file - production and test - gives `MalformedBackendResult` 8, `CounterexampleReplayFailed` 11, `InfrastructureFailure` 5, `PostconditionMayBeUndefined` 5, and so on for nine members, and **zero, in both columns, for `UnsupportedOperation`, `ApproximationTouchedGoal` and `MissingApiSpecification`**. They appear in their own declaration and nowhere else: not in `ProofKernel.cs`, which `docs/unknown-reasons.md:112` names as the only thing that constructs proof outcomes; not in `VerificationProjections.generated.cs:12-23`, whose `MapFailure` covers six of the twelve and funnels everything else to `MalformedBackendResult`; not in `WorkerProjections.generated.cs`; and not in any test. **The documentation asserts they are reachable.** The table at `docs/unknown-reasons.md:88-104` is introduced with "`SharpProof.Verify.AbstentionReason` has these exact values" and gives each a boundary - "The proof query contains an operation outside the verified subset", "Establishing the goal would depend on approximate evidence", "An external member has no exact resolved spec" - which describe three real analysis boundaries a reader would expect to see reported and which no run can produce. **The asymmetry with its neighbours is the reason this survived.** `scripts/Test-SharpProofReadme.ps1:770-793` reads ten enums out of `ProtocolModel.generated.cs` - `WorkerRunStatus`, `WorkerClaimReason`, `WorkerCacheStatus` and seven more - and throws if any member is absent from this document. The document makes **four** "has these exact values" claims - `FrontendAbstention` at `:15`, `BackendFailureReason` at `:73`, `AbstentionReason` at `:88` and `WorkerClaimReason` at `:178` - and only the last is covered, because only it is generated into `ProtocolModel.generated.cs`. The other three are hand-written enums in `SharpProof.Frontend` and `SharpProof.Verify`, and no gate compares any of their tables to their enums. What singles out `AbstentionReason` is not that it is ungated but that it is the only ungated one that has drifted: every one of `FrontendAbstention`'s sixteen members and `BackendFailureReason`'s seven is constructed in production. Either the three boundaries are unimplemented and the rows are a promise, or they are obsolete and both the enum and the table should lose them; the ungated table is what allows the question to stay open. | `SharpProof.Verify/Outcomes.cs:3-17`; `docs/unknown-reasons.md:86-104,112`; `SharpProof.Verify/VerificationProjections.generated.cs:12-23`; `scripts/Test-SharpProofReadme.ps1:770-793` for the ten gated neighbours; the twelve-member reference census (nine live, three at zero in both production and test); related R2060, R362, R973, R1600 |
+| R2140 | **`SharpProofSoundnessAnalyzer` resolves `"SharpProof.Worker.Launcher.Program"` on every compilation into a `KnownType` slot that no rule ever reads.** `KnownType.WorkerLauncherProgram` is declared at `:1039` between `WorkerProgram` and `SharpProofWorker`, and its metadata name sits at `:34`. Both neighbours are live - `CancellationBoundaryAnalyzer.cs:493,670` reads `symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerProgram]` and `SharpProofSoundnessAnalyzer.cs:1069` reads `this[KnownType.SharpProofWorker]` - and `WorkerLauncherProgram` has **zero** reads anywhere in the tracked tree. It is the only dead member of the 41. **The cost is small and the coupling is the point.** One `GetTypeByMetadataName` call per compilation is negligible; what matters is that removing the pair requires deleting the name at `:34` **and** the member at `:1039` **at the same index**, and R1960 establishes that nothing checks that the two lists stay aligned. A dead entry in a positionally bound pair of lists is the cheapest possible way to discover that the alignment is unguarded, and it is also the most likely thing a future edit removes carelessly. R2140 should be applied together with R1960's two assertions, not before them. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:34,1039,1052-1059,1081`; `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:493,670` and `SharpProofSoundnessAnalyzer.cs:1069` for the live neighbours; related R1960, R1720 |
+
+### Checked and not proposed (part six hundred thirty-seven)
+
+- **The two large unreferenced groups are shipped public API consumed as sets, and
+  are correctly unreferenced.** `SharpProofCapability` has 10 of 14 members with no
+  qualified reference and `SharpProofEffect` 4 of 17, but both are `[Flags]` enums in
+  `SharpProof.Attributes` that consumers write into attributes - `[Capability(
+  SharpProofCapability.FileRead)]` - and the analyzer consumes the *value*, not the
+  member: `EffectContractDiagnostics.cs:326` validates only that a flags value is
+  defined. Every member also carries an XML doc comment. A per-member reference is
+  not the shape of use here.
+- **`CompilerEffectReplayEventKind`'s three unreferenced members line up exactly with
+  part six hundred thirty-six's result.** `Unspecified`, `ReceiverFieldRead` and
+  `ReceiverFieldWrite` are unreferenced, and `direct-field-read` /
+  `direct-field-write` are precisely the wire names R2100 found have no production
+  literal, because those events are not replayed. The generated model declares a
+  wider event vocabulary than the replay path exercises, which is a schema being
+  complete rather than a defect - but it does mean R2100's ten sites are the whole
+  production exposure, confirmed independently.
+- **`Unspecified` members on generated protocol enums are the schema's zero value
+  and must exist.** `WorkerCallableCoverageReason.Unspecified` and
+  `WorkerCacheStatus.Unspecified` are unreferenced in C# for the same reason every
+  protocol enum needs a defined zero: they are what a default-initialized or
+  unrecognized wire value decodes to. These are also inside the ten enums that
+  `Test-SharpProofReadme.ps1` gates against `docs/unknown-reasons.md`, so their
+  documentation is enforced.
+- **The remaining singletons are each defensible.** `GeneratedIrCategory.Justification`
+  belongs to a fuzz generator's category set, `ProofDiagnosticKind.EffectContract`
+  to a diagnostic-kind union whose members are matched by pattern rather than by
+  name, and no other enum has more than one unreferenced member.
+
+### Status (part six hundred thirty-seven)
+
+R2120 is `pending` and needs a decision rather than an edit: whether three documented
+boundaries are unimplemented or obsolete. Adding `AbstentionReason` to the readme
+gate's enum list is the mechanical half and would stop the table drifting again, but
+it pins the current twelve rather than answering the question. R2140 is `pending` and
+is two deletions at one index, which should follow R1960.
+
+## Second survey, part six hundred thirty-eight: correction to R2120, and what the wider check found
+
+R2120 as first written said `AbstentionReason` was "the one enum in that document
+whose value list is checked against nothing while ten neighbours in the same file
+are gated." **That was wrong, and wrong in the direction that understates the
+gap.** Checking the other exact-value claims in the same document rather than
+assuming the ten-enum gate covered them gives:
+
+| Claim in `docs/unknown-reasons.md` | Members | Gated? | All members constructed? |
+|---|---|---|---|
+| `SharpProof.Frontend.FrontendAbstention` `:15` | 16 | **no** | yes - all 16 |
+| `SharpProof.Verify.BackendFailureReason` `:73` | 7 | **no** | yes - all 7 |
+| `SharpProof.Verify.AbstentionReason` `:88` | 12 | **no** | **no - 3 of 12 never constructed** |
+| `WorkerClaimReason` `:178` | - | yes | yes |
+
+Only `WorkerClaimReason` is covered, and only because it is generated into
+`ProtocolModel.generated.cs`, which is where `Test-SharpProofReadme.ps1:770-793`
+reads its ten enums from. The three hand-written enums - two in `SharpProof.Verify`,
+one in `SharpProof.Frontend` - are documented with the same "has these exact values"
+phrasing and compared to nothing.
+
+The finding has been corrected in place. Its substance is unchanged and slightly
+strengthened: `AbstentionReason` is not the only ungated table, it is the only
+ungated table that has **drifted**. Every one of `FrontendAbstention`'s sixteen
+members and `BackendFailureReason`'s seven is constructed in production code -
+`UnsupportedType` 26 times, `None` 9, `ErrorOperation` and `UnsupportedStatement`
+once each - so the absence of a gate has cost nothing there yet. That is what makes
+the three dead `AbstentionReason` members evidence rather than speculation: two
+comparable tables under the same absent gate stayed true, and one did not.
+
+### Checked and not proposed (part six hundred thirty-eight)
+
+- **Extending the readme gate to the three hand-written enums is the obvious
+  mechanical fix and is not filed separately.** `Get-EnumMemberMap` and
+  `Get-EnumMembers` already parse enum members out of a C# source text, and the loop
+  at `:774-793` would take three more `(file, enumName)` pairs. It is the same work
+  R2120's status note describes, and filing it as its own reduction would split one
+  remedy across two ids.
+- **`FrontendAbstention`'s per-member counts also answer a question part six
+  hundred thirty-seven left open.** The census there flagged enum members with no
+  qualified reference; `ErrorOperation` (1 production reference) and
+  `UnsupportedStatement` (1) sit just above that line, so the sixteen-member table
+  is genuinely exercised rather than narrowly saved by a single test.
+
+### Status (part six hundred thirty-eight)
+
+The correction is recorded because the original claim had already been written into
+the ledger. R2120 stands with its corrected scope; R2140 is unaffected.
+
+## Second survey, part six hundred thirty-nine: six categories censused and closed with no finding
+
+Six axes measured end to end in this pass that produced nothing worth filing. They
+are recorded with their numbers so the next pass does not spend the measurement
+again.
+
+**Boolean flag parameters that never vary.** Across every tracked C# file there are
+**171** distinct named boolean arguments (`someFlag: true` / `someFlag: false`), of
+which **100** are only ever passed one literal. Almost all of the top of that list
+belongs to the framework rather than the repository - `recursive: true` on directory
+deletion (68 sites), `nodeReuse: false` on MSBuild (29), `entireProcessTree: true`
+on process kill (13), `encoderShouldEmitUTF8Identifier`, `isCollectible`,
+`ignoreCase`, `inherit`, `writable` - and cannot be removed by anyone here. The three
+repository-owned candidates each turned out to vary through a channel a
+named-argument scan cannot see: `dispatchUncertain` is passed
+`method.IsVirtual || method.IsAbstract` at `OperationEffectScanner.Expressions.cs:282,379`;
+`instanceAlreadyComplete` is passed the variable `valueAlreadyComplete` at
+`OperationCompletionEvaluator.cs:1040`; and `aliasSource`, though written `true` at
+all thirteen explicit sites, is declared `bool aliasSource = false` at
+`ConversionOwnershipClassifier.cs:36` and takes `false` by omission. R1099 remains
+the only genuine instance of this shape, and it was already found.
+
+**MSBuild targets that never run.** **20** `<Target>` declarations across **9**
+build files. Every one either carries `BeforeTargets`/`AfterTargets` or is named
+from another target's `DependsOnTargets`; **zero** are unreachable. The hook points
+are conventional - `CoreCompile` (8), plus `Build`, `Clean`, `Restore;PrepareForBuild`,
+`GenerateNuspec`, `AssignProjectConfiguration` and the two
+`GenerateMSBuildEditorConfigFile` variants once each.
+
+**Conditional compilation symbols.** Four symbols are tested by `#if` anywhere:
+`SHARPPROOF_DATAFLOW_ARGUMENT_GUARD` (3 sites) and `SHARPPROOF_WORKER_PROTOCOL` (1),
+both declared in `<DefineConstants>`; `NEVER`, which is a
+`CSharpPreprocessorSymbolsTests` fixture and is *meant* to be undefined; and
+`SHARPPROOF_NEGATIVE_PROBE`, which no build file declares and which is therefore
+easy to mistake for dead code. It is not - `scripts/Test-SharpProofPilots.ps1:294`
+passes `-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE` on the negative-probe build.
+A `DefineConstants` census that reads only build files will report this symbol as
+undefined; it is defined on a command line.
+
+**Central package management.** All **14** `PackageVersion` entries in
+`Directory.Packages.props` have at least one matching `PackageReference`; there are
+no dead pins. The nine referenced names with no central version - `Serilog`,
+`Polly`, `FluentValidation`, `OneOf`, `Ardalis.GuardClauses`, `NETStandard.Library`
+and three `SharpProof*` self-references - are pilot and consumer fixtures outside
+the CPM tree, which is the arrangement R491 already assumes.
+
+**Pilot category against pilot source.** `Test-SharpProofPilots.ps1:274` runs the
+contract-rejection probe only when `$pilot.category -eq 'contract-heavy'`, and
+`eng/pilots/catalog.json` marks exactly two of five pilots that way -
+`ardalis-contracts` and `fluentvalidation-contracts`. Exactly those two source trees
+contain an `#if SHARPPROOF_NEGATIVE_PROBE` block:
+`ArdalisContracts/GuardAdapter.cs:17` and
+`FluentValidationContracts/CustomerValidation.cs:28`. The declarative category and
+the guarded source agree exactly in both directions, with no third mechanism.
+
+**Duplicate NUnit case rows.** **835** `[TestCase]` and `[TestCaseSource]`
+attributes across the test tree, and **zero** exact duplicate rows within any one
+attribute block. Whatever else the suites repeat - and parts six hundred six and six
+hundred thirty-three measured what they do - they do not run the same parameterised
+case twice.
+
+### Status (part six hundred thirty-nine)
+
+Nothing filed. Six axes are closed with figures attached.
+
+## Second survey, part six hundred forty: R2160 - the generated layer authors accessibility and the hand-written layer defaults it, in a package that ships no reference assembly at all
+
+A public-surface census: **297** `public` types declared in production projects,
+each checked for a reference from any *other* production project. **72** have none.
+Classifying those 72 by why they might still need to be public leaves a residue that
+is small, hand-written, and free to change.
+
+| Category | Count |
+|---|---|
+| Generated, accessibility authored in a catalog | 35 |
+| In a gate, probe, smoke or testing asset assembly | 14 |
+| In a file that hosts a reflection-loaded type (analyzer, generator, MSBuild task) | 8 |
+| **Residue: hand-written, no reflection host, no asset assembly** | **15** |
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2160 | **Fifteen hand-written production types are `public` with no consumer in any other production assembly, in a package that ships no `lib/` folder - so `public` outside `SharpProof.Attributes` buys visibility that nothing can use - and nine of the fifteen can become `internal` today with no build change because the `InternalsVisibleTo` grant they would need already exists.** `SharpProof.Package/SharpProof.nuspec` maps every assembly to `tools\analyzers\dotnet\cs`, `tools\collector`, `tools\shared\netstandard2.0` or `buildTransitive`; there is **no `lib/` target anywhere in either nuspec**, and the only thing a consumer compilation references is the separate `SharpProof.Attributes` package, declared at `:18` as a dependency. Accessibility on everything else is therefore a within-repository decision. **The fifteen**: `EffectRegionSet` (`EffectRegions.cs:63`), `EffectThrowSet` (`EffectValues.cs:102`), `ApiSpecLookupStatus`, `ApiSpecLookupFailureKind` and `ApiSpecResolutionFailureKind` (`ApiSpecResolution.cs:18,23,8`) in `SharpProof.Effects`; `BackendCheckStatus` (`Backend.cs:2`) in `SharpProof.Verify`; `IAbstractDomain` (`IAbstractDomain.cs:7`), `SequenceCardinalityKind` (`SequenceCardinalityValue.cs:2`) and `DataflowAnalysisResult` (`ForwardDataflowAnalysis.cs:16`) in `SharpProof.Dataflow`; `FrontendProgramAbstention` (`FrontendSubset.cs:120`); `IrRelationalSummaryBuildResult` (`IrRelationalSummary.cs:135`); `SpecInstantiationResult` and `SpecInstantiationFailureKind` (`ApiSpecInstantiation.cs:18,8`); and `ContainerContractInfo` (`ContainerContract.cs:6`) and `LinuxWorkerCompletion` (`LinuxWorkerProcess.cs:12`) in `SharpProof.Host`. None appears in any document as an API. **Nine are free.** `ContainerContractInfo`, `LinuxWorkerCompletion` and `DataflowAnalysisResult` have no consumer outside their own project at all; `EffectRegionSet` and `EffectThrowSet` are used only by `SharpProof.Effects.Test`, which `SharpProof.Effects.csproj` already grants `InternalsVisibleTo`; likewise `BackendCheckStatus` for `SharpProof.Smt.Test`, `IAbstractDomain` and `SequenceCardinalityKind` for `SharpProof.Dataflow.Test`, and `FrontendProgramAbstention` for `SharpProof.Frontend.Test`. The remaining six need one grant each - `SharpProof.Effects` to `SharpProof.Specs.Test`, and a first grant from `SharpProof.Summaries` and `SharpProof.Specs`, neither of which has any - in the SDK item form applied R316 standardised. **The asymmetry is the point.** `SharpProof.DeclarativeModels.catalog.json` makes accessibility an authored field and exercises all three values - **62 `public`, 51 `internal`, 17 `private`** - so in the generated layer every `public` is a decision someone wrote down. The hand-written layer has no equivalent, and `public` is what a type gets by not thinking about it. R2100 is the same gap seen from the other side: there, a generated table is `internal` where two assemblies need it. | `SharpProof.Package/SharpProof.nuspec:16-18` and its file map (no `lib/` target; `SharpProof.Verifier.nuspec` likewise); the 297/72/15 census; the fifteen cited declarations; the `InternalsVisibleTo` lists in `SharpProof.Effects.csproj`, `SharpProof.Verify.csproj`, `SharpProof.Dataflow.csproj`, `SharpProof.Frontend.csproj`, `SharpProof.Host.csproj`, and their absence from `SharpProof.Specs.csproj` and `SharpProof.Summaries.csproj`; `SharpProof.DeclarativeModels.catalog.json` accessibility distribution; related R2100, applied R316, applied R734, R735 |
+
+### Checked and not proposed (part six hundred forty)
+
+- **The 35 generated types are excluded because their accessibility is authored,
+  not defaulted.** Types emitted from `SharpProof.DeclarativeModels.catalog.json` and
+  the other catalogs carry an explicit `"accessibility"` field, and the catalog uses
+  all three values across 67 type-shaped entries. Proposing that some of the 62
+  `public` ones be narrowed would be second-guessing a written decision from
+  outside, with no evidence that the decision was wrong. If R2160's hand-written
+  half is ever applied, the generated half is the natural place to look next - with
+  the catalog, not the generated file, as the thing to change.
+- **The 14 in `SharpProof.Gates`, `SharpProof.CompilerProbe.TestAsset`,
+  `SharpProof.Smoke.Net472` and `SharpProof.Testing` must be public.** They are
+  fixtures whose whole purpose is to be seen from outside - by an analyzer under
+  test, by a probe build, by a smoke consumer. `EnabledRetentionFixture_`,
+  `IdeEditFixture`, `CancellationSubject`, `ExternalCorpusEffects` and `SmokeMath`
+  are the shape of that category.
+- **The 8 in reflection-hosting files are correctly public.** Roslyn instantiates
+  `DiagnosticAnalyzer` and generator implementations by reflection and MSBuild
+  instantiates `Task` subclasses the same way; both require public types.
+  `CancelableBuildTask` is the clearest instance.
+- **`docs/` orphans are not a finding.** Of 25 markdown files under `docs/`, three
+  are referenced by nothing but this ledger and the file-inventory audit, and all
+  three are dated entries under `docs/soundness-notes/` - a chronological record is
+  supposed to accumulate entries nothing links to.
+
+### Status (part six hundred forty)
+
+R2160 is `pending`. Nine of the fifteen are a one-word change each with no build
+edit; six add one `InternalsVisibleTo` item apiece. The larger half of the finding is
+the observation that the repository has a written convention for accessibility in one
+layer and none in the other.
+
+## Second survey, part six hundred forty-one: the collector wire mappings are gated by set equality against reality, and three more axes close clean
+
+**The cross-schema enum mirroring is fully gated, and the gate is tier A.**
+`CompilerArtifactModel.schema.json` declares **18** `collectorWireMappings` totalling
+**109** rows. Five of them - `BoundContractKind`, `BoundContractEvidence`,
+`BoundContractVariableRole`, `BoundContractEvidenceWorker` and
+`ContractBindingFailure` - restate, name for name, **28** members of four enums
+declared in a *different* schema file, `SharpProof.Contracts/BoundContractModel.schema.json`,
+which `scripts/Generate-CompilerArtifactModel.ps1` never reads: the word
+`BoundContract` does not appear in that generator. That is the exact shape this
+survey has filed repeatedly, and here it is closed.
+`SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:454-457` asserts
+
+    Assert.That(sources, Is.EquivalentTo(Enum.GetNames(types.Source)), name + " source completeness");
+
+for every mapping - **set equality between the schema's rows and the reflected
+members of the real enum**, not containment, not a count. Adding a
+`ContractBindingFailure` member without adding a row fails. The same test pins each
+mapping's `sourceType`, `targetType`, `owner`, `method`, `kind` and
+`unknownException`, and requires source names to be distinct. `targets` is checked by
+containment only, which is correct: `ToWorkerFailure` deliberately collapses fifteen
+binding failures onto three `WorkerClaimReason` values, so target equality would be
+wrong. This is the strongest correspondence gate the survey has found, and it covers
+the one place where two schema files name the same types.
+
+**Schema definition duplication: none.** The repository has four `*.schema.json`
+files - `CompilerArtifactModel`, `BoundContractModel`, `IrModel`, `ProtocolModel` -
+holding 69, 7, 48 and 45 named declarations respectively. **Zero** identical
+definitions appear in two schemas, and **zero** names carry divergent bodies. The
+only four names appearing in two files are the wire-mapping references above, where
+one schema deliberately *cites* the other's type by name.
+
+**Asynchrony: clean.** **62** `async` methods in hand-written production code, and
+**zero** whose body contains no `await`. **Zero** `async void` methods anywhere in
+production. The `ConfigureAwait` result recorded earlier - 153 awaits, 153
+`ConfigureAwait(false)`, no `ConfigureAwait(true)` - covers the other half of this
+axis.
+
+**Disposal: clean.** **Zero** empty or no-op `Dispose`/`DisposeAsync` implementations
+in production code. Every disposal either releases something or is absent.
+
+### Status (part six hundred forty-one)
+
+Nothing filed. The wire-mapping result is recorded at length because it is the
+counter-example the survey needed: a hand-restated table across an assembly and
+schema boundary that is nonetheless checked by set equality against reality. It is
+the standard R2100, R1960 and R2120 are measured against, and it shows the
+repository already knows how to write that gate.
+
+## Second survey, part six hundred forty-two: R2180 - a machine-read contract field is being used as an append-only changelog, and its gate needs only the last line
+
+The acceptance contract measured as text rather than as a path list: **41,002
+characters**, of which three string fields exceed 200 characters. Two are 220- and
+226-character component rationales. The third is not the same kind of thing.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2180 | **`productionComplexity.ceilingRationale` is a single 2,463-character JSON string holding a nine-entry dated changelog - six percent of the whole acceptance contract - and its gate requires only that the current ceiling triple appear somewhere inside it.** `eng/acceptance/contract.json:778` runs from "2026-08-07: extracting the cancellable verifier runner..." through eight further dated entries to "2026-09-01 branch integration: ...ceilings:218647/12875/5808." Two `ceilings:` triples are embedded. **One of them is required and the mechanism is a good one.** `scripts/Test-ProductionCSharpComplexity.ps1:41-49` builds `"ceilings:$maximumExpressionNodes/$maximumDecisionPoints/$maximumMembers"` from the three structured sibling fields and throws unless `ceilingRationale.IndexOf` finds it, so raising a ceiling forces the author to write a rationale entry naming the new numbers. That forcing function is why the numbers are in the prose, and it is not the finding. **The other triple is dead text.** `ceilings:218226/12839/5799` is a superseded binding; a search of the whole repository outside the ledger finds it in that one JSON string and nowhere else. The gate is an `IndexOf` for the *current* triple only, so every previous one stays forever, and every ceiling raise appends a paragraph. Nine entries have produced 2,463 characters, and nothing in the mechanism bounds the tenth or the fiftieth. **The repository already has the right home for the superseded entries.** `docs/soundness-notes/` is a dated log of exactly this material, and part six hundred forty established that three of its notes are referenced by nothing - which for a chronological record is correct. Moving the eight historical paragraphs there and leaving `ceilingRationale` stating why the *current* ceiling is what it is, with its required `ceilings:218647/12875/5808` binding, keeps the gate passing, keeps the history, and stops a machine-read field growing without limit. | `eng/acceptance/contract.json:778` (2,463 chars, 9 dated entries, 6.0% of the 41,002-character file, two `ceilings:` triples); `scripts/Test-ProductionCSharpComplexity.ps1:36-49` for the non-empty check and the current-triple `IndexOf`; `productionComplexity.maximumExpressionNodes` 218647, `maximumDecisionPoints` 12875, `maximumMembers` 5808; the two 220/226-character `trustedComputingBase/components/rationale` fields for the intended scale; `docs/soundness-notes/`; related R752, R980 |
+
+### Checked and not proposed (part six hundred forty-two)
+
+- **Every path in the acceptance contract exists.** Extracting path-shaped strings
+  gives **351** distinct values over 479 occurrences, and all but two resolve to a
+  tracked file. The two are false positives of the extraction rather than stale
+  entries: the `ceilingRationale` prose itself, which contains slashes, and the
+  string `linux/amd64` under `/container/platform`. The 349-path trusted computing
+  base has no dangling member.
+- **The ceiling-binding mechanism should not be replaced by a structured field.**
+  Splitting the triple out of the prose into, say, `"boundCeilings": [218647, 12875,
+  5808]` would let a ceiling be raised by editing two numeric fields in the same
+  commit with no sentence written, which is exactly what the current design
+  prevents. R2180 asks only that superseded entries be moved, not that the binding
+  change form.
+- **The two component rationales are the right size and are not part of this.** At
+  220 and 226 characters, `trustedComputingBase/components/rationale` states why a
+  component is in the trusted base and stops. They are the contract's own evidence
+  for what a rationale field is meant to look like.
+
+### Status (part six hundred forty-two)
+
+R2180 is `pending` and is a move rather than a deletion: eight paragraphs to
+`docs/soundness-notes/`, one paragraph and one required triple left behind. The gate
+passes unchanged either way, which is what makes it safe to do and also what has
+allowed it to go undone.
+
+## Second survey, part six hundred forty-three: R2200 and R2220 - the generated-file header is the one part of the generated-file pipeline the shared helper does not own, and one authority path is spelled two ways
+
+A duplicate-literal census over the PowerShell tree, the counterpart to part six
+hundred thirty-six's C# pass: 101 scripts and modules, **94** single-quoted literals
+of fourteen or more characters appearing in three or more files. Two clusters are
+not incidental.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2200 | **Every generator dot-sources `GeneratedFileHelpers.ps1`, which owns normalization, C# formatting and the write-if-changed/verify path, and then assembles the same three-line generated-file frame itself - `'// <auto-generated>'` at 19 sites in 15 files, `'// Do not edit this file directly.'` at 16 in 13, `'// </auto-generated>'` at 19 in 15.** The helper has **21** functions, including `ConvertTo-SharpProofGeneratedText`, `Format-SharpProofGeneratedCSharp` and `Update-SharpProofGeneratedFile` - the whole tail of the pipeline - and no header builder, so the head of every generated file is hand-built line by line. `Generate-IrModel.ps1` does it **twice in one script**, at `:151-158` for the model and `:539-543` for the alias file, with different middles and the same frame. **The variable part is small and is exactly what a parameter is for.** Between the fixed first and last lines each generator writes a `// Generated by scripts/<name>.ps1 from` line, a source-and-schema-version line, and nought to two generator-specific notes - "Only declarative IR vocabulary and storage are generated here." - then `'#nullable enable'`, itself repeated at 16 sites in 13 files and correctly omitted by the two global-usings outputs. A `New-SharpProofGeneratedHeader -Generator -Source -Notes -Nullable` in the file every generator already loads would leave each script owning only its notes. **The consequence is that the frame can drift silently.** Nothing compares the fifteen headers to each other; a generator that misspells `// </auto-generated>` still produces a file that compiles, and the `<auto-generated>` marker is what `.globalconfig` and the analyzers use to exempt generated code from rules - so the frame is load-bearing, not decorative. | `scripts/GeneratedFileHelpers.ps1` (21 functions, `:249,257,347` for the pipeline it does own, no header builder); `scripts/Generate-IrModel.ps1:150-158,538-543` for one script writing the frame twice; the 19/16/19-site census across 15, 13 and 15 files; `.globalconfig` and the generated-code exemptions that depend on the marker; related R342, R463, R610, R1500, R1580 |
+| R2220 | **The acceptance contract's path is written `eng/acceptance/contract.json` in nine scripts and `eng\acceptance\contract.json` in seven, and `scripts/Test-ProductionCSharpComplexity.ps1` uses both spellings - in a repository whose only supported build runs in a Linux container.** Across the 101-file script tree there are **310** distinct quoted repository-relative paths: 80 written only with forward slashes, 193 only with backslashes, and **37 spelled both ways somewhere**. **36 of 101 files** use at least one backslash path. Three files contradict themselves: `Test-ProductionCSharpComplexity.ps1` on the contract path, and `Invoke-SharpProofSemanticTests.ps1` on both `SharpProof.ArchitectureTest.csproj` and `SharpProof.Worker.Test.csproj`. Other paths carrying two spellings include `scripts/package-projects.json`, `.github/workflows/package-consumers.yml`, `eng/acceptance/Verify.ps1`, `SharpProof.Verifier.nuspec` and four `.csproj` files. **This is a consistency finding and not a latent defect, which is worth stating precisely.** PowerShell normalizes `\` in path arguments on Linux, so all 193 backslash spellings work; auditing every backslash literal that reaches a comparison, `-match`, `.Contains` or `-Filter` context turns up **seven** hits and all seven are regular-expression escapes (`'\.(g|generated)\.cs$'`, `'\.snupkg$'`) rather than separators. Nothing is broken today. What it costs is grep and review: `grep -rn 'eng/acceptance/contract.json' scripts` finds nine of the sixteen files that read the repository's central authority file, and a reader cannot tell from either spelling which is intended. The container-only build makes forward slashes the obvious single convention. | The 310/80/193/37 census over `*.ps1` and `*.psm1`; `scripts/Test-ProductionCSharpComplexity.ps1` (both spellings of `eng/acceptance/contract.json`); `scripts/Invoke-SharpProofSemanticTests.ps1` (both spellings of two csproj paths); the seven comparison-context backslash literals, all regex escapes; `eng/container/Dockerfile` and `docker compose run --rm tooling` as the only supported build; related R726, R1600, R484 |
+
+### Checked and not proposed (part six hundred forty-three)
+
+- **The remaining multi-file PowerShell literals are shared-module names and
+  authority paths, which is what they should be.** `'SharpProof.ContainerExecution.psm1'`
+  in 13 files, `'GeneratedFileHelpers.ps1'` in 14, `'Resolve-SharpProofContainedPath.ps1'`
+  in 14 and `'Get-SharpProofReleaseVersion.ps1'` in 10 are dot-source targets - naming
+  the file you load is not duplication - and `'SharpProof.sln'` (22 sites),
+  `'SharpProof.release.json'` (15) and `'eng/acceptance/contract.json'` name the
+  repository's authority files. R2220 is about how those names are *spelled*, not
+  that they appear.
+- **`'^[0-9a-f]{40}$'` in 13 files is a shared regular expression and a weaker
+  candidate than it looks.** It validates a forty-hex-character commit or content
+  hash, and the thirteen uses are in release, evidence, mutation and inventory
+  scripts that do not otherwise share a module. Extracting it would create a
+  dependency between scripts that currently have none, for one line each; the
+  repository already prefers a duplicated regex to a new coupling in comparable
+  places.
+- **The `[Guid]::NewGuid().ToString(` fragment in 10 files is temporary-directory
+  naming**, which R726 and R727 already cover at greater length and with the
+  ownership-guarded delete that should accompany it.
+
+### Status (part six hundred forty-three)
+
+R2200 is `pending` and is one function in a file all fifteen generators already
+load. R2220 is `pending` and is a mechanical rewrite of 193 literals to one
+convention, with three self-contradicting files as the place to start; it changes no
+behaviour, which is both why it is safe and why it has never been done.
