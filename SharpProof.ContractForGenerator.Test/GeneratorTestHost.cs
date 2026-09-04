@@ -59,7 +59,31 @@ internal static class GeneratorTestHost
         return compilation;
     }
 
-    internal static GeneratorRun Run(
+    internal static AnalyzerRun RunAnalyzer(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
+    {
+        return new AnalyzerRun(CollectDiagnostics(
+            compilation,
+            globalOptions,
+            analyzer: null,
+            ImmutableArray<Diagnostic>.Empty));
+    }
+
+    internal static AnalyzerRun RunWithAnalyzer(
+        CSharpCompilation compilation,
+        DiagnosticAnalyzer analyzer,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(analyzer);
+        return new AnalyzerRun(CollectDiagnostics(
+            compilation,
+            globalOptions,
+            analyzer,
+            ImmutableArray<Diagnostic>.Empty));
+    }
+
+    internal static GeneratorRun RunWithDefaultGenerator(
         CSharpCompilation compilation,
         GeneratorDriver? previousDriver = null,
         IReadOnlyDictionary<string, string>? globalOptions = null)
@@ -80,19 +104,6 @@ internal static class GeneratorTestHost
             globalOptions);
     }
 
-    internal static GeneratorRun RunWithAnalyzer(
-        CSharpCompilation compilation,
-        DiagnosticAnalyzer analyzer,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
-    {
-        ArgumentNullException.ThrowIfNull(analyzer);
-        return RunCore(
-            compilation,
-            CreateDriver(globalOptions),
-            globalOptions,
-            analyzer);
-    }
-
     private static GeneratorRun RunCore(
         CSharpCompilation compilation,
         GeneratorDriver driver,
@@ -103,12 +114,28 @@ internal static class GeneratorTestHost
             compilation,
             out var outputCompilation,
             out var driverDiagnostics);
-        RequireNoErrors((CSharpCompilation)outputCompilation);
         var runResult = driver.GetRunResult();
-        var diagnostics = runResult.Diagnostics
-            .Concat(driverDiagnostics)
+        var diagnostics = CollectDiagnostics(
+            (CSharpCompilation)outputCompilation,
+            globalOptions,
+            analyzer,
+            runResult.Diagnostics.Concat(driverDiagnostics));
+        return new GeneratorRun(
+            driver,
+            runResult,
+            diagnostics);
+    }
+
+    private static ImmutableArray<Diagnostic> CollectDiagnostics(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string>? globalOptions,
+        DiagnosticAnalyzer? analyzer,
+        IEnumerable<Diagnostic> existing)
+    {
+        RequireNoErrors(compilation);
+        return existing
             .Concat(AnalyzeFinalCompilation(
-                (CSharpCompilation)outputCompilation,
+                compilation,
                 globalOptions,
                 analyzer))
             .Distinct(DiagnosticIdentityComparer.Instance)
@@ -123,10 +150,6 @@ internal static class GeneratorTestHost
                     diagnostic.GetMessage(CultureInfo.InvariantCulture),
                 StringComparer.Ordinal)
             .ToImmutableArray();
-        return new GeneratorRun(
-            driver,
-            runResult,
-            diagnostics);
     }
 
     private static ImmutableArray<Diagnostic> AnalyzeFinalCompilation(
@@ -225,14 +248,24 @@ internal static class GeneratorTestHost
     }
 }
 
+internal interface IDiagnosticRun
+{
+    ImmutableArray<Diagnostic> Diagnostics { get; }
+}
+
 internal sealed class GeneratorRun(
     GeneratorDriver driver,
     GeneratorDriverRunResult runResult,
-    ImmutableArray<Diagnostic> diagnostics)
+    ImmutableArray<Diagnostic> diagnostics) : IDiagnosticRun
 {
     internal GeneratorDriver Driver { get; } = driver;
     internal GeneratorDriverRunResult RunResult { get; } = runResult;
-    internal ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
+    public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
+}
+
+internal sealed class AnalyzerRun(ImmutableArray<Diagnostic> diagnostics) : IDiagnosticRun
+{
+    public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
 }
 
 internal sealed class DiagnosticIdentityComparer :

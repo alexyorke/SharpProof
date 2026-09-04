@@ -121,7 +121,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        AssertSingle(GeneratorTestHost.Run(compilation), "SPCF0005");
+        AssertSingle(GeneratorTestHost.RunAnalyzer(compilation), "SPCF0005");
     }
 
     [Test]
@@ -147,7 +147,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -179,7 +179,8 @@ public sealed class ContractForValidatorGeneratorTests
     [Test]
     public void InterfaceCompanionWithDirectClausesIsValid()
     {
-        var run = Run(
+        var compilation = GeneratorTestHost.CreateCompilation((
+            "Subject.cs",
             """
             #nullable enable
             using SharpProof.Attributes;
@@ -198,10 +199,11 @@ public sealed class ContractForValidatorGeneratorTests
                     return null;
                 }
             }
-            """);
+            """));
 
-        Assert.That(run.Diagnostics, Is.Empty);
-        Assert.That(run.RunResult.GeneratedTrees, Is.Empty);
+        var generatedRun = GeneratorTestHost.RunWithDefaultGenerator(compilation);
+        Assert.That(generatedRun.Diagnostics, Is.Empty);
+        Assert.That(generatedRun.RunResult.GeneratedTrees, Is.Empty);
     }
 
     [Test]
@@ -397,7 +399,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -421,7 +423,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [TestCase("ref", "ref")]
@@ -537,7 +539,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -645,7 +647,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -671,7 +673,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -1020,7 +1022,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0002");
         Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
     }
@@ -1046,7 +1048,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -1064,7 +1066,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0004");
 
         using (Assert.EnterMultipleScope())
@@ -1092,7 +1094,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0004");
 
         using (Assert.EnterMultipleScope())
@@ -1120,7 +1122,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0004");
 
         using (Assert.EnterMultipleScope())
@@ -1164,7 +1166,7 @@ public sealed class ContractForValidatorGeneratorTests
                 """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0001");
 
         Assert.That(
@@ -1556,7 +1558,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -1638,7 +1640,7 @@ public sealed class ContractForValidatorGeneratorTests
                 """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0001");
         Assert.That(
             diagnostic.GetMessage(
@@ -1674,7 +1676,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0001");
         Assert.That(
             diagnostic.GetMessage(
@@ -1772,7 +1774,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        var run = GeneratorTestHost.Run(
+        var run = GeneratorTestHost.RunAnalyzer(
             compilation,
             globalOptions: new Dictionary<string, string>(
                 StringComparer.OrdinalIgnoreCase)
@@ -1831,7 +1833,7 @@ public sealed class ContractForValidatorGeneratorTests
                 public static void Ghost(ITarget receiver) { }
             }
             """));
-        var run = GeneratorTestHost.Run(
+        var run = GeneratorTestHost.RunAnalyzer(
             compilation,
             globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -1863,7 +1865,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        var run = GeneratorTestHost.Run(compilation);
+        var run = GeneratorTestHost.RunAnalyzer(compilation);
 
         AssertSingle(run, "SPCF0004");
     }
@@ -1911,11 +1913,11 @@ public sealed class ContractForValidatorGeneratorTests
             ("02_Target.cs", target),
             ("03_OtherCompanion.cs", duplicate));
 
-        var first = GeneratorTestHost.Run(forwardCompilation);
-        var cached = GeneratorTestHost.Run(
+        var first = GeneratorTestHost.RunWithDefaultGenerator(forwardCompilation);
+        var cached = GeneratorTestHost.RunWithDefaultGenerator(
             forwardCompilation,
             first.Driver);
-        var reversed = GeneratorTestHost.Run(reverseCompilation);
+        var reversed = GeneratorTestHost.RunWithDefaultGenerator(reverseCompilation);
 
         Assert.That(
             GeneratorTestHost.DiagnosticKeys(cached),
@@ -1964,14 +1966,14 @@ public sealed class ContractForValidatorGeneratorTests
         }
     }
 
-    private static GeneratorRun Run(string source)
+    private static AnalyzerRun Run(string source)
     {
-        return GeneratorTestHost.Run(
+        return GeneratorTestHost.RunAnalyzer(
             GeneratorTestHost.CreateCompilation(("Subject.cs", source)));
     }
 
     private static Diagnostic AssertSingle(
-        GeneratorRun run,
+        IDiagnosticRun run,
         string diagnosticId)
     {
         Assert.That(
