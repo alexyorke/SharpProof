@@ -50,18 +50,28 @@ internal static class VerifierDiagnosticTransport
                 return false;
             }
 
-            var names = new HashSet<string>(StringComparer.Ordinal);
+            const int AllFieldsMask = (1 << 7) - 1;
+            var fields = 0;
             foreach (var property in root.EnumerateObject())
             {
-                if (!names.Add(property.Name) ||
-                    property.Name is not (
-                        "schema" or "severity" or "code" or "file" or
-                        "line" or "column" or "message"))
+                var field = property.Name switch
+                {
+                    "schema" => 1 << 0,
+                    "severity" => 1 << 1,
+                    "code" => 1 << 2,
+                    "file" => 1 << 3,
+                    "line" => 1 << 4,
+                    "column" => 1 << 5,
+                    "message" => 1 << 6,
+                    _ => 0
+                };
+                if (field == 0 || (fields & field) != 0)
                 {
                     return false;
                 }
+                fields |= field;
             }
-            if (names.Count != 7 ||
+            if (fields != AllFieldsMask ||
                 root.GetProperty("schema").GetInt32() != 1)
             {
                 return false;
