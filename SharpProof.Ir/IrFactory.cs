@@ -729,15 +729,7 @@ public sealed class IrFactory
                 immutableArguments,
                 nameof(arguments),
                 opaque: true);
-            if (purity == IrOpaquePurity.Pure)
-            {
-                if (!operation.IsDefault)
-                {
-                    throw new ArgumentException(
-                    "Pure opaque terms cannot carry an operation identity.", nameof(operation));
-                }
-            }
-            else
+            if (purity != IrOpaquePurity.Pure)
             {
                 GetOperationInfoCore(operation, nameof(operation));
             }
