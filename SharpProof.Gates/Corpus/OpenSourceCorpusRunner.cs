@@ -37,7 +37,9 @@ internal static class OpenSourceCorpusRunner
 
         var methodsByFile = document.Methods
             .GroupBy(
-                static method => $"{method.SourceId}|{method.Path}",
+                static method => OpenSourceCorpusCatalog.GetSourceFileKey(
+                    method.SourceId,
+                    method.Path),
                 StringComparer.Ordinal)
             .ToImmutableDictionary(
                 static group => group.Key,
@@ -56,7 +58,9 @@ internal static class OpenSourceCorpusRunner
                     Encoding.UTF8,
                     cancellationToken)
                 .GetCompilationUnitRoot(cancellationToken);
-            var key = $"{file.SourceId}|{file.Path}";
+            var key = OpenSourceCorpusCatalog.GetSourceFileKey(
+                file.SourceId,
+                file.Path);
             if (methodsByFile.TryGetValue(key, out var methods))
             {
                 var declarationIndex =

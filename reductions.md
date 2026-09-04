@@ -22333,6 +22333,10 @@ syscall argument projections; RunVerifier retains checked casts and overrides,
 while VerifierProcessSupervisor retains its raw-result policy. Focused build-task
 and supervisor tests pass.
 
+R2026 is applied: `OpenSourceCorpusCatalog.GetSourceFileKey` now owns the shared
+`SourceId|Path` composite-key projection used by catalog validation and corpus
+execution. Corpus gate tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

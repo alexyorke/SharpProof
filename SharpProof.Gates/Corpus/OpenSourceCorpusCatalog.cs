@@ -81,11 +81,18 @@ internal static class OpenSourceCorpusCatalog
             "Corpus");
     }
 
+    internal static string GetSourceFileKey(string sourceId, string path)
+    {
+        return sourceId + "|" + path;
+    }
+
     internal static int CountSourceFiles(
         IEnumerable<OpenSourceCorpusMethod> methods)
     {
         return methods
-            .Select(static method => method.SourceId + "|" + method.Path)
+            .Select(static method => GetSourceFileKey(
+                method.SourceId,
+                method.Path))
             .Distinct(StringComparer.Ordinal)
             .Count();
     }
@@ -152,7 +159,7 @@ internal static class OpenSourceCorpusCatalog
             }
 
             ValidateRelativePath(file.Path, $"source file {file.Path}");
-            var key = $"{file.SourceId}|{file.Path}";
+            var key = GetSourceFileKey(file.SourceId, file.Path);
             if (files.ContainsKey(key))
             {
                 throw new InvalidDataException(
@@ -202,7 +209,7 @@ internal static class OpenSourceCorpusCatalog
                     $"Duplicate OSS corpus method ID: {method.Id}.");
             }
 
-            var fileKey = $"{method.SourceId}|{method.Path}";
+            var fileKey = GetSourceFileKey(method.SourceId, method.Path);
             if (!files.TryGetValue(fileKey, out var sourceFile))
             {
                 throw new InvalidDataException(
