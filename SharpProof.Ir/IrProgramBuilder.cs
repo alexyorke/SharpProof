@@ -141,6 +141,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 "A program must contain at least one block.");
         }
 
+        var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>(_blocks.Count);
         foreach (var block in _blocks)
         {
             if (block.Instructions.Count == 0 ||
@@ -149,13 +150,15 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 throw new InvalidOperationException(
                     "Every program block must end in branch, goto, or return.");
             }
+
+            blocks.Add(block.Freeze());
         }
         _built = true;
         return new IrProgram(
             _factory,
             _scope,
             _entry.Value,
-            [.. _blocks.Select(static block => block.Freeze())]);
+            blocks.MoveToImmutable());
     }
 
     private T Append<T>(IrBlockId blockId, Func<IrInstructionId, T> create) where T : IrInstruction

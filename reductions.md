@@ -22400,6 +22400,10 @@ R2239 is applied: `AnalyzerConfiguration.FromOptions` now reads the named
 `Profile` and `Features` descriptors directly while retaining `All` for iteration
 and validation. Analyzer configuration tests pass.
 
+R2242 is applied: `IrProgramBuilder.Build` now validates and freezes each block in
+one traversal, preserving block order, terminal validation, and the immutable
+output boundary. The IR program and schema tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
@@ -22981,3 +22985,48 @@ CompilerCollector to `SharpProof.Analyzer`, CompilerCollector to
 
 Nothing filed. Nineteen test projects carry no unused reference, and the axis is
 closed with both false-positive mechanisms documented.
+
+## Second survey, part six hundred forty-seven: the build-property and CI surfaces close clean
+
+**Every SharpProof MSBuild property is read.** The build files define **129**
+properties whose names begin `SharpProof` or `_SharpProof`. Searching the whole
+tracked tree for `$(name)`, `-p:name=` and the quoted bare name leaves **three**
+apparent orphans, and all three are read through channels that syntax does not
+cover:
+
+- `SharpProofAnalyzerRole` is `<Analyzer>` **item metadata**, not a property -
+  `SharpProof.Package/buildTransitive/SharpProof.targets:17` and
+  `eng/self-application/SharpProof.SelfApplication.props:36,39,57` set it on five
+  items, and this ledger already records that it is metadata rather than an unused
+  property.
+- `_SharpProofCompilationTargetFramework` and `_SharpProofProjectDirectory`
+  (`SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:98,101`) are
+  **`CompilerVisibleProperty` entries**. Both are listed at
+  `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:31` and
+  `SharpProof.AnalyzerConsumer.props:12`, and
+  `SharpProof.CompilerCollector/FinalCompilationCollector.cs:8-9` reads them as
+  `"build_property._SharpProofCompilationTargetFramework"` and
+  `"build_property._SharpProofProjectDirectory"`. A property whose only consumer is
+  an analyzer never appears as `$(...)` anywhere, which is the blind spot any future
+  census of this kind has to allow for.
+
+**Continuous integration is factored and has no duplicated job.** Seven workflow
+files totalling **576 lines**, plus one composite action and one reusable workflow.
+`.github/actions/prepare-qualified-packages` is used **nine times across five
+workflows** - `ci.yml`, `coverage.yml`, `nightly.yml`, `security-reusable.yml` and
+five of the ten jobs in `package-consumers.yml`. Comparing the ten jobs of the
+largest workflow by their full step sequences finds **no two identical**, and the one
+package-consuming job that does not use the composite action, `portable-consumers`,
+downloads a build artifact instead, which is a different mechanism for a different
+input. There is no inlined copy of the shared setup anywhere.
+
+**`.github/CODEOWNERS` is one wildcard line and `dependabot.yml` declares two
+ecosystems**, both rooted at `/`, with version ignores whose rationale is written
+beside them - the one configuration comment habit R1980 found missing from
+`.editorconfig`.
+
+### Status (part six hundred forty-seven)
+
+Nothing filed. The MSBuild property surface and the CI surface are both closed, with
+the `CompilerVisibleProperty` channel recorded as the trap that makes a live property
+look dead.
