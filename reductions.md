@@ -21396,3 +21396,11 @@ Assert-SharpProofStandaloneGateResult.ps1 defines Assert-UniqueJsonElementProper
 | ID | Finding | Evidence |
 |---|---|---|
 | R2022 | `ManagedAbstractFlow.MayCompleteListPattern` and `OperationCompletionEvaluator` duplicate list-pattern non-slice counting, slice detection, and the known-length mismatch rule; share only that shape fact. | SharpProof.Effects/ManagedAbstractFlow.cs:2556-2589; SharpProof.Effects/OperationCompletionEvaluator.cs:349-383,494-501,580-588; related R1161 and R1997 |
+
+## Second survey, continued: R2023 - RunVerifier and VerifierProcessSupervisor duplicate pidfd syscall projections
+
+`RunVerifier.OpenPidFdRequired` and `VerifierProcessSupervisor.OpenPidFd` both invoke the shared `LinuxNativeMethods.SystemCall2` binding with `LinuxProcessControlConstants.PidFdOpenSystemCall`, a process ID, and flags `0`; `RunVerifier.SendPidFdSignal` and `VerifierProcessSupervisor.SendPidFdSignal` likewise pass `PidFdSendSignalSystemCall`, a descriptor, a signal, and two zero arguments. The callers intentionally differ at their boundaries: `RunVerifier` performs the Linux admission check, supports an injected opener, checks the negative result, and uses checked casts, while the supervisor returns the raw syscall result for its own retry and identity handling. R330/R356 cover the shared constants and libc imports, not these duplicated argument projections. A narrow helper that accepts the caller's raw/checked and override/error policy can own the pidfd syscall shape without merging cleanup state or failure semantics.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2023 | RunVerifier and VerifierProcessSupervisor duplicate pidfd_open/pidfd_send_signal argument projections; share only the syscall-shape helper while retaining their distinct override, checked-cast, retry, and negative-result policies. | SharpProof.BuildTasks/RunVerifier.cs:1098-1128; SharpProof.BuildTasks/VerifierProcessSupervisor.cs:475-491; related R330, R356 |
