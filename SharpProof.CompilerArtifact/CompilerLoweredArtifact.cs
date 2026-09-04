@@ -133,16 +133,40 @@ internal static class CompilerLoweredArtifact
             .Concat(orderedSummaryCalls.Select(
                 static call => call.NormalRelation))
             .ToArray();
-        var variables = preparation.Variables
-            .SelectMany(static variable => variable.CurrentStateVariable.HasValue
-                ? new[] { variable.Variable, variable.CurrentStateVariable.Value }
-                : [variable.Variable])
-            .Concat(body?.ParameterBindings.SelectMany(
-                static item => new[] { item.Key, item.Value }) ?? [])
-            .Concat(orderedSummaryCalls.SelectMany(static call =>
-                call.ExistentialVariables.Insert(0, call.Result)))
-            .Distinct()
-            .ToArray();
+        var variables = new List<IrVarId>();
+        var seenVariables = new HashSet<IrVarId>();
+        void AddVariable(IrVarId variable)
+        {
+            if (seenVariables.Add(variable))
+            {
+                variables.Add(variable);
+            }
+        }
+
+        foreach (var variable in preparation.Variables)
+        {
+            AddVariable(variable.Variable);
+            if (variable.CurrentStateVariable is { } current)
+            {
+                AddVariable(current);
+            }
+        }
+        if (body != null)
+        {
+            foreach (var binding in body.ParameterBindings)
+            {
+                AddVariable(binding.Key);
+                AddVariable(binding.Value);
+            }
+        }
+        foreach (var call in orderedSummaryCalls)
+        {
+            AddVariable(call.Result);
+            foreach (var existential in call.ExistentialVariables)
+            {
+                AddVariable(existential);
+            }
+        }
         var encoded = PortableIrGraphCodec.Encode(preparation.Factory, body?.Program, roots, variables);
         var canonicalByVariable = preparation.Variables.ToDictionary(
             static variable => variable.Variable);
