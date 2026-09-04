@@ -242,12 +242,17 @@ internal sealed class EffectMethodNodeBuilder
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
-        if (!CanTriggerBeforeFieldInitInitialization(method) ||
+        if (!CanTriggerBeforeFieldInitInitialization(method))
+        {
+            return;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_beforeFieldInitNodes.ContainsKey(method.ContainingType) ||
             !HasPotentialStaticInitialization(
                 method.ContainingType,
                 _session.ApiSpecs,
-                cancellationToken) ||
-            _beforeFieldInitNodes.ContainsKey(method.ContainingType))
+                cancellationToken))
         {
             return;
         }
