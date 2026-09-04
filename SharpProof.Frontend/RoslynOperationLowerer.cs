@@ -475,14 +475,19 @@ public sealed class RoslynOperationLowerer
 
         var sourceType = operation.Type ??
             operation.SemanticModel?.GetTypeInfo(operation.Syntax).ConvertedType;
+        var specializedSourceType = TypeSpecializer(sourceType);
         if (sourceType?.TypeKind == TypeKind.Error ||
-            !IsSupportedValueDomain(sourceType))
+            !IsSupportedValueDomain(
+                specializedSourceType,
+                typeAlreadySpecialized: true))
         {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
 
         var value = operation.ConstantValue.Value;
-        var type = GetTypeId(sourceType);
+        var type = GetTypeId(
+            specializedSourceType,
+            typeAlreadySpecialized: true);
         if (sourceType is { IsValueType: true, SpecialType: SpecialType.None })
         {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
