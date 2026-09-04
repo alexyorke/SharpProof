@@ -447,9 +447,8 @@ internal static class CompilerImplementationIlSummaryLowerer
         }
 
         handle = (MethodDefinitionHandle)entity;
-        if (MetadataTokens.GetRowNumber(handle) <= 0 ||
-            MetadataTokens.GetRowNumber(handle) >
-            reader.MethodDefinitions.Count)
+        var rowNumber = MetadataTokens.GetRowNumber(handle);
+        if (rowNumber <= 0 || rowNumber > reader.MethodDefinitions.Count)
         {
             definition = default;
             return false;

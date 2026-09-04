@@ -22457,6 +22457,10 @@ R2253 is applied: `OperationNullnessEvaluator.IsProvenNonNull` now reuses the
 existing `IsStaticallyNonNull` predicate and keeps the non-null guard around the
 abstract-flow fallback. The full Effects.Test suite passes 323/323.
 
+R2249 is applied: `TryGetMethodDefinition` now caches the validated metadata
+row number before checking the method-definition count. The focused compiler
+relational-summary tests pass 3/3.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
