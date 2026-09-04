@@ -506,8 +506,8 @@ function Measure-Coverage {
 }
 
 $projects = [Collections.Generic.List[object]]::new()
-$productionPathSet = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
+$aggregateCovered = 0
+$aggregateCoverable = 0
 foreach ($property in $baseline.projects.PSObject.Properties |
         Sort-Object Name) {
     $projectName = $property.Name
@@ -544,8 +544,9 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     if ($paths.Count -eq 0) {
         throw "Coverage did not contain production project '$projectName'."
     }
-    foreach ($path in $paths) { [void]$productionPathSet.Add($path) }
     $measurement = Measure-Coverage -Paths $paths
+    $aggregateCovered += $measurement.coveredLines
+    $aggregateCoverable += $measurement.coverableLines
     $minimum = [double]$property.Value
     $projects.Add([pscustomobject][ordered]@{
         name = $projectName
@@ -557,9 +558,17 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     })
 }
 
-$productionPaths = @(ConvertTo-OrdinalSortedArray `
-    -Values @($productionPathSet))
-$aggregate = Measure-Coverage -Paths $productionPaths
+$aggregatePercent = if ($aggregateCoverable -eq 0) {
+    100.0
+}
+else {
+    100.0 * $aggregateCovered / $aggregateCoverable
+}
+$aggregate = [pscustomobject][ordered]@{
+    coveredLines = $aggregateCovered
+    coverableLines = $aggregateCoverable
+    linePercent = [Math]::Round($aggregatePercent, 2)
+}
 $aggregateMinimum = [double]$baseline.minimumAggregateLinePercent
 $aggregatePassed =
     $aggregate.linePercent + 0.005 -ge $aggregateMinimum

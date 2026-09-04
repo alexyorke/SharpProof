@@ -7,23 +7,12 @@ public sealed class DataflowBlock<T>(int id, Func<T, T> transfer)
         ArgumentNullGuard.NotNull(transfer, nameof(transfer));
 }
 
-public readonly record struct DataflowEdge
+public readonly record struct DataflowEdge(int SourceId, int TargetId)
 {
-    public DataflowEdge(int sourceId, int targetId)
-    {
-        (SourceId, TargetId) = (
-            ArgumentNullGuard.RequireNonnegative(sourceId, nameof(sourceId)),
-            ArgumentNullGuard.RequireNonnegative(targetId, nameof(targetId)));
-    }
-
-    public int SourceId
-    {
-        get;
-    }
-    public int TargetId
-    {
-        get;
-    }
+    public int SourceId { get; } =
+        ArgumentNullGuard.RequireNonnegative(SourceId, nameof(SourceId));
+    public int TargetId { get; } =
+        ArgumentNullGuard.RequireNonnegative(TargetId, nameof(TargetId));
 }
 
 /// <summary>

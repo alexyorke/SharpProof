@@ -22506,6 +22506,31 @@ set directly from `ContractApiSymbols`, removing a forwarding wrapper while
 preserving inventory-builder compatibility. The full Contracts.Test suite passes
 142/142.
 
+R378 is applied: `DataflowEdge` now uses a validated primary-constructor record
+struct, retaining non-negative argument checks, deconstruction, and value
+equality while removing the hand-written constructor/property boilerplate. The
+full Dataflow.Test suite passes 56/56.
+
+R443 is applied: aggregate coverage totals now accumulate from the already
+measured, disjoint production-project paths instead of traversing every
+sequence point a second time. The full CoverageScriptTests fixture set passes
+33/33.
+
+R364 is refuted on current-tree behavior: `MethodResourceBudget.RequireNonnegative`
+intentionally throws its resource-counter-specific `InvalidOperationException`,
+while `ArgumentNullGuard.RequireNonnegative` throws a parameter-oriented
+`ArgumentOutOfRangeException`; replacing the local guard would change the
+public failure contract.
+
+R385 is refuted as stale: the cited `CompilerSourceLocationAuthority` hash helper
+does not exist in the current tree, and `ReplayEventComparer` has no matching
+authority API to call. The current location equality/hash projection remains
+explicit and tested.
+
+R432 is already satisfied on the current tree: `AnalyzerGateHost` no longer has
+the cited redundant `Cast<MetadataReference>()` call. The remaining separate
+parse-options setup crosses an assembly-host boundary and is not duplicate code.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
