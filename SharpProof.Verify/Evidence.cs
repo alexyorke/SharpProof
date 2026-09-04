@@ -26,14 +26,7 @@ public readonly record struct SourceLocationId
     }
 }
 
-public abstract class Justification
-{
-    private protected Justification()
-    {
-    }
-}
-
-public abstract class ProofJustification : Justification
+public abstract class ProofJustification
 {
     private protected ProofJustification()
     {
