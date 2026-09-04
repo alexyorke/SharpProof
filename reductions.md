@@ -22299,6 +22299,11 @@ read/version/JSON-policy validation used by the compiler-artifact and protocol
 generators, with the compiler-specific namespace guard remaining parameterized
 and all schema-specific checks local. Generated outputs verify successfully.
 
+R2014 is applied: the IR layer now owns one terminator-to-successor projection;
+artifact validation still throws for malformed terminators, while callable
+preparation still fails closed with no successors. The canonical IR and worker
+test suites cover both policies.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

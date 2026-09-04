@@ -557,14 +557,7 @@ internal sealed class CompilerCallableLowerer
 
     private static ImmutableArray<IrBlockId> GetSuccessors(IrInstruction terminator)
     {
-        return terminator switch
-        {
-            IrBranchInstruction branch => branch.WhenTrue == branch.WhenFalse
-                ? [branch.WhenTrue] : [branch.WhenTrue, branch.WhenFalse],
-            IrGotoInstruction go => [go.Target],
-            IrReturnInstruction => [],
-            _ => []
-        };
+        return IrInstructionFacts.TryGetSuccessors(terminator) ?? [];
     }
 
     private static bool TryCreateParameterBindings(ManifestCallableTarget target, BoundMethodContracts contracts,

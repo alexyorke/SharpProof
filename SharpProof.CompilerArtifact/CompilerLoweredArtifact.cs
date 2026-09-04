@@ -1118,17 +1118,9 @@ internal static class CompilerLoweredArtifact
 
         static ImmutableArray<IrBlockId> Successors(IrInstruction terminator)
         {
-            return terminator switch
-            {
-                IrBranchInstruction branch when
-                    branch.WhenTrue == branch.WhenFalse => [branch.WhenTrue],
-                IrBranchInstruction branch =>
-                    [branch.WhenTrue, branch.WhenFalse],
-                IrGotoInstruction go => [go.Target],
-                IrReturnInstruction => [],
-                _ => throw new InvalidDataException(
-                    "A lowered block does not end in a terminator.")
-            };
+            return IrInstructionFacts.TryGetSuccessors(terminator) ??
+                throw new InvalidDataException(
+                    "A lowered block does not end in a terminator.");
         }
     }
 
