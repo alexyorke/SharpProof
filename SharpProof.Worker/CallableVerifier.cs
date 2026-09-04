@@ -211,8 +211,8 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             records.AddRange(
                 CallableClaimResultAssembler.PostconditionUnknowns(
                     target,
-                    WorkerClaimReason.ResourceLimit)
-                .Skip(startIndex));
+                    WorkerClaimReason.ResourceLimit,
+                    startIndex));
         }
 
         for (var index = 0; index < ensures.Length; index++)

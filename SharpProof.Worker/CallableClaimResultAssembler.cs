@@ -143,21 +143,30 @@ internal static class CallableClaimResultAssembler
     }
 
     internal static ImmutableArray<WorkerClaimResult> PostconditionUnknowns(
-        CompilerCallablePreparation target, WorkerClaimReason reason)
+        CompilerCallablePreparation target,
+        WorkerClaimReason reason,
+        int startIndex = 0)
     {
         // One caller reaches here precisely because the Ensures clauses outnumber
         // the declared claim ids, so the clause count cannot be used to index
         // ClaimIds without clamping.
         var ensures = target.Clauses.Count(static clause =>
             clause.Kind == CompilerContractKind.Ensures);
+        var count = Math.Min(ensures, target.Entry.ClaimIds.Length);
+        startIndex = Math.Clamp(startIndex, 0, count);
         var effectClaimIds = EffectClaimIds(target);
-        return [.. Enumerable.Range(0, Math.Min(ensures, target.Entry.ClaimIds.Length))
-            .Select(index =>
-                CreateUnknown(
-                    target,
-                    target.Entry.ClaimIds[index],
-                    reason,
-                    effectClaimIds.Contains(target.Entry.ClaimIds[index])))];
+        var results = ImmutableArray.CreateBuilder<WorkerClaimResult>(
+            count - startIndex);
+        for (var index = startIndex; index < count; index++)
+        {
+            var claimId = target.Entry.ClaimIds[index];
+            results.Add(CreateUnknown(
+                target,
+                claimId,
+                reason,
+                effectClaimIds.Contains(claimId)));
+        }
+        return results.MoveToImmutable();
     }
 
     private static HashSet<string> EffectClaimIds(
