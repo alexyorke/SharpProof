@@ -69,18 +69,21 @@ internal static class EffectDirectEventKinds
 {
     internal static readonly (EffectDirectEventKind Event, string WireName)[] WireNames =
         EffectContractMappingCatalog.DirectEvents;
+    private static readonly ImmutableDictionary<string, EffectDirectEventKind>
+        EventsByWireName = WireNames.ToImmutableDictionary(
+            static mapping => mapping.WireName,
+            static mapping => mapping.Event,
+            StringComparer.Ordinal);
+    private static readonly ImmutableDictionary<EffectDirectEventKind, string>
+        WireNamesByEvent = WireNames.ToImmutableDictionary(
+            static mapping => mapping.Event,
+            static mapping => mapping.WireName);
 
     internal static EffectDirectEventKind FromWireName(string kind)
     {
-        foreach (var mapping in WireNames)
+        if (kind != null && EventsByWireName.TryGetValue(kind, out var eventKind))
         {
-            if (string.Equals(
-                    mapping.WireName,
-                    kind,
-                    StringComparison.Ordinal))
-            {
-                return mapping.Event;
-            }
+            return eventKind;
         }
 
         throw new ArgumentOutOfRangeException(nameof(kind));
@@ -88,12 +91,9 @@ internal static class EffectDirectEventKinds
 
     internal static string ToWireName(EffectDirectEventKind kind)
     {
-        foreach (var mapping in WireNames)
+        if (WireNamesByEvent.TryGetValue(kind, out var wireName))
         {
-            if (mapping.Event == kind)
-            {
-                return mapping.WireName;
-            }
+            return wireName;
         }
 
         throw new ArgumentOutOfRangeException(nameof(kind));

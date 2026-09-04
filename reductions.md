@@ -22253,6 +22253,11 @@ coverage and pilot-authority fixture scripts. The fixture script completes
 successfully in the canonical container, and the coverage script retains the
 repository-root value that its downstream path logic actually consumes.
 
+R2018 is applied: `EffectDirectEventKinds` now builds ordinal wire-name and
+enum-key projections once from the generated catalog, so both directions share
+the same lookup tables and retain their existing out-of-domain exceptions. The
+full Effects suite passes 323/323 with zero warnings or errors.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
