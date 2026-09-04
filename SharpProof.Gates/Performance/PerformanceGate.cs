@@ -755,7 +755,7 @@ internal static class PerformanceGate
         CancellationToken cancellationToken)
     {
         ForceCollection();
-        var before = GC.GetTotalMemory(forceFullCollection: true);
+        var before = GC.GetTotalMemory(forceFullCollection: false);
         var retained = new List<Compilation>(RetainedCompilationCount);
         var sessionFactory = runAnalyzer ? new CountingSessionFactory() : null;
         var analyzer = runAnalyzer ? new SharpProofAnalyzer(sessionFactory!) : null;
@@ -785,7 +785,7 @@ internal static class PerformanceGate
         }
 
         ForceCollection();
-        var after = GC.GetTotalMemory(forceFullCollection: true);
+        var after = GC.GetTotalMemory(forceFullCollection: false);
         GC.KeepAlive(retained);
         GC.KeepAlive(analyzer);
         return Math.Max(1, after - before);
@@ -836,7 +836,7 @@ internal static class PerformanceGate
     {
         var analyzer = new SharpProofAnalyzer();
         ForceCollection();
-        var before = GC.GetTotalMemory(forceFullCollection: true);
+        var before = GC.GetTotalMemory(forceFullCollection: false);
         var compilations =
             new List<WeakReference<Compilation>>(
                 warmups + RetainedCompilationCount);
@@ -853,7 +853,7 @@ internal static class PerformanceGate
                     cancellationToken));
         }
         ForceCollection();
-        var after = GC.GetTotalMemory(forceFullCollection: true);
+        var after = GC.GetTotalMemory(forceFullCollection: false);
         var retainedCompilationCount = compilations.Count(
             static compilation => compilation.TryGetTarget(out _));
         GC.KeepAlive(compilations);
