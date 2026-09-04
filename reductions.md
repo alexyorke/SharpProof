@@ -22203,3 +22203,7 @@ result-domain policy.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2221 | **`ApiSpecInstantiation.IsSupportedSpecType` and `ApiSpecTable.ValidateSpecType` duplicate the exact five-kind `IrTypeKind` allowlist.** Share only the Specs-layer type-domain predicate, retaining instantiation's fail-closed boolean result, table creation's argument exception, and the worker's intentional narrower result domain. | `SharpProof.Specs/ApiSpecInstantiation.cs:116-123`; `SharpProof.Specs/ApiSpecTable.cs:402-409`; `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:591-598` |
+R2029 is applied: `PerformanceGate` now reuses one class-level UTF-8
+encoding without a BOM for both generated probe files. The focused
+performance-probe tests pass (2/2); the broader Gates performance filter has
+two unrelated pre-existing advisory-package-policy failures.

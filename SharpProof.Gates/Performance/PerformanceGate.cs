@@ -64,6 +64,8 @@ internal static class PerformanceGate
         TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ProcessTerminationTimeout =
         TimeSpan.FromSeconds(5);
+    private static readonly UTF8Encoding Utf8WithoutBom =
+        new(encoderShouldEmitUTF8Identifier: false);
 
     public static Task<PerformanceGateResult> RunAsync(
         string repositoryRoot,
@@ -505,7 +507,7 @@ internal static class PerformanceGate
         File.WriteAllText(
             Path.Combine(directory, "Subject.cs"),
             source,
-            new UTF8Encoding(false));
+            Utf8WithoutBom);
         var props = System.Security.SecurityElement.Escape(Path.Combine(
             repositoryRoot, "SharpProof.Package",
             "buildTransitive",
@@ -550,10 +552,10 @@ internal static class PerformanceGate
                 <_SharpProofContractForGeneratorPath>{generatorPath}</_SharpProofContractForGeneratorPath>
                 <_SharpProofSharedDirectory>{sharedDirectory}</_SharpProofSharedDirectory>
               </PropertyGroup>
-              {imports.Item1}{imports.Item2}
+            {imports.Item1}{imports.Item2}
             </Project>
             """,
-            new UTF8Encoding(false));
+            Utf8WithoutBom);
         return project;
     }
 
