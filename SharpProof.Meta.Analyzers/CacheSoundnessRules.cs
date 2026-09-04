@@ -1492,18 +1492,9 @@ internal static class CacheSoundnessRules
         switch (candidate, target)
         {
             case (IMethodSymbol method, IMethodSymbol targetMethod):
-                for (var current = method.OverriddenMethod;
-                     current != null;
-                     current = current.OverriddenMethod)
-                {
-                    if (SymbolEqualityComparer.Default.Equals(
-                            current.OriginalDefinition,
-                            targetMethod.OriginalDefinition))
-                    {
-                        return true;
-                    }
-                }
-                break;
+                return RoslynCfgFactory.OverridesMethod(
+                    method.OverriddenMethod,
+                    targetMethod);
             case (IPropertySymbol property, IPropertySymbol targetProperty):
                 for (var current = property.OverriddenProperty;
                      current != null;

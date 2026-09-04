@@ -19,4 +19,23 @@ internal static class RoslynCfgFactory
             _ => null
         };
     }
+
+    internal static bool OverridesMethod(
+        IMethodSymbol? candidate,
+        IMethodSymbol target)
+    {
+        for (var current = candidate;
+             current != null;
+             current = current.OverriddenMethod)
+        {
+            if (SymbolEqualityComparer.Default.Equals(
+                    current.OriginalDefinition,
+                    target.OriginalDefinition))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

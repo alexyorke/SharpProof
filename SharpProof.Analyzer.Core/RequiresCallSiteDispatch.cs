@@ -1,3 +1,5 @@
+using SharpProof.Roslyn;
+
 namespace SharpProof.Analyzer;
 
 internal static class RequiresCallSiteDispatch
@@ -83,18 +85,6 @@ internal static class RequiresCallSiteDispatch
         IMethodSymbol candidate,
         IMethodSymbol target)
     {
-        for (var current = candidate;
-             current != null;
-             current = current.OverriddenMethod)
-        {
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    target.OriginalDefinition))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return RoslynCfgFactory.OverridesMethod(candidate, target);
     }
 }

@@ -22279,6 +22279,11 @@ own block admission, fallback, cancellation, and exception policies. The
 canonical builds for `SharpProof.Analyzer.Core`, `SharpProof.Effects`, and
 `SharpProof.Meta.Analyzers` pass with zero warnings or errors.
 
+R2009 is applied: the shared Roslyn factory now owns method override-chain
+comparison, with Requires retaining candidate self-inclusion and Meta retaining
+its property-override branch and already-excluded seed. Analyzer.Core and Meta
+tests pass with the existing symbol-identity behavior unchanged.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
