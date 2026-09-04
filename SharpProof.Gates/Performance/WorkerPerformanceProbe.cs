@@ -569,8 +569,7 @@ internal static class WorkerPerformanceProbe
             var launcherSource = Path.Combine(
                 ioDirectory,
                 "LauncherSubject.cs");
-            File.WriteAllText(
-                cancellationSource,
+            var cancellationSourceText =
                 """
                 using SharpProof.Attributes;
 
@@ -580,11 +579,15 @@ internal static class WorkerPerformanceProbe
                         return value;
                     }
                 }
-                """,
+                """;
+            var launcherSourceText = CreateLauncherSource();
+            File.WriteAllText(
+                cancellationSource,
+                cancellationSourceText,
                 Utf8WithoutBom);
             File.WriteAllText(
                 launcherSource,
-                CreateLauncherSource(),
+                launcherSourceText,
                 Utf8WithoutBom);
 
             var references = GetReferences();
@@ -593,13 +596,13 @@ internal static class WorkerPerformanceProbe
                 workspace.LauncherManifestPath,
                 "SharpProofPerformanceProbe",
                 launcherSource,
-                File.ReadAllText(launcherSource),
+                launcherSourceText,
                 references);
             WriteCompilerManifest(
                 workspace.CancellationManifestPath,
                 "SharpProofCancellationPerformanceProbe",
                 cancellationSource,
-                File.ReadAllText(cancellationSource),
+                cancellationSourceText,
                 references);
             return workspace;
         }
