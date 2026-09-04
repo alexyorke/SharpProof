@@ -153,19 +153,22 @@ internal static class Program
     private static async Task<bool> WaitForStartAsync(TimeSpan timeout)
     {
         using var timeoutBoundary = new CancellationTokenSource(timeout);
-        try
-        {
-            var line = await Console.In.ReadLineAsync(timeoutBoundary.Token)
-                .ConfigureAwait(false);
-            return string.Equals(
-                line,
-                LinuxWorkerProcess.StartMessage,
-                StringComparison.Ordinal);
-        }
-        catch
+        var read = Console.In.ReadLineAsync(timeoutBoundary.Token).AsTask();
+        var timeoutSignal = Task.Delay(
+            Timeout.InfiniteTimeSpan,
+            timeoutBoundary.Token);
+        var completed = await Task.WhenAny(read, timeoutSignal)
+            .ConfigureAwait(false);
+        if (!ReferenceEquals(completed, read) ||
+            !read.IsCompletedSuccessfully)
         {
             return false;
         }
+
+        return string.Equals(
+            read.Result,
+            LinuxWorkerProcess.StartMessage,
+            StringComparison.Ordinal);
     }
     internal static bool IsBackendUnavailable(Exception exception)
     {
