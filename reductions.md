@@ -22179,3 +22179,8 @@ R2200 is `pending` and is one function in a file all fifteen generators already
 load. R2220 is `pending` and is a mechanical rewrite of 193 literals to one
 convention, with three self-contradicting files as the place to start; it changes no
 behaviour, which is both why it is safe and why it has never been done.
+
+R2028 is applied: removed the inert empty `ItemGroup` from
+`SharpProof.Dataflow.csproj`; the linked guard source and
+`InternalsVisibleTo` declarations are unchanged. The canonical
+`SharpProof.Dataflow` build passes with zero warnings and errors.

@@ -12,8 +12,6 @@
              Link="ArgumentNullGuard.cs" />
   </ItemGroup>
   <ItemGroup>
-  </ItemGroup>
-  <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Dataflow.Test" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
   </ItemGroup>
