@@ -212,30 +212,16 @@ public static partial class WorkerProtocolJson
         WorkerVersionSummary expectedVersions,
         int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
     {
-        RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
-        RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
-        _ = expectedManifest ??
-            throw new ArgumentNullException(nameof(expectedManifest));
-        _ = expectedRequest ?? throw new ArgumentNullException(nameof(expectedRequest));
-        _ = expectedVersions ?? throw new ArgumentNullException(nameof(expectedVersions));
-        if (!Validate(expectedRequest).IsValid ||
-            ComputeRequestHash(expectedRequest) != expectedRequestHash)
-        {
-            throw new ArgumentException(
-                "Expected request authority is invalid or does not match its hash.",
-                nameof(expectedRequest));
-        }
-        if (!WorkerProtocolMetadata.IsVersionsValid(expectedVersions))
-        {
-            throw new ArgumentException(
-                "Expected runtime provenance is invalid.",
-                nameof(expectedVersions));
-        }
-        var maximumElapsedMilliseconds = WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
-            expectedRequest, terminationGraceMilliseconds);
-        return ValidateResponse(response, expectedInputHash, expectedManifest,
-            expectedRequestHash, expectedRequest, expectedVersions,
-            maximumElapsedMilliseconds);
+        return ValidateForRequestCore(
+            response,
+            expectedRequestHash,
+            expectedInputHash,
+            expectedManifest,
+            expectedRequest,
+            expectedVersions,
+            terminationGraceMilliseconds,
+            null,
+            default);
     }
 
     internal static WorkerProtocolValidationResult ValidateForRequest(
@@ -246,16 +232,33 @@ public static partial class WorkerProtocolJson
         int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
         CancellationToken cancellationToken = default)
     {
+        _ = evidenceAuthority ??
+            throw new ArgumentNullException(nameof(evidenceAuthority));
+        return ValidateForRequestCore(
+            response,
+            expectedRequestHash,
+            expectedInputHash,
+            expectedManifest,
+            expectedRequest,
+            expectedVersions,
+            terminationGraceMilliseconds,
+            evidenceAuthority,
+            cancellationToken);
+    }
+
+    private static WorkerProtocolValidationResult ValidateForRequestCore(
+        WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
+        WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
+        WorkerVersionSummary expectedVersions, int terminationGraceMilliseconds,
+        IWorkerResponseEvidenceAuthority? evidenceAuthority,
+        CancellationToken cancellationToken)
+    {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         _ = expectedManifest ??
             throw new ArgumentNullException(nameof(expectedManifest));
-        _ = expectedRequest ??
-            throw new ArgumentNullException(nameof(expectedRequest));
-        _ = expectedVersions ??
-            throw new ArgumentNullException(nameof(expectedVersions));
-        _ = evidenceAuthority ??
-            throw new ArgumentNullException(nameof(evidenceAuthority));
+        _ = expectedRequest ?? throw new ArgumentNullException(nameof(expectedRequest));
+        _ = expectedVersions ?? throw new ArgumentNullException(nameof(expectedVersions));
         if (!Validate(expectedRequest).IsValid ||
             ComputeRequestHash(expectedRequest) != expectedRequestHash)
         {

@@ -299,8 +299,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(run.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(run, "SPCF0005");
     }
 
     [Test]
@@ -334,8 +333,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(exact.Diagnostics, Is.Empty);
-        Assert.That(mismatch.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(mismatch, "SPCF0005");
     }
 
     [Test]
@@ -376,8 +374,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(exact.Diagnostics, Is.Empty);
-        Assert.That(returnMismatch.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(returnMismatch, "SPCF0005");
     }
 
     [Test]
@@ -495,8 +492,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(ordinary.Diagnostics, Is.Empty);
-        Assert.That(missing.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0007"));
+        AssertSingle(missing, "SPCF0007");
     }
 
     [Test]
@@ -1452,9 +1448,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(run, "SPCF0005");
     }
 
     [Test]
@@ -1871,9 +1865,7 @@ public sealed class ContractForValidatorGeneratorTests
 
         var run = GeneratorTestHost.Run(compilation);
 
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0004"]));
+        AssertSingle(run, "SPCF0004");
     }
 
     [Test]

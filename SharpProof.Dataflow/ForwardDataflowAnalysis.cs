@@ -137,7 +137,7 @@ public static class ForwardDataflowAnalysis
                 batch = ValidatePermutation(batch, worklistOrder(batch));
             }
 
-            var changedOutputs = new Dictionary<int, T>();
+            var changedOutputs = new List<int>();
             foreach (var blockId in batch)
             {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
@@ -150,7 +150,8 @@ public static class ForwardDataflowAnalysis
                 var monotoneOutput = domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
                 {
-                    changedOutputs.Add(blockId, monotoneOutput);
+                    outputs[blockId] = monotoneOutput;
+                    changedOutputs.Add(blockId);
                 }
             }
             if (changedOutputs.Count == 0)
@@ -158,13 +159,8 @@ public static class ForwardDataflowAnalysis
                 continue;
             }
 
-            foreach (var change in changedOutputs)
-            {
-                outputs[change.Key] = change.Value;
-            }
-
             var affected = new SortedSet<int>();
-            foreach (var blockId in changedOutputs.Keys)
+            foreach (var blockId in changedOutputs)
             {
                 foreach (var successor in graph.GetSuccessors(blockId))
                 {

@@ -545,30 +545,18 @@ public sealed class IrProgramTests
             factory.GetOrCreateSequenceType(factory.IntegerType);
         var sequence =
             factory.CreateVariable("values", sequenceType);
-        var failingBuilder = new IrProgramBuilder(factory);
-        var failingEntry = failingBuilder.CreateBlock("entry");
-        var failingStore = failingBuilder.Store(
-            failingEntry,
-            factory.CreateOperation("failing-store"),
-            failingBuilder.SequenceLocation(
-                factory.Variable(sequence),
-                factory.Integer(1)),
+        var (failingProgram, failingStore) = BuildStoreProgram(
+            factory,
+            sequence,
+            "failing-store",
+            "failing-return",
             DivisionByZero(factory));
-        failingBuilder.Return(
-            failingEntry,
-            factory.CreateOperation("failing-return"));
-        var boundsBuilder = new IrProgramBuilder(factory);
-        var boundsEntry = boundsBuilder.CreateBlock("entry");
-        var boundsStore = boundsBuilder.Store(
-            boundsEntry,
-            factory.CreateOperation("bounds-store"),
-            boundsBuilder.SequenceLocation(
-                factory.Variable(sequence),
-                factory.Integer(1)),
+        var (boundsProgram, boundsStore) = BuildStoreProgram(
+            factory,
+            sequence,
+            "bounds-store",
+            "bounds-return",
             factory.Integer(7));
-        boundsBuilder.Return(
-            boundsEntry,
-            factory.CreateOperation("bounds-return"));
         var values = new Dictionary<IrVarId, IrValue>
         {
             [sequence] = factory.CreateSequenceValue(sequenceType, [])
@@ -576,9 +564,9 @@ public sealed class IrProgramTests
         var interpreter = new IrProgramInterpreter(factory);
 
         var failing =
-            interpreter.Execute(failingBuilder.Build(), values);
+            interpreter.Execute(failingProgram, values);
         var bounds =
-            interpreter.Execute(boundsBuilder.Build(), values);
+            interpreter.Execute(boundsProgram, values);
 
         Assert.That(
             failing.Status,
@@ -594,6 +582,26 @@ public sealed class IrProgramTests
         Assert.That(
             bounds.Exception!.Kind,
             Is.EqualTo(IrExceptionKind.IndexOutOfRange));
+    }
+
+    private static (IrProgram Program, IrStoreInstruction Store) BuildStoreProgram(
+        IrFactory factory,
+        IrVarId sequence,
+        string storeOperation,
+        string returnOperation,
+        IrTerm value)
+    {
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var store = builder.Store(
+            entry,
+            factory.CreateOperation(storeOperation),
+            builder.SequenceLocation(
+                factory.Variable(sequence),
+                factory.Integer(1)),
+            value);
+        builder.Return(entry, factory.CreateOperation(returnOperation));
+        return (builder.Build(), store);
     }
 
     [Test]

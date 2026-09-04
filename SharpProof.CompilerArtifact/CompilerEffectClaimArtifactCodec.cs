@@ -220,12 +220,25 @@ internal static class CompilerEffectClaimArtifactCodec
 
     private static bool HasCanonicalStrings(string[]? values)
     {
-        return WorkerProtocolJson.AreDistinctNonblank(values) &&
-            values!.Zip(
-                    values.Skip(1),
-                    static (left, right) =>
-                        StringComparer.Ordinal.Compare(left, right) < 0)
-                .All(static ordered => ordered);
+        if (values == null)
+        {
+            return false;
+        }
+
+        string? previous = null;
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value) ||
+                previous != null &&
+                StringComparer.Ordinal.Compare(previous, value) >= 0)
+            {
+                return false;
+            }
+
+            previous = value;
+        }
+
+        return true;
     }
 
     internal static string ComputeConstraintSha256(
