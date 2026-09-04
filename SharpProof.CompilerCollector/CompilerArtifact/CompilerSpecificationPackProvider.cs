@@ -366,10 +366,7 @@ internal sealed class CompilerSpecificationPackProvider
             checked((int)resource.Length));
         resource.CopyTo(buffer);
         var bytes = buffer.ToArray();
-        buffer.Position = 0;
-        var evidenceSha256 = CompilerCompilationCapture.Hash(
-            buffer,
-            CancellationToken.None);
+        var evidenceSha256 = HashEncoding.ComputeSha256Hex(bytes);
         using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions
         {
             AllowTrailingCommas = false,

@@ -39,6 +39,13 @@ internal static class EffectContractDiagnostics
         var evaluations = Evaluate(
             method, AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
             session, reportDiagnostic, cancellationToken);
+        if (evaluations.IsDefaultOrEmpty)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
+        var hasRefuted = false;
+        var allProven = true;
         foreach (var evaluation in evaluations)
         {
             if (evaluation.Diagnostic != null)
@@ -48,21 +55,23 @@ internal static class EffectContractDiagnostics
                     evaluation.DiagnosticLocation,
                     evaluation.DiagnosticArguments));
             }
+
+            if (evaluation.Outcome == EffectEvaluationOutcome.Refuted)
+            {
+                hasRefuted = true;
+            }
+            else if (evaluation.Outcome != EffectEvaluationOutcome.Proven)
+            {
+                allProven = false;
+            }
         }
 
-        if (evaluations.IsDefaultOrEmpty)
-        {
-            return AnalyzerSemanticOutcome.NotApplicable;
-        }
-
-        if (evaluations.Any(static item =>
-                item.Outcome == EffectEvaluationOutcome.Refuted))
+        if (hasRefuted)
         {
             return AnalyzerSemanticOutcome.Refuted;
         }
 
-        return evaluations.All(static item =>
-                item.Outcome == EffectEvaluationOutcome.Proven)
+        return allProven
             ? AnalyzerSemanticOutcome.Proven
             : AnalyzerSemanticOutcome.Unknown;
     }

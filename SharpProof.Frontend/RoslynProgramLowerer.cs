@@ -415,9 +415,7 @@ public sealed class RoslynProgramLowerer(
                 if (IsClosureInvocation(invocation.TargetMethod))
                 {
                     mutated = [.. mutated
-                        .Concat(CreateKnownStateVariables())
-                        .Distinct()
-                        .OrderBy(static variable => variable.Value)];
+                        .Concat(CreateKnownStateVariables())];
                 }
                 Havoc(block, operation, mutated.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, mutated);
             }
@@ -447,7 +445,7 @@ public sealed class RoslynProgramLowerer(
                 invocation.Arguments.Length ==
                 invocation.TargetMethod.Parameters.Length;
             var ordinals = isDirect ? new HashSet<int>() : null;
-            var mutated = new HashSet<IrVarId>();
+            HashSet<IrVarId>? mutated = null;
             var lowered = new List<(
                 int Ordinal, IrTerm Value)>(invocation.Arguments.Length);
             foreach (var argument in invocation.Arguments)
@@ -458,7 +456,7 @@ public sealed class RoslynProgramLowerer(
                 if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
                     _expressions.GetReferencedVariable(argument.Value) is { } variable)
                 {
-                    mutated.Add(variable);
+                    (mutated ??= []).Add(variable);
                 }
                 if (isDirect &&
                     (argument.ArgumentKind != ArgumentKind.Explicit ||
@@ -480,7 +478,7 @@ public sealed class RoslynProgramLowerer(
                 .OrderBy(static argument => argument.Ordinal)
                 .Select(static argument => argument.Value)],
                 isDirect,
-                [.. mutated.OrderBy(static variable => variable.Value)]);
+                mutated?.ToArray() ?? []);
         }
 
         private LocationLowering LowerLocation(
@@ -654,9 +652,7 @@ public sealed class RoslynProgramLowerer(
         {
             return [.. _expressions.CreateVariableBindings()
                 .Select(static binding => binding.Variable)
-                .Concat(_expressions.CreateCaptureBindings())
-                .Distinct()
-                .OrderBy(static variable => variable.Value)];
+                .Concat(_expressions.CreateCaptureBindings())];
         }
 
         private void LowerReturn(
