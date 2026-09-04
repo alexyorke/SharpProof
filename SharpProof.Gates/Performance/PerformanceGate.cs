@@ -294,12 +294,8 @@ internal static class PerformanceGate
                 contract.SmokeSamples,
                 cancellationToken)
             .ConfigureAwait(false);
-        var ratios = timing.Samples
-            .Select(static sample =>
-                sample.UnannotatedAdvisoryMilliseconds /
-                sample.BaselineMilliseconds)
-            .ToImmutableArray();
-        var maximumObservedRatio = ratios.Max();
+        var maximumObservedRatio = timing.Samples.Max(
+            static sample => sample.Ratio);
         var forcedTermination =
             await WorkerPerformanceProbe.MeasureForcedTerminationAsync(
                     repositoryRoot,
