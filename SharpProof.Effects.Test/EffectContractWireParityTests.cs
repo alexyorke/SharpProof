@@ -3,6 +3,57 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class EffectContractWireParityTests
 {
+    private static readonly (
+        EffectRegionKind Region,
+        EffectContractKind Read,
+        EffectContractKind Write,
+        EffectRegionId? RegionId,
+        bool ExpandsParameters)[] s_regionMappings =
+    [
+        (
+            EffectRegionKind.Receiver,
+            EffectContractKind.ReadsReceiverState,
+            EffectContractKind.WritesReceiverState,
+            (EffectRegionId?)EffectRegionId.Receiver,
+            false),
+        (
+            EffectRegionKind.Parameter,
+            EffectContractKind.ReadsArgumentState,
+            EffectContractKind.WritesArgumentState,
+            null,
+            true),
+        (
+            EffectRegionKind.Captured,
+            EffectContractKind.ReadsCapturedState,
+            EffectContractKind.WritesCapturedState,
+            (EffectRegionId?)EffectRegionId.Captured(0),
+            false),
+        (
+            EffectRegionKind.Static,
+            EffectContractKind.ReadsStaticState,
+            EffectContractKind.WritesStaticState,
+            (EffectRegionId?)EffectRegionId.Static(),
+            false),
+        (
+            EffectRegionKind.Fresh,
+            EffectContractKind.None,
+            EffectContractKind.None,
+            null,
+            false),
+        (
+            EffectRegionKind.Ambient,
+            EffectContractKind.ReadsAmbientState,
+            EffectContractKind.WritesAmbientState,
+            (EffectRegionId?)EffectRegionId.Ambient,
+            false),
+        (
+            EffectRegionKind.Unknown,
+            EffectContractKind.None,
+            EffectContractKind.None,
+            null,
+            false)
+    ];
+
     [Test]
     public void GeneratedEffectCatalogContainsNoAnalysisAlgorithms()
     {
@@ -120,27 +171,7 @@ public sealed class EffectContractWireParityTests
         }
     }
 
-    [TestCase(EffectRegionKind.Receiver,
-        EffectContractKind.ReadsReceiverState,
-        EffectContractKind.WritesReceiverState)]
-    [TestCase(EffectRegionKind.Parameter,
-        EffectContractKind.ReadsArgumentState,
-        EffectContractKind.WritesArgumentState)]
-    [TestCase(EffectRegionKind.Captured,
-        EffectContractKind.ReadsCapturedState,
-        EffectContractKind.WritesCapturedState)]
-    [TestCase(EffectRegionKind.Static,
-        EffectContractKind.ReadsStaticState,
-        EffectContractKind.WritesStaticState)]
-    [TestCase(EffectRegionKind.Ambient,
-        EffectContractKind.ReadsAmbientState,
-        EffectContractKind.WritesAmbientState)]
-    [TestCase(EffectRegionKind.Fresh,
-        EffectContractKind.None,
-        EffectContractKind.None)]
-    [TestCase(EffectRegionKind.Unknown,
-        EffectContractKind.None,
-        EffectContractKind.None)]
+    [TestCaseSource(nameof(RegionProjectionCases))]
     public void RegionProjectionUsesAnExplicitNamedMapping(
         EffectRegionKind region,
         EffectContractKind expectedRead,
@@ -161,77 +192,39 @@ public sealed class EffectContractWireParityTests
         }
     }
 
+    private static IEnumerable<TestCaseData> RegionProjectionCases()
+    {
+        return s_regionMappings.Select(static mapping => new TestCaseData(
+            mapping.Region,
+            mapping.Read,
+            mapping.Write));
+    }
+
     [Test]
     public void RegionCatalogIsClosedAndDrivesBothDirections()
     {
-        var expected = new[]
-        {
-            (
-                EffectRegionKind.Receiver,
-                EffectContractKind.ReadsReceiverState,
-                EffectContractKind.WritesReceiverState,
-                (EffectRegionId?)EffectRegionId.Receiver,
-                false),
-            (
-                EffectRegionKind.Parameter,
-                EffectContractKind.ReadsArgumentState,
-                EffectContractKind.WritesArgumentState,
-                null,
-                true),
-            (
-                EffectRegionKind.Captured,
-                EffectContractKind.ReadsCapturedState,
-                EffectContractKind.WritesCapturedState,
-                (EffectRegionId?)EffectRegionId.Captured(0),
-                false),
-            (
-                EffectRegionKind.Static,
-                EffectContractKind.ReadsStaticState,
-                EffectContractKind.WritesStaticState,
-                (EffectRegionId?)EffectRegionId.Static(),
-                false),
-            (
-                EffectRegionKind.Fresh,
-                EffectContractKind.None,
-                EffectContractKind.None,
-                null,
-                false),
-            (
-                EffectRegionKind.Ambient,
-                EffectContractKind.ReadsAmbientState,
-                EffectContractKind.WritesAmbientState,
-                (EffectRegionId?)EffectRegionId.Ambient,
-                false),
-            (
-                EffectRegionKind.Unknown,
-                EffectContractKind.None,
-                EffectContractKind.None,
-                null,
-                false)
-        };
-
         Assert.That(
             EffectContractMappings.RegionContracts,
-            Is.EqualTo(expected));
+            Is.EqualTo(s_regionMappings));
         Assert.That(
-            expected.Select(static mapping => mapping.Item1),
+            s_regionMappings.Select(static mapping => mapping.Region),
             Is.EqualTo(Enum.GetValues<EffectRegionKind>()));
 
         const int parameterCount = 3;
-        foreach (var mapping in expected)
+        foreach (var mapping in s_regionMappings)
         {
             var expectedRegions =
-                mapping.Item5
+                mapping.ExpandsParameters
                     ? EffectContractMappings.ParameterRegions(parameterCount)
-                    : mapping.Item4 is { } region
+                    : mapping.RegionId is { } region
                         ? EffectRegionSet.Create(region)
                         : EffectRegionSet.Empty;
             var reads = EffectContractMappings.ToAnalysisRegions(
-                mapping.Item2,
+                mapping.Read,
                 isWrite: false,
                 parameterCount);
             var writes = EffectContractMappings.ToAnalysisRegions(
-                mapping.Item3,
+                mapping.Write,
                 isWrite: true,
                 parameterCount);
 
@@ -240,17 +233,17 @@ public sealed class EffectContractWireParityTests
                 Assert.That(
                     reads,
                     Is.EqualTo(
-                        mapping.Item2 == EffectContractKind.None
+                        mapping.Read == EffectContractKind.None
                             ? EffectRegionSet.Empty
                             : expectedRegions),
-                    mapping.Item1 + " read");
+                    mapping.Region + " read");
                 Assert.That(
                     writes,
                     Is.EqualTo(
-                        mapping.Item3 == EffectContractKind.None
+                        mapping.Write == EffectContractKind.None
                             ? EffectRegionSet.Empty
                             : expectedRegions),
-                    mapping.Item1 + " write");
+                    mapping.Region + " write");
             }
         }
     }
