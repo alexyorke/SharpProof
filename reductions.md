@@ -21428,3 +21428,17 @@ Eleven private factories across eight Effects test files return `Microsoft.CodeA
 | ID | Finding | Evidence |
 |---|---|---|
 | R2026 | `OpenSourceCorpusCatalog` and `OpenSourceCorpusRunner` repeat the same five `SourceId|Path` composite-key constructions; centralize the delimiter/order projection while retaining their distinct validation and instrumentation paths. | `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:88,155,205`; `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:38-45,59-63`; delimiter rejection at `OpenSourceCorpusCatalog.cs:391-400` |
+
+## Second survey, continued: R2027 - SharpProof.Ir.csproj retains an empty build group
+
+`SharpProof.Ir/SharpProof.Ir.csproj` contains an empty `<ItemGroup>` between its
+`System.Collections.Immutable` package reference and its populated
+`InternalsVisibleTo` group. The group has no items, conditions, metadata, or
+comments, so MSBuild derives no project state from it. It is inert build-file
+structure and can be removed without changing the package reference or any
+friend-assembly edge; the same residue was already removed from
+`SharpProof.Smt.csproj` under R1153.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2027 | **`SharpProof.Ir.csproj` retains an inert empty `<ItemGroup>`.** Remove the empty XML without changing the adjacent package reference or `InternalsVisibleTo` declarations. | `SharpProof.Ir/SharpProof.Ir.csproj:8-13`; related applied R1153 in `SharpProof.Smt/SharpProof.Smt.csproj` |
