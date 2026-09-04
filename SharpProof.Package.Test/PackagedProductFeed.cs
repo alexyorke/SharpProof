@@ -311,19 +311,10 @@ internal sealed class PackagedProductFeed : IDisposable
         string workingDirectory,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        var startInfo = ProcessRunner.CreateStartInfo(
+            workingDirectory,
+            "dotnet",
+            arguments);
         startInfo.Environment["SharedCompilationId"] =
             s_sharedCompilationServerId;
 

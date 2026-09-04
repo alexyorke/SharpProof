@@ -4150,19 +4150,10 @@ public sealed class WorkerMsBuildIntegrationTests
         private async Task<BuildResult> RunDotNetAsync(
             IEnumerable<string> arguments)
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = _root,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-            foreach (var argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
+            var startInfo = ProcessRunner.CreateStartInfo(
+                _root,
+                "dotnet",
+                arguments);
             startInfo.Environment["SharedCompilationId"] =
                 s_sharedCompilationServerId;
             using var process = Process.Start(startInfo)!;

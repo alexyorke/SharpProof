@@ -846,19 +846,10 @@ public sealed class FinalCompilationProbeTests
             string[] arguments,
             string? workingDirectory = null)
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = workingDirectory ?? _root,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-            foreach (var argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
+            var startInfo = ProcessRunner.CreateStartInfo(
+                workingDirectory ?? _root,
+                "dotnet",
+                arguments);
             startInfo.Environment["SharedCompilationId"] =
                 _sharedCompilationServerId;
 
