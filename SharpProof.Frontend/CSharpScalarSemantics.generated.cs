@@ -253,7 +253,7 @@ internal static class CSharpScalarSemantics
         kind is not (BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) ||
         SupportsBuiltInEquality(left) && SupportsBuiltInEquality(right);
 
-    private static bool TryGetBinary(
+    internal static bool TryGetBinary(
         BinaryOperatorKind kind,
         out CSharpBinarySemantics semantics) =>
         TryGet(BinaryOperators, kind,

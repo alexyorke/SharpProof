@@ -851,17 +851,27 @@ public sealed class RoslynOperationLowerer
                 return OpaqueBinary(operation, FirstAbstention(left, right));
             }
 
-            var mapped = CSharpScalarSemantics.MapBinary(operation.OperatorKind,
-                operation.Type?.SpecialType ?? SpecialType.None);
-            if (!mapped.HasValue)
+            IrBinaryOperator? mapped;
+            CSharpBinarySemantics semantics = default;
+            if (operation.OperatorKind == BinaryOperatorKind.Add &&
+                operation.Type?.SpecialType == SpecialType.System_String)
+            {
+                mapped = IrBinaryOperator.StringConcat;
+            }
+            else if (!CSharpScalarSemantics.TryGetBinary(
+                         operation.OperatorKind,
+                         out semantics))
             {
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedOperationKind);
+            }
+            else
+            {
+                mapped = semantics.IrOperator;
             }
 
             if (mapped.Value != IrBinaryOperator.StringConcat)
             {
-                if (CSharpScalarSemantics.IsIntegerArithmetic(
-                        operation.OperatorKind) &&
+                if (semantics.IsIntegerArithmetic &&
                     !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
                         operation.Type?.SpecialType ?? SpecialType.None))
                 {
@@ -870,8 +880,7 @@ public sealed class RoslynOperationLowerer
                         FrontendAbstention.UnsupportedType);
                 }
 
-                if (CSharpScalarSemantics.RequiresCheckedArithmetic(
-                        operation.OperatorKind) && !operation.IsChecked)
+                if (semantics.RequiresCheckedArithmetic && !operation.IsChecked)
                 {
                     return OpaqueBinary(
                         operation,
