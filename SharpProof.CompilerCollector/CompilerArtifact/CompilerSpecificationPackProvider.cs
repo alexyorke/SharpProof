@@ -59,20 +59,23 @@ internal sealed class CompilerSpecificationPackProvider
 
             foreach (var method in pack.Methods)
             {
-                if (methods.ContainsKey(method.DocumentationCommentId))
+                var definition = method with
+                {
+                    EvidenceSha256 = catalog.EvidenceSha256,
+                    EvidenceIdentity = pack.Id + "@" + pack.Version
+                };
+                try
+                {
+                    methods.Add(method.DocumentationCommentId, definition);
+                }
+                catch (ArgumentException exception)
+                    when (exception is not ArgumentNullException)
                 {
                     throw new InvalidOperationException(
                         "Enabled SharpProof specification packs overlap at '" +
-                        method.DocumentationCommentId + "'.");
+                        method.DocumentationCommentId + "'.",
+                        exception);
                 }
-
-                methods.Add(
-                    method.DocumentationCommentId,
-                    method with
-                    {
-                        EvidenceSha256 = catalog.EvidenceSha256,
-                        EvidenceIdentity = pack.Id + "@" + pack.Version
-                    });
             }
         }
 
