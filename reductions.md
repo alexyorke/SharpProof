@@ -22184,3 +22184,22 @@ R2028 is applied: removed the inert empty `ItemGroup` from
 `SharpProof.Dataflow.csproj`; the linked guard source and
 `InternalsVisibleTo` declarations are unchanged. The canonical
 `SharpProof.Dataflow` build passes with zero warnings and errors.
+
+## Second survey, continued: R2221 - the Specs layer repeats its supported IR type allowlist
+
+`ApiSpecInstantiation.MatchesType` calls its private
+`IsSupportedSpecType` predicate, which accepts exactly `Boolean`, `Integer`,
+`String`, `Reference`, and `Sequence`. `ApiSpecTable.ValidateSpecType`
+repeats the same five-way `IrTypeKind` pattern before accepting parameter,
+receiver, and result types. These helpers live in the same `SharpProof.Specs`
+assembly, but their boundary behavior is intentionally different:
+instantiation returns `false` as a fail-closed match result, while table
+creation throws an argument exception. A shared internal type-domain predicate
+can own only the allowlist and preserve those caller-specific outcomes and
+type-equality checks. The worker's `AcyclicBlockPredicateExecutor.IsResultType`
+is not part of this reduction: it deliberately excludes `Reference` for its
+result-domain policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2221 | **`ApiSpecInstantiation.IsSupportedSpecType` and `ApiSpecTable.ValidateSpecType` duplicate the exact five-kind `IrTypeKind` allowlist.** Share only the Specs-layer type-domain predicate, retaining instantiation's fail-closed boolean result, table creation's argument exception, and the worker's intentional narrower result domain. | `SharpProof.Specs/ApiSpecInstantiation.cs:116-123`; `SharpProof.Specs/ApiSpecTable.cs:402-409`; `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:591-598` |
