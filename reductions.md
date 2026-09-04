@@ -21292,3 +21292,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2009 | RequiresCallSiteDispatch and CacheSoundnessRules repeat the method `OverriddenMethod`/`OriginalDefinition` walk; share only the method-chain predicate with each caller's self-inclusion and property policies explicit. | `SharpProof.Analyzer.Core/RequiresCallSiteDispatch.cs:82-96`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1492-1514` |
+
+## Second survey, continued: R2010 - CallableEntryFeasibility and CallableVerifier duplicate the internal-consistency false solver goal
+
+`CallableEntryFeasibility` and `CallableVerifier` each build a satisfiability `VerificationQuery` with the same `Goal` shape: `factory.Boolean(false)`, `ProofDiagnosticKind.InternalConsistency`, and `new SourceLocationId(0)`. Their surrounding policies are different and must remain local: the feasibility path uses evidence assumptions and replay variables while classifying contradictory preconditions and resource limits, whereas the verifier probes a distinct evidence set and returns a nullable proof outcome. A small Worker-owned goal factory (or a named constant projection) can centralize only this sentinel goal construction, leaving each query's assumptions, replay variables, kernel call, and outcome handling explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2010 | CallableEntryFeasibility and CallableVerifier repeat the same `InternalConsistency` false `Goal` construction; share only the sentinel-goal projection while preserving their distinct query and outcome policies. | `SharpProof.Worker/CallableEntryFeasibility.cs:123-128`; `SharpProof.Worker/CallableVerifier.cs:360-365` |
