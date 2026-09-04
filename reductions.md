@@ -22337,6 +22337,11 @@ R2026 is applied: `OpenSourceCorpusCatalog.GetSourceFileKey` now owns the shared
 `SourceId|Path` composite-key projection used by catalog validation and corpus
 execution. Corpus gate tests pass.
 
+R2030 is applied: the shared Effects `MonitorFacts.IsExplicitMonitorCall`
+predicate now owns the full static Monitor-call admission shape used by replay
+lowering and effect scanning; each caller still resolves its own monitor symbol
+and retains its surrounding policy. Effects and CompilerCollector tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

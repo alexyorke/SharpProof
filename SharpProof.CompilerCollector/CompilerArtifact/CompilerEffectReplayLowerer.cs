@@ -319,22 +319,10 @@ internal static class CompilerEffectReplayLowerer
         CSharpCompilation compilation,
         IInvocationOperation invocation)
     {
-        var monitorType = compilation.GetTypeByMetadataName(
-            FrameworkTypeMetadataNames.Monitor);
-        return !invocation.IsImplicit &&
-            invocation.Instance == null &&
-            !invocation.Arguments.IsDefaultOrEmpty &&
-            invocation.Arguments.All(static argument =>
-                DefiniteOperationFacts.IsHarmlessValue(argument.Value)) &&
-            DefiniteOperationFacts.IsDefinitelyNonNull(
-                invocation.Arguments[0].Value) &&
-            invocation.TargetMethod.Name is
-                "Enter" or "Exit" or "Pulse" or "PulseAll" or
-                "TryEnter" or "Wait" &&
-            monitorType != null &&
-            SymbolEqualityComparer.Default.Equals(
-                invocation.TargetMethod.ContainingType.OriginalDefinition,
-                monitorType.OriginalDefinition);
+        return MonitorFacts.IsExplicitMonitorCall(
+            invocation,
+            compilation.GetTypeByMetadataName(
+                FrameworkTypeMetadataNames.Monitor));
     }
 
     private static bool IsDefiniteEmptyLock(

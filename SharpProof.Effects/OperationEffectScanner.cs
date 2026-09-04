@@ -1447,13 +1447,7 @@ internal sealed partial class OperationEffectScanner
 
     private bool IsMonitorCall(IInvocationOperation invocation)
     {
-        return !invocation.IsImplicit &&
-        invocation.Instance == null &&
-        !invocation.Arguments.IsDefaultOrEmpty &&
-        invocation.Arguments.All(argument => DefiniteOperationFacts.IsHarmlessValue(argument.Value)) &&
-        DefiniteOperationFacts.IsDefinitelyNonNull(invocation.Arguments[0].Value) &&
-        invocation.TargetMethod.Name is "Enter" or "Exit" or "Pulse" or "PulseAll" or "TryEnter" or "Wait" &&
-         MonitorFacts.IsMonitorMethod(invocation.TargetMethod, _monitorType);
+        return MonitorFacts.IsExplicitMonitorCall(invocation, _monitorType);
     }
 
     private bool IsSynthesizedLockMonitorCall(IInvocationOperation invocation)
