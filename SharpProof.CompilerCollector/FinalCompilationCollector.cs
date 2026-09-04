@@ -85,7 +85,7 @@ internal static class FinalCompilationCollector
             context.CancellationToken,
             context.Options.AdditionalFiles,
             ParseSpecificationPacks(Get(options, SpecificationPacksOption)));
-        return CompilerManifestArtifactJson.Serialize(artifact);
+        return CompilerManifestArtifactJson.SerializeValidated(artifact);
     }
 
     private static ImmutableArray<string> ParseSpecificationPacks(

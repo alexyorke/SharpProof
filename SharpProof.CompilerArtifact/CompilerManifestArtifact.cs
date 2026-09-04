@@ -359,10 +359,25 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
     {
+        return SerializeCore(artifact, cancellationToken, validate: true);
+    }
+
+    internal static string SerializeValidated(
+        CompilerManifestArtifact artifact,
+        CancellationToken cancellationToken = default)
+    {
+        return SerializeCore(artifact, cancellationToken, validate: false);
+    }
+
+    private static string SerializeCore(
+        CompilerManifestArtifact artifact,
+        CancellationToken cancellationToken,
+        bool validate)
+    {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
+        if (validate && !HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
         {
             throw new JsonException("The compiler diagnostics are invalid.");
         }
@@ -380,12 +395,15 @@ internal static class CompilerManifestArtifactJson
                 .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
         ];
         cancellationToken.ThrowIfCancellationRequested();
-        Validate(
-            artifact,
-            validateFeatureScope: true,
-            validateDecodability: true,
-            cancellationToken,
-            validateDiagnosticShapes: false);
+        if (validate)
+        {
+            Validate(
+                artifact,
+                validateFeatureScope: true,
+                validateDecodability: true,
+                cancellationToken,
+                validateDiagnosticShapes: false);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var json = JsonSerializer.Serialize(
                 artifact,
