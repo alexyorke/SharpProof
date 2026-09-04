@@ -18,7 +18,7 @@ using SharpProof.Worker;
 namespace SharpProof.Package.Test;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class PackageLayoutSmokeTests
 {
     private static readonly Guid SourceLinkKind = new(
