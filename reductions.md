@@ -21470,3 +21470,25 @@ separate file-generation steps.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2029 | **`PerformanceGate.CreatePerformanceProbeProject` constructs the same no-BOM `UTF8Encoding` twice for adjacent generated-file writes.** Reuse one class-level encoder while retaining the distinct `Subject.cs` and `Probe.csproj` contents. | `SharpProof.Gates/Performance/PerformanceGate.cs:499-508,540-556` |
+
+## Second survey, continued: R2030 - explicit Monitor-call admission is duplicated across compiler replay and Effects scanning
+
+`CompilerEffectReplayLowerer.IsDefiniteMonitorCall` and
+`OperationEffectScanner.IsMonitorCall` independently perform the same
+explicit-call admission sequence: reject implicit invocations, require a
+static call, require a nonempty argument list, require harmless argument
+values, require a definitely non-null first argument, allow the six
+`System.Threading.Monitor` method names, and compare the target's containing
+type with the Monitor symbol by `OriginalDefinition`. The lowerer resolves
+Monitor from the current compilation, while the scanner uses its cached
+`_monitorType`; their consumers also produce different replay/event versus
+effect facts, so those surrounding policies should remain separate. R915 and
+R2020 cover the repeated framework lookup and identity fragments, not this
+complete explicit-call admission predicate. An Effects-owned parameterized
+predicate is available to the existing `CompilerCollector` friend boundary;
+it can centralize only the shared checks while retaining each caller's symbol
+source and downstream behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2030 | **`CompilerEffectReplayLowerer.IsDefiniteMonitorCall` and `OperationEffectScanner.IsMonitorCall` duplicate the full explicit `Monitor`-call admission predicate.** Share only the static/argument/harmless-value/non-null/name/type-identity checks, preserving the lowerer's compilation-scoped lookup and replay policy, the scanner's cached symbol and effect policy, and the separate synthesized-lock path. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:322-342`; `SharpProof.Effects/OperationEffectScanner.cs:1448-1459`; `SharpProof.Effects/SharpProof.Effects.csproj:26`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:20`; related R915, R2020 |
