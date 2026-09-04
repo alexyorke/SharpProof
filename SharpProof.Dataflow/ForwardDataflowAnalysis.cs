@@ -182,8 +182,9 @@ public static class ForwardDataflowAnalysis
                     continue;
                 }
 
-                var updated = graph.IsCyclicBlock(blockId) &&
-                    updateCounts[blockId] >= options.WidenAfter
+                var shouldWiden = graph.IsCyclicBlock(blockId) &&
+                    updateCounts[blockId] >= options.WidenAfter;
+                var updated = shouldWiden
                     ? domain.Widen(inputs[blockId], candidate)
                     : candidate;
                 if (!domain.LessThanOrEqual(inputs[blockId], updated) ||
@@ -193,7 +194,7 @@ public static class ForwardDataflowAnalysis
                 }
 
                 updateCounts[blockId]++;
-                if (!domain.AreEquivalent(inputs[blockId], updated))
+                if (!shouldWiden || !domain.AreEquivalent(inputs[blockId], updated))
                 {
                     inputs[blockId] = updated;
                     pending.Add(blockId);
