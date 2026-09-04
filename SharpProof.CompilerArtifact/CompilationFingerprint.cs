@@ -102,9 +102,7 @@ internal static class CompilationFingerprint
                 value.SpecificationPackCatalogVersion,
                 value.SpecificationPackCatalogSha256) &&
             ValidOptions(value.Options) &&
-            All(value.SyntaxTrees, ValidTree) &&
-            value.SyntaxTrees.Select(static tree => tree.Path)
-                .Distinct(StringComparer.Ordinal).Count() == value.SyntaxTrees.Length &&
+            ValidTrees(value.SyntaxTrees) &&
             ValidReferences(value.References) &&
             ValidAdditionalFiles(value.AdditionalFiles) &&
             ValidSummaryEvidence(value.SummaryEvidence, value);
@@ -323,6 +321,25 @@ internal static class CompilationFingerprint
         CompilerCaptureAuthority.HasValidEmptyTreeRepresentation(value) &&
         All(value.Features, ValidFeature) &&
             IsOrdered(value.Features, static feature => feature.Key, unique: true);
+    }
+
+    private static bool ValidTrees(CompilerSyntaxTreeSnapshot[]? values)
+    {
+        if (values is null)
+        {
+            return false;
+        }
+
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in values)
+        {
+            if (!ValidTree(value) || !paths.Add(value.Path))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsChecksum(string? value, string algorithm)
