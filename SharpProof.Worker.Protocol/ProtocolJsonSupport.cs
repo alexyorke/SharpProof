@@ -64,14 +64,9 @@ public static partial class WorkerProtocolJson
         new(StringComparer.Ordinal);
 
     private static void EnsureJsonShape(
-        string json,
+        JsonElement root,
         string rootType)
     {
-        json = json ?? throw new ArgumentNullException(nameof(json));
-
-        using var document = JsonDocument.Parse(
-            json,
-            new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });
         if (!WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
                 rootType,
                 out var shape))
@@ -80,7 +75,7 @@ public static partial class WorkerProtocolJson
         }
         try
         {
-            EnsureObjectShape(document.RootElement, shape);
+            EnsureObjectShape(root, shape);
         }
         catch (InvalidOperationException exception)
         {

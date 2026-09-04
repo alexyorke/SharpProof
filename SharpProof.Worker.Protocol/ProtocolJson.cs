@@ -1189,8 +1189,12 @@ public static partial class WorkerProtocolJson
 
     private static T? Deserialize<T>(string json)
     {
-        EnsureJsonShape(json, typeof(T).Name);
-        return JsonSerializer.Deserialize<T>(json, s_options);
+        json = json ?? throw new ArgumentNullException(nameof(json));
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });
+        EnsureJsonShape(document.RootElement, typeof(T).Name);
+        return JsonSerializer.Deserialize<T>(document.RootElement, s_options);
     }
     private static OrdinalIdentityIndex<WorkerClaimManifestEntry>
         CreateClaimIndex(WorkerClaimManifest? manifest)
