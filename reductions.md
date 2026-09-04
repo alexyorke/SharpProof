@@ -22243,6 +22243,11 @@ diagnostic-example anchors, and the readme gate requires every descriptor to
 provide a validated help link. The catalog and documentation checks pass with
 the existing anchors unchanged.
 
+R2024 is applied: the private differential-oracle term collector now accepts
+the concrete `SortedDictionary`, `HashSet`, and `List` instances supplied by
+its sole caller instead of widening them to unused collection interfaces. The
+canonical `SharpProof.Testing` build passes with zero warnings or errors.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

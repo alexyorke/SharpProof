@@ -201,9 +201,9 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
 
     private bool TryCollectTerms(
         IrTerm term,
-        IDictionary<int, IrVarId> variables,
-        ISet<IrId> visited,
-        ICollection<IrTerm> terms,
+        SortedDictionary<int, IrVarId> variables,
+        HashSet<IrId> visited,
+        List<IrTerm> terms,
         out string reason)
     {
         var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
