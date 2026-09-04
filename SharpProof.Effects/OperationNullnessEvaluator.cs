@@ -222,11 +222,8 @@ internal sealed class OperationNullnessEvaluator
 
     internal bool IsProvenNonNull(IOperation? value, IOperation access)
     {
-        return value == null ||
-            value is IInstanceReferenceOperation ||
-            (value.Type is { IsValueType: true } type &&
-             !ManagedAbstractValue.IsNullableType(type)) ||
-            DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
+        return IsStaticallyNonNull(value) ||
+            value is not null &&
             _abstractFlow?.ProvesNonNull(access, value) == true;
     }
 }

@@ -22453,6 +22453,10 @@ collector, or verifier-tools paths that their paired targets recompute before
 consumption; public override defaults remain in props and late normalization
 remains in targets. The late-override MSBuild integration test passes.
 
+R2253 is applied: `OperationNullnessEvaluator.IsProvenNonNull` now reuses the
+existing `IsStaticallyNonNull` predicate and keeps the non-null guard around the
+abstract-flow fallback. The full Effects.Test suite passes 323/323.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
