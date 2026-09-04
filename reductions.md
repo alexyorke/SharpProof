@@ -22273,6 +22273,12 @@ non-throwing-and-terminating facet predicate used by compiler replay and Effects
 scanning, while constructor admission and surrounding policy remain local. The
 full Effects suite passes 323/323 with zero warnings or errors.
 
+R2008 is applied: the linked `RoslynCfgThrowFacts` utility now owns method- and
+constructor-body CFG creation, while Requires, Effects, and Meta retain their
+own block admission, fallback, cancellation, and exception policies. The
+canonical builds for `SharpProof.Analyzer.Core`, `SharpProof.Effects`, and
+`SharpProof.Meta.Analyzers` pass with zero warnings or errors.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

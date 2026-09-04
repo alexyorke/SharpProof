@@ -432,10 +432,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             var created = operationRoot switch
             {
-                IMethodBodyOperation method =>
-                    ControlFlowGraph.Create(method, cancellationToken),
-                IConstructorBodyOperation constructor =>
-                    ControlFlowGraph.Create(constructor, cancellationToken),
+                IMethodBodyOperation or IConstructorBodyOperation =>
+                    RoslynCfgFactory.TryCreateMethodOrConstructorGraph(
+                        operationRoot, cancellationToken),
                 IFieldInitializerOperation field =>
                     ControlFlowGraph.Create(field, cancellationToken),
                 IPropertyInitializerOperation property =>

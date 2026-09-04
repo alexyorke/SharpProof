@@ -1068,11 +1068,9 @@ internal static class CacheSoundnessRules
         {
             var graph = root switch
             {
-                IMethodBodyOperation method => ControlFlowGraph.Create(
-                    method,
-                    cancellationToken),
-                IConstructorBodyOperation constructor =>
-                    ControlFlowGraph.Create(constructor, cancellationToken),
+                IMethodBodyOperation or IConstructorBodyOperation =>
+                    RoslynCfgFactory.TryCreateMethodOrConstructorGraph(
+                        root, cancellationToken),
                 IBlockOperation block => ControlFlowGraph.Create(
                     block,
                     cancellationToken),

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Roslyn;
 
 namespace SharpProof.Effects;
 
@@ -1123,10 +1124,9 @@ internal sealed class EffectMethodNodeBuilder
         {
             return root switch
             {
-                IMethodBodyOperation method =>
-                    ControlFlowGraph.Create(method, cancellationToken),
-                IConstructorBodyOperation constructor =>
-                    ControlFlowGraph.Create(constructor, cancellationToken),
+                IMethodBodyOperation or IConstructorBodyOperation =>
+                    RoslynCfgFactory.TryCreateMethodOrConstructorGraph(
+                        root, cancellationToken),
                 IBlockOperation { Parent: null } block =>
                     ControlFlowGraph.Create(block, cancellationToken),
                 _ => null

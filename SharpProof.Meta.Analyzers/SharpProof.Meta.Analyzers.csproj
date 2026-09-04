@@ -5,6 +5,8 @@
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\eng\RoslynCfgFactory.cs"
+             Link="RoslynCfgFactory.cs" />
     <Compile Include="..\eng\RoslynCfgThrowFacts.cs"
              Link="RoslynCfgThrowFacts.cs" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
