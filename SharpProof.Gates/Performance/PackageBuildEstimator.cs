@@ -196,22 +196,7 @@ internal static class PackageBuildEstimator
         double rank,
         bool requireFinitePositive = true)
     {
-        var sorted = values.OrderBy(static value => value).ToArray();
-        if (sorted.Length == 0)
-        {
-            throw new ArgumentException(
-                "At least one sample is required.",
-                nameof(values));
-        }
-
-        if (requireFinitePositive &&
-            sorted.Any(static value => !double.IsFinite(value) || value <= 0))
-        {
-            throw new ArgumentException(
-                "Every sample must be finite and positive.",
-                nameof(values));
-        }
-
+        var sorted = ValidateAndSort(values, requireFinitePositive);
         return NearestRankPercentileSorted(sorted, rank);
     }
 
@@ -234,7 +219,9 @@ internal static class PackageBuildEstimator
         return sorted[index];
     }
 
-    private static double[] ValidateAndSort(IEnumerable<double> values)
+    private static double[] ValidateAndSort(
+        IEnumerable<double> values,
+        bool requireFinitePositive = true)
     {
         var sorted = values.OrderBy(static value => value).ToArray();
         if (sorted.Length == 0)
@@ -244,7 +231,8 @@ internal static class PackageBuildEstimator
                 nameof(values));
         }
 
-        if (sorted.Any(static value => !double.IsFinite(value) || value <= 0))
+        if (requireFinitePositive &&
+            sorted.Any(static value => !double.IsFinite(value) || value <= 0))
         {
             throw new ArgumentException(
                 "Every sample must be finite and positive.",
