@@ -21308,3 +21308,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2011 | `ContractApiIdentityResolver.InheritsFrom` and `CancellationBoundaryAnalyzer.IsOrDerivesFrom` duplicate the `BaseType`/`OriginalDefinition` hierarchy walk; share only a parameterized narrow predicate and retain include-self and interface/attribute policies. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:545-560`; `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:406-424` |
+
+## Second survey, continued: R2012 - EffectExceptionFlow and ExceptionHandlerReachability duplicate constant catch-filter classification
+
+`EffectExceptionFlow.GetFilterSelection` and `ExceptionHandlerReachability.GetFilterSelection` both map a catch filter's constant value through the same three-way policy: no filter is `CatchSelection.Always`, constant `true` is `Always`, constant `false` is `Never`, and every other expression is `Maybe`. The second helper then adds the reachability-specific check that a non-constant filter operation which cannot complete normally is `Never`; the first helper must remain a pure constant fold for its catch-chain model. A shared `CatchFilterFacts.GetConstantSelection` (or equivalent narrow helper) could own only the identical constant classification and let the two callers retain their different fail-closed extensions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2012 | `EffectExceptionFlow.GetFilterSelection` and `ExceptionHandlerReachability.GetFilterSelection` duplicate the constant catch-filter-to-`CatchSelection` mapping; share only that pure classification and retain the latter's non-completing-operation rule. | `SharpProof.Effects/EffectExceptionFlow.cs:229-246`; `SharpProof.Effects/ExceptionHandlerReachability.cs:3316-3338` |
