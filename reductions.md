@@ -22318,6 +22318,11 @@ check in `MonitorFacts`, while nullness, explicit-call, and synthesized-lock
 callers retain their distinct argument, name, and syntax policies. The full
 Effects suite passes.
 
+R2021 is applied: the Host assembly now owns the shared libc `kill` binding used
+by `RunVerifier` and `LinuxWorkerProcess`; their process-group, signal, errno,
+and fail-closed policies remain local. The focused BuildTasks and worker-process
+tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

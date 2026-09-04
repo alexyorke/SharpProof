@@ -178,7 +178,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             return false;
         }
         var descendants = CaptureDescendants(process.Id);
-        if (NativeMethods.Kill(
+        if (LinuxProcessControl.Kill(
                 process.Id,
                 LinuxProcessControlConstants.SignalTerminate) != 0)
         {
@@ -263,7 +263,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             {
                 continue;
             }
-            if (NativeMethods.Kill(
+            if (LinuxProcessControl.Kill(
                     processId,
                     LinuxProcessControlConstants.SignalKill) != 0 &&
                 Marshal.GetLastPInvokeError() !=
@@ -342,9 +342,6 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int GetParentProcessId();
 
-        [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int Kill(int processId, int signal);
     }
 }
 

@@ -1077,7 +1077,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 // The stopped session leader keeps this process-group identity
                 // live while the group-directed signal is delivered.
-                _ = NativeMethods.Kill(
+                _ = LinuxProcessControl.Kill(
                     -processGroupId,
                     LinuxProcessControlConstants.SignalKill);
                 _ = SendPidFdSignal(
@@ -1389,14 +1389,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         using var stream = File.OpenRead(path);
         return Convert.ToHexString(SHA256.HashData(stream));
-    }
-
-    private static partial class NativeMethods
-    {
-        [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int Kill(int processId, int signal);
-
     }
 
 }
