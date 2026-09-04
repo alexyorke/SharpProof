@@ -22232,3 +22232,13 @@ replace the surrounding conversion or flow logic.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2222 | **`RequiresCallSiteDiscovery`, `ConversionEffectClassifier`, `StringConcatenationEffectResolver`, `UsingDisposalEffectResolver`, and `OperationEffectScanner` duplicate the `Nullable<T>` symbol-shape test and underlying-type projection.** Centralize only the nullable-underlying lookup, retaining each caller's original-type fallback, mutation/projection form, and conversion/disposal/numeric semantics. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:892-910,1329-1338`; `SharpProof.Effects/ConversionEffectClassifier.cs:282-291`; `SharpProof.Effects/StringConcatenationEffectResolver.cs:319-328`; `SharpProof.Effects/UsingDisposalEffectResolver.cs:302-310`; `SharpProof.Effects/OperationEffectScanner.cs:1652-1660`; existing boolean helper `SharpProof.Effects/ManagedAbstractFlow.cs:2092-2097` |
+R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
+matching enum slot from the soundness analyzer's positionally bound catalog.
+The catalog-resolution assertions continue to pass, and the full
+`SharpProof.Meta.Analyzers.Test` project passes 164/164 with zero warnings or
+errors.
+
+R2160 is deferred: the proposed accessibility narrowing reaches public
+`EffectSummary` properties and other public data contracts, while the
+remaining candidates require new friend-assembly/API decisions. No public
+surface is narrowed merely for line count.
