@@ -22466,6 +22466,11 @@ variable projection alongside the lowered arguments, removing the later
 rescan while retaining directness, closure, and havoc policies. The full
 Frontend.Test suite passes 121/121.
 
+R2241 is applied: `IrFactory` now snapshots member parameter and opaque
+argument payloads while building their structural-key child IDs, avoiding a
+second enumeration while retaining immutable payloads and validation order.
+The full Ir.Test suite passes 115/115.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

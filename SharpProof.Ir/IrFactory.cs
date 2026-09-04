@@ -212,7 +212,17 @@ public sealed class IrFactory
         params IrTypeId[] parameterTypes)
     {
         ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
-        var parameters = parameterTypes.ToImmutableArray();
+        var parameterBuilder =
+            ImmutableArray.CreateBuilder<IrTypeId>(parameterTypes.Length);
+        var parameterIdBuilder =
+            ImmutableArray.CreateBuilder<int>(parameterTypes.Length);
+        foreach (var parameterType in parameterTypes)
+        {
+            parameterBuilder.Add(parameterType);
+            parameterIdBuilder.Add(parameterType.Value);
+        }
+        var parameters = parameterBuilder.MoveToImmutable();
+        var parameterIds = parameterIdBuilder.MoveToImmutable();
         ValidateName(name, nameof(name));
 
         lock (_gate)
@@ -227,7 +237,7 @@ public sealed class IrFactory
 
             var key = new StructuralKey(
                 default, declaringType.Value, identity.Value, returnType.Value, isStatic ? 1 : 0,
-                children: [.. parameters.Select(static value => value.Value)]);
+                children: parameterIds);
             if (_memberIds.TryGetValue(key, out var existing))
             {
                 return existing;
@@ -676,7 +686,18 @@ public sealed class IrFactory
     private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
     {
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        var immutableArguments = arguments.ToImmutableArray();
+        var argumentBuilder =
+            ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
+        var childIdBuilder =
+            ImmutableArray.CreateBuilder<int>(arguments.Length + 1);
+        childIdBuilder.Add(receiver?.Id.Value ?? -1);
+        foreach (var argument in arguments)
+        {
+            argumentBuilder.Add(argument);
+            childIdBuilder.Add(argument.Id.Value);
+        }
+        var immutableArguments = argumentBuilder.MoveToImmutable();
+        var childIds = childIdBuilder.MoveToImmutable();
 
         lock (_gate)
         {
@@ -701,8 +722,6 @@ public sealed class IrFactory
                 GetOperationInfoCore(operation, nameof(operation));
             }
 
-            ImmutableArray<int> childIds =
-                [receiver?.Id.Value ?? -1, .. immutableArguments.Select(static value => value.Id.Value)];
             return Intern(new StructuralKey(
                     IrTermKind.Opaque, memberInfo.ReturnType.Value, member.Value, PurityKey(purity),
                     operation.IsDefault ? -1 : operation.Value, children: childIds),
