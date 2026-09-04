@@ -22212,3 +22212,23 @@ R2221 is applied: the Specs layer now owns one internal five-kind
 `IrTypeKind` allowlist helper, while instantiation retains its fail-closed
 boolean result and table validation retains its argument exception. The full
 `SharpProof.Specs.Test` project passes 82/82 with zero warnings or errors.
+
+## Second survey, continued: R2222 - production Roslyn consumers repeat Nullable<T> underlying-type projection
+
+Several production consumers recognize a constructed nullable value type by
+checking `OriginalDefinition.SpecialType == SpecialType.System_Nullable_T`
+and exactly one type argument, then use that argument as the effective type.
+`RequiresCallSiteDiscovery` already owns a `TryGetNullableUnderlyingType`
+helper, but the Effects consumers independently repeat the same shape in
+conversion, string-concatenation, disposal, and numeric-special-type paths.
+The callers intentionally retain different null handling and semantic
+policies: some return the original type when it is not nullable, one mutates a
+disposal-resolution input, and one projects only a `SpecialType`. A shared
+Roslyn type-facts helper can own the narrow nullable-underlying projection
+while preserving those caller-specific decisions; it would complement the
+existing `ManagedAbstractValue.IsNullableType` boolean helper rather than
+replace the surrounding conversion or flow logic.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2222 | **`RequiresCallSiteDiscovery`, `ConversionEffectClassifier`, `StringConcatenationEffectResolver`, `UsingDisposalEffectResolver`, and `OperationEffectScanner` duplicate the `Nullable<T>` symbol-shape test and underlying-type projection.** Centralize only the nullable-underlying lookup, retaining each caller's original-type fallback, mutation/projection form, and conversion/disposal/numeric semantics. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:892-910,1329-1338`; `SharpProof.Effects/ConversionEffectClassifier.cs:282-291`; `SharpProof.Effects/StringConcatenationEffectResolver.cs:319-328`; `SharpProof.Effects/UsingDisposalEffectResolver.cs:302-310`; `SharpProof.Effects/OperationEffectScanner.cs:1652-1660`; existing boolean helper `SharpProof.Effects/ManagedAbstractFlow.cs:2092-2097` |
