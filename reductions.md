@@ -22408,6 +22408,12 @@ R2243 is applied: lowered summary-call decoding now relies on
 `SummaryEvidenceIndex.IsValid` for the evidence SHA-256 check instead of scanning
 that same value a second time. Compiler manifest/artifact tests pass.
 
+R2244 is applied: `Publish-SharpProofRelease.ps1` no longer carries the unused
+`Invoke-V3Get -OutputPath`/`OutFile`/`PassThru` branch; its GET and HEAD callers
+remain unchanged. The script parses and 33 release-authority architecture tests
+pass. The broader packaging-backed release group remains blocked by the
+pre-existing `SPMETA003` violation in `SharpProof.Host/ContainerNativeLibrary.cs`.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
@@ -23034,3 +23040,43 @@ beside them - the one configuration comment habit R1980 found missing from
 Nothing filed. The MSBuild property surface and the CI surface are both closed, with
 the `CompilerVisibleProperty` channel recorded as the trap that makes a live property
 look dead.
+
+## Second survey, part six hundred forty-eight: project membership and shared-source distribution close clean, and the third trap
+
+**Every project name in an MSBuild condition is a real project.** `Directory.Build.props`
+and the other build files gate item groups on **29** distinct
+`'$(MSBuildProjectName)' == '...'` values; all 29 name an existing `.csproj`. A stale
+name here would silently stop linking a shared source into a renamed project, and
+there is none. The most-conditioned projects are `SharpProof.Worker.Test` and
+`SharpProof.Package.Test` at six sites each.
+
+**Every linked shared source is used where it is linked - and the reason one looks
+otherwise is the third trap in this family.** `Directory.Build.props` produces **36**
+(shared source, project) pairs across ten `eng/testing` files. Checking each against
+the receiving project's own sources leaves exactly one apparent orphan:
+`TestRepository.cs` is linked into `SharpProof.Meta.Analyzers.Test`, whose own files
+never write `TestRepository`. The link is still required, because
+`eng/testing/DiagnosticDescriptorCatalogAssertions.cs:167,211` calls
+`TestRepository.FindRoot()` and *that* file is linked into the same project.
+**Linked sources depend on each other**, so a project's own files naming nothing is
+not evidence. Together with part six hundred forty-six's two traps - the project name
+is not the namespace, and linked sources carry dependencies the project does not name
+- and part six hundred forty-seven's `CompilerVisibleProperty` channel, that is four
+distinct ways a live dependency in this repository reads as dead.
+
+**Solution membership is exact and its exclusions are principled.** The repository
+tracks **60** `.csproj`; `SharpProof.sln` lists **47**; **zero** solution entries
+point at a file that does not exist. The 13 outside are precisely the five
+`eng/pilots` projects and the eight `samples` projects - both built deliberately
+against the *packaged* analyzer by `Test-SharpProofPilots.ps1` and
+`Test-SharpProofSamples.ps1` rather than through project references, which putting
+them in the product solution would defeat. `samples/SharpProof.Samples.slnx` lists
+all eight sample projects and exactly those, and `Test-SharpProofSamples.ps1:170`
+finds them with `Get-ChildItem -Filter '*.csproj' -Recurse` rather than a hand
+roster - the derivation form part six hundred thirty-five noted was available and
+unused for the generator list.
+
+### Status (part six hundred forty-eight)
+
+Nothing filed. Project membership, shared-source distribution and sample enumeration
+are closed, with a fourth false-positive mechanism recorded.

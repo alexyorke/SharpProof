@@ -404,10 +404,8 @@ function Invoke-V3Get {
 
         [Parameter()]
         [ValidateSet('Get', 'Head')]
-        [string]$Method = 'Get',
+        [string]$Method = 'Get'
 
-        [Parameter()]
-        [string]$OutputPath
     )
 
     $parameters = @{
@@ -421,10 +419,6 @@ function Invoke-V3Get {
         $parameters.Headers = @{
             'X-NuGet-ApiKey' = $ReadApiKey
         }
-    }
-    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-        $parameters.OutFile = $OutputPath
-        $parameters.PassThru = $true
     }
     return Invoke-WebRequest @parameters
 }
