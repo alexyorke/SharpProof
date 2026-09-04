@@ -45,7 +45,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         _supervisorArmedSignal;
     private System.Threading.Tasks.Task<BoundedProcessOutput>?
         _supervisorOutputCompletion;
-    private bool _canceled;
 
     internal Func<int, int>? OpenPidFdOverride { get; set; }
     internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
@@ -119,10 +118,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         HasStructuredError = false;
         ExitCode = 0;
         var containmentFailed = false;
-        if (!_canceled)
-        {
-            _cancellationSignal.Reset();
-        }
         _outputLimitSignal.Reset();
         try
         {
@@ -181,7 +176,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
             lock (_gate)
             {
-                if (_canceled)
+                if (_cancellationSignal.IsSet)
                 {
                     ExitCode = -1;
                     return true;
@@ -352,7 +347,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 if (retainCleanupAnchor && process != null)
                 {
                     Action<string>? authenticationFailure =
-                        _canceled
+                        _cancellationSignal.IsSet
                             ? null
                             : HandleContainmentAuthenticationFailure;
                     RetainCleanupAnchor(
@@ -1308,7 +1303,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         int processGroupId;
         lock (_gate)
         {
-            _canceled = true;
             _cancellationSignal.Set();
             process = _process;
             processGroupId = _processGroupId;
