@@ -22382,6 +22382,11 @@ forwarder is gone; property lowering calls the owning
 `CompilerIdentityBridge.IsIntrinsicSequenceLength` predicate directly. The full
 Frontend.Test suite passes.
 
+R2238 is applied: `AnalyzerGeneratedCodePolicy` now reads the Roslyn generated-kind
+classification once for the symbol overload, then applies the existing
+marked/path/header/attribute precedence without a second provider query. The
+generated-code and advisory analyzer tests pass.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
@@ -22882,3 +22887,42 @@ after which the fifteenth generator can adopt the helper the other fourteen alre
 use. It is filed as a follow-up to applied R2200 rather than a criticism of it: the
 remedy was right and its one gap is the repository's oldest counting mistake, now
 encoded in a string literal.
+
+## Second survey, part six hundred forty-five: R2320 - the diagnostics reference says eight ContractFor rules, ships ten, and its gate proves the ten while walking past the sentence
+
+A numeric-claim census over documentation: **262** countable claims across the
+tracked markdown outside this ledger, filtered to those a repository measurement can
+settle. Almost all are correct or are dated historical notes. One is not.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2320 | **`docs/diagnostic-examples.md:268-269` states "All eight rules are enabled-by-default errors once the generator is loaded" about the ContractFor generator, which ships ten - and the same document then documents all ten, while the gate that reads the file proves all ten exist without ever looking at the sentence.** `eng/diagnostics/diagnostic-descriptors.v1.json` declares **ten** `contractForGenerator` descriptors, `SPCF0001` through `SPCF0010`, every one `defaultSeverity: Error` with `isEnabledByDefault: true` - so the *property* the sentence asserts is true of all ten and only the count is wrong. The document contradicts itself thirty lines later: `:298-359` carries `<a id="spcf0001"></a>` through `<a id="spcf0010"></a>`, each above its own `### SPCF000n` section. **The gate walks the same file and cannot see it.** `scripts/Test-SharpProofReadme.ps1:566-574` iterates every catalog id matching `^SP(?:CF)?\d{4}$` and throws unless the exact `<a id="...">` tag is present - it therefore confirms ten anchors in this file on every run - and `:770-793` reads the file again to check ten protocol enums' members appear in it. Both gates read `docs/diagnostic-examples.md`; neither has any notion of a prose count, so a sentence claiming eight survives a check that proves ten. **This is the third instance of one pattern and the cheapest.** R2060 found the ten `SPCF` descriptors ship with no help link while their anchors are gated; R2120 found three documented `AbstentionReason` boundaries that cannot be reached, in the one exact-values table nothing checks; R2320 is a stale count in the paragraph that introduces the same ten rules. In each the machine-checkable half of a documentation claim is enforced and the prose half is not. **The fix is one word.** "All eight rules" becomes "All ten rules", or better, the sentence drops the count - the ten subsections below it already enumerate them, and a count in prose beside a list that is gated is a second authority for something the file already states exactly. | `docs/diagnostic-examples.md:268-269` against `:298,305,311,317,324,331,337,344,352,359`; `eng/diagnostics/diagnostic-descriptors.v1.json` `contractForGenerator` output (10 descriptors, all `Error`/`isEnabledByDefault: true`); `scripts/Test-SharpProofReadme.ps1:558-574,770-793` for the two gates that read the file; related R2060, R2120, R273, R326 |
+
+### Checked and not proposed (part six hundred forty-five)
+
+- **The other numeric claim in the same file is correct.**
+  `docs/diagnostic-examples.md:240` says "Compiler artifact schema version 18", and
+  `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:18` declares
+  `internal const int Current = 18`. The neighbouring version constants - portable IR
+  at 2, wire mappings and spec packs at 1 - are not claimed in prose anywhere, which
+  is the right restraint.
+- **`eng/pilots/README.md:3` "These five projects" is exact.** Five pilot `.csproj`
+  files exist and `eng/pilots/catalog.json` lists five entries. Part six hundred
+  thirty-nine already established the catalog's category field agrees with the
+  guarded pilot sources in both directions.
+- **The dated soundness notes' counts are correctly frozen.**
+  `docs/soundness-notes/2026-07-27-product-sweep.md:55` records "44 contract tests, 45
+  effect tests, 61 analyzer tests, and 161 worker tests"; those numbers are a
+  measurement taken on a date, in a directory whose purpose is to hold dated
+  measurements. Updating them would destroy the record. This is the distinction that
+  matters when auditing documentation counts, and it is why the 262-claim census
+  reduces to one finding: a reference document must track reality, a dated note must
+  not.
+- **`README.md:180` "the same two commands directly" is correct** - it names
+  `docker compose build tooling` and its successor on the same line.
+
+### Status (part six hundred forty-five)
+
+R2320 is `pending` and is one word. It is filed at that size because it is the third
+independent instance of the same gap in the same document family, and because the two
+gates that read this file on every acceptance run are what make the error surprising.
