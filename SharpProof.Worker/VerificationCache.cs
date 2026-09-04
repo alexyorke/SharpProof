@@ -614,10 +614,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
         var targetByCallable = targets.ToDictionary(
             static target => target.Entry.CallableId,
-            static target => (
-                Target: target,
-                Postconditions: target.Clauses.Where(static clause =>
-                    clause.Kind == CompilerContractKind.Ensures).ToArray()),
+            static target => CreateReplayTarget(target),
             StringComparer.Ordinal);
         var claimById = manifest.Claims.ToDictionary(
             static claim => claim.ClaimId,
@@ -630,15 +627,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 !targetByCallable.TryGetValue(
                     declaration.CallableId,
                     out var preparedTarget) ||
-                !TryCreateModel(preparedTarget.Target, claim.Model, out var model))
+                !TryCreateModel(preparedTarget, claim.Model, out var model))
             {
                 return false;
             }
 
-            var ordinal = Array.FindIndex(
-                preparedTarget.Postconditions,
-                clause => clause.ClaimId == claim.ClaimId);
-            if (ordinal < 0 ||
+            if (!preparedTarget.PostconditionOrdinals.TryGetValue(
+                    claim.ClaimId,
+                    out var ordinal) ||
                 !CompilerModelValues.EntryAssumptionsHold(
                     preparedTarget.Target,
                     model,
@@ -657,8 +653,52 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         return true;
     }
 
+    private static ReplayTarget CreateReplayTarget(
+        CompilerCallablePreparation target)
+    {
+        var postconditions = target.Clauses.Where(static clause =>
+            clause.Kind == CompilerContractKind.Ensures).ToArray();
+        var variablesByLabel = target.Variables.ToDictionary(
+            static variable => variable.ModelLabel,
+            StringComparer.Ordinal);
+        var requiredInputs = new HashSet<IrVarId>();
+        foreach (var variable in target.Variables)
+        {
+            if (variable.Role is not
+                (CompilerVariableRole.Receiver or CompilerVariableRole.Parameter))
+            {
+                continue;
+            }
+
+            var type = target.Factory.GetVariableInfo(variable.Variable).Type;
+            if (type == target.Factory.BooleanType ||
+                type == target.Factory.IntegerType)
+            {
+                requiredInputs.Add(variable.Variable);
+            }
+        }
+
+        var postconditionOrdinals = new Dictionary<string, int>(
+            StringComparer.Ordinal);
+        for (var index = 0; index < postconditions.Length; index++)
+        {
+            if (postconditions[index].ClaimId is { } claimId &&
+                !postconditionOrdinals.ContainsKey(claimId))
+            {
+                postconditionOrdinals.Add(claimId, index);
+            }
+        }
+
+        return new ReplayTarget(
+            target,
+            postconditions,
+            variablesByLabel,
+            requiredInputs,
+            postconditionOrdinals);
+    }
+
     private static bool TryCreateModel(
-        CompilerCallablePreparation target,
+        ReplayTarget preparedTarget,
         WorkerModelValue[] rows,
         out ImmutableDictionary<IrVarId, IrValue> model)
     {
@@ -668,16 +708,15 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             return false;
         }
 
-        var variables = target.Variables.ToDictionary(
-            static variable => variable.ModelLabel,
-            StringComparer.Ordinal);
         var result = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var row in rows)
         {
             if (row == null ||
-                !variables.TryGetValue(row.Variable, out var variable) ||
+                !preparedTarget.VariablesByLabel.TryGetValue(
+                    row.Variable,
+                    out var variable) ||
                 !CompilerModelValues.TryCreateValue(
-                    target.Factory,
+                    preparedTarget.Target.Factory,
                     variable,
                     row,
                     out var value) ||
@@ -687,22 +726,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
         }
 
-        foreach (var variable in target.Variables.Where(static variable =>
-                     variable.Role is CompilerVariableRole.Receiver or
-                         CompilerVariableRole.Parameter))
+        foreach (var variable in preparedTarget.RequiredInputs)
         {
-            var type = target.Factory.GetVariableInfo(variable.Variable).Type;
             // Replay models intentionally contain only values needed by the
             // counterexample. Non-scalar inputs cannot be materialized by the
             // scalar model codec, but that is harmless when the replay does
             // not reference them. Scalar inputs remain mandatory so missing
             // values cannot be mistaken for a concrete execution.
-            if (type != target.Factory.BooleanType &&
-                type != target.Factory.IntegerType)
-            {
-                continue;
-            }
-            if (!result.ContainsKey(variable.Variable))
+            if (!result.ContainsKey(variable))
             {
                 return false;
             }
@@ -711,6 +742,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         model = result.ToImmutable();
         return true;
     }
+
+    private sealed record ReplayTarget(
+        CompilerCallablePreparation Target,
+        CompilerPreparedClause[] Postconditions,
+        Dictionary<string, CompilerCanonicalVariable> VariablesByLabel,
+        HashSet<IrVarId> RequiredInputs,
+        Dictionary<string, int> PostconditionOrdinals);
 
 
 }
