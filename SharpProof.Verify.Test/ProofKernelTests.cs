@@ -170,8 +170,6 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)incomplete).Reason,
             Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
-        Assert.That(spurious is ProvenOutcome or RefutedOutcome, Is.False);
-        Assert.That(incomplete is ProvenOutcome or RefutedOutcome, Is.False);
     }
 
     [TestCase(
@@ -203,7 +201,6 @@ public sealed class ProofKernelTests
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason,
             Is.EqualTo(expectedReason));
-        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.False);
     }
 
     [Test]
@@ -253,7 +250,6 @@ public sealed class ProofKernelTests
                 new StubBackend(BackendCheckResult.Unknown(pair.Item1)))
                 .VerifyAsync(fixture.Query);
             Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(pair.Item2));
-            Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.False);
         }
     }
 

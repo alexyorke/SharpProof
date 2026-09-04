@@ -793,13 +793,13 @@ internal static class CompilerLoweredArtifact
         }
         var specs = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
         var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
-        var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
+        var callCount = graph.Instructions.Count(static instruction => instruction is IrCallInstruction);
         var summaryVariables = new HashSet<IrVarId>();
         var portableInstructions = portable.Blocks
             .SelectMany(static block => block.Instructions)
             .ToArray();
-        if (row.Calls.Length != calls.Length ||
-            row.SpecCalls.Length + row.SummaryCalls.Length != calls.Length)
+        if (row.Calls.Length != callCount ||
+            row.SpecCalls.Length + row.SummaryCalls.Length != callCount)
         {
             throw new InvalidDataException(
                 "Lowered call evidence does not equal program calls.");
@@ -962,7 +962,7 @@ internal static class CompilerLoweredArtifact
             });
         }
 
-        if (specs.Count + summaries.Count != calls.Length)
+        if (specs.Count + summaries.Count != callCount)
         {
             throw new InvalidDataException(
                 "Lowered call evidence is incomplete.");

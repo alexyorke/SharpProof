@@ -285,7 +285,7 @@ public sealed class IrInterpreter(IrFactory factory)
                 or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual =>
                 EvaluateIntegerBinary(binary.Operator, left.Value!, right.Value!),
             IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
-                EvaluateBooleanBinary(binary.Operator, left.Value!, right.Value!),
+                EvaluateBooleanBinary(binary.Operator, left.Value!.Boolean, right.Value!),
             IrBinaryOperator.Equal => EvaluateEquality(left.Value!, right.Value!, negate: false),
             IrBinaryOperator.NotEqual => EvaluateEquality(left.Value!, right.Value!, negate: true),
             IrBinaryOperator.StringConcat => EvaluateStringConcat(left.Value!, right.Value!),
@@ -321,16 +321,16 @@ public sealed class IrInterpreter(IrFactory factory)
         };
     }
 
-    private IrEvaluationResult EvaluateBooleanBinary(IrBinaryOperator @operator, IrValue left, IrValue right)
+    private IrEvaluationResult EvaluateBooleanBinary(IrBinaryOperator @operator, bool left, IrValue right)
     {
-        if (left.Kind != IrValueKind.Boolean || right.Kind != IrValueKind.Boolean)
+        if (right.Kind != IrValueKind.Boolean)
         {
             return InvalidValue("Boolean operators require boolean values.");
         }
 
         var value = @operator == IrBinaryOperator.AndAlso
-            ? left.Boolean && right.Boolean
-            : left.Boolean || right.Boolean;
+            ? left && right.Boolean
+            : left || right.Boolean;
         return Boolean(value);
     }
 
