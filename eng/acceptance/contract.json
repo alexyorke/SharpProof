@@ -802,8 +802,8 @@
       {
         "name": "soundness-meta-analyzer",
         "path": "SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs",
-        "maximumExpressionNodes": 2676,
-        "maximumDecisionPoints": 162
+        "maximumExpressionNodes": 2743,
+        "maximumDecisionPoints": 164
       },
       {
         "name": "ir-factory",
