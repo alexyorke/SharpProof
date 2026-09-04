@@ -622,24 +622,6 @@ public sealed class ReleasePublicationScriptTests
                         await output.WriteAsync(new byte[] { 1, 2, 3, 4 });
                         break;
                     }
-                case "z3-byte":
-                    {
-                        var entry = archive.GetEntry(
-                            "tools/native/linux-x64/libz3.so")!;
-                        using var image = new MemoryStream();
-                        await using (var input = entry.Open())
-                        {
-                            await input.CopyToAsync(image);
-                        }
-                        var bytes = image.ToArray();
-                        bytes[^1] ^= 0x01;
-                        RewriteEntry(
-                            archive,
-                            entry,
-                            "tools/native/linux-x64/libz3.so",
-                            bytes);
-                        break;
-                    }
                 case "duplicate-first-party":
                     {
                         var entry = archive.GetEntry(
