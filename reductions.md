@@ -22342,6 +22342,11 @@ predicate now owns the full static Monitor-call admission shape used by replay
 lowering and effect scanning; each caller still resolves its own monitor symbol
 and retains its surrounding policy. Effects and CompilerCollector tests pass.
 
+R2200 is applied: all C# generators now obtain their standard generated-file
+header frame from `New-SharpProofGeneratedHeader`; generator-specific notes and
+nullable policy remain local. Regenerated outputs pass the deterministic
+generated-output verification gate.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
