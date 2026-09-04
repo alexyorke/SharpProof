@@ -945,7 +945,7 @@ public sealed class FrontendDifferentialOracle
         {
             var failure = Mismatch(
                 "Generated C# did not compile: " +
-                FormatErrors(emit.Diagnostics));
+                DifferentialFormatting.FormatErrors(emit.Diagnostics));
             if (generatedCases.Count == 1)
             {
                 return [failure];
@@ -1092,7 +1092,7 @@ public sealed class FrontendDifferentialOracle
             return IsolateSemanticEdgeFailure(
                 cases,
                 "Generated semantic-edge C# did not compile: " +
-                FormatErrors(emit.Diagnostics),
+                DifferentialFormatting.FormatErrors(emit.Diagnostics),
                 cancellationToken);
         }
 
@@ -1672,7 +1672,7 @@ public sealed class FrontendDifferentialOracle
                 "Compiled C# threw " +
                 actual.Exception.GetType().Name +
                 " while the lowered IR reported " +
-                Describe(interpreted) +
+                DifferentialFormatting.Describe(interpreted) +
                 ".");
         }
 
@@ -1680,7 +1680,7 @@ public sealed class FrontendDifferentialOracle
         {
             return Mismatch(
                 "Compiled C# returned normally while the lowered IR reported " +
-                Describe(interpreted) +
+                DifferentialFormatting.Describe(interpreted) +
                 ".");
         }
 
@@ -1740,35 +1740,6 @@ public sealed class FrontendDifferentialOracle
             char item => item == expected,
             _ => false
         };
-    }
-
-    private static string Describe(IrEvaluationResult result)
-    {
-        return result.Status switch
-        {
-            IrEvaluationStatus.Value => "a value",
-            IrEvaluationStatus.Exception =>
-                "exception " + result.Exception!.Kind,
-            IrEvaluationStatus.Unsupported =>
-                "unsupported " + result.Unsupported!.Reason,
-            _ => result.Status.ToString()
-        };
-    }
-
-    private static string FormatErrors(IEnumerable<Diagnostic> diagnostics)
-    {
-        return string.Join(
-            " | ",
-            diagnostics
-                .Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
-                .OrderBy(static diagnostic =>
-                    diagnostic.Location.SourceSpan.Start)
-                .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
-                .Select(static diagnostic =>
-                    diagnostic.Id +
-                    ": " +
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)));
     }
 
     private static ImmutableArray<MetadataReference> CreateReferences()

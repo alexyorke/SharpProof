@@ -57,16 +57,11 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         var emit = compilation.Emit(image);
         if (!emit.Success)
         {
-            var errors = string.Join(
-                " | ",
-                emit.Diagnostics
-                    .Where(static value => value.Severity == DiagnosticSeverity.Error)
-                    .OrderBy(static value => value.Location.SourceSpan.Start)
-                    .Select(static value => value.Id + ": " + value.GetMessage(CultureInfo.InvariantCulture)));
             return new DifferentialResult(
                 DifferentialStatus.Mismatch,
                 interpreted,
-                "Generated C# did not compile: " + errors);
+                "Generated C# did not compile: " +
+                DifferentialFormatting.FormatErrors(emit.Diagnostics));
         }
 
         var loadContext = new DifferentialOracleLoadContext();
