@@ -1453,9 +1453,7 @@ internal sealed partial class OperationEffectScanner
         invocation.Arguments.All(argument => DefiniteOperationFacts.IsHarmlessValue(argument.Value)) &&
         DefiniteOperationFacts.IsDefinitelyNonNull(invocation.Arguments[0].Value) &&
         invocation.TargetMethod.Name is "Enter" or "Exit" or "Pulse" or "PulseAll" or "TryEnter" or "Wait" &&
-        _monitorType != null &&
-        SymbolEqualityComparer.Default.Equals(
-            invocation.TargetMethod.ContainingType.OriginalDefinition, _monitorType.OriginalDefinition);
+         MonitorFacts.IsMonitorMethod(invocation.TargetMethod, _monitorType);
     }
 
     private bool IsSynthesizedLockMonitorCall(IInvocationOperation invocation)
@@ -1463,10 +1461,7 @@ internal sealed partial class OperationEffectScanner
         return invocation.IsImplicit &&
             invocation.Instance == null &&
             invocation.TargetMethod.Name is "Enter" or "Exit" &&
-            _monitorType != null &&
-            SymbolEqualityComparer.Default.Equals(
-                invocation.TargetMethod.ContainingType.OriginalDefinition,
-                _monitorType.OriginalDefinition) &&
+            MonitorFacts.IsMonitorMethod(invocation.TargetMethod, _monitorType) &&
             invocation.Syntax.AncestorsAndSelf().Any(
                 static syntax => syntax is LockStatementSyntax);
     }

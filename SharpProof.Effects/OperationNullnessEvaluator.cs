@@ -126,10 +126,7 @@ internal sealed class OperationNullnessEvaluator
     internal bool IsImplicitLockEnterWithNullValue(IInvocationOperation invocation)
     {
         return invocation.IsImplicit &&
-            _monitorType != null &&
-            SymbolEqualityComparer.Default.Equals(
-                invocation.TargetMethod.ContainingType.OriginalDefinition,
-                _monitorType.OriginalDefinition) &&
+            MonitorFacts.IsMonitorMethod(invocation.TargetMethod, _monitorType) &&
             invocation.TargetMethod.Name == "Enter" &&
             invocation.Arguments.Length != 0 &&
             IsProvenNull(invocation.Arguments[0].Value, invocation);

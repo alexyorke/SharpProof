@@ -22313,6 +22313,11 @@ one dependency-neutral recursive JSON property-uniqueness validator. Their
 surrounding UTF-8/document and schema validation boundaries remain local, and
 the generator and standalone validation paths pass.
 
+R2020 is applied: Effects now centralizes the Monitor containing-type identity
+check in `MonitorFacts`, while nullness, explicit-call, and synthesized-lock
+callers retain their distinct argument, name, and syntax policies. The full
+Effects suite passes.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full
