@@ -353,6 +353,13 @@ try {
             'SharpProof.Verifier/SharpProof.Verifier.csproj',
             '-c', 'Release', '--no-restore',
             '-p:GeneratePackageOnBuild=false')
+        if ($Configuration -ceq 'Release') {
+            # The Release test-harness build already builds every project
+            # referenced by Verifier. Re-evaluating those project references
+            # here only races on shared outputs; the root has no package
+            # payload of its own, so build it without dependencies.
+            $packageProductBuildArguments += '--no-dependencies'
+        }
         if ($Fast) {
             $packageProductBuildArguments +=
                 '-p:RunAnalyzersDuringBuild=false'
@@ -365,7 +372,18 @@ try {
     if ($builds.Count -gt 0) {
         Invoke-SharpProofTimedPhase -Name 'build-prerequisites' `
             -Timings $phaseTimings -RecordOnFailure -Action {
-            Invoke-RequiredBuilds -Builds @($builds)
+            if ($Configuration -ceq 'Release' -and $builds.Count -eq 2) {
+                # The test harness builds the complete Release dependency
+                # closure. Wait for it before building the empty Verifier
+                # root, whose package payload consumes those outputs.
+                Invoke-RequiredBuilds -Builds @(
+                    $builds | Where-Object Name -eq 'test-harness-release')
+                Invoke-RequiredBuilds -Builds @(
+                    $builds | Where-Object Name -eq 'package-products-release')
+            }
+            else {
+                Invoke-RequiredBuilds -Builds @($builds)
+            }
         }
     }
 
