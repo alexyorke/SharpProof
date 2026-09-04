@@ -412,10 +412,26 @@ internal static class CompilationFingerprint
 
     private static bool ValidAdditionalFiles(CompilerAdditionalFileSnapshot[]? values)
     {
-        return values != null &&
-        All(values, ValidAdditionalFile) &&
-        values.Select(static value => value.Path).Distinct(PathComparer).Count() == values.Length &&
-        values.Zip(values.Skip(1), static (left, right) => Compare(left, right) < 0).All(static ordered => ordered);
+        if (values is null)
+        {
+            return false;
+        }
+
+        var paths = new HashSet<string>(PathComparer);
+        CompilerAdditionalFileSnapshot? previous = null;
+        foreach (var value in values)
+        {
+            if (!ValidAdditionalFile(value) ||
+                !paths.Add(value.Path) ||
+                previous is not null && Compare(previous, value) >= 0)
+            {
+                return false;
+            }
+
+            previous = value;
+        }
+
+        return true;
     }
 
     private static bool ValidAdditionalFile(CompilerAdditionalFileSnapshot? value)
