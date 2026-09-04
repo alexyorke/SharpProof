@@ -39,11 +39,12 @@ RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
 
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json
 COPY eng/container/Prepare-NativePayload.ps1 /opt/sharpproof/Prepare-NativePayload.ps1
-COPY eng/container/New-ContainerContract.ps1 /opt/sharpproof/New-ContainerContract.ps1
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Prepare-NativePayload.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json \
-        -DestinationRoot /opt/sharpproof/native \
-    && pwsh -NoLogo -NoProfile -File /opt/sharpproof/New-ContainerContract.ps1 \
+        -DestinationRoot /opt/sharpproof/native
+
+COPY eng/container/New-ContainerContract.ps1 /opt/sharpproof/New-ContainerContract.ps1
+RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/New-ContainerContract.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json \
         -OutputPath "${SHARPPROOF_CONTAINER_CONTRACT}"
 
