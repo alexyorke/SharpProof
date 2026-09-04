@@ -107,22 +107,35 @@ internal static class PackageBuildEstimator
             }
         }
 
-        var baselineFirst = ordered
-            .Where(static sample => !sample.UnannotatedAdvisoryFirst)
-            .Select(static sample => sample.Ratio)
-            .ToImmutableArray();
-        var unannotatedAdvisoryFirst = ordered
-            .Where(static sample => sample.UnannotatedAdvisoryFirst)
-            .Select(static sample => sample.Ratio)
-            .ToImmutableArray();
-        if (baselineFirst.Length == 0 ||
-            baselineFirst.Length != unannotatedAdvisoryFirst.Length)
+        var baselineFirstBuilder = ImmutableArray.CreateBuilder<double>(
+            ordered.Length / 2);
+        var unannotatedAdvisoryFirstBuilder =
+            ImmutableArray.CreateBuilder<double>(ordered.Length / 2);
+        var ratiosBuilder = ImmutableArray.CreateBuilder<double>(
+            ordered.Length);
+        foreach (var sample in ordered)
+        {
+            ratiosBuilder.Add(sample.Ratio);
+            if (sample.UnannotatedAdvisoryFirst)
+            {
+                unannotatedAdvisoryFirstBuilder.Add(sample.Ratio);
+            }
+            else
+            {
+                baselineFirstBuilder.Add(sample.Ratio);
+            }
+        }
+        if (baselineFirstBuilder.Count == 0 ||
+            baselineFirstBuilder.Count != unannotatedAdvisoryFirstBuilder.Count)
         {
             throw new ArgumentException(
                 "Package-build samples must balance baseline-first and " +
                 "unannotated-advisory-first execution orders.",
                 nameof(samples));
         }
+        var baselineFirst = baselineFirstBuilder.MoveToImmutable();
+        var unannotatedAdvisoryFirst =
+            unannotatedAdvisoryFirstBuilder.MoveToImmutable();
 
         var balancedRatios = ImmutableArray.CreateBuilder<double>(
             ordered.Length / 2);
@@ -149,8 +162,7 @@ internal static class PackageBuildEstimator
             ValidateAndSort(unannotatedAdvisoryFirst);
         var balanced = balancedRatios.MoveToImmutable();
         var balancedSorted = ValidateAndSort(balanced);
-        var ratiosSorted = ValidateAndSort(
-            ordered.Select(static sample => sample.Ratio));
+        var ratiosSorted = ValidateAndSort(ratiosBuilder.MoveToImmutable());
         return new PackageBuildStatistics(
             MedianSorted(balancedSorted),
             MedianSorted(ratiosSorted),
