@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -29,6 +30,10 @@ internal sealed class ManagedAbstractFlow
     private static int s_walkDepth;
 
     private static readonly ConditionalWeakTable<Compilation, ManagedAbstractFlow> Sessions = new();
+    private static readonly ConditionalWeakTable<
+        Compilation,
+        ConcurrentDictionary<(SyntaxTree Tree, int Start, int Length), bool>>
+        CompileTimeUnreachableCache = new();
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _contractApi;
@@ -1130,22 +1135,42 @@ internal sealed class ManagedAbstractFlow
         var statement = operation.Syntax.AncestorsAndSelf()
             .OfType<StatementSyntax>()
             .FirstOrDefault();
-        if (statement != null)
+        if (statement == null)
         {
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, statement.SyntaxTree);
-            try
+            return false;
+        }
+
+        var key = (
+            statement.SyntaxTree,
+            statement.SpanStart,
+            statement.Span.Length);
+        var cache = CompileTimeUnreachableCache.GetValue(
+            compilation,
+            static _ => new());
+        if (cache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var unreachable = false;
+        var statementModel = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, statement.SyntaxTree);
+        try
+        {
+            if (statementModel.AnalyzeControlFlow(statement) is
+                { Succeeded: true, StartPointIsReachable: false })
             {
-                if (model.AnalyzeControlFlow(statement) is
-                    { Succeeded: true, StartPointIsReachable: false })
-                {
-                    return true;
-                }
+                unreachable = true;
             }
-            catch (ArgumentException)
-            {
-                // Unsupported statement shapes retain the permissive fallback.
-            }
+        }
+        catch (ArgumentException)
+        {
+            // Unsupported statement shapes retain the permissive fallback.
+        }
+        if (unreachable)
+        {
+            cache.TryAdd(key, true);
+            return true;
         }
 
         foreach (var syntax in operation.Syntax.Ancestors())
@@ -1172,11 +1197,13 @@ internal sealed class ManagedAbstractFlow
                 .GetSemanticModel(compilation, condition.SyntaxTree);
             if (model.GetConstantValue(condition) is { HasValue: true, Value: false })
             {
-                return true;
+                unreachable = true;
+                break;
             }
         }
 
-        return false;
+        cache.TryAdd(key, unreachable);
+        return unreachable;
     }
 
     private static EffectAnalysisIncompleteReason CheckBudget(
