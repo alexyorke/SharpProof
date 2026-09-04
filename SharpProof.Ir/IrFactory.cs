@@ -374,8 +374,9 @@ public sealed class IrFactory
         lock (_gate)
         {
             return Intern(
-            new StructuralKey(IrTermKind.Boolean, BooleanType.Value, value ? 1 : 0),
-            id => new IrBooleanTerm(id, BooleanType, value));
+                new StructuralKey(IrTermKind.Boolean, BooleanType.Value, value ? 1 : 0),
+                (BooleanType, value),
+                static (id, state) => new IrBooleanTerm(id, state.BooleanType, state.value));
         }
     }
 
@@ -384,8 +385,9 @@ public sealed class IrFactory
         lock (_gate)
         {
             return Intern(
-            new StructuralKey(IrTermKind.Integer, IntegerType.Value, number: value),
-            id => new IrIntegerTerm(id, IntegerType, value));
+                new StructuralKey(IrTermKind.Integer, IntegerType.Value, number: value),
+                (IntegerType, value),
+                static (id, state) => new IrIntegerTerm(id, state.IntegerType, state.value));
         }
     }
 
@@ -404,7 +406,8 @@ public sealed class IrFactory
             var stringId = InternStringCore(value);
             return Intern(
                 new StructuralKey(IrTermKind.String, StringType.Value, stringId.Value),
-                id => new IrStringTerm(id, StringType, stringId));
+                (StringType, stringId),
+                static (id, state) => new IrStringTerm(id, state.StringType, state.stringId));
         }
     }
 
@@ -416,7 +419,8 @@ public sealed class IrFactory
 
             return Intern(
                 new StructuralKey(IrTermKind.Null, type.Value),
-                id => new IrNullTerm(id, type));
+                type,
+                static (id, state) => new IrNullTerm(id, state));
         }
     }
 
@@ -427,7 +431,8 @@ public sealed class IrFactory
             var info = GetVariableInfoCore(variable, nameof(variable));
             return Intern(
                 new StructuralKey(IrTermKind.Variable, info.Type.Value, variable.Value),
-                id => new IrVariableTerm(id, info.Type, variable));
+                (info.Type, variable),
+                static (id, state) => new IrVariableTerm(id, state.Type, state.variable));
         }
     }
 
@@ -468,7 +473,9 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.Unary, expectedType.Value, semantics.Key,
                     second: operand.Id.Value),
-                id => new IrUnaryTerm(id, expectedType, @operator, operand));
+                (expectedType, @operator, operand),
+                static (id, state) => new IrUnaryTerm(
+                    id, state.expectedType, state.@operator, state.operand));
         }
     }
 
@@ -498,7 +505,9 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.Binary, resultType.Value, semantics.Key,
                     second: left.Id.Value, third: right.Id.Value),
-                id => new IrBinaryTerm(id, resultType, @operator, left, right));
+                (resultType, @operator, left, right),
+                static (id, state) => new IrBinaryTerm(
+                    id, state.resultType, state.@operator, state.left, state.right));
         }
     }
 
@@ -533,7 +542,9 @@ public sealed class IrFactory
                     IrTermKind.Conditional, whenTrue.Type.Value,
                     first: condition.Id.Value, second: whenTrue.Id.Value,
                     third: whenFalse.Id.Value),
-                id => new IrConditionalTerm(id, whenTrue.Type, condition, whenTrue, whenFalse));
+                (whenTrue.Type, condition, whenTrue, whenFalse),
+                static (id, state) => new IrConditionalTerm(
+                    id, state.Type, state.condition, state.whenTrue, state.whenFalse));
         }
     }
 
@@ -577,7 +588,8 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.Cast, targetType.Value,
                     first: operand.Id.Value),
-                id => new IrCastTerm(id, targetType, operand));
+                (targetType, operand),
+                static (id, state) => new IrCastTerm(id, state.targetType, state.operand));
         }
     }
 
@@ -603,7 +615,8 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.Length, IntegerType.Value,
                     first: value.Id.Value),
-                id => new IrLengthTerm(id, IntegerType, value));
+                (value, IntegerType),
+                static (id, state) => new IrLengthTerm(id, state.IntegerType, state.value));
         }
     }
 
@@ -625,7 +638,9 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.SequenceAccess, elementType.Value,
                     first: sequence.Id.Value, second: index.Id.Value),
-                id => new IrSequenceAccessTerm(id, elementType, sequence, index));
+                (elementType, sequence, index),
+                static (id, state) => new IrSequenceAccessTerm(
+                    id, state.elementType, state.sequence, state.index));
         }
     }
 
@@ -730,8 +745,10 @@ public sealed class IrFactory
             return Intern(new StructuralKey(
                     IrTermKind.Opaque, memberInfo.ReturnType.Value, member.Value, PurityKey(purity),
                     operation.IsDefault ? -1 : operation.Value, children: childIds),
-                id => new IrOpaqueTerm(id, memberInfo.ReturnType, member, receiver,
-                    immutableArguments, purity, operation));
+                (memberInfo.ReturnType, member, receiver, immutableArguments, purity, operation),
+                static (id, state) => new IrOpaqueTerm(
+                    id, state.ReturnType, state.member, state.receiver,
+                    state.immutableArguments, state.purity, state.operation));
         }
     }
 
@@ -848,7 +865,11 @@ public sealed class IrFactory
         }
     }
 
-    private T Intern<T>(StructuralKey key, Func<IrId, T> create) where T : IrTerm
+    private T Intern<TState, T>(
+        StructuralKey key,
+        TState state,
+        Func<IrId, TState, T> create)
+        where T : IrTerm
     {
         if (_termIds.TryGetValue(key, out var existing))
         {
@@ -856,7 +877,7 @@ public sealed class IrFactory
         }
 
         var id = new IrId(_scope, _terms.Count);
-        var term = create(id);
+        var term = create(id, state);
         _termIds.Add(key, term);
         _terms.Add(term);
         return term;
