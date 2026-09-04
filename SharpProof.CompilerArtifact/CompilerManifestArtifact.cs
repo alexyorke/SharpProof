@@ -334,10 +334,9 @@ internal static class CompilerManifestArtifactJson
     {
         internal ClaimPartitions(IEnumerable<WorkerClaimManifestEntry> claims)
         {
-            Claims = [.. claims.OrderBy(static claim => claim.Ordinal)];
             var postconditions = new List<WorkerClaimManifestEntry>();
             var effects = new List<WorkerClaimManifestEntry>();
-            foreach (var claim in Claims)
+            foreach (var claim in claims.OrderBy(static claim => claim.Ordinal))
             {
                 if (claim.Kind == WorkerClaimKind.Postcondition)
                 {
@@ -352,7 +351,6 @@ internal static class CompilerManifestArtifactJson
             Effects = [.. effects];
         }
 
-        internal WorkerClaimManifestEntry[] Claims { get; }
         internal WorkerClaimManifestEntry[] Postconditions { get; }
         internal WorkerClaimManifestEntry[] Effects { get; }
     }

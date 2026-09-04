@@ -184,7 +184,6 @@ internal static class OpenSourceCorpusCatalog
             static pair => BuildDeclarationIndex(pair.Value.Root),
             StringComparer.Ordinal);
 
-        var ids = new HashSet<string>(StringComparer.Ordinal);
         var locations = new HashSet<string>(StringComparer.Ordinal);
         var declarations = new HashSet<string>(StringComparer.Ordinal);
         for (var index = 0; index < document.Methods.Length; index++)
@@ -196,12 +195,6 @@ internal static class OpenSourceCorpusCatalog
                 throw new InvalidDataException(
                     $"OSS corpus IDs must be contiguous and sorted; expected " +
                     $"{expectedId}, found {method.Id}.");
-            }
-
-            if (!ids.Add(method.Id))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate OSS corpus method ID: {method.Id}.");
             }
 
             var fileKey = GetSourceFileKey(method.SourceId, method.Path);
