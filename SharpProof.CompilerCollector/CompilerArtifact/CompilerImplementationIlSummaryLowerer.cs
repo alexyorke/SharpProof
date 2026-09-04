@@ -483,6 +483,8 @@ internal static class CompilerImplementationIlSummaryLowerer
                 ImmutableDictionary.CreateBuilder<
                     IrInstructionId,
                     IrRelationalSummary>();
+        private readonly Dictionary<MethodDefinitionHandle, IMethodSymbol?>
+            _resolvedMethods = new();
         private bool _mayThrow;
 
         internal CompilerImplementationIlAbstentionReason FailureReason
@@ -1089,6 +1091,11 @@ internal static class CompilerImplementationIlSummaryLowerer
         private IMethodSymbol? ResolveMethod(
             MethodDefinitionHandle handle)
         {
+            if (_resolvedMethods.TryGetValue(handle, out var cached))
+            {
+                return cached;
+            }
+
             var definition = _reader.GetMethodDefinition(handle);
             var typeName = GetMetadataTypeName(
                 definition.GetDeclaringType());
@@ -1096,17 +1103,20 @@ internal static class CompilerImplementationIlSummaryLowerer
                 typeName);
             if (type == null)
             {
+                _resolvedMethods.Add(handle, null);
                 return null;
             }
 
             var token = MetadataTokens.GetToken(handle);
             var name = _reader.GetString(definition.Name);
-            return type.GetMembers(name)
+            var resolved = type.GetMembers(name)
                 .OfType<IMethodSymbol>()
                 .SingleOrDefault(candidate =>
                     candidate.MetadataToken == token &&
                     candidate.ContainingModule.Name ==
                     _method.ContainingModule.Name);
+            _resolvedMethods.Add(handle, resolved);
+            return resolved;
         }
 
         private string GetMetadataTypeName(
