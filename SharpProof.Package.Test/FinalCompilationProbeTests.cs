@@ -25,6 +25,11 @@ public sealed class FinalCompilationProbeTests
             "1",
             StringComparison.Ordinal);
 
+    internal static void DisposeSharedPackageCache()
+    {
+        ProbeWorkspace.DisposeSharedPackageCache();
+    }
+
     [Test]
     public async Task MultiTargetBuildWritesOneIsolatedFinalCompilationPerTargetFramework()
     {
@@ -601,6 +606,9 @@ public sealed class FinalCompilationProbeTests
         private static readonly string s_workspaceParent = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.FinalProbe");
+        private static readonly string s_sharedPackageCache = Path.Combine(
+            s_workspaceParent,
+            "package-cache-" + Guid.NewGuid().ToString("N"));
         private readonly string _root;
         private string _sharedCompilationServerId;
 
@@ -611,7 +619,7 @@ public sealed class FinalCompilationProbeTests
                 "direct");
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
-            PackageCache = Path.Combine(root, "package-cache");
+            PackageCache = s_sharedPackageCache;
             CompilerManifestPath = Path.Combine(
                 root,
                 "published",
@@ -675,6 +683,14 @@ public sealed class FinalCompilationProbeTests
                 Path.Combine(TestRepository.FindRoot(), "global.json"),
                 Path.Combine(root, "global.json"));
             return new ProbeWorkspace(root);
+        }
+
+        internal static void DisposeSharedPackageCache()
+        {
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                s_sharedPackageCache,
+                "SharpProof.FinalProbe",
+                "Refusing to remove an unexpected shared package cache.");
         }
 
         internal void WriteConsumer(

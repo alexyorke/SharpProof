@@ -14,6 +14,7 @@ public sealed class PackagedProductFeedLifecycle
     {
         PackagedProductFeed.DisposeShared();
         PackageLayoutSmokeTests.DisposeSharedPackageCache();
+        FinalCompilationProbeTests.DisposeSharedPackageCache();
     }
 }
 
