@@ -333,7 +333,7 @@ public sealed class RoslynProgramLowerer(
                             : priorCustomLowering(candidate);
                     try
                     {
-                        var nestedLowered = _expressions.Lower(value);
+                        var nestedLowered = _expressions.LowerTerm(value);
                         Observe(operation, nestedLowered.Classification);
                         return nestedLowered.Term;
                     }
@@ -344,7 +344,7 @@ public sealed class RoslynProgramLowerer(
                     }
             }
 
-            var lowered = _expressions.Lower(value);
+            var lowered = _expressions.LowerTerm(value);
             Observe(operation, lowered.Classification);
             return lowered.Term;
         }

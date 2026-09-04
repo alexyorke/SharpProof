@@ -55,6 +55,20 @@ public sealed class RoslynOperationLowerer
 
     public FrontendLoweringResult Lower(IOperation operation)
     {
+        var lowered = LowerWithoutBindings(operation);
+        return new FrontendLoweringResult(
+            lowered.Term, lowered.Classification, CreateVariableBindings());
+    }
+
+    internal (IrTerm Term, FrontendSubsetClassification Classification)
+        LowerTerm(IOperation operation)
+    {
+        var lowered = LowerWithoutBindings(operation);
+        return (lowered.Term, lowered.Classification);
+    }
+
+    private LoweredExpression LowerWithoutBindings(IOperation operation)
+    {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         var previousResults = _currentLoweringResults;
@@ -65,9 +79,7 @@ public sealed class RoslynOperationLowerer
             ReferenceComparer<IOperation>.Instance);
         try
         {
-            var lowered = LowerCore(operation);
-            return new FrontendLoweringResult(
-                lowered.Term, lowered.Classification, CreateVariableBindings());
+            return LowerCore(operation);
         }
         finally
         {
