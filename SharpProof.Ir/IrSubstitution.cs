@@ -11,11 +11,12 @@ public static class IrSubstitution
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(replacement, nameof(replacement));
+        factory.EnsureTerm(root, nameof(root));
 
-        return Substitute(
+        var replacementMap = CreateReplacementMap(
             factory,
-            root,
             new Dictionary<IrVarId, IrTerm> { [variable] = replacement });
+        return SubstituteValidated(factory, root, replacementMap);
     }
 
     public static IrTerm Substitute(
@@ -29,6 +30,14 @@ public static class IrSubstitution
 
         factory.EnsureTerm(root, nameof(root));
         var replacementMap = CreateReplacementMap(factory, replacements);
+        return SubstituteValidated(factory, root, replacementMap);
+    }
+
+    private static IrTerm SubstituteValidated(
+        IrFactory factory,
+        IrTerm root,
+        Dictionary<IrVarId, IrTerm> replacementMap)
+    {
         if (replacementMap.Count == 0)
         {
             return root;
