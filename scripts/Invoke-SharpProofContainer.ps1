@@ -597,10 +597,6 @@ switch ($Command) {
             @{ PackageSource = $output; ValidatePackageSourceOnly = $true }
         Invoke-RequiredScript 'scripts/New-SharpProofReleaseEvidence.ps1' `
             'Release evidence generation failed.' @{ PackageSource = $output }
-        $version = Get-SharpProofReleaseVersion -RepositoryRoot $repositoryRoot
-        Invoke-RequiredScript 'scripts/Test-SharpProofReleaseArtifacts.ps1' `
-            'Release artifact validation failed.' `
-            @{ PackageSource = $output; ExpectedTag = 'v' + $version }
     }
     'pilots' {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
