@@ -123,19 +123,24 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             foreach (var invocation in root.DescendantsAndSelf().OfType<IInvocationOperation>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var targetMethod = invocation.TargetMethod;
+                if (_api?.GetClauseKind(targetMethod) is not { } kind)
+                {
+                    hasRejectedContractApiUsage |=
+                        _identity.IsRejectedClauseMethod(targetMethod) &&
+                        IsOwnedByCallable(
+                            callable,
+                            invocation,
+                            model,
+                            cancellationToken);
+                    continue;
+                }
+
                 var ownedByCallable = IsOwnedByCallable(
                     callable,
                     invocation,
                     model,
                     cancellationToken);
-                if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
-                {
-                    hasRejectedContractApiUsage |= ownedByCallable &&
-                        _identity.IsRejectedClauseMethod(
-                            invocation.TargetMethod);
-                    continue;
-                }
-
                 found.Add((kind, Classify(
                     invocation,
                     model,
