@@ -359,20 +359,26 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
     {
-        return SerializeCore(artifact, cancellationToken, validate: true);
+        return SerializeCore(
+            artifact,
+            validate: true,
+            cancellationToken: cancellationToken);
     }
 
     internal static string SerializeValidated(
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
     {
-        return SerializeCore(artifact, cancellationToken, validate: false);
+        return SerializeCore(
+            artifact,
+            validate: false,
+            cancellationToken: cancellationToken);
     }
 
     private static string SerializeCore(
         CompilerManifestArtifact artifact,
-        CancellationToken cancellationToken,
-        bool validate)
+        bool validate,
+        CancellationToken cancellationToken)
     {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
         cancellationToken.ThrowIfCancellationRequested();
