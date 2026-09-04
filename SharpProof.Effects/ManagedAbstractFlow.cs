@@ -1377,6 +1377,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
     private readonly Dictionary<object, ManagedFlowState> _states = new(ManagedKeyComparer.Instance);
     private readonly Dictionary<IOperation, bool> _mutationFacts = new();
+    private readonly Dictionary<IOperation, bool> _reachabilityFacts = new();
 
     internal bool HasMutation(IOperation operation)
     {
@@ -1419,9 +1420,16 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool IsReachable(IOperation operation)
     {
-        return !flow.IsBlockedAfterNoncompletingStatement(operation) &&
+        if (_reachabilityFacts.TryGetValue(operation, out var reachable))
+        {
+            return reachable;
+        }
+
+        reachable = !flow.IsBlockedAfterNoncompletingStatement(operation) &&
             operation.DescendantsAndSelf().Any(candidate =>
                 TryGetState(candidate, out var state) && !state.IsBottom);
+        _reachabilityFacts.Add(operation, reachable);
+        return reachable;
     }
 
     internal static IOperation? GetUnavoidableDirectOperation(
