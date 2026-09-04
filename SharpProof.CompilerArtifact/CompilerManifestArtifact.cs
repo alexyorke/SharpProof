@@ -426,11 +426,14 @@ internal static class CompilerManifestArtifactJson
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
         cancellationToken.ThrowIfCancellationRequested();
-        RequireCompatibilityProperties(json, cancellationToken);
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
+        RequireCompatibilityProperties(document.RootElement, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
-            json, WorkerProtocolJson.SharedOptions) ??
+            document.RootElement, WorkerProtocolJson.SharedOptions) ??
             throw new JsonException("A compiler manifest artifact is required.");
         cancellationToken.ThrowIfCancellationRequested();
         Validate(artifact, cancellationToken);
@@ -755,13 +758,9 @@ internal static class CompilerManifestArtifactJson
     }
 
     private static void RequireCompatibilityProperties(
-        string json,
+        JsonElement root,
         CancellationToken cancellationToken)
     {
-        using var document = JsonDocument.Parse(
-            json,
-            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
-        var root = document.RootElement;
         RequireProperty(root, "specificationPackIds");
         RequireProperty(root, "specificationPackCatalogVersion");
         RequireProperty(root, "specificationPackCatalogSha256");
