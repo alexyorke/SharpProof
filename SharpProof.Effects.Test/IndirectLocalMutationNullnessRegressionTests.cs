@@ -31,7 +31,7 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
         }
     }
 
-    private static Compilation CreateRefAliasCompilation()
+    private static CSharpCompilation CreateRefAliasCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """
@@ -89,7 +89,7 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
         }
     }
 
-    private static Compilation CreateReceiverEffectsCompilation()
+    private static CSharpCompilation CreateReceiverEffectsCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """

@@ -46,7 +46,7 @@ public sealed class AssignableRecursivePatternCompletionRegressionTests
         }
     }
 
-    private static Compilation CreateCompilation()
+    private static CSharpCompilation CreateCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """

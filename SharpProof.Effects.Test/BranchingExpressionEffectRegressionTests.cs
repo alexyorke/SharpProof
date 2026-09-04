@@ -27,7 +27,7 @@ public sealed class BranchingExpressionEffectRegressionTests
             Is.True);
     }
 
-    private static Compilation CreateTerminalInitializerCompilation()
+    private static CSharpCompilation CreateTerminalInitializerCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """
@@ -81,7 +81,7 @@ public sealed class BranchingExpressionEffectRegressionTests
             typeName);
     }
 
-    private static Compilation CreateInfeasibleInitializerCompilation()
+    private static CSharpCompilation CreateInfeasibleInitializerCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """

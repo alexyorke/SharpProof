@@ -53,7 +53,7 @@ public sealed class ConstantTrueLoopCompletionTests
             EffectTestHost.SampleMethod(compilation, callerName));
     }
 
-    private static Compilation CreateCompilation()
+    private static CSharpCompilation CreateCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """

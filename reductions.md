@@ -21491,6 +21491,11 @@ source and downstream behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2030 | **`CompilerEffectReplayLowerer.IsDefiniteMonitorCall` and `OperationEffectScanner.IsMonitorCall` duplicate the full explicit `Monitor`-call admission predicate.** Share only the static/argument/harmless-value/non-null/name/type-identity checks, preserving the lowerer's compilation-scoped lookup and replay policy, the scanner's cached symbol and effect policy, and the separate synthesized-lock path. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:322-342`; `SharpProof.Effects/OperationEffectScanner.cs:1448-1459`; `SharpProof.Effects/SharpProof.Effects.csproj:26`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:20`; related R915, R2020 |
+R2025 is applied: the eleven private Effects regression fixture factories now
+return `CSharpCompilation`, matching the concrete `EffectTestHost` result and
+removing the repeated CA1859 widening without changing their consumers. The
+full `SharpProof.Effects.Test` project passes 323/323 with zero warnings or
+errors.
 ## Second survey, part six hundred thirty-one: R2030 - the container dispatcher runs eighteen dotnet commands with no timeout, through a local wrapper, while importing the module that exports a timeout-capable one
 
 The compiler-invocation surface, measured for the first time: every way the

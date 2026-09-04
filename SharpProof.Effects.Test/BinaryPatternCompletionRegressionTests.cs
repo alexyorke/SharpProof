@@ -26,7 +26,7 @@ public sealed class BinaryPatternCompletionRegressionTests
         }
     }
 
-    private static Compilation CreateCompilation()
+    private static CSharpCompilation CreateCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """

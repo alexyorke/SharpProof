@@ -33,7 +33,7 @@ public sealed class NullablePatternCompletionRegressionTests
         }
     }
 
-    private static Compilation CreateCompilation()
+    private static CSharpCompilation CreateCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """

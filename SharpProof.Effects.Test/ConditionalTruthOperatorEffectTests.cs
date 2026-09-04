@@ -27,7 +27,7 @@ public sealed class ConditionalTruthOperatorEffectTests
             Is.EqualTo(suffixIsReachable));
     }
 
-    private static Compilation CreateFixedTruthCompilation()
+    private static CSharpCompilation CreateFixedTruthCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """
@@ -137,7 +137,7 @@ public sealed class ConditionalTruthOperatorEffectTests
         }
     }
 
-    private static Compilation CreateTruthOperatorCompilation()
+    private static CSharpCompilation CreateTruthOperatorCompilation()
     {
         return EffectTestHost.CreateCompilation(
             """
