@@ -3321,11 +3321,11 @@ internal sealed class ExceptionHandlerReachability(
         {
             return CatchSelection.Always;
         }
-        var selection = model.GetConstantValue(
-            @catch.Filter.FilterExpression) switch
+        var selection = CatchFilterFacts.GetConstantSelection(
+            @catch.Filter, model) switch
         {
-            { HasValue: true, Value: true } => CatchSelection.Always,
-            { HasValue: true, Value: false } => CatchSelection.Never,
+            true => CatchSelection.Always,
+            false => CatchSelection.Never,
             _ => CatchSelection.Maybe
         };
         if (selection != CatchSelection.Maybe)

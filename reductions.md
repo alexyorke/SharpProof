@@ -22263,6 +22263,11 @@ evaluation helper between sequence locations and call operands, preserving the
 existing operand order and returning only non-value evaluation failures. The
 full `SharpProof.Ir.Test` project passes with zero failures.
 
+R2012 is applied: the Effects exception-flow consumers now share one constant
+catch-filter boolean projection while retaining the reachability consumer's
+additional non-completing-filter rule. The full Effects suite passes 323/323
+with zero warnings or errors.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

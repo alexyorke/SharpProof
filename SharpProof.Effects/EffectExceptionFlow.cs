@@ -235,10 +235,10 @@ internal static class EffectExceptionFlow
             return CatchSelection.Always;
         }
 
-        return model.GetConstantValue(filter.FilterExpression) switch
+        return CatchFilterFacts.GetConstantSelection(filter, model) switch
         {
-            { HasValue: true, Value: true } => CatchSelection.Always,
-            { HasValue: true, Value: false } => CatchSelection.Never,
+            true => CatchSelection.Always,
+            false => CatchSelection.Never,
             _ => CatchSelection.Maybe
         };
     }
