@@ -34,6 +34,8 @@ internal sealed class ExceptionHandlerReachability(
         _incrementTargetCompletionCache = new();
     private readonly Dictionary<IMethodSymbol, bool> _methodCompletionCache =
         new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<IMethodSymbol, ReturnNullability>
+        _returnNullabilityCache = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<
         ICoalesceAssignmentOperation,
         (bool Completes, bool IsNonNull)> _coalesceAssignmentTargetFactsCache = new();
@@ -2865,6 +2867,18 @@ internal sealed class ExceptionHandlerReachability(
     internal ReturnNullability GetReturnNullability(IMethodSymbol method)
     {
         method = method.OriginalDefinition;
+        if (_returnNullabilityCache.TryGetValue(method, out var cached))
+        {
+            return cached;
+        }
+
+        var result = ComputeReturnNullability(method);
+        _returnNullabilityCache.Add(method, result);
+        return result;
+    }
+
+    private ReturnNullability ComputeReturnNullability(IMethodSymbol method)
+    {
         if (method.DeclaringSyntaxReferences.Length != 1)
         {
             return ReturnNullability.MaybeNull;
