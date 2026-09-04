@@ -22310,6 +22310,129 @@ R2160 is deferred: the proposed accessibility narrowing reaches public
 remaining candidates require new friend-assembly/API decisions. No public
 surface is narrowed merely for line count.
 
+## Second survey, continued: R2230 - Worker result-state projection classifies discarded evidence
+
+`TryProjectRunState` calls `Classify(callables, claims)` before inspecting
+the error sequence. If any error is present, the method returns the
+error-derived status and failure and never uses the classification. The
+classification can enumerate callable and claim results for every
+error-bearing response only to discard that work. Keep the error projection
+and consensus checks first, then classify only when the error list is empty.
+This is separate from R1059, which concerns allocations inside the error
+consensus loop.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2230 | **`WorkerResultAssembler.TryProjectRunState` classifies callable and claim results before checking errors, then discards that classification for every error-bearing response.** Defer `Classify` until the error list is known to be empty while preserving error consensus and failure mapping. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:320-364`; existing error-loop allocation reduction R1059 is narrower |
+
+## Second survey, continued: R2231 - `CompilerLoweredArtifact` ships a test-only variable collector
+
+`CollectProgramVariables` is an internal production helper whose only
+repository call is the `PortableIrGraphCodecTests` assertion comparing
+program variables with encoded variable indices. No production caller uses
+it, while the helper recursively covers every instruction and location shape
+only to support that test. Move the collector to test infrastructure or
+replace the assertion with a test-local projection, retaining the variable
+closure coverage and codec behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2231 | **`CompilerLoweredArtifact.CollectProgramVariables` has no production callers and exists only to support a Worker test.** Move the helper out of the production assembly or replace the test seam with a local assertion while preserving variable-closure coverage. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:1135-1144`; sole caller `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:83-96` |
+
+## Second survey, continued: R2232 - package compiler-probe tests duplicate analyzer-option stubs
+
+`CompilerProbeSnapshotTests.OutputPathOptionsProvider` and
+`CompilerProbeInputConsistencyTests.DictionaryOptions` independently
+implement map-backed `AnalyzerConfigOptions` behavior, including empty
+options and output-path lookup. The repository already has
+`DictionaryAnalyzerConfigOptions` and
+`DictionaryAnalyzerConfigOptionsProvider` for this uniform case. The
+stateful reference-identity routing in `ProbeOptionsProvider` is different
+and should remain local; only the uniform option objects and provider shape
+are candidates for reuse. The package test is currently omitted from the
+shared-source condition, which explains the duplicate but does not make the
+duplicate necessary.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2232 | **`SharpProof.Package.Test` duplicates the shared map-backed analyzer-options implementation in two compiler-probe tests.** Link or otherwise reuse `DictionaryAnalyzerConfigOptions` for uniform output-path/local-map options, retaining the stateful per-additional-file router and any intentionally different comparer semantics. | `SharpProof.Package.Test/CompilerProbeSnapshotTests.cs:175-212`; `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:94-136`; shared helper `eng/testing/DictionaryAnalyzerConfigOptions.cs:6-65`; current link condition `Directory.Build.props:131-135` |
+
+## Second survey, continued: R2233 - `AnalyzerSession.EffectApiSpecs` is a test-only identity seam
+
+`EffectApiSpecs` exposes the effect analyzer's resolved table through the
+production `AnalyzerSession`, but its only consumer is a test that checks it
+is the same instance as `ApiSpecs`. Production analysis uses the effect
+analysis object internally and has no read of this property. A test-specific
+observation or an explicit cache-reuse contract can preserve the identity
+assertion without shipping a production property solely for inspection;
+`HasCreatedEffectAnalysis` remains the separate lazy-creation state signal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2233 | **`AnalyzerSession.EffectApiSpecs` has no production consumer and is read only by one analyzer test as a lazy-cache identity seam.** Replace the inspection with a test-only observation/contract or remove the property while preserving the intended `ApiSpecs` reuse assertion. | `SharpProof.Analyzer.Core/AnalyzerSession.cs:123-127`; sole read `SharpProof.Analyzer.Test/AnalyzerModeAndEffectTests.cs:187-200` |
+
+## Second survey, continued: R2234 - `IrSubstitution` repeats overload-entry validation
+
+The single-variable `IrSubstitution.Substitute` overload validates
+`factory` and `root`, then delegates to the dictionary overload, which
+validates both values again before calling `EnsureTerm`. The replacement
+argument still needs its own validation, and the dictionary overload must
+retain its caller-boundary checks. A private validated core can remove only
+the repeated `factory`/`root` entry checks without changing replacement
+exception behavior or the map snapshot contract already covered by R739.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2234 | **`IrSubstitution.Substitute` repeats `factory` and `root` validation across its single-variable and dictionary overloads.** Share a validated core while preserving the replacement-specific guard, dictionary snapshot/type checks, and empty-map behavior. | `SharpProof.Ir/IrSubstitution.cs:5-38`; map materialization remains the separate R739 concern |
+
+## Second survey, continued: R2235 - summary non-null constraints re-spell the IR nullable domain
+
+`IrRelationalSummaryBuilder.ConstrainNonNullReceiver` manually accepts
+`String`, `Reference`, or `Sequence` before constructing a null comparison.
+The same three-kind domain is already the generated
+`IrOperatorCatalog.IsNullable` predicate used by `IrFactory` for null and
+cast validation. Reusing that canonical domain fact would prevent the
+summary path from drifting when nullable IR kinds change, while retaining
+the summary-specific `Spend`, throw tracking, and result-support policies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2235 | **`IrRelationalSummaryBuilder.ConstrainNonNullReceiver` re-spells the IR nullable-type domain.** Reuse `IrOperatorCatalog.IsNullable` while retaining the summary-specific budget, throw, and supported-result handling. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:496-505`; canonical predicate `SharpProof.Ir/IrOperatorCatalog.generated.cs:67-73`; related factory use `SharpProof.Ir/IrFactory.cs:544-559,784-791` |
+
+## Second survey, continued: R2236 - `RoslynOperationLowerer.IsIntrinsicLength` is a single-use adapter
+
+`RoslynOperationLowerer.IsIntrinsicLength` contains no policy of its own;
+it forwards directly to `CompilerIdentityBridge.IsIntrinsicSequenceLength`.
+The repository has one caller in the operation-lowering path and no test or
+other production caller. Inline the bridge call or move the convenience
+name to the owning identity bridge, preserving the intrinsic string/array
+shape rules already recorded separately in R1259.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2236 | **`RoslynOperationLowerer.IsIntrinsicLength` is a single-use forwarding adapter over `CompilerIdentityBridge.IsIntrinsicSequenceLength`.** Inline or collapse the seam while retaining the bridge's intrinsic-length policy and the R1259 shared shape guard. | `SharpProof.Frontend/RoslynOperationLowerer.cs:231-234,1026`; target `SharpProof.Frontend/CompilerIdentityBridge.cs:50-94` |
+
+## Second survey, continued: R2237 - invocation lowering rescans arguments for mutation facts
+
+`RoslynProgramLowerer.LowerInvocationArguments` already enumerates every
+invocation argument, reads its parameter metadata, lowers its value, and
+returns the ordered argument projection. `LowerInvocation` then enumerates
+the same argument list again to find `ref`/`out` arguments and derive
+mutated variables before deciding the havoc kind. The directness fact is
+already carried by the first projection under R1252; the mutation fact is a
+separate remaining scan. Extend the projection with mutation information or
+use a shared per-argument record, preserving evaluation order, distinctness,
+and ordinal sorting.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2237 | **`RoslynProgramLowerer.LowerInvocation` rescans invocation arguments for `ref`/`out` mutation variables after `LowerInvocationArguments` has already walked them.** Carry the mutation projection with the existing argument pass while retaining the separate directness, closure, and havoc policies. | `SharpProof.Frontend/RoslynProgramLowerer.cs:387-441,450-485`; directness scan already recorded as R1252 |
+
+### Status (second survey, part six hundred forty-five)
+
+R2230-R2237 are deferred ledger-only observations. No source, test, build,
+script, or generated file was changed; the only appended file is this ledger.
+
 ## Second survey, continued: R2223 - `CompilationFingerprint.ValidReference` repeats a module restriction
 
 `ValidReference` first applies `!EmbedInteropTypes && Aliases.Length == 0`
