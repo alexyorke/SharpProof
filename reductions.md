@@ -21316,3 +21316,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2012 | `EffectExceptionFlow.GetFilterSelection` and `ExceptionHandlerReachability.GetFilterSelection` duplicate the constant catch-filter-to-`CatchSelection` mapping; share only that pure classification and retain the latter's non-completing-operation rule. | `SharpProof.Effects/EffectExceptionFlow.cs:229-246`; `SharpProof.Effects/ExceptionHandlerReachability.cs:3316-3338` |
+
+## Second survey, continued: R2013 - Generate-CompilerArtifactModel and Generate-ProtocolModel duplicate schema preamble validation
+
+`Generate-CompilerArtifactModel.ps1` and `Generate-ProtocolModel.ps1` each independently read a JSON schema with `Get-Content -Raw | ConvertFrom-Json -Depth 100`, require `schemaVersion == 1`, read `namespace` and `jsonNamingPolicy`, reject any naming policy other than `camelCase`, and then enumerate declarations. The expected namespaces, error text, and the additional schema-specific fields differ, so the generators should keep their own domain validation and output contracts. A shared `GeneratedFileHelpers` reader parameterized by expected version/namespace could own only this common schema preamble, reducing two build-time authorities for the same file-loading and baseline-shape rules.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2013 | `Generate-CompilerArtifactModel.ps1` and `Generate-ProtocolModel.ps1` repeat the schema read/version/namespace/JSON naming-policy preamble; share only the parameterized baseline reader and retain schema-specific validation. | `scripts/Generate-CompilerArtifactModel.ps1:306-323`; `scripts/Generate-ProtocolModel.ps1:258-276` |
