@@ -330,6 +330,14 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                context.Node.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
         if (context.SemanticModel.GetOperation(
                 context.Node,
                 context.CancellationToken) is not
@@ -469,7 +477,15 @@ internal static partial class AnalyzerFeaturePipeline
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.Node is not TypeDeclarationSyntax declaration ||
-            !PrimaryConstructorCallableInventory.TryGet(
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                context.Node.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        if (!PrimaryConstructorCallableInventory.TryGet(
                 declaration,
                 context.SemanticModel,
                 context.CancellationToken,
@@ -478,8 +494,12 @@ internal static partial class AnalyzerFeaturePipeline
                 declaration,
                 context.SemanticModel,
                 context.CancellationToken,
-                out constructor) ||
-            AnalyzerGeneratedCodePolicy.IsGenerated(
+                out constructor))
+        {
+            return;
+        }
+
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
                 constructor,
                 declaration.SyntaxTree,
                 context.Compilation,

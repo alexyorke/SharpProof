@@ -252,18 +252,6 @@ internal static class CompilerImplementationIlSummaryLowerer
             var result = factory.CreateVariable(
                 "il-summary:result",
                 memberInfo.ReturnType);
-            var evidenceSha256 = CompilerCompilationCapture.Hash(
-                stream,
-                cancellationToken);
-            var signature = new IrSummarySignature(
-                member,
-                receiver: null,
-                parameters,
-                result,
-                new IrSummaryProvenance(
-                    IrSummaryOrigin.ImplementationIl,
-                    evidenceSha256,
-                    evidenceCallIdentity: method.GetDocumentationCommentId() ?? string.Empty));
             var mapper = new RoslynOperationLowerer(
                 factory,
                 isKnownPure);
@@ -285,6 +273,15 @@ internal static class CompilerImplementationIlSummaryLowerer
                 return false;
             }
 
+            var signature = new IrSummarySignature(
+                member,
+                receiver: null,
+                parameters,
+                result,
+                new IrSummaryProvenance(
+                    IrSummaryOrigin.ImplementationIl,
+                    CompilerCompilationCapture.Hash(stream, cancellationToken),
+                    evidenceCallIdentity: method.GetDocumentationCommentId() ?? string.Empty));
             var built = IrRelationalSummaryBuilder.Build(
                 translated.Program,
                 signature,
