@@ -446,12 +446,12 @@ internal static class Program
         validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
 
-        var manifestClaims = response.Manifest.Claims.ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
         var refuted = false;
         var unknownClaims = 0;
-        foreach (var result in response.ClaimResults)
+        for (var index = 0; index < response.ClaimResults.Length; index++)
         {
-            var claim = manifestClaims[result.ClaimId];
+            var result = response.ClaimResults[index];
+            var claim = response.Manifest.Claims[index];
             var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
             Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
                 LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason);
@@ -462,9 +462,10 @@ internal static class Program
             }
         }
         var incompleteCount = 0;
-        string? firstIncompleteCallableId = null;
-        foreach (var result in response.CallableResults)
+        var firstIncompleteIndex = -1;
+        for (var index = 0; index < response.CallableResults.Length; index++)
         {
+            var result = response.CallableResults[index];
             if (result.Coverage != WorkerCallableCoverage.Incomplete)
             {
                 continue;
@@ -472,15 +473,14 @@ internal static class Program
 
             if (incompleteCount == 0)
             {
-                firstIncompleteCallableId = result.CallableId;
+                firstIncompleteIndex = index;
             }
             incompleteCount++;
         }
         if (incompleteCount != 0)
         {
             ReportDiagnostic(
-                response.Manifest.Callables.First(callable =>
-                    callable.CallableId == firstIncompleteCallableId).Location,
+                response.Manifest.Callables[firstIncompleteIndex].Location,
                 LauncherPresentation.Level(request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
                 FormattableString.Invariant(
