@@ -54,10 +54,9 @@ internal sealed class ProbeJsonObject
         AppendArray(Builder, rows, static (builder, row) => builder.Append(row));
     }
 
-    internal string Complete()
+    internal void Complete()
     {
         Builder.Append('}');
-        return Builder.ToString();
     }
 
     private static void AppendStringArray(
