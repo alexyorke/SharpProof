@@ -49,28 +49,22 @@ internal static class CompilerCaptureAuthority
 
     internal static string CaptureVersion(Type type)
     {
-        var value = type.Assembly.GetName().Version?.ToString() ??
+        var value = type.Assembly.GetName().Version ??
             throw new InvalidOperationException(
                 "The compiler version is unavailable.");
-        if (!IsCanonicalVersion(value))
-        {
-            throw new InvalidOperationException(
-                "The compiler version is not canonical.");
-        }
-
-        return value;
+        return value.ToString();
     }
 
     internal static string CaptureMvid(Type type)
     {
-        var value = type.Module.ModuleVersionId.ToString("D");
-        if (!IsCanonicalMvid(value))
+        var value = type.Module.ModuleVersionId;
+        if (value == Guid.Empty)
         {
             throw new InvalidOperationException(
                 "The compiler MVID is not canonical.");
         }
 
-        return value;
+        return value.ToString("D");
     }
 
     internal static bool IsCanonicalLanguageVersion(string value)
