@@ -291,13 +291,15 @@ public sealed class RoslynProgramLowerer(
                 case IInvocationOperation invocation:
                     return LowerInvocation(block, operation, invocation, wantsResult: true)!;
                 case IIncrementOrDecrementOperation mutation:
-                    LowerUnsupportedMutation(block, operation, mutation.Target);
-                    return CreateHavocTemporary(
-                        block, operation, "mutation-result", _expressions.GetTypeId(mutation.Type));
+                    return LowerUnsupportedMutationResult(
+                        block, operation, mutation.Target, mutation.Type);
                 case ICompoundAssignmentOperation mutation:
-                    LowerUnsupportedMutation(block, operation, mutation.Target, mutation.Value);
-                    return CreateHavocTemporary(
-                        block, operation, "mutation-result", _expressions.GetTypeId(mutation.Type));
+                    return LowerUnsupportedMutationResult(
+                        block,
+                        operation,
+                        mutation.Target,
+                        mutation.Type,
+                        mutation.Value);
                 case IFieldReferenceOperation:
                 case IArrayElementReferenceOperation:
                     var location = LowerLocation(block, operation, value);
@@ -639,6 +641,21 @@ public sealed class RoslynProgramLowerer(
             }
             Abstain(operation, FrontendAbstention.UnsupportedMutation);
             HavocKnownState(block, operation);
+        }
+
+        private IrTerm LowerUnsupportedMutationResult(
+            IrBlockId block,
+            OperationId operation,
+            IOperation target,
+            ITypeSymbol? type,
+            IOperation? value = null)
+        {
+            LowerUnsupportedMutation(block, operation, target, value);
+            return CreateHavocTemporary(
+                block,
+                operation,
+                "mutation-result",
+                _expressions.GetTypeId(type));
         }
 
         private void HavocKnownState(IrBlockId block, OperationId operation)
