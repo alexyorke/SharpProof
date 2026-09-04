@@ -922,28 +922,25 @@ internal static class PerformanceGate
             var currentMarker = currentlyAllocates
                 ? "return new object();"
                 : marker;
-            var warmSourceText = await currentTree.GetTextAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
-            var warmText = warmSourceText.WithChanges(
-                new TextChange(
-                    new TextSpan(markerStart, currentMarker.Length),
-                    allocates ? "return new object();" : marker));
-            var warmTree = currentTree.WithChangedText(warmText);
-            var warmCompilation = currentCompilation.ReplaceSyntaxTree(
-                currentTree,
-                warmTree);
-            var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
-                    warmCompilation,
+            var transition = await ApplyIdeEditAsync(
+                    marker,
+                    markerStart,
+                    currentMarker,
+                    allocates,
+                    measureLatency: false,
+                    currentTree,
+                    currentCompilation,
                     analyzer,
-                    "effects",
-                    concurrentAnalysis: true,
                     cancellationToken)
                 .ConfigureAwait(false);
-            ValidateIdeDiagnostics(diagnostics, allocates, index, "warmup");
-            currentTree = warmTree;
-            currentCompilation = warmCompilation;
-            currentlyAllocates = allocates;
+            ValidateIdeDiagnostics(
+                transition.Diagnostics,
+                transition.Allocates,
+                index,
+                "warmup");
+            currentTree = transition.Tree;
+            currentCompilation = transition.Compilation;
+            currentlyAllocates = transition.Allocates;
         }
 
         var latencies = new double[contract.IdeEdits];
@@ -952,35 +949,26 @@ internal static class PerformanceGate
         {
             cancellationToken.ThrowIfCancellationRequested();
             var allocates = !currentlyAllocates;
-            var replacement = allocates ? "return new object();" : marker;
             var currentMarker = currentlyAllocates
                 ? "return new object();"
                 : marker;
-            var stopwatch = Stopwatch.StartNew();
-            var currentText = await currentTree.GetTextAsync(cancellationToken)
-                .ConfigureAwait(false);
-            var changedText = currentText.WithChanges(
-                new TextChange(
-                    new TextSpan(markerStart, currentMarker.Length),
-                    replacement));
-            var changedTree = currentTree.WithChangedText(changedText);
-            var changedCompilation = currentCompilation.ReplaceSyntaxTree(
-                currentTree,
-                changedTree);
-            var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
-                    changedCompilation,
+            var transition = await ApplyIdeEditAsync(
+                    marker,
+                    markerStart,
+                    currentMarker,
+                    allocates,
+                    measureLatency: true,
+                    currentTree,
+                    currentCompilation,
                     analyzer,
-                    "effects",
-                    concurrentAnalysis: true,
                     cancellationToken)
                 .ConfigureAwait(false);
-            stopwatch.Stop();
-            latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
+            latencies[index] = transition.ElapsedMilliseconds;
             try
             {
                 ValidateIdeDiagnostics(
-                    diagnostics,
-                    allocates,
+                    transition.Diagnostics,
+                    transition.Allocates,
                     index,
                     "measured");
             }
@@ -988,13 +976,53 @@ internal static class PerformanceGate
             {
                 diagnosticFailures.Add(exception.Message);
             }
-            currentTree = changedTree;
-            currentCompilation = changedCompilation;
-            currentlyAllocates = allocates;
+            currentTree = transition.Tree;
+            currentCompilation = transition.Compilation;
+            currentlyAllocates = transition.Allocates;
         }
         return new IdeEditMeasurement(
             latencies,
             diagnosticFailures.ToImmutable());
+    }
+
+    private static async Task<IdeEditTransition> ApplyIdeEditAsync(
+        string marker,
+        int markerStart,
+        string currentMarker,
+        bool allocates,
+        bool measureLatency,
+        SyntaxTree currentTree,
+        CSharpCompilation currentCompilation,
+        DiagnosticAnalyzer analyzer,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = measureLatency
+            ? Stopwatch.StartNew()
+            : null;
+        var currentText = await currentTree.GetTextAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var changedText = currentText.WithChanges(
+            new TextChange(
+                new TextSpan(markerStart, currentMarker.Length),
+                allocates ? "return new object();" : marker));
+        var changedTree = currentTree.WithChangedText(changedText);
+        var changedCompilation = currentCompilation.ReplaceSyntaxTree(
+            currentTree,
+            changedTree);
+        var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
+                changedCompilation,
+                analyzer,
+                "effects",
+                concurrentAnalysis: true,
+                cancellationToken)
+            .ConfigureAwait(false);
+        stopwatch?.Stop();
+        return new IdeEditTransition(
+            changedTree,
+            changedCompilation,
+            diagnostics,
+            allocates,
+            stopwatch?.Elapsed.TotalMilliseconds ?? 0d);
     }
 
     private static void ValidateIdeDiagnostics(
@@ -1790,6 +1818,13 @@ internal static class PerformanceGate
     private sealed record IdeEditMeasurement(
         double[] Latencies,
         ImmutableArray<string> DiagnosticFailures);
+
+    private readonly record struct IdeEditTransition(
+        SyntaxTree Tree,
+        CSharpCompilation Compilation,
+        ImmutableArray<Diagnostic> Diagnostics,
+        bool Allocates,
+        double ElapsedMilliseconds);
 
     private sealed class CountingSessionFactory : IAnalyzerSessionFactory
     {
