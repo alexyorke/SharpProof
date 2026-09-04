@@ -99,7 +99,6 @@ public sealed class IrTraversalTests
         var variables = IrTraversal.CollectVariables(
             [root, shared, factory.Variable(first)]);
 
-        Assert.That(variables, Has.Count.EqualTo(3));
         Assert.That(
             variables,
             Is.EquivalentTo(new[] { condition, first, second }));

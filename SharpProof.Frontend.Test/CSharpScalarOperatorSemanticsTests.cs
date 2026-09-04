@@ -45,7 +45,6 @@ public sealed class CSharpScalarOperatorSemanticsTests
         var supportedKinds = CSharpScalarSemantics.SupportedBinaryOperators
             .Select(static semantics => semantics.Kind)
             .ToArray();
-        Assert.That(supportedKinds, Is.Unique);
         Assert.That(supportedKinds, Is.EquivalentTo(mappings.Keys));
         foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
         {
@@ -226,7 +225,6 @@ public sealed class CSharpScalarOperatorSemanticsTests
         var supportedKinds = CSharpScalarSemantics.SupportedUnaryOperators
             .Select(static semantics => semantics.Kind)
             .ToArray();
-        Assert.That(supportedKinds, Is.Unique);
         Assert.That(supportedKinds, Is.EquivalentTo(expected.Keys));
         foreach (var kind in Enum.GetValues<UnaryOperatorKind>())
         {

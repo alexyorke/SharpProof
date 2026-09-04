@@ -206,11 +206,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         bool concreteReplay = false)
     {
         var tree = CSharpSyntaxTree.ParseText(
-            "public static class Subject {" +
-            Environment.NewLine +
-            members +
-            Environment.NewLine +
-            "}",
+            FrontendTestHelpers.WrapSubjectMembers(members),
             new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create(
             "UnaryCoverage_" + Guid.NewGuid().ToString("N"),
