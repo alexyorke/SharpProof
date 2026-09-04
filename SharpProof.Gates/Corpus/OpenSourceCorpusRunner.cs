@@ -18,6 +18,7 @@ internal static class OpenSourceCorpusRunner
         OpenSourceCorpusDocument document,
         CancellationToken cancellationToken)
     {
+        var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(document);
         var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
             document.Files.Length + 1);
         trees.Add(CSharpSyntaxTree.ParseText(
@@ -51,16 +52,19 @@ internal static class OpenSourceCorpusRunner
         foreach (var file in document.Files)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var root = CSharpSyntaxTree.ParseText(
-                    OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
-                    AnalyzerGateHost.ParseOptions,
-                    file.Path,
-                    Encoding.UTF8,
-                    cancellationToken)
-                .GetCompilationUnitRoot(cancellationToken);
             var key = OpenSourceCorpusCatalog.GetSourceFileKey(
                 file.SourceId,
                 file.Path);
+            var root = parsedFiles is not null &&
+                parsedFiles.TryGetValue(key, out var parsedRoot)
+                ? parsedRoot
+                : CSharpSyntaxTree.ParseText(
+                        OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
+                        AnalyzerGateHost.ParseOptions,
+                        file.Path,
+                        Encoding.UTF8,
+                        cancellationToken)
+                    .GetCompilationUnitRoot(cancellationToken);
             if (methodsByFile.TryGetValue(key, out var methods))
             {
                 var declarationIndex =

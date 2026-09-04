@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -21,6 +22,9 @@ internal static class OpenSourceCorpusCatalog
         PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() }
     };
+    private static readonly ConditionalWeakTable<
+        OpenSourceCorpusDocument,
+        ImmutableDictionary<string, CompilationUnitSyntax>> ParsedFiles = new();
 
     internal static OpenSourceCorpusDocument Load(string repositoryRoot)
     {
@@ -37,8 +41,17 @@ internal static class OpenSourceCorpusCatalog
                 File.ReadAllText(manifestPath),
                 JsonOptions) ??
             throw new InvalidDataException("The OSS corpus manifest is empty.");
-        Validate(document, corpusDirectory);
+        ParsedFiles.Add(document, Validate(document, corpusDirectory));
         return document;
+    }
+
+    internal static ImmutableDictionary<string, CompilationUnitSyntax>?
+        GetParsedFiles(OpenSourceCorpusDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return ParsedFiles.TryGetValue(document, out var parsedFiles)
+            ? parsedFiles
+            : null;
     }
 
     internal static ImmutableArray<CorpusCase> CreateCases(
@@ -108,7 +121,7 @@ internal static class OpenSourceCorpusCatalog
             .Trim();
     }
 
-    private static void Validate(
+    private static ImmutableDictionary<string, CompilationUnitSyntax> Validate(
         OpenSourceCorpusDocument document,
         string corpusDirectory)
     {
@@ -273,6 +286,8 @@ internal static class OpenSourceCorpusCatalog
                 $"The OSS corpus spans only {sourceFileCount} source files; " +
                 $"{MinimumSourceFileCount} are required to prevent one-file padding.");
         }
+
+        return files.ToImmutableDictionary(StringComparer.Ordinal);
     }
 
     internal static HashSet<string> ValidateSourceIds(
