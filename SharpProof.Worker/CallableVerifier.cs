@@ -357,11 +357,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         var query = new VerificationQuery(
             factory,
             evidence,
-            new Goal(
-                factory,
-                factory.Boolean(false),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)),
+            Goal.CreateInternalConsistency(factory),
             replayVariables);
         var outcome = await _kernel.VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);

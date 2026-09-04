@@ -22284,6 +22284,11 @@ comparison, with Requires retaining candidate self-inclusion and Meta retaining
 its property-override branch and already-excluded seed. Analyzer.Core and Meta
 tests pass with the existing symbol-identity behavior unchanged.
 
+R2010 is applied: `Goal` now owns the shared internal-consistency sentinel used
+by worker feasibility and verification queries, while both callers retain their
+independent assumptions, replay variables, and outcome handling. The canonical
+Worker and Verify test builds will exercise the shared goal factory.
+
 R2140 is applied: removed the unused `WorkerLauncherProgram` metadata name and
 matching enum slot from the soundness analyzer's positionally bound catalog.
 The catalog-resolution assertions continue to pass, and the full

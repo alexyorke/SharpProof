@@ -89,6 +89,15 @@ public sealed class Assumption
 
 public sealed partial class Goal
 {
+    internal static Goal CreateInternalConsistency(IrFactory factory)
+    {
+        return new(
+            factory,
+            factory.Boolean(false),
+            ProofDiagnosticKind.InternalConsistency,
+            new SourceLocationId(0));
+    }
+
     public Goal(
         IrFactory factory,
         IrTerm predicate,

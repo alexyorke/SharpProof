@@ -120,11 +120,7 @@ internal static class CallableEntryFeasibilityEvaluator
         var query = new VerificationQuery(
             factory,
             evidence.Assumptions,
-            new Goal(
-                factory,
-                factory.Boolean(false),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)),
+            Goal.CreateInternalConsistency(factory),
             evidence.ReplayVariables);
         var outcome = await kernel.VerifyAsync(
                 query,
