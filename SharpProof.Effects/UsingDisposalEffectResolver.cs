@@ -134,10 +134,11 @@ internal sealed class UsingDisposalEffectResolver
                 return EffectSummary.Empty;
             }
             return ResolveResource(
-                ResolveResourceFacts(resources.Type, resources, origin),
-                classifyRegion,
-                canMethodCompleteNormally,
-                canMethodThrow);
+                    ResolveResourceFacts(resources.Type, resources, origin),
+                    classifyRegion,
+                    canMethodCompleteNormally,
+                    canMethodThrow)
+                .Summary;
         }
 
         var (acquired, reachableDisposalCount) = UsingDisposalGraph.AcquireResources(
@@ -161,11 +162,10 @@ internal sealed class UsingDisposalEffectResolver
                 classifyRegion,
                 canMethodCompleteNormally,
                 canMethodThrow);
-            summary = EffectSummaryDomain.Instance.Join(summary, disposal);
-            if (!CanDisposalUnwind(
-                    facts,
-                    canMethodCompleteNormally,
-                    canMethodThrow))
+            summary = EffectSummaryDomain.Instance.Join(
+                summary,
+                disposal.Summary);
+            if (!disposal.CanUnwind)
             {
                 break;
             }
@@ -206,21 +206,6 @@ internal sealed class UsingDisposalEffectResolver
             canMethodCompleteNormally(dispose);
     }
 
-    private static bool CanDisposalUnwind(
-        ResourceDisposalFacts facts,
-        Func<IMethodSymbol, bool> canMethodCompleteNormally,
-        Func<IMethodSymbol, bool> canMethodThrow)
-    {
-        if (facts.IsDefinitelyNull)
-        {
-            return true;
-        }
-        var dispose = facts.Dispose;
-        var complete = dispose != null && canMethodCompleteNormally(dispose);
-        var throws = dispose != null && canMethodThrow(dispose);
-        return dispose == null || facts.IsDispatchUncertain || complete || throws;
-    }
-
     private bool IsDefinitelyNull(IOperation resource, IOperation origin)
     {
         return resource.ConstantValue is { HasValue: true, Value: null } ||
@@ -228,7 +213,7 @@ internal sealed class UsingDisposalEffectResolver
             value.IsDefinitelyNull;
     }
 
-    private EffectSummary ResolveResource(
+    private (EffectSummary Summary, bool CanUnwind) ResolveResource(
         ResourceDisposalFacts facts,
         Func<IOperation?, bool, EffectRegionSet> classifyRegion,
         Func<IMethodSymbol, bool> canMethodCompleteNormally,
@@ -236,38 +221,44 @@ internal sealed class UsingDisposalEffectResolver
     {
         if (facts.ResourceType == null || facts.Resource == null)
         {
-            return EffectSummaryOperations.Unsupported();
+            return (EffectSummaryOperations.Unsupported(), true);
         }
 
         if (facts.IsDefinitelyNull)
         {
-            return EffectSummary.Empty;
+            return (EffectSummary.Empty, true);
         }
 
         var dispose = facts.Dispose;
         if (dispose == null)
         {
-            return EffectSummaryOperations.Unsupported();
+            return (EffectSummaryOperations.Unsupported(), true);
         }
-        if (!facts.IsDispatchUncertain &&
-            !canMethodCompleteNormally(dispose) &&
-            !canMethodThrow(dispose))
+
+        var canComplete = !facts.IsDispatchUncertain &&
+            canMethodCompleteNormally(dispose);
+        var canThrow = !facts.IsDispatchUncertain &&
+            canMethodThrow(dispose);
+        var canUnwind = facts.IsDispatchUncertain || canComplete || canThrow;
+        if (!canUnwind)
         {
-            return EffectSummary.Empty;
+            return (EffectSummary.Empty, false);
         }
 
         var receiver = dispose.ContainingType?.IsValueType == true &&
             !dispose.ContainingType.IsRefLikeType
                 ? EffectRegionSet.Empty
                 : classifyRegion(facts.Resource, true);
-        return _calls.Resolve(
-            dispose,
-            receiver,
-            ImmutableArray<EffectRegionSet>.Empty,
-            ImmutableArray<IOperation?>.Empty,
-            facts.IsDispatchUncertain,
-            facts.Origin,
-            facts.Resource);
+        return (
+            _calls.Resolve(
+                dispose,
+                receiver,
+                ImmutableArray<EffectRegionSet>.Empty,
+                ImmutableArray<IOperation?>.Empty,
+                facts.IsDispatchUncertain,
+                facts.Origin,
+                facts.Resource),
+            canUnwind);
     }
 
     private ResourceDisposalFacts ResolveResourceFacts(
