@@ -1247,11 +1247,16 @@ internal sealed class ManagedAbstractFlow
         return true;
     }
 
-    private sealed class FlowDomain : ClosedAbstractDomain<ManagedFlowState>
+    private sealed class FlowDomain : CanonicalAbstractDomain<ManagedFlowState>
     {
         internal static FlowDomain Instance { get; } = new();
         public override ManagedFlowState Bottom => ManagedFlowState.Bottom;
         public override ManagedFlowState Top => ManagedFlowState.Top;
+        protected override bool IsCanonical(ManagedFlowState value)
+        {
+            return value.IsCanonicalRepresentation();
+        }
+
         public override ManagedFlowState Join(ManagedFlowState left, ManagedFlowState right)
         {
             return ManagedFlowState.Join(left, right);
@@ -1601,6 +1606,19 @@ internal sealed class ManagedFlowState
     internal static ManagedFlowState Empty { get; } = new(NoValues);
     internal static ManagedFlowState Top { get; } = new(NoValues, hasUntrackedAlias: true);
     internal bool IsBottom => _values == null;
+
+    internal bool IsCanonicalRepresentation()
+    {
+        if (_values == null)
+        {
+            return !_hasUntrackedAlias;
+        }
+
+        return _hasUntrackedAlias
+            ? _values.Count == 0
+            : _values.Values.All(static value => value.IsCanonicalRepresentation());
+    }
+
     internal ManagedAbstractValue Get(object storage)
     {
         if (_values == null)
@@ -1717,14 +1735,31 @@ internal sealed class ManagedKeyComparer : IEqualityComparer<object>
     }
 }
 
-internal readonly record struct ManagedAbstractValue(
-    IntervalValue Scalar,
-    NullnessValue Nullness,
-    IntervalValue Cardinality,
-    bool ExcludesZero,
-    bool IsUnknown,
-    bool IsBoolean)
+internal readonly record struct ManagedAbstractValue
 {
+    private ManagedAbstractValue(
+        IntervalValue scalar,
+        NullnessValue nullness,
+        IntervalValue cardinality,
+        bool excludesZero,
+        bool isUnknown,
+        bool isBoolean)
+    {
+        Scalar = scalar;
+        Nullness = nullness;
+        Cardinality = cardinality;
+        ExcludesZero = excludesZero;
+        IsUnknown = isUnknown;
+        IsBoolean = isBoolean;
+    }
+
+    internal IntervalValue Scalar { get; }
+    internal NullnessValue Nullness { get; }
+    internal IntervalValue Cardinality { get; }
+    internal bool ExcludesZero { get; }
+    internal bool IsUnknown { get; }
+    internal bool IsBoolean { get; }
+
     internal static ManagedAbstractValue Bottom => default;
     internal static ManagedAbstractValue Unknown { get; } = new(default, default, default, false, true, false);
     internal static ManagedAbstractValue BooleanUnknown
@@ -1739,6 +1774,45 @@ internal readonly record struct ManagedAbstractValue(
     internal bool IsDefinitelyNonNull => Nullness == NullnessValue.NonNull;
     internal bool IsDefinitelyNonZero => !Scalar.IsBottom && (ExcludesZero || !Scalar.Contains(0));
 
+    internal bool IsCanonicalRepresentation()
+    {
+        if (this == default)
+        {
+            return true;
+        }
+
+        if (IsUnknown)
+        {
+            return Scalar.IsBottom &&
+                   Nullness == NullnessValue.Bottom &&
+                   Cardinality.IsBottom &&
+                   !ExcludesZero &&
+                   !IsBoolean;
+        }
+
+        if (IsBoolean)
+        {
+            return Nullness == NullnessValue.Bottom &&
+                   Cardinality.IsBottom &&
+                   !ExcludesZero &&
+                   (Scalar.IsSingleton
+                        ? Scalar.SingletonValue is 0 or 1
+                        : Scalar == IntervalValue.Range(0, 1));
+        }
+
+        if (!Scalar.IsBottom)
+        {
+            return Nullness == NullnessValue.Bottom &&
+                   Cardinality.IsBottom;
+        }
+
+        return Nullness is (NullnessValue.Null or
+            NullnessValue.NonNull or
+            NullnessValue.MaybeNull) &&
+            !ExcludesZero &&
+            !IsBoolean;
+    }
+
     internal static ManagedAbstractValue Boolean(bool value)
     {
         return new(IntervalValue.Constant(value ? 1 : 0), default, default, false, false, true);
@@ -1752,7 +1826,11 @@ internal readonly record struct ManagedAbstractValue(
     internal static ManagedAbstractValue Reference(
             NullnessValue value, IntervalValue cardinality = default)
     {
-        return value == NullnessValue.Bottom ? Bottom : new(default, value, cardinality, false, false, false);
+        return value is NullnessValue.Null or
+            NullnessValue.NonNull or
+            NullnessValue.MaybeNull
+            ? new(default, value, cardinality, false, false, false)
+            : Bottom;
     }
 
     internal static ManagedAbstractValue TopForType(ITypeSymbol? type)
