@@ -72,6 +72,48 @@ public sealed class AcceptanceScriptTests
             Does.Not.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
     }
 
+    [Test]
+    public async Task AcceptanceVerifierUsesGeneratedVerifierDefaults()
+    {
+        var verify = await File.ReadAllTextAsync(Path.Combine(
+            TestRepository.FindRoot(), "eng", "acceptance", "Verify.ps1"));
+        var properties = new[]
+        {
+            "SharpProofVerifyQueryRlimit",
+            "SharpProofVerifyMethodRlimit",
+            "SharpProofVerifyMethodWallTimeMilliseconds",
+            "SharpProofVerifyProjectWallTimeMilliseconds",
+            "SharpProofVerifyMaxParallelism",
+            "SharpProofVerifyMaximumExpressionDepth",
+            "SharpProofVerifyTerminationGraceMilliseconds",
+            "SharpProofVerifyCacheMaximumBytes",
+            "SharpProofVerifyCacheEnabled"
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                verify,
+                Does.Contain(
+                    "SharpProof.Verifier\\buildTransitive\\SharpProof.Verifier.defaults.props"));
+            foreach (var property in properties)
+            {
+                Assert.That(
+                    verify,
+                    Does.Contain(
+                        "@{ Document = $verifierDefaultsProps; Property = '" +
+                        property + "';"),
+                    property);
+                Assert.That(
+                    verify,
+                    Does.Not.Contain(
+                        "@{ Document = $verifierProps; Property = '" +
+                        property + "';"),
+                    property);
+            }
+        }
+    }
+
     [TestCase(false, false, "passed", "SharpProof acceptance checks passed.")]
     [TestCase(true, false, "incomplete", "non-qualifying partial mode")]
     [TestCase(false, true, "incomplete", "non-qualifying partial mode")]

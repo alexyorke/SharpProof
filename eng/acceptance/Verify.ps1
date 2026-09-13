@@ -222,6 +222,12 @@ $verifierPropsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'
 [xml]$verifierProps = Get-Content -LiteralPath $verifierPropsPath -Raw
+$verifierDefaultsPropsPath = Join-Path `
+    $repositoryRoot `
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.defaults.props'
+[xml]$verifierDefaultsProps = Get-Content `
+    -LiteralPath $verifierDefaultsPropsPath `
+    -Raw
 $verifierTargetsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
@@ -474,15 +480,15 @@ $msBuildAssertions = @(
     @{ Document = $packageMetadata; Property = 'IncludeSymbols'; Owner = 'package metadata'; Expected = 'true' },
     @{ Document = $packageMetadata; Property = 'SymbolPackageFormat'; Owner = 'package metadata'; Expected = 'snupkg' },
     @{ Document = $packageMetadata; Property = 'EnablePackageValidation'; Owner = 'package metadata'; Expected = 'true' },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyQueryRlimit'; Owner = 'verifier package'; Expected = [string]$contract.worker.queryRlimit },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyMethodRlimit'; Owner = 'verifier package'; Expected = [string]$contract.worker.methodRlimit },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyMethodWallTimeMilliseconds'; Owner = 'verifier package'; Expected = [string]([int]$contract.worker.maximumMethodWallSeconds * 1000) },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyProjectWallTimeMilliseconds'; Owner = 'verifier package'; Expected = [string]([int]$contract.worker.maximumProjectWallSeconds * 1000) },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyMaxParallelism'; Owner = 'verifier package'; Expected = [string]$contract.worker.maximumParallelism },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyMaximumExpressionDepth'; Owner = 'verifier package'; Expected = [string]$contract.worker.maximumExpressionDepth },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyTerminationGraceMilliseconds'; Owner = 'verifier package'; Expected = [string]$contract.worker.forcedTerminationMilliseconds },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyCacheMaximumBytes'; Owner = 'verifier package'; Expected = [string]([int64]$contract.cache.maximumMiB * 1024 * 1024) },
-    @{ Document = $verifierProps; Property = 'SharpProofVerifyCacheEnabled'; Owner = 'verifier package'; Expected = ([string]$contract.cache.enabledByDefault).ToLowerInvariant() })
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyQueryRlimit'; Owner = 'verifier package'; Expected = [string]$contract.worker.queryRlimit },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyMethodRlimit'; Owner = 'verifier package'; Expected = [string]$contract.worker.methodRlimit },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyMethodWallTimeMilliseconds'; Owner = 'verifier package'; Expected = [string]([int]$contract.worker.maximumMethodWallSeconds * 1000) },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyProjectWallTimeMilliseconds'; Owner = 'verifier package'; Expected = [string]([int]$contract.worker.maximumProjectWallSeconds * 1000) },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyMaxParallelism'; Owner = 'verifier package'; Expected = [string]$contract.worker.maximumParallelism },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyMaximumExpressionDepth'; Owner = 'verifier package'; Expected = [string]$contract.worker.maximumExpressionDepth },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyTerminationGraceMilliseconds'; Owner = 'verifier package'; Expected = [string]$contract.worker.forcedTerminationMilliseconds },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyCacheMaximumBytes'; Owner = 'verifier package'; Expected = [string]([int64]$contract.cache.maximumMiB * 1024 * 1024) },
+    @{ Document = $verifierDefaultsProps; Property = 'SharpProofVerifyCacheEnabled'; Owner = 'verifier package'; Expected = ([string]$contract.cache.enabledByDefault).ToLowerInvariant() })
 foreach ($assertion in $msBuildAssertions) {
     Assert-Equal `
         (Get-MsBuildProperty $assertion.Document $assertion.Property $assertion.Owner) `
