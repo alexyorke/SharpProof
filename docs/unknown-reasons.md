@@ -89,9 +89,6 @@ value accompanies backend `Unknown` and is mapped through the proof kernel.
 
 | Value | Boundary |
 |---|---|
-| `UnsupportedOperation` | The proof query contains an operation outside the verified subset |
-| `ApproximationTouchedGoal` | Establishing the goal would depend on approximate evidence |
-| `MissingApiSpecification` | An external member has no exact resolved spec |
 | `UnsupportedEncoding` | The active SMT backend cannot encode the query |
 | `ResourceLimit` | A deterministic solver or method resource allowance was exhausted |
 | `Timeout` | The method wall boundary was reached |
@@ -284,9 +281,8 @@ as an ordinary proof. The field is preserved by canonical JSON and SARIF
 projection. Proven claims do not enter the semantic cache.
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
-proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
-`MissingApiSpecification`, and `UnsupportedEncoding` map to worker
-`UnsupportedExpression`. Contract binding failures map to
+proof `UnsupportedEncoding` maps to worker `UnsupportedExpression`.
+Contract binding failures map to
 `UnsupportedContract`, `UnsupportedExpression`, or `UnsupportedCallable`
 according to their closed failure kind.
 

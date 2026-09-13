@@ -2,18 +2,15 @@ namespace SharpProof.Verify;
 
 public enum AbstentionReason
 {
-    UnsupportedOperation,
-    ApproximationTouchedGoal,
-    MissingApiSpecification,
-    UnsupportedEncoding,
-    ResourceLimit,
-    Timeout,
-    BackendUnavailable,
-    InfrastructureFailure,
-    MalformedBackendResult,
-    CounterexampleReplayFailed,
-    PostconditionMayBeUndefined,
-    InternalConsistencyMayBeUndefined
+    UnsupportedEncoding = 3,
+    ResourceLimit = 4,
+    Timeout = 5,
+    BackendUnavailable = 6,
+    InfrastructureFailure = 7,
+    MalformedBackendResult = 8,
+    CounterexampleReplayFailed = 9,
+    PostconditionMayBeUndefined = 10,
+    InternalConsistencyMayBeUndefined = 11
 }
 
 public abstract class ProofOutcome
