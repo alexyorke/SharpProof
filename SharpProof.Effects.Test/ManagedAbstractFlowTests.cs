@@ -33,6 +33,101 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void BottomBlockStateSkipsBranchWorkButLiveStateStillHonorsCancellation()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(bool condition) {
+                    if (condition) {
+                    }
+                }
+            }
+            """);
+        var (_, _, graph) = GetCallsContext(compilation);
+        var block = graph.Blocks.Single(static candidate =>
+            candidate.BranchValue is not null && candidate.Operations.IsEmpty);
+        var flow = ManagedAbstractFlow.ForCompilation(compilation);
+        var transferBlock = typeof(ManagedAbstractFlow).GetMethod(
+            "TransferBlock",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var result = new ManagedFlowResult(flow);
+        var bottom = (ManagedFlowState)transferBlock.Invoke(
+            flow,
+            [ManagedFlowState.Bottom, block, result, cancellation.Token])!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bottom, Is.SameAs(ManagedFlowState.Bottom));
+            Assert.That(
+                result.TryGetState(block.BranchValue!, out _),
+                Is.False,
+                "bottom input must not record branch evaluation");
+        }
+
+        var liveException = Assert.Throws<TargetInvocationException>(
+            (Action)(() => transferBlock.Invoke(
+                flow,
+                [ManagedFlowState.Empty, block, new ManagedFlowResult(flow),
+                    cancellation.Token])));
+        Assert.That(liveException!.InnerException,
+            Is.TypeOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public void BottomCoalesceBlockDoesNotRecordFlowCaptures()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(object? value) {
+                    value ??= new object();
+                }
+            }
+            """);
+        var (_, _, graph) = GetCallsContext(compilation);
+        var capture = graph.Blocks
+            .SelectMany(static block => block.Operations)
+            .SelectMany(static operation => operation.DescendantsAndSelf())
+            .OfType<IFlowCaptureOperation>()
+            .First(static candidate => candidate.Syntax.AncestorsAndSelf()
+                .Any(static syntax => syntax.IsKind(
+                    SyntaxKind.CoalesceAssignmentExpression)));
+        var captureReference = graph.Blocks
+            .SelectMany(static block => block.Operations)
+            .SelectMany(static operation => operation.DescendantsAndSelf())
+            .OfType<IFlowCaptureReferenceOperation>()
+            .First(reference => reference.Id.Equals(capture.Id));
+        var block = graph.Blocks.First(candidate => candidate.Operations
+            .SelectMany(static operation => operation.DescendantsAndSelf())
+            .OfType<IFlowCaptureOperation>()
+            .Any(operation => operation.Id.Equals(capture.Id)));
+        var flow = ManagedAbstractFlow.ForCompilation(compilation);
+        var transferBlock = typeof(ManagedAbstractFlow).GetMethod(
+            "TransferBlock",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var result = new ManagedFlowResult(flow);
+
+        var bottom = (ManagedFlowState)transferBlock.Invoke(
+            flow,
+            [ManagedFlowState.Bottom, block, result, cancellation.Token])!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bottom, Is.SameAs(ManagedFlowState.Bottom));
+            Assert.That(
+                result.ResolveCoalesceAssignmentTarget(captureReference),
+                Is.SameAs(captureReference),
+                "bottom input must not record a coalesce flow capture");
+        }
+    }
+
+    [Test]
     public void MultidimensionalArrayEvaluationRemainsNonNull()
     {
         var compilation = EffectTestHost.CreateCompilation(

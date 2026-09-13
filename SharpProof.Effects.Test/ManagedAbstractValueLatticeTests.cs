@@ -1,3 +1,6 @@
+using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Dataflow;
+
 namespace SharpProof.Effects.Test;
 
 [TestFixture]

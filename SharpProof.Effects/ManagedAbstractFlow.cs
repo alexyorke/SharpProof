@@ -193,7 +193,7 @@ internal sealed class ManagedAbstractFlow
         ManagedFlowState state, BasicBlock block, ManagedFlowResult result, CancellationToken cancellationToken)
     {
         state = TransferMany(state, block.Operations, result, cancellationToken);
-        return state.IsBottom || block.BranchValue == null
+        return block.BranchValue == null
             ? state
             : Transfer(state, block.BranchValue, result, cancellationToken);
     }
