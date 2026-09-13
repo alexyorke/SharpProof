@@ -530,7 +530,7 @@ internal static class PerformanceGate
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                 <WarningsAsErrors>$(WarningsAsErrors);AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
-                <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
+                <_SharpProofTestAnalyzerDirectory>{analyzerDirectory}</_SharpProofTestAnalyzerDirectory>
                 <_SharpProofContractForGeneratorPath>{generatorPath}</_SharpProofContractForGeneratorPath>
                 <_SharpProofSharedDirectory>{sharedDirectory}</_SharpProofSharedDirectory>
               </PropertyGroup>
@@ -1584,7 +1584,7 @@ internal static class PerformanceGate
             collectorGroup?.Elements("Analyzer").Count() == 2 &&
             HasAnalyzerItem(
                 collectorGroup,
-                "$(SharpProofCompilerCollectorPath)",
+                "$(_SharpProofCompilerCollectorPath)",
                 "Collector") &&
             HasAnalyzerItem(
                 collectorGroup,

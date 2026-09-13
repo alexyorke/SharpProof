@@ -15,8 +15,16 @@
           Condition="'$(DesignTimeBuild)' != 'true'">
     <Error Condition="'$(SharpProofMode)' != ''"
            Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
+    <Error Condition="'$(SharpProofAnalyzerDirectory)' != ''"
+           Text="SharpProofAnalyzerDirectory was removed before preview.1. Analyzer paths are derived from the package import location." />
+    <Error Condition="'$(SharpProofCollectorDirectory)' != ''"
+           Text="SharpProofCollectorDirectory was removed before preview.1. Collector paths are derived from the package import location." />
+    <Error Condition="'$(SharpProofCompilerCollectorPath)' != ''"
+           Text="SharpProofCompilerCollectorPath was removed before preview.1. Collector paths are derived from the package import location." />
+    <Error Condition="'$(SharpProofToolsDirectory)' != ''"
+           Text="SharpProofToolsDirectory was removed before preview.1. Verifier tools are derived from the package import location." />
     <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
-           Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned; use SharpProofAnalyzerDirectory only for package testing." />
+           Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned." />
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
            Text="SharpProofProfile must be advisory, strict, or off." />
     <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"

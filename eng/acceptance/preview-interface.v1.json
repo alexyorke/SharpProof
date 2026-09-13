@@ -1,16 +1,12 @@
 {
   "schemaVersion": 1,
   "msbuildProperties": [
-    "SharpProofAnalyzerDirectory",
     "SharpProofAssumptionPolicy",
-    "SharpProofCollectorDirectory",
-    "SharpProofCompilerCollectorPath",
     "SharpProofCompilerManifestFile",
     "SharpProofFeatures",
     "SharpProofLauncherPath",
     "SharpProofProfile",
     "SharpProofSpecificationPacks",
-    "SharpProofToolsDirectory",
     "SharpProofVerify",
     "SharpProofVerifyCacheDirectory",
     "SharpProofVerifyCacheEnabled",
@@ -29,8 +25,12 @@
     "SharpProofWorkerPath"
   ],
   "retiredMsbuildProperties": [
+    "SharpProofAnalyzerDirectory",
+    "SharpProofCollectorDirectory",
+    "SharpProofCompilerCollectorPath",
     "SharpProofMode",
-    "SharpProofPortableAnalyzerPath"
+    "SharpProofPortableAnalyzerPath",
+    "SharpProofToolsDirectory"
   ],
   "versions": {
     "workerProtocol": 11,

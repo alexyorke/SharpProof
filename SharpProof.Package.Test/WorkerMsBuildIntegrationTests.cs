@@ -63,9 +63,15 @@ public sealed class WorkerMsBuildIntegrationTests
         "SharpProof.Verifier.targets"
     ];
     private static readonly string[] s_runtimeClosureProperties = [
-        "SharpProofToolsDirectory",
+        "_SharpProofTestToolsDirectory",
         "SharpProofWorkerPath",
         "SharpProofLauncherPath"
+    ];
+    private static readonly string[] s_removedPackagePathProperties = [
+        "SharpProofAnalyzerDirectory",
+        "SharpProofCollectorDirectory",
+        "SharpProofCompilerCollectorPath",
+        "SharpProofToolsDirectory"
     ];
 
     [Test]
@@ -155,7 +161,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Path.GetDirectoryName(project.ProjectPath)!,
             "foreign-runtime");
         Directory.CreateDirectory(foreign);
-        var value = property == "SharpProofToolsDirectory"
+        var value = property == "_SharpProofTestToolsDirectory"
             ? foreign
             : project.CompilerManifestPath;
 
@@ -177,7 +183,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Path.GetTempPath(),
             "SharpProof.ForeignRuntime",
             Guid.NewGuid().ToString("N"));
-        var value = property == "SharpProofToolsDirectory"
+        var value = property == "_SharpProofTestToolsDirectory"
             ? foreign
             : Path.Combine(foreign, "foreign.dll");
         using var project = ConsumerProject.CreateConfigured(
@@ -200,6 +206,21 @@ public sealed class WorkerMsBuildIntegrationTests
         }
     }
 
+    [TestCaseSource(nameof(s_removedPackagePathProperties))]
+    public async Task RemovedPackagePathOverridesAreRejected(string property)
+    {
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            (property, "legacy-path-override"));
+
+        var build = await project.BuildAsync(verify: null);
+
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(
+            build.Output,
+            Does.Contain(property + " was removed"));
+    }
+
     [Test]
     public async Task ProjectBodyAnalyzerAndCollectorOverridesNormalizeLate()
     {
@@ -209,9 +230,9 @@ public sealed class WorkerMsBuildIntegrationTests
             "absolute-collector");
         using var project = ConsumerProject.CreateConfigured(
             IdentitySource,
-            ("SharpProofAnalyzerDirectory", analyzerDirectory),
-            ("SharpProofCollectorDirectory", collectorDirectory),
-            ("SharpProofCompilerCollectorPath", " "),
+            ("_SharpProofTestAnalyzerDirectory", analyzerDirectory),
+            ("_SharpProofTestCollectorDirectory", collectorDirectory),
+            ("_SharpProofTestCompilerCollectorPath", " "),
             ("_SharpProofTestContractForGeneratorPath", " "));
 
         var properties = await project.EvaluatePropertiesAsync(
@@ -219,7 +240,7 @@ public sealed class WorkerMsBuildIntegrationTests
             "_SharpProofAnalyzerPath",
             "_SharpProofContractForGeneratorPath",
             "_SharpProofCollectorDirectory",
-            "SharpProofCompilerCollectorPath");
+            "_SharpProofCompilerCollectorPath");
 
         var expectedAnalyzerDirectory = Path.GetFullPath(
             Path.Combine(project.Root, analyzerDirectory));
@@ -242,7 +263,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 properties["_SharpProofCollectorDirectory"],
                 Is.EqualTo(Path.GetFullPath(collectorDirectory)));
             Assert.That(
-                properties["SharpProofCompilerCollectorPath"],
+                properties["_SharpProofCompilerCollectorPath"],
                 Is.EqualTo(Path.Combine(
                     Path.GetFullPath(collectorDirectory),
                     "SharpProof.CompilerCollector.dll")));
@@ -4264,11 +4285,11 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Import Project="{template.PropsPath}" />
                   <Import Project="{template.VerifierPropsPath}" />
                   <PropertyGroup>
-                    <SharpProofAnalyzerDirectory>{template.AnalyzerDirectory}</SharpProofAnalyzerDirectory>
+                    <_SharpProofTestAnalyzerDirectory>{template.AnalyzerDirectory}</_SharpProofTestAnalyzerDirectory>
                     <_SharpProofTestContractForGeneratorPath>{template.GeneratorDirectory}/SharpProof.ContractForGenerator.dll</_SharpProofTestContractForGeneratorPath>
                     <_SharpProofSharedDirectory>{template.CollectorDirectory}</_SharpProofSharedDirectory>
-                    <SharpProofCollectorDirectory>{template.CollectorDirectory}</SharpProofCollectorDirectory>
-                    <SharpProofCompilerCollectorPath>{template.CollectorDirectory}/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
+                    <_SharpProofTestCollectorDirectory>{template.CollectorDirectory}</_SharpProofTestCollectorDirectory>
+                    <_SharpProofTestCompilerCollectorPath>{template.CollectorDirectory}/SharpProof.CompilerCollector.dll</_SharpProofTestCompilerCollectorPath>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{template.WorkerPath}</SharpProofWorkerPath>

@@ -650,7 +650,7 @@ public sealed class PerformanceGateTests
         var analyzerDirectory = Path.Combine(
             temporaryRoot,
             "unusable-analyzers");
-        projectDocument.Descendants("SharpProofAnalyzerDirectory")
+        projectDocument.Descendants("_SharpProofTestAnalyzerDirectory")
             .Single()
             .Value = analyzerDirectory;
         projectDocument.Save(project);

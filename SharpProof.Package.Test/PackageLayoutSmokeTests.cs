@@ -747,8 +747,8 @@ public sealed class PackageLayoutSmokeTests
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
                     <SharpProofVerify>true</SharpProofVerify>
-                    <SharpProofAnalyzerDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "analyzers"))}</SharpProofAnalyzerDirectory>
-                    <SharpProofCollectorDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "collector"))}</SharpProofCollectorDirectory>
+                    <_SharpProofTestAnalyzerDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "analyzers"))}</_SharpProofTestAnalyzerDirectory>
+                    <_SharpProofTestCollectorDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "collector"))}</_SharpProofTestCollectorDirectory>
                     <_SharpProofSharedDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "shared"))}</_SharpProofSharedDirectory>
                   </PropertyGroup>
                   <Import Project="{EscapeMsBuildImportPath(Path.Combine(packageBuild.FullName, "SharpProof.props"))}" />

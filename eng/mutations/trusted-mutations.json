@@ -1258,7 +1258,7 @@
   {
     "name": "packaged-paths-normalize-after-project-body",
     "file": "SharpProof.Package/buildTransitive/SharpProof.targets",
-    "original": "    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>",
+    "original": "    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>",
     "mutated": "    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</_SharpProofAnalyzerDirectory>",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~ProjectBodyAnalyzerAndCollectorOverridesNormalizeLate"

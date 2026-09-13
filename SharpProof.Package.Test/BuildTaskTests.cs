@@ -2123,8 +2123,8 @@ public sealed class BuildTaskTests
             "msbuild",
             targets,
             "-t:_SharpProofValidateConfiguration",
-            "-p:SharpProofAnalyzerDirectory=" + placeholder,
-            "-p:SharpProofCollectorDirectory=" + placeholder,
+            "-p:_SharpProofTestAnalyzerDirectory=" + placeholder,
+            "-p:_SharpProofTestCollectorDirectory=" + placeholder,
             "-p:_SharpProofSharedDirectory=" + placeholder,
             "--nologo",
             "--verbosity:minimal"
