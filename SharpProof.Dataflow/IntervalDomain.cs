@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Reduced interval and congruence domain over signed 64-bit integers.
 /// </summary>
-public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
+public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
 {
     public static IntervalDomain Instance { get; } = new();
     private IntervalDomain()
@@ -12,6 +12,14 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
 
     public override IntervalValue Bottom => IntervalValue.Bottom;
     public override IntervalValue Top { get; } = new(null, null, 1, 0);
+
+    protected override bool IsCanonical(IntervalValue value)
+    {
+        // The value constructor is internal and every public factory creates
+        // the canonical representation, so every externally supplied value is
+        // canonical.
+        return true;
+    }
 
     public IntervalValue Constant(long value)
     {

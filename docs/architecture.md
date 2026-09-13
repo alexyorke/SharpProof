@@ -121,6 +121,10 @@ widen a stage's semantics. Unknown future Roslyn operation kinds fail closed.
 `SharpProof.Dataflow` supplies deterministic fixpoint evaluation, partial
 orders, joins, widening, havoc, and interval/congruence, sequence-cardinality,
 and nullness domains. Source method effects are solved by stable SCC order.
+Its canonical-domain opt-in stores validated strictly growing transfer results
+directly; ordinary custom domains retain the normalizing join path. Managed
+effect-flow analysis remains on that generic path until its representation
+contract has independent regression coverage.
 The out-of-process worker also projects validated `ApiSpec` result nullness and
 array cardinality into spec-justified Boolean and integer proxies. This is a
 bounded call-result integration; it does not use roslyn-analyzers entities,

@@ -1,5 +1,15 @@
 namespace SharpProof.Dataflow;
 
+/// <summary>
+/// A control-flow block and its abstract transfer function.
+/// </summary>
+/// <remarks>
+/// When the graph is analyzed with a
+/// <see cref="CanonicalAbstractDomain{T}"/>, a transfer function that returns
+/// a canonical representative may use the solver's direct strict-growth path;
+/// noncanonical results retain the normalizing
+/// <see cref="IAbstractDomain{T}.Join"/> fallback.
+/// </remarks>
 public sealed class DataflowBlock<T>(int id, Func<T, T> transfer)
 {
     public int Id { get; } = ArgumentNullGuard.RequireNonnegative(id, nameof(id));

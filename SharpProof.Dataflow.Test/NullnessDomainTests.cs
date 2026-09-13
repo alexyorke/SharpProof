@@ -13,6 +13,12 @@ public sealed class NullnessDomainTests
     }
 
     [Test]
+    public void FactoryValuesSatisfyCanonicalTransferContract()
+    {
+        DomainLawAssertions.AssertCanonicalTransfers(_domain, Samples);
+    }
+
+    [Test]
     public void RefinementTransfersAreMonotone()
     {
         DomainLawAssertions.AssertMonotone(_domain, Samples, _domain.AssumeNull);

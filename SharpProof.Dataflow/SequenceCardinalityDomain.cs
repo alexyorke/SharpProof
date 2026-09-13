@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Product domain for sequence emptiness and length.
 /// </summary>
-public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCardinalityValue>
+public sealed class SequenceCardinalityDomain : CanonicalAbstractDomain<SequenceCardinalityValue>
 {
     private readonly IntervalDomain _intervals = IntervalDomain.Instance;
 
@@ -28,6 +28,13 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     public override SequenceCardinalityValue Top
     {
         get;
+    }
+
+    protected override bool IsCanonical(SequenceCardinalityValue value)
+    {
+        // The value constructor is internal and every public factory creates
+        // the canonical kind/length pair.
+        return true;
     }
 
     public SequenceCardinalityValue KnownLength(long length)

@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Four-point nullness domain.
 /// </summary>
-public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue>
+public sealed class NullnessDomain : CanonicalAbstractDomain<NullnessValue>
 {
     public static NullnessDomain Instance { get; } = new();
 
@@ -13,6 +13,12 @@ public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue>
 
     public override NullnessValue Bottom => NullnessValue.Bottom;
     public override NullnessValue Top => NullnessValue.MaybeNull;
+
+    protected override bool IsCanonical(NullnessValue value)
+    {
+        Validate(value);
+        return true;
+    }
 
     public override bool LessThanOrEqual(NullnessValue left, NullnessValue right)
     {

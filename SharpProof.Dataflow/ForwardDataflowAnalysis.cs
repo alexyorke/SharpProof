@@ -149,7 +149,10 @@ public static class ForwardDataflowAnalysis
                     continue;
                 }
 
-                var monotoneOutput = domain.Join(outputs[blockId], transferred);
+                var monotoneOutput = domain is CanonicalAbstractDomain<T> canonicalDomain &&
+                    canonicalDomain.IsCanonicalTransfer(transferred)
+                        ? transferred
+                        : domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
                 {
                     outputs[blockId] = monotoneOutput;

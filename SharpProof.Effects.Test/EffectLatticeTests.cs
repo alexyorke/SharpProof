@@ -24,6 +24,16 @@ public sealed class EffectLatticeTests
                 var join = domain.Join(left, right);
                 Assert.That(domain.LessThanOrEqual(left, join), Is.True);
                 Assert.That(domain.LessThanOrEqual(right, join), Is.True);
+                if (domain.LessThanOrEqual(left, right))
+                {
+                    Assert.That(domain.AreEquivalent(join, right), Is.True);
+                }
+
+                if (domain.LessThanOrEqual(right, left))
+                {
+                    Assert.That(domain.AreEquivalent(join, left), Is.True);
+                }
+
                 Assert.That(join, Is.EqualTo(domain.Join(right, left)));
             }
         }

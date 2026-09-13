@@ -29,6 +29,12 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void FactoryValuesSatisfyCanonicalTransferContract()
+    {
+        DomainLawAssertions.AssertCanonicalTransfers(_domain, Samples);
+    }
+
+    [Test]
     public void CongruentBoundsAreCanonicalized()
     {
         var even = _domain.Create(-5, 5, 2, 0);

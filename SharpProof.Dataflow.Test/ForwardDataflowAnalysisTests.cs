@@ -62,6 +62,62 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     [Test]
+    public void CanonicalDomainStoresStrictGrowthWithoutJoining()
+    {
+        var domain = new TrackingCanonicalDomain();
+        var graph = new DataflowGraph<int>(
+            [new(0, _ => 1)],
+            []);
+
+        var result = ForwardDataflowAnalysis.Analyze(graph, domain, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.GetOutputState(0), Is.EqualTo(1));
+            Assert.That(domain.JoinCallCount, Is.EqualTo(0));
+        }
+    }
+
+    [Test]
+    public void CanonicalDomainStoresLaterStrictGrowthWithoutJoining()
+    {
+        var domain = new TrackingCanonicalDomain();
+        var graph = new DataflowGraph<int>(
+            [
+                new(0, _ => 1),
+                new(1, value => value == 0 ? 1 : 2)
+            ],
+            [new(0, 1)]);
+
+        var result = ForwardDataflowAnalysis.Analyze(graph, domain, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.GetOutputState(1), Is.EqualTo(2));
+            // The two joins are the predecessor/input propagation joins. No
+            // strict-growth output update invokes Join.
+            Assert.That(domain.JoinCallCount, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void CanonicalDomainRetainsJoinNormalizationForNonCanonicalTransfer()
+    {
+        var domain = new NormalizingDomain();
+        var graph = new DataflowGraph<int>(
+            [new(0, _ => 1)],
+            []);
+
+        var result = ForwardDataflowAnalysis.Analyze(graph, domain, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.GetOutputState(0), Is.EqualTo(2));
+            Assert.That(domain.JoinCallCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void LoopUsesWideningAndTerminates()
     {
         var domain = IntervalDomain.Instance;
@@ -318,6 +374,74 @@ public sealed class ForwardDataflowAnalysisTests
         catch (OverflowException)
         {
             return domain.Top;
+        }
+    }
+
+    private sealed class TrackingCanonicalDomain : CanonicalAbstractDomain<int>
+    {
+        public int JoinCallCount { get; private set; }
+
+        public override int Bottom => 0;
+        public override int Top => 2;
+
+        protected override bool IsCanonical(int value)
+        {
+            return value is >= 0 and <= 2;
+        }
+
+        public override bool LessThanOrEqual(int left, int right)
+        {
+            return left <= right;
+        }
+
+        public override int Join(int left, int right)
+        {
+            JoinCallCount++;
+            return Math.Max(left, right);
+        }
+
+        public override int Havoc(int value)
+        {
+            return value == Bottom ? Bottom : Top;
+        }
+    }
+
+    private sealed class NormalizingDomain : CanonicalAbstractDomain<int>
+    {
+        public int JoinCallCount { get; private set; }
+
+        public override int Bottom => 0;
+        public override int Top => 3;
+
+        protected override bool IsCanonical(int value)
+        {
+            return Normalize(value) == value;
+        }
+
+        public override bool LessThanOrEqual(int left, int right)
+        {
+            return Normalize(left) <= Normalize(right);
+        }
+
+        public override int Join(int left, int right)
+        {
+            JoinCallCount++;
+            return Math.Max(Normalize(left), Normalize(right));
+        }
+
+        public override int Widen(int previous, int candidate)
+        {
+            return Join(previous, candidate);
+        }
+
+        public override int Havoc(int value)
+        {
+            return value == Bottom ? Bottom : Top;
+        }
+
+        private static int Normalize(int value)
+        {
+            return value == 1 ? 2 : value;
         }
     }
 }

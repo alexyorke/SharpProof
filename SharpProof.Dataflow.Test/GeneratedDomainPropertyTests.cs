@@ -71,6 +71,23 @@ internal static class GeneratedDomainLawAssertions
                 domain.LessThanOrEqual(second, middle),
                 Is.True,
                 $"Join is not above {second} at seed {seed}, iteration {iteration}.");
+            if (domain.LessThanOrEqual(first, second))
+            {
+                Assert.That(
+                    domain.AreEquivalent(middle, second),
+                    Is.True,
+                    $"Ordered join did not absorb its right operand at seed {seed}, " +
+                    $"iteration {iteration}.");
+            }
+
+            if (domain.LessThanOrEqual(second, first))
+            {
+                Assert.That(
+                    domain.AreEquivalent(middle, first),
+                    Is.True,
+                    $"Ordered join did not absorb its left operand at seed {seed}, " +
+                    $"iteration {iteration}.");
+            }
 
             for (var upperBoundAttempt = 0; upperBoundAttempt < 8; upperBoundAttempt++)
             {

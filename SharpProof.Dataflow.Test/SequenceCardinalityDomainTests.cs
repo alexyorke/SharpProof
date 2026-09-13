@@ -27,6 +27,12 @@ public sealed class SequenceCardinalityDomainTests
     }
 
     [Test]
+    public void FactoryValuesSatisfyCanonicalTransferContract()
+    {
+        DomainLawAssertions.AssertCanonicalTransfers(_domain, Samples);
+    }
+
+    [Test]
     public void LengthCanonicalizesCardinalityKind()
     {
         var zero = _domain.Create(
