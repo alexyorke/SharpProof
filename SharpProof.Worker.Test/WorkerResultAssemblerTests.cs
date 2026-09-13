@@ -33,6 +33,42 @@ public sealed class WorkerResultAssemblerTests
     }
 
     [Test]
+    public void WorkerTimeoutCodeProjectsOnlyTheExactProtocolIdentity()
+    {
+        var projected = WorkerResultAssembler.TryProjectRunState(
+            [], [],
+            [new WorkerProtocolError {
+                Code = WorkerProtocolErrorCodes.WorkerTimeout,
+                Message = "timeout"
+            }],
+            out var status,
+            out var failure);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(projected, Is.True);
+            Assert.That(status, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(failure, Is.EqualTo(WorkerRunFailureReason.None));
+        }
+
+        var nearMiss = WorkerResultAssembler.TryProjectRunState(
+            [], [],
+            [new WorkerProtocolError {
+                Code = "worker.timeouts",
+                Message = "timeout"
+            }],
+            out status,
+            out failure);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nearMiss, Is.False);
+            Assert.That(status, Is.EqualTo(WorkerRunStatus.Unspecified));
+            Assert.That(failure, Is.EqualTo(WorkerRunFailureReason.Unspecified));
+        }
+    }
+
+    [Test]
     public void IncompleteAssemblyToleratesNullManifestEntries()
     {
         var manifest = new WorkerClaimManifest

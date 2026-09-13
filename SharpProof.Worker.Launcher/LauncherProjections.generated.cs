@@ -27,7 +27,7 @@ internal static partial class LauncherPresentation
     {
         return exitCode switch
         {
-            124 => new Program.LauncherFailure(124, SharpProof.Worker.Protocol.WorkerRunStatus.TimedOut, SharpProof.Worker.Protocol.WorkerRunFailureReason.None, "worker.timeout", "The worker exceeded its project time budget.", string.Empty),
+            124 => new Program.LauncherFailure(124, SharpProof.Worker.Protocol.WorkerRunStatus.TimedOut, SharpProof.Worker.Protocol.WorkerRunFailureReason.None, SharpProof.Worker.Protocol.WorkerProtocolErrorCodes.WorkerTimeout, "The worker exceeded its project time budget.", string.Empty),
             125 => new Program.LauncherFailure(125, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.ContainmentFailure, "containment.unavailable", "Required worker containment could not be established.", string.Empty),
             _ => new Program.LauncherFailure(exitCode, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.MalformedResult, "worker.no_result", "The worker exited without a result.", string.Empty)
         };

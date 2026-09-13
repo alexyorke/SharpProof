@@ -1739,6 +1739,19 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void TimeoutWithoutResultPreservesProtocolErrorIdentity()
+    {
+        var failure = LauncherPresentation.NoResultFailure(124);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure.Code, Is.EqualTo("worker.timeout"));
+            Assert.That(failure.Status, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(failure.Reason, Is.EqualTo(WorkerRunFailureReason.None));
+        }
+    }
+
+    [Test]
     public void SarifProjectionPreservesInfrastructureFailure()
     {
         var manifest = new WorkerClaimManifest();

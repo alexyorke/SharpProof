@@ -532,7 +532,7 @@ internal static class WorkerResultAssembler
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?
         ProjectError(string code)
     {
-        if (code is "worker.timeout")
+        if (code is WorkerProtocolErrorCodes.WorkerTimeout)
         {
             return (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None);
         }

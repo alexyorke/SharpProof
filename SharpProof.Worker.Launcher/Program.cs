@@ -878,7 +878,7 @@ internal static class Program
                 ClaimResults.Length: 0,
                 Errors.Length: 1
             } ||
-            response.Errors[0].Code != "worker.timeout")
+            response.Errors[0].Code != WorkerProtocolErrorCodes.WorkerTimeout)
         {
             return;
         }
