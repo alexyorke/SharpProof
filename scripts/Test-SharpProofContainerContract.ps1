@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Read-SharpProofSdkPolicy.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($DockerfilePath)) {
@@ -20,9 +21,8 @@ $catalog = Get-Content -LiteralPath (
 $acceptance = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
-$globalJson = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'global.json') -Raw |
-    ConvertFrom-Json
+$globalJson = Read-SharpProofSdkPolicy -Path (
+    Join-Path $repositoryRoot 'global.json')
 $dockerfile = Get-Content -LiteralPath $DockerfilePath -Raw
 $compose = Get-Content -LiteralPath $ComposePath -Raw
 $devContainer = Get-Content -LiteralPath (

@@ -48,6 +48,7 @@ Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseBundle.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Read-SharpProofSdkPolicy.ps1')
 
 $packageOrder = $SharpProofPackagePushOrder
 
@@ -78,8 +79,7 @@ function Get-RepositorySdkVersion {
         throw "The repository SDK policy is missing: $globalJsonPath"
     }
 
-    $globalJson = Get-Content -LiteralPath $globalJsonPath -Raw |
-        ConvertFrom-Json
+    $globalJson = Read-SharpProofSdkPolicy -Path $globalJsonPath
     $sdk = $globalJson.PSObject.Properties['sdk']
     $version = if ($null -eq $sdk) {
         $null
