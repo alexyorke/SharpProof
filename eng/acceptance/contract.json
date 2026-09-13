@@ -98,6 +98,7 @@
       "SharpProof.Specs/DefaultApiSpecCatalog.json",
       "SharpProof.Specs/RelationalSpecPackCatalog.json",
       "SharpProof.Verifier/SharpProof.Verifier.nuspec",
+      "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props",
       "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
       "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets",
       "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",

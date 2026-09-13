@@ -13,15 +13,9 @@
     <_SharpProofPackageLauncherPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Launcher.dll'))</_SharpProofPackageLauncherPath>
     <_SharpProofPackageWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofPackageWorkerProtocolPath>
     <_SharpProofPackageBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofPackageBuildTasksPath>
-    <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
-    <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
-    <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>
-    <SharpProofVerifyProjectWallTimeMilliseconds Condition="'$(SharpProofVerifyProjectWallTimeMilliseconds)' == ''">300000</SharpProofVerifyProjectWallTimeMilliseconds>
-    <SharpProofVerifyMaxParallelism Condition="'$(SharpProofVerifyMaxParallelism)' == ''">4</SharpProofVerifyMaxParallelism>
-    <SharpProofVerifyMaximumExpressionDepth Condition="'$(SharpProofVerifyMaximumExpressionDepth)' == ''">64</SharpProofVerifyMaximumExpressionDepth>
-    <SharpProofVerifyTerminationGraceMilliseconds Condition="'$(SharpProofVerifyTerminationGraceMilliseconds)' == ''">1000</SharpProofVerifyTerminationGraceMilliseconds>
-    <SharpProofVerifyCacheEnabled Condition="'$(SharpProofVerifyCacheEnabled)' == ''">true</SharpProofVerifyCacheEnabled>
-    <SharpProofVerifyCacheMaximumBytes Condition="'$(SharpProofVerifyCacheMaximumBytes)' == ''">536870912</SharpProofVerifyCacheMaximumBytes>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props" />
+  <PropertyGroup>
     <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == '' AND '$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</_SharpProofDotNetHost>
     <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == ''">dotnet</_SharpProofDotNetHost>
   </PropertyGroup>

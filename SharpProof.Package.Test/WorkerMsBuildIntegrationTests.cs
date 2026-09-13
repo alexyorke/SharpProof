@@ -2828,7 +2828,12 @@ public sealed class WorkerMsBuildIntegrationTests
             "SharpProof.Verifier",
             "buildTransitive",
             "SharpProof.Verifier.props"));
-        var properties = verifierProps
+        var verifierDefaults = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.defaults.props"));
+        var properties = verifierDefaults
             .Descendants()
             .Where(static element =>
                 element.Parent?.Name.LocalName == "PropertyGroup")

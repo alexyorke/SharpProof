@@ -713,9 +713,12 @@ $portablePackageProps = [xml](Get-RequiredText (
     'SharpProof.Package\buildTransitive\SharpProof.props'))
 $verifierPackageProps = [xml](Get-RequiredText (
     'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'))
+$verifierDefaultsProps = [xml](Get-RequiredText (
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.defaults.props'))
 $packagePropsDocuments = @(
     $portablePackageProps,
-    $verifierPackageProps
+    $verifierPackageProps,
+    $verifierDefaultsProps
 )
 $workerPropertyNames = @(
     @(

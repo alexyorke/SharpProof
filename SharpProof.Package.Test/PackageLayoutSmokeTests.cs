@@ -1905,6 +1905,7 @@ public sealed class PackageLayoutSmokeTests
                 "_rels/.rels",
                 "[Content_Types].xml",
                 "buildTransitive/SharpProof.Verifier.props",
+                "buildTransitive/SharpProof.Verifier.defaults.props",
                 "buildTransitive/SharpProof.Verifier.targets",
                 "LICENSE",
                 "package/services/metadata/core-properties/" +
@@ -2243,6 +2244,24 @@ public sealed class PackageLayoutSmokeTests
                     "tools/net9/SharpProof.Contracts.dll" or
                     "tools/net9/SharpProof.Frontend.dll"),
             Is.Empty);
+        Assert.That(
+            entries,
+            Does.Contain(
+                "buildTransitive/SharpProof.Verifier.defaults.props"));
+        Assert.That(
+            ReadArchiveText(
+                archive,
+                "buildTransitive/SharpProof.Verifier.defaults.props"),
+            Does.Contain(
+                "<SharpProofVerifyQueryRlimit")
+                .And.Contain(
+                    "<SharpProofVerifyCacheMaximumBytes"));
+        Assert.That(
+            ReadArchiveText(
+                archive,
+                "buildTransitive/SharpProof.Verifier.props"),
+            Does.Contain(
+                "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
         foreach (var dependencies in new[] {
                      "tools/net9/SharpProof.Worker.deps.json",
                      "tools/net9/SharpProof.Worker.Launcher.deps.json"

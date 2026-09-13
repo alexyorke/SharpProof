@@ -21,6 +21,7 @@
   </metadata>
   <files>
     <file src="buildTransitive\SharpProof.Verifier.props" target="buildTransitive" />
+    <file src="buildTransitive\SharpProof.Verifier.defaults.props" target="buildTransitive" />
     <file src="buildTransitive\SharpProof.Verifier.targets" target="buildTransitive" />
     <file src="..\README.md" />
     <file src="..\LICENSE" />

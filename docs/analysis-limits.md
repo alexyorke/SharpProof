@@ -9,13 +9,15 @@ SharpProof has two kinds of limits:
 They have different sources.
 The portable `SharpProof.props` and `SharpProof.targets` define analyzer paths,
 profile/feature defaults, and verifier-package requirements.
-`SharpProof.Verifier.props` and
+`SharpProof.Verifier.props` and its generated defaults companion
+`SharpProof.Verifier.defaults.props` and
 `SharpProof.Verifier.targets` define worker budgets, policy defaults,
 compiler-manifest properties, paths, invocation, and host enforcement.
 `SharpProof.Worker.Protocol/ProtocolModel.schema.json` is the authoritative
-model, and checked-in `ProtocolModel.generated.cs` defines the matching runtime
-defaults and validation bounds. The release gate mirrors selected values in
-`eng/acceptance/contract.json` and verifies that they agree.
+model. `ProtocolModel.generated.cs` defines the matching runtime defaults and
+validation bounds, while the generated verifier defaults companion projects
+the same schema values into MSBuild. The release gate mirrors selected values
+in `eng/acceptance/contract.json` and verifies that they agree.
 `SharpProof.Frontend/CSharpScalarSemantics.json` is the corresponding review
 source for admitted integer widths and ranges, value-preserving conversions,
 checked behavior, Roslyn-to-IR and inverse mappings, comparison relations, and
@@ -32,15 +34,15 @@ both generated C# projections before building.
 | `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | verifier targets; mirrored by `contract.json` |
 | `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | verifier targets; mirrored by `contract.json` |
 | `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
-| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | verifier props and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
-| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | verifier props and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
-| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | verifier props, `FinalCompilationCollector`, and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | generated verifier defaults and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
+| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | generated verifier defaults and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
+| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | generated verifier defaults, `FinalCompilationCollector`, and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | generated verifier defaults and `WorkerLauncherDefaults`; mirrored by `contract.json` |
+| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | generated verifier defaults and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | generated verifier defaults and `WorkerCacheOptions`; mirrored by `contract.json` |
 | `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
 
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath

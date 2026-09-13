@@ -715,6 +715,88 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void VerifierDefaultsAreProjectedFromTheProtocolSchema()
+    {
+        var repository = TestRepository.FindRoot();
+        using var schema = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(
+                repository,
+                "SharpProof.Worker.Protocol",
+                "ProtocolModel.schema.json")));
+        var expected = new Dictionary<string, string>(
+            StringComparer.Ordinal)
+        {
+            ["SharpProofVerifyQueryRlimit"] =
+                "WorkerBudgets.DefaultQueryRlimit",
+            ["SharpProofVerifyMethodRlimit"] =
+                "WorkerBudgets.DefaultMethodRlimit",
+            ["SharpProofVerifyMethodWallTimeMilliseconds"] =
+                "WorkerBudgets.DefaultMethodWallTimeMilliseconds",
+            ["SharpProofVerifyProjectWallTimeMilliseconds"] =
+                "WorkerBudgets.DefaultProjectWallTimeMilliseconds",
+            ["SharpProofVerifyMaxParallelism"] =
+                "WorkerBudgets.MaximumParallelism",
+            ["SharpProofVerifyMaximumExpressionDepth"] =
+                "WorkerBudgets.DefaultMaximumExpressionDepth",
+            ["SharpProofVerifyTerminationGraceMilliseconds"] =
+                "WorkerLauncherDefaults.TerminationGraceMilliseconds",
+            ["SharpProofVerifyCacheEnabled"] =
+                "WorkerCacheOptions.Enabled",
+            ["SharpProofVerifyCacheMaximumBytes"] =
+                "WorkerCacheOptions.DefaultMaximumBytes"
+        };
+        var mappings = schema.RootElement
+            .GetProperty("verifierMsBuildDefaults")
+            .EnumerateArray()
+            .ToDictionary(
+                static mapping => mapping.GetProperty("property").GetString()!,
+                static mapping => mapping.GetProperty("member").GetString()!,
+                StringComparer.Ordinal);
+        var defaults = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.defaults.props"));
+        var defaultElements = defaults
+            .Descendants("PropertyGroup")
+            .Single()
+            .Elements()
+            .ToDictionary(
+                static element => element.Name.LocalName,
+                StringComparer.Ordinal);
+        var verifierProps = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.props"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mappings, Is.EqualTo(expected));
+            Assert.That(defaultElements.Keys, Is.EquivalentTo(expected.Keys));
+            Assert.That(
+                verifierProps.Root?.Elements("Import")
+                    .Select(static element =>
+                        element.Attribute("Project")?.Value),
+                Does.Contain(
+                    "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
+            Assert.That(
+                verifierProps.Descendants()
+                    .Any(element => expected.ContainsKey(
+                        element.Name.LocalName)),
+                Is.False);
+            foreach (var property in expected.Keys)
+            {
+                Assert.That(
+                    defaultElements[property].Attribute("Condition")?.Value,
+                    Is.EqualTo("'$(" + property + ")' == ''"),
+                    property);
+                Assert.That(defaultElements[property].Value, Is.Not.Empty, property);
+            }
+        }
+    }
+
+    [Test]
     public void PreviewConfigurationInterfaceMatchesFrozenSnapshot()
     {
         var repository = TestRepository.FindRoot();
@@ -746,6 +828,7 @@ public sealed class ArchitectureTests
             "SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props",
             "SharpProof.Package/buildTransitive/SharpProof.targets",
             "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
+            "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props",
             "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
         ];
         var buildFiles = buildFilePaths

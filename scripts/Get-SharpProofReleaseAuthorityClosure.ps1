@@ -24,6 +24,7 @@ function Get-SharpProofReleaseAuthorityClosure {
         'scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1',
         'scripts/Invoke-SharpProofContainer.ps1',
         'scripts/Invoke-SharpProofReleaseContainer.ps1',
+        'SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props',
         'SharpProof.Verifier/SharpProof.Verifier.nuspec')
     $pending = [Collections.Generic.Queue[string]]::new()
     $seen = [Collections.Generic.HashSet[string]]::new(

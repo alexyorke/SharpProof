@@ -3,6 +3,17 @@
   "namespace": "SharpProof.Worker.Protocol",
   "jsonNamingPolicy": "camelCase",
   "usings": ["System.Collections.Immutable"],
+  "verifierMsBuildDefaults": [
+    {"property":"SharpProofVerifyQueryRlimit","member":"WorkerBudgets.DefaultQueryRlimit"},
+    {"property":"SharpProofVerifyMethodRlimit","member":"WorkerBudgets.DefaultMethodRlimit"},
+    {"property":"SharpProofVerifyMethodWallTimeMilliseconds","member":"WorkerBudgets.DefaultMethodWallTimeMilliseconds"},
+    {"property":"SharpProofVerifyProjectWallTimeMilliseconds","member":"WorkerBudgets.DefaultProjectWallTimeMilliseconds"},
+    {"property":"SharpProofVerifyMaxParallelism","member":"WorkerBudgets.MaximumParallelism"},
+    {"property":"SharpProofVerifyMaximumExpressionDepth","member":"WorkerBudgets.DefaultMaximumExpressionDepth"},
+    {"property":"SharpProofVerifyTerminationGraceMilliseconds","member":"WorkerLauncherDefaults.TerminationGraceMilliseconds"},
+    {"property":"SharpProofVerifyCacheEnabled","member":"WorkerCacheOptions.Enabled"},
+    {"property":"SharpProofVerifyCacheMaximumBytes","member":"WorkerCacheOptions.DefaultMaximumBytes"}
+  ],
   "manifestNameEnums": [
     "WorkerSelectedFeature",
     "WorkerSelectionReason",

@@ -22,11 +22,12 @@ release action rather than routine configuration.
 
 The protocol schema owns worker budget, cache, and launcher defaults. Generated
 `WorkerBudgets`, `WorkerCacheOptions`, and `WorkerLauncherDefaults` are the
-compiled projection. Verifier MSBuild properties, the acceptance contract, and
-documentation repeat user-visible values only where the format cannot consume
-the C# constants; package, worker, acceptance, and README checks require exact
-parity. This covers query/method limits, wall times, parallelism, expression
-depth, parallelism, termination grace, and cache defaults.
+compiled projection. The verifier MSBuild defaults are generated into the
+package props companion from explicit schema mappings; the acceptance contract
+and documentation mirror those values for validation and explanation. Package,
+worker, acceptance, and README checks require exact parity. This covers
+query/method limits, wall times, parallelism, expression depth, termination
+grace, and cache defaults.
 
 Portable profile, feature, verification-policy, and assumption-policy defaults
 are owned by the package props/targets and mirrored in the acceptance contract.
