@@ -117,7 +117,7 @@ public sealed class ContractApiIdentityTests
             namespace SharpProof.Attributes {
                 public static class Contract {
                     public const string ConditionalSymbol =
-                        "SHARPPROOF_CONTRACTS";
+                        "{{Contract.ConditionalSymbol}}";
 
                     {{conditionalAttributes}}
                     public static void Requires(bool condition) {
