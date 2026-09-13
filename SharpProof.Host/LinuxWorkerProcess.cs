@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Host;
 
@@ -50,7 +51,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         {
             startInfo.ArgumentList.Add(argument);
         }
-        startInfo.ArgumentList.Add("--parent-pid");
+        startInfo.ArgumentList.Add(WorkerInvocationArguments.ParentPidOption);
         startInfo.ArgumentList.Add(
             Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
         var process = Process.Start(startInfo) ?? throw new InvalidOperationException(

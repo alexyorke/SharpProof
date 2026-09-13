@@ -1,5 +1,12 @@
 {
   "schemaVersion": 1,
+  "workerInvocation": {
+    "command": "verify",
+    "requestOption": "--request",
+    "resultOption": "--result",
+    "startStdinOption": "--start-stdin",
+    "parentPidOption": "--parent-pid"
+  },
   "runtimeCompanionExtensions": [
     ".deps.json",
     ".runtimeconfig.json"

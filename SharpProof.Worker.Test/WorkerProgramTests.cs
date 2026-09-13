@@ -11,6 +11,30 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerProgramTests
 {
     [Test]
+    public void WorkerInvocationConstantsPreserveExactTokenSequence()
+    {
+        var actual = new[]
+        {
+            WorkerInvocationArguments.Command,
+            WorkerInvocationArguments.RequestOption,
+            "<request>",
+            WorkerInvocationArguments.ResultOption,
+            "<result>",
+            WorkerInvocationArguments.StartStdinOption,
+            WorkerInvocationArguments.ParentPidOption,
+            "<pid>"
+        };
+
+        Assert.That(
+            actual,
+            Is.EqualTo(new[]
+            {
+                "verify", "--request", "<request>", "--result", "<result>",
+                "--start-stdin", "--parent-pid", "<pid>"
+            }));
+    }
+
+    [Test]
     public async Task DirectInvocationRequiresContainmentStartBarrier()
     {
         var directory = Path.Combine(

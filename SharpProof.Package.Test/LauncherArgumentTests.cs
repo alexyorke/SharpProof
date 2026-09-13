@@ -48,6 +48,28 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [NonParallelizable]
+    public void LinuxWorkerAppendsExactlyOneParentPidAfterCallerArguments()
+    {
+        RequireLinuxX64();
+
+        const string script =
+            "test \"$0\" = caller-zero && test \"$1\" = caller-one && " +
+            "test \"$2\" = caller-two && test \"x$3\" = x--parent-pid && " +
+            "test \"$4\" -gt 0 && test -z \"$5\"";
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", script, "caller-zero", "caller-one", "caller-two"],
+            TestContext.CurrentContext.WorkDirectory);
+        var completion = process.WaitForExit(
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(6));
+
+        Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+        Assert.That(completion.ExitCode, Is.Zero);
+    }
+
+    [Test]
     public void LinuxWorkerTimeoutTerminatesTheDirectChild()
     {
         RequireLinuxX64();

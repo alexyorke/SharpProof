@@ -7,6 +7,8 @@
   <ItemGroup>
     <EmbeddedResource Include="..\eng\container\toolchain.json"
                       LogicalName="SharpProof.Host.toolchain.json" />
+    <Compile Include="..\SharpProof.Worker.Protocol\WorkerInvocationArguments.generated.cs"
+             Link="WorkerInvocationArguments.generated.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Package.Test" />

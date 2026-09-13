@@ -30,7 +30,9 @@ internal static class Program
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
             Console.Error.WriteLine(
-                "Usage: SharpProof.Worker.Launcher verify --worker <path> --request <path> --result <path> " +
+                "Usage: SharpProof.Worker.Launcher " + WorkerInvocationArguments.Command + " --worker <path> " +
+                WorkerInvocationArguments.RequestOption + " <path> " +
+                WorkerInvocationArguments.ResultOption + " <path> " +
                 "--compiler-manifest <path> --verify-policy <policy> --assumption-policy <policy> " +
                 "[--publish-request <path> --publish-result <path> --publish-compiler-manifest <path> " +
                 "[--publish-sarif <path>]] [budget options]");
@@ -258,8 +260,10 @@ internal static class Program
             arguments.TerminationGraceMilliseconds));
         using var process = LinuxWorkerProcess.Start(
             ResolveDotNetHostPath(projectDirectory),
-            [workerPath, "verify", "--request", arguments.RequestPath,
-                "--result", arguments.ResultPath, "--start-stdin"],
+            [workerPath, WorkerInvocationArguments.Command,
+                WorkerInvocationArguments.RequestOption, arguments.RequestPath,
+                WorkerInvocationArguments.ResultOption, arguments.ResultPath,
+                WorkerInvocationArguments.StartStdinOption],
             projectDirectory);
         var completion = process.WaitForExit(
             terminationStart,
@@ -945,7 +949,12 @@ internal sealed partial class LauncherArguments
     internal static bool TryParse(string[] args, out LauncherArguments arguments)
     {
         arguments = null!;
-        if (args.Length < 3 || !string.Equals(args[0], "verify", StringComparison.Ordinal) || args.Length % 2 == 0)
+        if (args.Length < 3 ||
+            !string.Equals(
+                args[0],
+                WorkerInvocationArguments.Command,
+                StringComparison.Ordinal) ||
+            args.Length % 2 == 0)
         {
             return false;
         }

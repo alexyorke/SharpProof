@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using SharpProof.Host;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker;
 
@@ -14,8 +15,11 @@ internal static class Program
                 out var parentProcessId))
         {
             Console.Error.WriteLine(
-                "Usage: SharpProof.Worker verify --request <request.json> --result <result.json> " +
-                "--start-stdin --parent-pid <pid>");
+                "Usage: SharpProof.Worker " + WorkerInvocationArguments.Command + " " +
+                WorkerInvocationArguments.RequestOption + " <request.json> " +
+                WorkerInvocationArguments.ResultOption + " <result.json> " +
+                WorkerInvocationArguments.StartStdinOption + " " +
+                WorkerInvocationArguments.ParentPidOption + " <pid>");
             return 2;
         }
         try
@@ -131,9 +135,12 @@ internal static class Program
         out string result,
         out int parentProcessId)
     {
-        if (args is not ["verify", "--request", var requestValue,
-                "--result", var resultValue, "--start-stdin",
-                "--parent-pid", var parentProcessValue] ||
+        if (args is not [WorkerInvocationArguments.Command,
+                WorkerInvocationArguments.RequestOption, var requestValue,
+                WorkerInvocationArguments.ResultOption, var resultValue,
+                WorkerInvocationArguments.StartStdinOption,
+                WorkerInvocationArguments.ParentPidOption,
+                var parentProcessValue] ||
             !int.TryParse(
                 parentProcessValue,
                 NumberStyles.None,

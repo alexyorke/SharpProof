@@ -1687,10 +1687,77 @@ public sealed class ArchitectureTests
                     "RedirectStandardInput = true",
                     StringComparison.Ordinal),
                 Is.True);
-            Assert.That(host, Does.Contain("--parent-pid"));
+            Assert.That(
+                host,
+                Does.Contain("WorkerInvocationArguments.ParentPidOption"));
             Assert.That(host, Does.Contain("EntryPoint = \"prctl\""));
             Assert.That(launcher, Does.Contain("LinuxWorkerProcess.Start"));
             Assert.That(launcher, Does.Not.Contain("kernel32"));
+        }
+    }
+
+    [Test]
+    public void WorkerInvocationCatalogAndConsumersUseTheExactTokenSequence()
+    {
+        var root = TestRepository.FindRoot();
+        var catalogPath = Path.Combine(
+            root,
+            "SharpProof.Worker.Launcher",
+            "LauncherArguments.catalog.json");
+        using var catalog = JsonDocument.Parse(File.ReadAllText(catalogPath));
+        var invocation = catalog.RootElement.GetProperty("workerInvocation");
+        var expected = new (string Property, string Member, string Value)[]
+        {
+            ("command", "Command", "verify"),
+            ("requestOption", "RequestOption", "--request"),
+            ("resultOption", "ResultOption", "--result"),
+            ("startStdinOption", "StartStdinOption", "--start-stdin"),
+            ("parentPidOption", "ParentPidOption", "--parent-pid")
+        };
+
+        var generated = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Worker.Protocol",
+            "WorkerInvocationArguments.generated.cs"));
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var token in expected)
+            {
+                Assert.That(
+                    invocation.GetProperty(token.Property).GetString(),
+                    Is.EqualTo(token.Value),
+                    token.Property);
+                Assert.That(
+                    generated,
+                    Does.Contain(
+                        $"internal const string {token.Member} = \"{token.Value}\";"),
+                    token.Member);
+            }
+        }
+
+        var consumers = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["SharpProof.Worker/Program.cs"] =
+            ["Command", "RequestOption", "ResultOption", "StartStdinOption", "ParentPidOption"],
+            ["SharpProof.Worker.Launcher/Program.cs"] =
+            ["Command", "RequestOption", "ResultOption", "StartStdinOption"],
+            ["SharpProof.BuildTasks/RunVerifier.cs"] = ["Command"],
+            ["SharpProof.Host/LinuxWorkerProcess.cs"] = ["ParentPidOption"],
+            ["SharpProof.Gates/Performance/WorkerPerformanceProbe.cs"] =
+            ["Command", "RequestOption"]
+        };
+        foreach (var consumer in consumers)
+        {
+            var source = File.ReadAllText(Path.Combine(
+                root,
+                consumer.Key.Replace('/', Path.DirectorySeparatorChar)));
+            foreach (var member in consumer.Value)
+            {
+                Assert.That(
+                    source,
+                    Does.Contain($"WorkerInvocationArguments.{member}"),
+                    $"{consumer.Key}: {member}");
+            }
         }
     }
 

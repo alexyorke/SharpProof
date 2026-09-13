@@ -390,7 +390,8 @@
           "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
           "scripts/Generate-LauncherArguments.ps1",
           "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
-          "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs"
+          "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
+          "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
         ]
       },
       {

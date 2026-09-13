@@ -14,6 +14,8 @@ $OutputPath = Resolve-SharpProofPath $null (
     Join-Path $repositoryRoot 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs')
 $BuildTasksOutputPath = Resolve-SharpProofPath $null (
     Join-Path $repositoryRoot 'SharpProof.BuildTasks\LauncherRuntimeCompanionInventory.generated.cs')
+$WorkerInvocationOutputPath = Resolve-SharpProofPath $null (
+    Join-Path $repositoryRoot 'SharpProof.Worker.Protocol\WorkerInvocationArguments.generated.cs')
 
 $catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
 $document = [System.Text.Json.JsonDocument]::Parse($catalogJson)
@@ -26,11 +28,32 @@ finally {
 }
 $catalog = $catalogJson | ConvertFrom-Json
 Assert-Properties $catalog @(
-    'schemaVersion', 'runtimeCompanionExtensions', 'runtimeCompanionFiles',
+    'schemaVersion', 'workerInvocation', 'runtimeCompanionExtensions', 'runtimeCompanionFiles',
     'runtimeCompanionAssemblyTypes', 'options', 'budgets', 'cache') `
     'launcher argument catalog'
 if ($catalog.schemaVersion -ne 1) {
     throw 'Launcher argument catalog schemaVersion must be 1.'
+}
+$expectedWorkerInvocation = [ordered]@{
+    command = 'verify'
+    requestOption = '--request'
+    resultOption = '--result'
+    startStdinOption = '--start-stdin'
+    parentPidOption = '--parent-pid'
+}
+$workerInvocation = $catalog.workerInvocation
+$workerInvocationPropertyNames = @(
+    $workerInvocation.PSObject.Properties.Name)
+if (($workerInvocationPropertyNames -join '|') -cne
+    ($expectedWorkerInvocation.Keys -join '|')) {
+    throw 'Worker invocation token properties are invalid or out of order.'
+}
+foreach ($property in $expectedWorkerInvocation.Keys) {
+    if ($workerInvocation.$property -isnot [string] -or
+        [string]$workerInvocation.$property -cne
+            $expectedWorkerInvocation[$property]) {
+        throw "Worker invocation token '$property' is invalid."
+    }
 }
 $runtimeCompanionExtensions = @($catalog.runtimeCompanionExtensions)
 $expectedRuntimeCompanionExtensions = @(
@@ -280,6 +303,30 @@ $lines.Add('        };')
 $lines.Add('    }')
 $lines.Add('}')
 
+$workerInvocationLines = New-SharpProofGeneratedHeader `
+    -Generator 'scripts/Generate-LauncherArguments.ps1' `
+    -Source 'SharpProof.Worker.Launcher/LauncherArguments.catalog.json.' `
+    -Notes @(
+        'Worker process token constants only.',
+        'Parsing, validation, PID handling, and startup sequencing remain handwritten.') `
+    -Nullable
+$workerInvocationLines.Add('')
+$workerInvocationLines.Add('namespace SharpProof.Worker.Protocol;')
+$workerInvocationLines.Add('')
+$workerInvocationLines.Add('internal static class WorkerInvocationArguments')
+$workerInvocationLines.Add('{')
+$workerInvocationLines.Add(
+    "    internal const string Command = $(ConvertTo-CSharpString $workerInvocation.command);")
+$workerInvocationLines.Add(
+    "    internal const string RequestOption = $(ConvertTo-CSharpString $workerInvocation.requestOption);")
+$workerInvocationLines.Add(
+    "    internal const string ResultOption = $(ConvertTo-CSharpString $workerInvocation.resultOption);")
+$workerInvocationLines.Add(
+    "    internal const string StartStdinOption = $(ConvertTo-CSharpString $workerInvocation.startStdinOption);")
+$workerInvocationLines.Add(
+    "    internal const string ParentPidOption = $(ConvertTo-CSharpString $workerInvocation.parentPidOption);")
+$workerInvocationLines.Add('}')
+
 $buildTaskLines = New-SharpProofGeneratedHeader `
     -Generator 'scripts/Generate-LauncherArguments.ps1' `
     -Source 'SharpProof.Worker.Launcher/LauncherArguments.catalog.json.' `
@@ -306,6 +353,12 @@ Update-SharpProofGeneratedFile `
     -Path $BuildTasksOutputPath `
     -Content ($buildTaskLines -join "`n") `
     -DisplayPath $BuildTasksOutputPath `
+    -GeneratorCommand '.\scripts\Generate-LauncherArguments.ps1' `
+    -Verify:$Verify
+Update-SharpProofGeneratedFile `
+    -Path $WorkerInvocationOutputPath `
+    -Content ($workerInvocationLines -join "`n") `
+    -DisplayPath $WorkerInvocationOutputPath `
     -GeneratorCommand '.\scripts\Generate-LauncherArguments.ps1' `
     -Verify:$Verify
 $verb = if ($Verify) { 'Verified' } else { 'Generated' }

@@ -302,7 +302,7 @@ internal static class WorkerPerformanceProbe
             ResolveDotNetHost(),
             workspace.DirectoryPath);
         AddArgument(startInfo, launcherPath);
-        AddArgument(startInfo, "verify");
+        AddArgument(startInfo, WorkerInvocationArguments.Command);
         AddOption(startInfo, "worker", workerPath);
         AddOption(startInfo, "request", workspace.RequestPath(runName));
         AddOption(startInfo, "result", workspace.ResultPath(runName));
@@ -694,7 +694,7 @@ internal static class WorkerPerformanceProbe
             var path = Path.Combine(
                 WorkerDirectoryPath,
                 "UncooperativeWorker.dll");
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var probeSource =
                 """
                 using System;
                 using System.Globalization;
@@ -706,7 +706,7 @@ internal static class WorkerPerformanceProbe
 
                 internal static class Program {
                     private static int Main(string[] args) {
-                        var requestIndex = Array.IndexOf(args, "--request");
+                        var requestIndex = Array.IndexOf(args, "__REQUEST_OPTION__");
                         if (requestIndex < 0 ||
                             requestIndex + 1 >= args.Length)
                             return 2;
@@ -723,7 +723,12 @@ internal static class WorkerPerformanceProbe
                         return 0;
                     }
                 }
-                """,
+                """.Replace(
+                    "\"__REQUEST_OPTION__\"",
+                    "\"" + WorkerInvocationArguments.RequestOption + "\"",
+                    StringComparison.Ordinal);
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                probeSource,
                 CSharpParseOptions.Default.WithLanguageVersion(
                     LanguageVersion.CSharp12));
             var compilation = CSharpCompilation.Create(

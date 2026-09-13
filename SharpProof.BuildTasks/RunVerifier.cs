@@ -873,7 +873,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             !IsWorkerLauncherPath(Arguments[0].ItemSpec) ||
             !string.Equals(
                 Arguments[1].ItemSpec,
-                "verify",
+                WorkerInvocationArguments.Command,
                 StringComparison.Ordinal))
         {
             return false;
