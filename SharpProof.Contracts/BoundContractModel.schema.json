@@ -53,9 +53,6 @@
         {"type": "IrTerm", "name": "Condition"},
         {"type": "OperationId", "name": "SourceOperation"},
         {"type": "BoundContractEvidence", "name": "Evidence"}
-      ],
-      "projections": [
-        {"type": "bool", "name": "IsAssumptionEvidence", "expression": "Kind == BoundContractKind.Assume"}
       ]
     },
     {

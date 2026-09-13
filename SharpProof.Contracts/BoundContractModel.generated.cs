@@ -67,7 +67,6 @@ public sealed class BoundContractClause
     public IrTerm Condition { get; }
     public OperationId SourceOperation { get; }
     public BoundContractEvidence Evidence { get; }
-    public bool IsAssumptionEvidence => Kind == BoundContractKind.Assume;
 }
 
 public sealed class BoundContractVariable

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace SharpProof.Contracts.Test;
@@ -8,10 +9,23 @@ public sealed class BoundContractModelTests
     [Test]
     public void GeneratedModelContainsOnlyVocabularyAndStorage()
     {
+        var repository = TestRepository.FindRoot();
         var source = File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
+            repository,
             "SharpProof.Contracts",
             "BoundContractModel.generated.cs"));
+        using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            repository,
+            "SharpProof.Contracts",
+            "BoundContractModel.schema.json")));
+        var clause = schema.RootElement
+            .GetProperty("classes")
+            .EnumerateArray()
+            .Single(value => value.GetProperty("name").GetString() ==
+                "BoundContractClause");
+        var generatedProperties = typeof(BoundContractClause)
+            .GetProperties()
+            .Select(static property => property.Name);
 
         using (Assert.EnterMultipleScope())
         {
@@ -36,6 +50,13 @@ public sealed class BoundContractModelTests
                     "InvalidClosedAttribute",
                     "InvalidClausePlacement",
                     "UnsupportedTarget"]));
+            Assert.That(source, Does.Not.Contain("IsAssumptionEvidence"));
+            Assert.That(
+                clause.TryGetProperty("projections", out _),
+                Is.False);
+            Assert.That(
+                generatedProperties,
+                Does.Not.Contain("IsAssumptionEvidence"));
         }
     }
 

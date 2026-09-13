@@ -657,7 +657,6 @@ public sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var clause = result.Contracts!.Clauses.Single();
         Assert.That(clause.Kind, Is.EqualTo(BoundContractKind.Assume));
-        Assert.That(clause.IsAssumptionEvidence, Is.True);
     }
 
     [Test]
