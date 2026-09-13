@@ -2287,31 +2287,6 @@
     },
     {
       "kind": "class",
-      "name": "CompilerSummaryEvidenceArtifact",
-      "properties": [
-        {
-          "name": "Origin",
-          "type": "CompilerSummaryOrigin",
-          "accessibility": "public",
-          "set": "set",
-          "default": {
-            "kind": "implicit"
-          }
-        },
-        {
-          "name": "CallIdentity",
-          "type": "string",
-          "accessibility": "public",
-          "set": "set",
-          "default": {
-            "kind": "stringEmpty"
-          }
-        },
-        { "group": "SummaryEvidenceIdentity" }
-      ]
-    },
-    {
-      "kind": "class",
       "name": "CompilerSummaryEvidenceSnapshot",
       "properties": [
         {
@@ -2474,7 +2449,7 @@
         { "group": "SummaryEvidenceIdentity" },
         {
           "name": "DependencyEvidence",
-          "type": "CompilerSummaryEvidenceArtifact[]",
+          "type": "CompilerPreparedSummaryEvidence[]",
           "accessibility": "public",
           "set": "set",
           "default": {

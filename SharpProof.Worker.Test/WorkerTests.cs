@@ -2965,6 +2965,22 @@ public sealed class WorkerTests
             await File.ReadAllTextAsync(request.CompilerManifest.Path));
         var summary = artifact.Callables.Single()
             .Body!.SummaryCalls.Single();
+        var manifestJson = await File.ReadAllTextAsync(
+            request.CompilerManifest.Path);
+        var canonicalJson = CompilerManifestArtifactJson.Serialize(artifact);
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(canonicalJson);
+        var roundTripSummary = roundTrip.Callables.Single()
+            .Body!.SummaryCalls.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(canonicalJson, Is.EqualTo(manifestJson));
+            Assert.That(
+                roundTripSummary.InstantiationSha256,
+                Is.EqualTo(summary.InstantiationSha256));
+            Assert.That(
+                roundTripSummary.DependencyEvidence,
+                Is.EqualTo(summary.DependencyEvidence));
+        }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request);
@@ -2991,7 +3007,11 @@ public sealed class WorkerTests
                 Is.True);
         }
 
-        implementationEvidence!.EvidenceSha256 = new string('b', 64);
+        summary.DependencyEvidence = [
+            .. summary.DependencyEvidence.Select(item =>
+                item.Origin == CompilerSummaryOrigin.ImplementationIl
+                    ? item with { EvidenceSha256 = new string('b', 64) }
+                    : item)];
         Assert.That(
             (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
                 artifact)),
@@ -3215,16 +3235,42 @@ public sealed class WorkerTests
             CompilerManifestArtifactJson.DecodeCallables(validTransitive)));
         AssertHydrationRejects(
             ReadTransitive(),
-            static summary => summary.DependencyEvidence
-                .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl)
-                .EvidenceSha256 = new string('d', 64),
+            static summary => summary.DependencyEvidence = [
+                .. summary.DependencyEvidence.Select(item =>
+                    item.Origin == CompilerSummaryOrigin.ImplementationIl
+                        ? item with { EvidenceSha256 = new string('d', 64) }
+                        : item)],
             "SP058 transitive dependency digest");
         AssertHydrationRejects(
             ReadTransitive(),
-            static summary => summary.DependencyEvidence
-                .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl)
-                .CallIdentity = "M:ExternalTransitive.NotTheCallee(System.Boolean)",
+            static summary => summary.DependencyEvidence = [
+                .. summary.DependencyEvidence.Select(item =>
+                    item.Origin == CompilerSummaryOrigin.ImplementationIl
+                        ? item with
+                        {
+                            CallIdentity =
+                                "M:ExternalTransitive.NotTheCallee(System.Boolean)"
+                        }
+                        : item)],
             "SP058 transitive dependency identity");
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence = [null!],
+            "SP058 null transitive dependency evidence");
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence = [
+                .. summary.DependencyEvidence,
+                summary.DependencyEvidence[0]],
+            "SP058 duplicate transitive dependency evidence");
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence = [
+                .. summary.DependencyEvidence.Select(item => item with
+                {
+                    Origin = CompilerSummaryOrigin.SpecificationPack
+                })],
+            "SP058 wrong transitive dependency origin");
 
         using var sourceWorker = SharpProofWorker.Create(sourceRequest.Budgets);
         AssertProven(

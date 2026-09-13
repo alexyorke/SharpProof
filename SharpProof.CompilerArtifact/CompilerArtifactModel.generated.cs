@@ -358,14 +358,6 @@ internal sealed class CompilerSpecCallArtifact
     public bool ConsumesMemoryHavoc { get; set; }
 }
 
-internal sealed class CompilerSummaryEvidenceArtifact
-{
-    public CompilerSummaryOrigin Origin { get; set; }
-    public string CallIdentity { get; set; } = string.Empty;
-    public string EvidenceSha256 { get; set; } = string.Empty;
-    public string EvidenceIdentity { get; set; } = string.Empty;
-}
-
 internal sealed class CompilerSummaryEvidenceSnapshot
 {
     public CompilerSummaryOrigin Origin { get; set; }
@@ -392,7 +384,7 @@ internal sealed class CompilerSummaryCallArtifact
     public int NormalRelationRoot { get; set; } = -1;
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
-    public CompilerSummaryEvidenceArtifact[] DependencyEvidence { get; set; } = [];
+    public CompilerPreparedSummaryEvidence[] DependencyEvidence { get; set; } = [];
     public string InstantiationSha256 { get; set; } = string.Empty;
 }
 

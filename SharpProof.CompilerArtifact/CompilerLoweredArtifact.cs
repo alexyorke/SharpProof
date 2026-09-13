@@ -74,7 +74,7 @@ internal static class CompilerLoweredArtifact
         }
 
         internal bool AreValidDependencies(
-            CompilerSummaryEvidenceArtifact[]? evidence)
+            CompilerPreparedSummaryEvidence[]? evidence)
         {
             if (evidence == null)
             {
@@ -303,14 +303,7 @@ internal static class CompilerLoweredArtifact
                 NormalRelationRoot = preparation.Clauses.Length + index,
                 EvidenceSha256 = item.EvidenceSha256,
                 EvidenceIdentity = item.EvidenceIdentity,
-                DependencyEvidence = [.. item.DependencyEvidence.Select(
-                    static evidence => new CompilerSummaryEvidenceArtifact
-                    {
-                        Origin = evidence.Origin,
-                        CallIdentity = evidence.CallIdentity,
-                        EvidenceSha256 = evidence.EvidenceSha256,
-                        EvidenceIdentity = evidence.EvidenceIdentity
-                    })],
+                DependencyEvidence = [.. item.DependencyEvidence],
                 InstantiationSha256 = SummaryInstantiationSha256(
                     preparation.Factory,
                     call,
@@ -1011,12 +1004,7 @@ internal static class CompilerLoweredArtifact
                 relation,
                 summary.EvidenceSha256,
                 summary.EvidenceIdentity,
-                [.. summary.DependencyEvidence.Select(static evidence =>
-                    new CompilerPreparedSummaryEvidence(
-                        evidence.Origin,
-                        evidence.CallIdentity,
-                        evidence.EvidenceSha256,
-                        evidence.EvidenceIdentity))])
+                [.. summary.DependencyEvidence])
             {
                 InstantiationSha256 = summary.InstantiationSha256
             });
@@ -1071,7 +1059,7 @@ internal static class CompilerLoweredArtifact
         IrVarId result,
         IReadOnlyList<IrVarId> existentials,
         IrTerm relation,
-        object dependencyEvidence)
+        IEnumerable<CompilerPreparedSummaryEvidence> dependencyEvidence)
     {
         var roots = new List<IrTerm>(
             (call.Receiver == null ? 0 : 1) +
