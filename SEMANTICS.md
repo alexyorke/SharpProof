@@ -207,7 +207,7 @@ An audited specification-pack summary is admissible only when its pack ID was
 explicitly selected by `SharpProofSpecificationPacks`. Packs are embedded,
 strictly schema-validated data with exact method signature, assembly-name, and
 public-key-token constraints. Arbitrary consumer files are not pack authority.
-The current pack schema is 1; `dotnet.scalar@1` contains the audited
+The current embedded pack catalog schema is 2; `dotnet.scalar@1` contains the audited
 `System.Math.Max(int, int)` relation. An absent, unknown, malformed, or
 identity-mismatched pack never contributes a fact.
 

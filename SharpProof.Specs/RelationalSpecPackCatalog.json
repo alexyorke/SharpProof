@@ -1,11 +1,10 @@
 {
   "schema": "SharpProof.RelationalSpecPackCatalog",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "packs": [
     {
       "id": "dotnet.scalar",
       "version": "1",
-      "evidence": "dotnet-api-contract:System.Math.Max(System.Int32,System.Int32)",
       "methods": [
         {
           "documentationCommentId": "M:System.Math.Max(System.Int32,System.Int32)",

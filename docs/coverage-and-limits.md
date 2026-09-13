@@ -255,7 +255,7 @@ contains:
 - canonical source, exact implementation-IL, and explicitly enabled audited
   specification-pack summary calls, including complete transitive evidence
   closure under relational-summary schema version 2 and specification-pack
-  schema version 1;
+  evidence schema version 1; the embedded pack catalog itself is schema 2;
 - compiler-neutral ordered replay evidence for admitted unconditional
   allocation, exact-framework-throw, and synchronization events, including
   authenticated selected-constraint and semantic-operation hashes plus

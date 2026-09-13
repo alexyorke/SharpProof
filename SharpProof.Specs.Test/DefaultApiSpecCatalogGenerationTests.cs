@@ -159,6 +159,62 @@ public sealed class DefaultApiSpecCatalogGenerationTests
     }
 
     [Test]
+    public async Task RelationalCatalogOmitsUnusedPerPackEvidence()
+    {
+        var catalog = await File.ReadAllTextAsync(RelationalCatalogPath());
+        using var document = JsonDocument.Parse(catalog);
+        Assert.That(
+            document.RootElement.GetProperty("schemaVersion").GetInt32(),
+            Is.EqualTo(2));
+        var pack = document.RootElement.GetProperty("packs")
+            .EnumerateArray()
+            .Single();
+        Assert.That(
+            pack.EnumerateObject().Select(static property => property.Name),
+            Is.EqualTo(new[] { "id", "version", "methods" }));
+
+        using var workspace = GenerationWorkspace.Create();
+        await File.WriteAllTextAsync(
+            workspace.RelationalCatalogInputPath,
+            catalog,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var result = await RunGeneratorAsync(
+            workspace,
+            "-RelationalCatalogPath",
+            workspace.RelationalCatalogInputPath);
+
+        Assert.That(result.ExitCode, Is.Zero, result.Output);
+        var generated = await File.ReadAllTextAsync(
+            workspace.FirstOutputs.RelationalPath);
+        Assert.That(
+            generated,
+            Does.Not.Contain("dotnet-api-contract:System.Math.Max"));
+        Assert.That(generated, Does.Contain("EvidenceSha256"));
+    }
+
+    [Test]
+    public async Task RelationalGeneratorRejectsRemovedPerPackEvidence()
+    {
+        var root = JsonNode.Parse(
+                await File.ReadAllTextAsync(RelationalCatalogPath()))!
+            .AsObject();
+        var pack = root["packs"]!.AsArray()[0]!.AsObject();
+        pack.Add("evidence", "obsolete");
+
+        using var workspace = GenerationWorkspace.Create();
+        await File.WriteAllTextAsync(
+            workspace.RelationalCatalogInputPath,
+            root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var result = await RunGeneratorAsync(
+            workspace,
+            "-RelationalCatalogPath",
+            workspace.RelationalCatalogInputPath);
+
+        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+    }
+
+    [Test]
     public async Task VerificationRejectsStaleGeneratedOutput()
     {
         using var workspace = GenerationWorkspace.Create();

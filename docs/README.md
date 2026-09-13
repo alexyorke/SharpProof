@@ -35,7 +35,7 @@ The implementation remains the authority for enumerated surfaces:
 - `SharpProof.Specs/ApiSpecTable.cs` declares typed API specifications. Not
   every witnessed facet is consumed by the worker.
 - `SharpProof.Specs/RelationalSpecPackCatalog.json` declares the embedded,
-  explicitly enabled relational specification packs. The schema-1 catalog is
+  explicitly enabled relational specification packs. The schema-2 catalog is
   strict data; relation parsing and identity validation remain handwritten in
   the build-time compiler collector.
 - `SharpProof.Summaries` owns reusable typed-IR relational construction,

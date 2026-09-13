@@ -1297,7 +1297,7 @@ $relationalSchemaVersion = Assert-JsonInt32 `
     -Value (Get-RequiredProperty $relational 'schemaVersion' 'relational catalog') `
     -Context 'relational catalog.schemaVersion'
 if ($relational.schema -cne 'SharpProof.RelationalSpecPackCatalog' -or
-    $relationalSchemaVersion -ne 1) {
+    $relationalSchemaVersion -ne 2) {
     throw 'The relational specification-pack catalog schema is unsupported.'
 }
 $relationalPacks = @(Get-RequiredArrayProperty $relational 'packs' 'relational catalog')
@@ -1307,10 +1307,9 @@ if ($relationalPacks.Count -eq 0) {
 $previousPack = $null
 $relationalRows = [Collections.Generic.List[object]]::new()
 foreach ($pack in $relationalPacks) {
-    Assert-ExactProperties $pack @('id', 'version', 'evidence', 'methods') 'relational pack'
+    Assert-ExactProperties $pack @('id', 'version', 'methods') 'relational pack'
     $packId = Assert-CanonicalRelationalIdentifier $pack.id 'relational pack.id'
     $packVersion = Assert-CanonicalRelationalIdentifier $pack.version 'relational pack.version'
-    [void](Assert-Text $pack.evidence 'relational pack.evidence')
     if ($null -ne $previousPack -and
         [StringComparer]::Ordinal.Compare($previousPack, $packId) -ge 0) {
         throw 'Relational specification-pack identifiers must be unique and sorted.'
