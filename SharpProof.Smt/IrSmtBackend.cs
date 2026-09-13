@@ -8,7 +8,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private readonly SemaphoreSlim _queryGate = new(1, 1);
     private readonly IrSmtBackendOptions _options;
     private long _consumedResourceCount;
-    private int _activeCheckCount;
     private int _disposeStarted;
     private bool _disposed;
 
@@ -69,55 +68,47 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         {
             return await Task.Run(() =>
             {
-                Interlocked.Increment(ref _activeCheckCount);
-                try
+                lock (_gate)
                 {
-                    lock (_gate)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (_disposed)
+                    {
+                        return BackendCheckResult.Unknown(
+                            BackendFailureReason.Unavailable);
+                    }
+
+                    using var registration = cancellationToken.Register(
+                        static state => ((IrSmtBackend)state!).Interrupt(),
+                        this);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        var result = CheckCore(query, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return result;
+                    }
+                    catch (QueryResourceLimitException)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (_disposed)
-                        {
-                            return BackendCheckResult.Unknown(
-                                BackendFailureReason.Unavailable);
-                        }
-
-                        using var registration = cancellationToken.Register(
-                            static state => ((IrSmtBackend)state!).Interrupt(),
-                            this);
-                        cancellationToken.ThrowIfCancellationRequested();
-                        try
-                        {
-                            var result = CheckCore(query, cancellationToken);
-                            cancellationToken.ThrowIfCancellationRequested();
-                            return result;
-                        }
-                        catch (QueryResourceLimitException)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            return BackendCheckResult.Unknown(
-                                BackendFailureReason.ResourceLimit);
-                        }
-                        catch (UnsupportedIrEncodingException)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            return BackendCheckResult.Unknown(
-                                BackendFailureReason.UnsupportedEncoding);
-                        }
-                        catch (Exception exception) when (exception is
-                            Z3Exception or
-                            InvalidOperationException or
-                            ArgumentException or
-                            ArithmeticException)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            return BackendCheckResult.Unknown(
-                                BackendFailureReason.InfrastructureFailure);
-                        }
+                        return BackendCheckResult.Unknown(
+                            BackendFailureReason.ResourceLimit);
                     }
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref _activeCheckCount);
+                    catch (UnsupportedIrEncodingException)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return BackendCheckResult.Unknown(
+                            BackendFailureReason.UnsupportedEncoding);
+                    }
+                    catch (Exception exception) when (exception is
+                        Z3Exception or
+                        InvalidOperationException or
+                        ArgumentException or
+                        ArithmeticException)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return BackendCheckResult.Unknown(
+                            BackendFailureReason.InfrastructureFailure);
+                    }
                 }
             }, cancellationToken).ConfigureAwait(false);
         }

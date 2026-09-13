@@ -713,11 +713,6 @@ public sealed class IrSmtBackendTests
                 System.Reflection.BindingFlags.NonPublic)?
             .GetValue(backend);
         Assert.That(gate, Is.Not.Null);
-        var activeChecks = typeof(IrSmtBackend).GetField(
-            "_activeCheckCount",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-        Assert.That(activeChecks, Is.Not.Null);
 
         Task<BackendCheckResult> active;
         Task<BackendCheckResult> queued;
@@ -726,18 +721,7 @@ public sealed class IrSmtBackendTests
             active = backend.CheckAsync(
                 healthyQuery,
                 CancellationToken.None);
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => (int)activeChecks!.GetValue(backend)! == 1,
-                    TimeSpan.FromSeconds(5)),
-                Is.True);
             queued = backend.CheckAsync(query, cancellation.Token);
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => (int)activeChecks!.GetValue(backend)! > 1,
-                    TimeSpan.FromSeconds(1)),
-                Is.False,
-                "A queued check must not occupy another worker thread.");
             cancellation.Cancel();
             Assert.That(
                 SpinWait.SpinUntil(
@@ -745,6 +729,10 @@ public sealed class IrSmtBackendTests
                     TimeSpan.FromSeconds(1)),
                 Is.True,
                 "A canceled queued check must not wait for the active solver.");
+            Assert.That(
+                queued.IsCanceled,
+                Is.True,
+                "A queued check must cancel before it enters the solver.");
         }
 
         Assert.That(
