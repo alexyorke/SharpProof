@@ -311,7 +311,11 @@ $workerInvocationLines = New-SharpProofGeneratedHeader `
         'Parsing, validation, PID handling, and startup sequencing remain handwritten.') `
     -Nullable
 $workerInvocationLines.Add('')
+$workerInvocationLines.Add('#if SHARPPROOF_HOST_INVOCATION_TOKENS')
+$workerInvocationLines.Add('namespace SharpProof.Host.Invocation;')
+$workerInvocationLines.Add('#else')
 $workerInvocationLines.Add('namespace SharpProof.Worker.Protocol;')
+$workerInvocationLines.Add('#endif')
 $workerInvocationLines.Add('')
 $workerInvocationLines.Add('internal static class WorkerInvocationArguments')
 $workerInvocationLines.Add('{')

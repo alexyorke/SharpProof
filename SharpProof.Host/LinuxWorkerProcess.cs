@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using SharpProof.Worker.Protocol;
+using WorkerInvocationArguments = SharpProof.Host.Invocation.WorkerInvocationArguments;
 
 namespace SharpProof.Host;
 
@@ -29,6 +29,10 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         _process = process;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1062",
+        Justification = "The standard ThrowIfNull guard validates the collection before enumeration.")]
     public static LinuxWorkerProcess Start(
         string executable,
         IReadOnlyList<string> arguments,

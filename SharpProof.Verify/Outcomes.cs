@@ -1,5 +1,9 @@
 namespace SharpProof.Verify;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1008",
+    Justification = "The sparse numeric values are part of the proof-outcome contract.")]
 public enum AbstentionReason
 {
     UnsupportedEncoding = 3,

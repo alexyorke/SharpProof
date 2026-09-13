@@ -7,7 +7,11 @@
 // </auto-generated>
 #nullable enable
 
+#if SHARPPROOF_HOST_INVOCATION_TOKENS
+namespace SharpProof.Host.Invocation;
+#else
 namespace SharpProof.Worker.Protocol;
+#endif
 
 internal static class WorkerInvocationArguments
 {

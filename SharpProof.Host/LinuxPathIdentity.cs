@@ -339,6 +339,10 @@ public static partial class LinuxPathIdentity
             AreSameExistingFileCanonical(firstPath, secondPath);
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1062",
+        Justification = "The standard ThrowIfNull guard validates the collection before enumeration.")]
     public static bool DeleteIfUnprotected(
         string path,
         IEnumerable<string> protectedPaths)
