@@ -6,9 +6,8 @@ namespace SharpProof.Effects;
 internal sealed class OperationCompletionEvaluator
 {
     private readonly ManagedFlowResult? _abstractFlow;
-    private readonly ResolvedApiSpecTable _apiSpecs;
+    private readonly EffectAnalysisSession _session;
     private readonly IMethodSymbol _caller;
-    private readonly Compilation _compilation;
     private readonly DefiniteOperationFacts _completionFacts;
     private readonly Func<IOperation?, IOperation, OperationNullnessEvaluator.NullState>
         _getNullState;
@@ -32,9 +31,8 @@ internal sealed class OperationCompletionEvaluator
         CancellationToken cancellationToken = default)
     {
         _abstractFlow = abstractFlow;
-        _apiSpecs = session.ApiSpecs;
+        _session = session;
         _caller = caller;
-        _compilation = session.Compilation;
         _completionFacts = new DefiniteOperationFacts(
             session.Compilation,
             cancellationToken);
@@ -78,6 +76,7 @@ internal sealed class OperationCompletionEvaluator
                     instance: null,
                     invocation),
             IInvocationOperation invocation =>
+                _session.IsConditionallyElided(invocation) ||
                 !_isImplicitLockEnterWithNullValue(invocation) &&
                 CanCompleteInvocation(
                     invocation.TargetMethod,
@@ -344,7 +343,7 @@ internal sealed class OperationCompletionEvaluator
             return true;
         }
 
-        var conversion = _compilation.ClassifyCommonConversion(
+        var conversion = _session.Compilation.ClassifyCommonConversion(
             inputType,
             matchedType);
         return conversion.IsImplicit && conversion.IsReference;
@@ -543,7 +542,7 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
         var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(_compilation, expression.SyntaxTree);
+            .GetSemanticModel(_session.Compilation, expression.SyntaxTree);
         return model.GetOperation(expression) is { } operation &&
             DefiniteOperationFacts.IsDefinitelyNonNull(operation);
     }
@@ -632,7 +631,7 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
         var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(_compilation, expression.SyntaxTree);
+            .GetSemanticModel(_session.Compilation, expression.SyntaxTree);
         var constant = model.GetConstantValue(expression);
         if (!constant.HasValue || constant.Value == null)
         {
@@ -863,7 +862,7 @@ internal sealed class OperationCompletionEvaluator
             return true;
         }
 
-        return _compilation.ClassifyCommonConversion(value.Type, array.ElementType).IsImplicit;
+        return _session.Compilation.ClassifyCommonConversion(value.Type, array.ElementType).IsImplicit;
     }
 
     private bool ArrayAccessMayComplete(
@@ -986,7 +985,7 @@ internal sealed class OperationCompletionEvaluator
         bool valueAlreadyComplete = false)
     {
         return !TryGetDeconstructionInfo(
-                _compilation,
+                _session.Compilation,
                 deconstruction,
                 out var info) ||
             DeconstructionPhasesMayComplete(
@@ -1113,14 +1112,14 @@ internal sealed class OperationCompletionEvaluator
                     .CanFormattedValueCompleteNormally(
                         assignment.Target,
                         assignment,
-                        _compilation,
+                        _session.Compilation,
                         _abstractFlow,
                         this) &&
                 StringConcatenationEffectResolver
                     .CanFormattedValueCompleteNormally(
                         assignment.Value,
                         assignment,
-                        _compilation,
+                        _session.Compilation,
                         _abstractFlow,
                         this);
         }
@@ -1223,7 +1222,7 @@ internal sealed class OperationCompletionEvaluator
         var defersFormatting = StringConcatenationEffectResolver
             .DefersInterpolationFormatting(
                 interpolation,
-                _compilation);
+                _session.Compilation);
         foreach (var part in interpolation.Parts)
         {
             if (part is not IInterpolationOperation value)
@@ -1244,7 +1243,7 @@ internal sealed class OperationCompletionEvaluator
                     .CanFormattedValueCompleteNormally(
                         value.Expression,
                         value,
-                        _compilation,
+                        _session.Compilation,
                         _abstractFlow,
                         this))
             {
@@ -1262,14 +1261,14 @@ internal sealed class OperationCompletionEvaluator
             member.ContainingType is not { } type ||
             !EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 type,
-                _apiSpecs))
+                _session.ApiSpecs))
         {
             return true;
         }
 
         return EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
             type,
-            _compilation,
+            _session.Compilation,
             _completionFacts.MayCompleteNormally) &&
             type.StaticConstructors.All(constructor =>
                 constructor.DeclaringSyntaxReferences.Length == 0 ||
@@ -1379,7 +1378,7 @@ internal sealed class OperationCompletionEvaluator
 
                 if (truthOperator != null &&
                     ConditionalTruthOperatorFacts.ReturnsConstant(
-                        _compilation,
+                        _session.Compilation,
                         truthOperator,
                         out var truthResult))
                 {

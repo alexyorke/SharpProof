@@ -19,7 +19,8 @@ internal sealed class ExceptionHandlerReachability(
     ResolvedApiSpecTable apiSpecs,
     ExternalEffectResolver externalEffects,
     EffectKnownSymbols knownSymbols,
-    Func<IMethodSymbol, bool> isKnownNonThrowing)
+    Func<IMethodSymbol, bool> isKnownNonThrowing,
+    Func<IInvocationOperation, bool> isConditionallyElided)
 {
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
     private readonly Dictionary<IOperation, PotentialExceptions>
@@ -141,6 +142,11 @@ internal sealed class ExceptionHandlerReachability(
         while (remaining.Count != 0)
         {
             var operation = remaining.Pop();
+            if (operation is IInvocationOperation elided &&
+                isConditionallyElided(elided))
+            {
+                continue;
+            }
             if (ManagedAbstractFlow.IsCompileTimeUnreachable(
                     compilation,
                     operation) &&

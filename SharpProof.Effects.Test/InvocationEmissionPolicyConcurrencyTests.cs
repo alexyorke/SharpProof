@@ -6,6 +6,74 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class InvocationEmissionPolicyConcurrencyTests
 {
+    [TestCase("After", false, true)]
+    [TestCase("After", true, false)]
+    [TestCase("Catch", false, false)]
+    [TestCase("Catch", true, true)]
+    [TestCase("AfterWrapper", false, true)]
+    [TestCase("AfterWrapper", true, false)]
+    [TestCase("CatchWrapper", false, false)]
+    [TestCase("CatchWrapper", true, true)]
+    [TestCase("AfterArgument", false, true)]
+    [TestCase("AfterArgument", true, false)]
+    [TestCase("CatchArgument", false, false)]
+    [TestCase("CatchArgument", true, true)]
+    public void ConditionalThrowControlsFollowingAndHandlerEffects(
+        string methodName, bool enabled, bool writes)
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            (enabled ? "#define TRACE_CALL\n" : "") +
+            """
+            public static class Sample {
+                public static int State;
+                [System.Diagnostics.Conditional("TRACE_CALL")]
+                public static void Throw() { throw new System.InvalidOperationException(); }
+                public static void After() { Throw(); State++; }
+                public static void Catch() {
+                    try { Throw(); }
+                    catch (System.InvalidOperationException) { State++; }
+                }
+                public static void Wrapper() { Throw(); }
+                public static void AfterWrapper() { Wrapper(); State++; }
+                public static void CatchWrapper() {
+                    try { Wrapper(); }
+                    catch (System.InvalidOperationException) { State++; }
+                }
+                [System.Diagnostics.Conditional("TRACE_CALL")]
+                public static void ConditionalValue(int value) { }
+                public static int ThrowValue() { throw new System.InvalidOperationException(); }
+                public static void AfterArgument() {
+                    int value = 1;
+                    ConditionalValue(value = 0);
+                    if (value == 1) State++;
+                }
+                public static void CatchArgument() {
+                    try { ConditionalValue(ThrowValue()); }
+                    catch (System.InvalidOperationException) { State++; }
+                }
+            }
+            """);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly(
+            "ConditionalThrow", EffectTestHost.EmitImage(compilation).Image, assembly =>
+            {
+                var sample = assembly.GetType("Sample")!;
+                try
+                {
+                    sample.GetMethod(methodName)!.Invoke(null, null);
+                }
+                catch (System.Reflection.TargetInvocationException exception)
+                    when (exception.InnerException is InvalidOperationException)
+                {
+                }
+                Assert.That(sample.GetField("State")!.GetValue(null),
+                    Is.EqualTo(writes ? 1 : 0));
+            });
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            EffectTestHost.SampleMethod(compilation, methodName));
+        Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.EqualTo(writes));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void ConditionalOverrideUsesInheritedEmissionCondition(bool enabled)

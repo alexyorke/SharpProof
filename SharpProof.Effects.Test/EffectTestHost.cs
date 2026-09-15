@@ -271,7 +271,8 @@ internal static class EffectTestHost
             knownSymbols: session.KnownSymbols,
             isKnownNonThrowing: isKnownNonThrowing
                 ? static _ => true
-                : static _ => false);
+                : static _ => false,
+            isConditionallyElided: session.IsConditionallyElided);
     }
 
     internal static INamedTypeSymbol RequireType(

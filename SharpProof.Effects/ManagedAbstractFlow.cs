@@ -313,6 +313,12 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case IInvocationOperation invocation:
+                if (!IsRequires(invocation) &&
+                    _completionFacts.IsConditionallyElided(invocation))
+                {
+                    result.Record(operation, state);
+                    return state;
+                }
                 state = TransferMany(state, invocation.ChildOperations, result, cancellationToken);
                 result.Record(operation, state);
                 return IsRequires(invocation) ? Assume(state, invocation.Arguments[0].Value, true)
@@ -2197,6 +2203,13 @@ internal readonly record struct ManagedAbstractValue
 /// <summary>Fail-closed execution facts shared by analyzer and effect witnesses.</summary>
 internal sealed class DefiniteOperationFacts(Compilation compilation, CancellationToken cancellationToken)
 {
+    private readonly InvocationEmissionPolicy _invocationEmission = new(compilation);
+
+    internal bool IsConditionallyElided(IInvocationOperation invocation)
+    {
+        return _invocationEmission.IsElided(invocation);
+    }
+
     // The active-method sets are the cycle guard for CompletesNormally and
     // MethodCanCompleteNormally.  ManagedAbstractFlow shares one instance per
     // compilation across Roslyn's concurrent analysis threads, and recursive
@@ -2285,7 +2298,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     private bool CompletesNormally(IInvocationOperation invocation)
     {
-        return IsContractClause(invocation) ||
+        return IsConditionallyElided(invocation) || IsContractClause(invocation) ||
         !invocation.IsVirtual &&
         (invocation.Instance == null ||
          invocation.Instance is IInstanceReferenceOperation && CompletesNormally(invocation.Instance)) &&
@@ -2421,6 +2434,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 .GetSemanticModel(compilation, expression.SyntaxTree);
             return model.GetOperation(expression, cancellationToken) is
                 IInvocationOperation invocation &&
+                !IsConditionallyElided(invocation) &&
                 SymbolEqualityComparer.Default.Equals(
                     invocation.TargetMethod.OriginalDefinition,
                     method.OriginalDefinition);
@@ -2848,6 +2862,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
     {
+        if (IsConditionallyElided(invocation))
+        {
+            return true;
+        }
         if (!MayCompleteNormally(invocation.Instance) ||
             invocation.Arguments.Any(argument =>
                 !MayCompleteNormally(argument.Value)))

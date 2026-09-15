@@ -101,7 +101,8 @@ internal sealed partial class OperationEffectScanner
             session.ApiSpecs,
             session.ExternalEffects,
             session.KnownSymbols,
-            IsKnownNonThrowing);
+            IsKnownNonThrowing,
+            session.IsConditionallyElided);
         var operationsBuilder = ImmutableArray.CreateBuilder<IOperation>();
         var relevantOperationsBuilder =
             ImmutableArray.CreateBuilder<IOperation>();
