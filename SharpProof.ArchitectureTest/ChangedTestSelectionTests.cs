@@ -7,6 +7,46 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
+    [TestCase("Directory.Build.props", false)]
+    [TestCase("Directory.Build.targets", false)]
+    [TestCase("Directory.Build.props", true)]
+    [TestCase("Directory.Build.targets", true)]
+    public async Task ImplicitBuildImportsSelectLinkedSourceConsumers(string importName, bool parent)
+    {
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        const string changedInput = "Shared/Source.cs";
+        await CreateFixtureAsync(root, changedInput);
+        var importDirectory = Path.Combine(root, "SharpProof.Effects.Test");
+        var projectDirectory = parent ? Path.Combine(importDirectory, "Nested") : importDirectory;
+        Directory.CreateDirectory(projectDirectory);
+        await File.WriteAllTextAsync(Path.Combine(importDirectory, importName),
+            $"<Project><ItemGroup><Compile Include=\"{(parent ? "../../" : "../")}Shared/Source.cs\" /></ItemGroup></Project>");
+        await File.WriteAllTextAsync(Path.Combine(projectDirectory, "SharpProof.Effects.Test.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>");
+        var evaluated = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "dotnet", "msbuild",
+                Path.Combine(projectDirectory, "SharpProof.Effects.Test.csproj"),
+                "-getItem:Compile", "-nologo"));
+        using var inventory = JsonDocument.Parse(evaluated.Output);
+        Assert.That(inventory.RootElement.GetProperty("Items").GetProperty("Compile").EnumerateArray()
+            .Any(item => item.GetProperty("FullPath").GetString() == Path.Combine(root, changedInput)), Is.True);
+        await ArchitectureGitRepository.InitializeAsync(root, "test@example.invalid", "SharpProof Test");
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "add", "."));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "commit", "--quiet", "-m", "baseline"));
+        await File.AppendAllTextAsync(Path.Combine(root, changedInput), "\n// changed\n");
+        var result = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "pwsh", "-NoLogo", "-NoProfile", "-File",
+                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+                "-ComparisonRef", "HEAD", "-PlanOnly"));
+        Assert.That(result.Output, Does.Contain(parent
+            ? "SharpProof.Effects.Test\\Nested\\SharpProof.Effects.Test.csproj"
+            : "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj"));
+        Assert.That(result.Output, Does.Not.Contain("duration-aware sharder"));
+    }
+
     [TestCase(false, false, false)]
     [TestCase(false, true, false)]
     [TestCase(true, false, false)]

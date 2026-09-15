@@ -125,6 +125,20 @@ foreach ($relativePath in $projectPaths) {
         [StringComparer]::Ordinal)
     $pendingImports = [Collections.Generic.Stack[string]]::new()
     $pendingImports.Push($fullPath)
+    # MSBuild searches upward independently for the nearest props and targets.
+    # Include their item declarations even without an explicit project Import.
+    foreach ($implicitName in @('Directory.Build.props', 'Directory.Build.targets')) {
+        $searchDirectory = Split-Path -Parent $fullPath
+        while (-not [string]::IsNullOrEmpty($searchDirectory)) {
+            $implicitPath = Join-Path $searchDirectory $implicitName
+            if (Test-Path -LiteralPath $implicitPath -PathType Leaf) {
+                $pendingImports.Push($implicitPath)
+                break
+            }
+            if ($searchDirectory -ceq $repositoryRoot) { break }
+            $searchDirectory = Split-Path -Parent $searchDirectory
+        }
+    }
     $items = [Collections.Generic.List[object]]::new()
     while ($pendingImports.Count -gt 0) {
         $buildFile = $pendingImports.Pop()
