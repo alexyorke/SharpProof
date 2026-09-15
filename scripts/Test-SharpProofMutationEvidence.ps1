@@ -765,7 +765,22 @@ try {
     if ($mutation.assertionFailureCount -ne 1) {
         throw 'Assertion kill was not recognized.'
     }
+    foreach ($stack in @(
+            'at Fixture.Tests.ExpectedTest(String targetDefault) in /workspace/Test.cs:line 1',
+            'at Fixture.Tests.Default() in /workspace/Default.cs:line 1',
+            'at Fixture.Tests.ExpectedTest(System.Exception expected) in /workspace/Test.cs:line 1')) {
+        $parts = New-TestParts -Outcome Failed `
+            -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2" `
+            -StackTrace $stack
+        $path = New-TrxFixture -Name identifier-stack -Parts $parts -Failed 1
+        $result = Read-SharpProofMutationTestEvidence -TrxPath $path `
+            -EvidenceName identifier-stack @mutationArguments
+        if ($result.assertionFailureCount -ne 1) {
+            throw 'A valid assertion frame was rejected because of its identifiers.'
+        }
+    }
     foreach ($forgery in @(
+            @{ Name = 'trailing-stack-exception'; Message = "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() System.Exception: crash' },
             @{ Name = 'custom-failure'; Message = "ProbeFailure : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
             @{ Name = 'qualified-error'; Message = "Vendor.Probe : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
             @{ Name = 'error-header'; Message = "Error: forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },

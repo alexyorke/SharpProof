@@ -171,11 +171,9 @@ function Test-NUnitAssertionStack {
         return $false
     }
     foreach ($line in $lines) {
-        if ($line -match '(?i)(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_`+]*\.)*[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault)\b' -or
-            $line -match '(?i)^\s*(?:error|warning|stack trace|fatal|unhandled)\s*:') {
-            return $false
-        }
-        if ($line -notmatch '^\s*(?:\d+\)\s+)?at\s+\S+') {
+        # Validate complete frames, not words inside method/parameter names:
+        # "targetDefault" is an identifier, not a fault header.
+        if ($line -notmatch '^\s*(?:\d+\)\s+)?at\s+[^\s()]+\([^()\r\n]*\)(?:\s+in\s+.+:line\s+\d+)?$') {
             return $false
         }
     }
