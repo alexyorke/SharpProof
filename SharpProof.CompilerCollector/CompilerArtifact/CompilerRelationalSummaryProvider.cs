@@ -20,31 +20,9 @@ internal sealed class CompilerRelationalSummaryProvider
 {
     private const int MaximumDependencyDepth = 64;
 
-    private readonly struct SummaryCacheEntry
-    {
-        private SummaryCacheEntry(
-            IrRelationalSummary? summary,
-            CompilerSummaryEvidenceAuthority? authority,
-            bool succeeded)
-        {
-            Summary = summary;
-            Authority = authority;
-            Succeeded = succeeded;
-        }
-
-        internal IrRelationalSummary? Summary { get; }
-        internal CompilerSummaryEvidenceAuthority? Authority { get; }
-        internal bool Succeeded { get; }
-
-        internal static SummaryCacheEntry Failure => default;
-
-        internal static SummaryCacheEntry Success(
-            IrRelationalSummary summary,
-            CompilerSummaryEvidenceAuthority authority)
-        {
-            return new SummaryCacheEntry(summary, authority, succeeded: true);
-        }
-    }
+    private readonly record struct SummaryCacheEntry(
+        IrRelationalSummary? Summary,
+        CompilerSummaryEvidenceAuthority? Authority);
 
     private readonly CSharpCompilation _compilation;
     private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
@@ -101,23 +79,10 @@ internal sealed class CompilerRelationalSummaryProvider
             compilation,
             nameof(compilation));
         _capturedTrees = capturedTrees;
-        Dictionary<SyntaxTree, int>? capturedTreeOrdinals = null;
-        if (capturedTrees is not null)
-        {
-            capturedTreeOrdinals = new Dictionary<SyntaxTree, int>(
-                _compilation.SyntaxTrees.Length,
-                ReferenceComparer<SyntaxTree>.Instance);
-            for (var index = 0; index < _compilation.SyntaxTrees.Length; index++)
-            {
-                var tree = _compilation.SyntaxTrees[index];
-                if (!capturedTreeOrdinals.ContainsKey(tree))
-                {
-                    capturedTreeOrdinals.Add(tree, index);
-                }
-            }
-        }
-
-        _capturedTreeOrdinals = capturedTreeOrdinals;
+        _capturedTreeOrdinals = capturedTrees is null ? null :
+            _compilation.SyntaxTrees.Select(static (tree, index) => (tree, index))
+                .ToDictionary(static pair => pair.tree, static pair => pair.index,
+                    ReferenceComparer<SyntaxTree>.Instance);
         _metadataResolution = new(_compilation);
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
@@ -148,8 +113,7 @@ internal sealed class CompilerRelationalSummaryProvider
         if (_cache.TryGetValue(method, out var cached))
         {
             summary = cached.Summary;
-            return cached.Succeeded &&
-                summary!.Signature.Member == member;
+            return summary is not null && summary.Signature.Member == member;
         }
 
         if (_active.Contains(method))
@@ -204,7 +168,7 @@ internal sealed class CompilerRelationalSummaryProvider
                         ? CompilerImplementationIlAbstentionReason
                             .SummaryResourceLimit
                         : implementationIlAbstention;
-                _cache.Add(method, SummaryCacheEntry.Failure);
+                _cache.Add(method, default);
                 return false;
             }
 
@@ -214,14 +178,14 @@ internal sealed class CompilerRelationalSummaryProvider
                 cancellationToken);
             if (authority == null)
             {
-                _cache.Add(method, SummaryCacheEntry.Failure);
+                _cache.Add(method, default);
                 summary = null;
                 return false;
             }
 
             _cache.Add(
                 method,
-                SummaryCacheEntry.Success(summary!, authority));
+                new SummaryCacheEntry(summary, authority));
             _dependencyResourceLimitReached = false;
             return true;
         }
@@ -409,10 +373,7 @@ internal sealed class CompilerRelationalSummaryProvider
         var provenance = summary.Signature.Provenance;
         var callIdentity = provenance.EvidenceCallIdentity;
         if (string.IsNullOrEmpty(callIdentity) ||
-            !string.Equals(
-                callIdentity,
-                method.GetDocumentationCommentId() ?? string.Empty,
-                StringComparison.Ordinal))
+            callIdentity != (method.GetDocumentationCommentId() ?? string.Empty))
         {
             return null;
         }
@@ -427,12 +388,9 @@ internal sealed class CompilerRelationalSummaryProvider
             }
 
             var capturedTree = FindCapturedTree(declaration.SyntaxTree);
-            var sourceTreeSha256 = capturedTree?.Sha256;
-            if (sourceTreeSha256 == null)
-            {
-                sourceTreeSha256 = CompilerCompilationCapture.ComputeTextSha256(
+            var sourceTreeSha256 = capturedTree?.Sha256 ??
+                CompilerCompilationCapture.ComputeTextSha256(
                     declaration.SyntaxTree.GetText(cancellationToken));
-            }
             return new CompilerSummaryEvidenceAuthority(
                 CompilerSummaryOrigin.Source,
                 callIdentity,
