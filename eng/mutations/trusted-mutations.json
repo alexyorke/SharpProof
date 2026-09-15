@@ -1965,6 +1965,6 @@
     "original": "            location.Line == mappedLine + 1L &&",
     "mutated": "            location.Line > 0 &&",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
-    "filter": "FullyQualifiedName~HydrationRejectsGenericLocationAuthorityGeometryTampering"
+    "filter": "FullyQualifiedName~LineMapBindsLineDirectiveAndExactEndCoordinates"
   }
 ]

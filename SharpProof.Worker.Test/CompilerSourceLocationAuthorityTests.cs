@@ -291,6 +291,13 @@ public sealed class CompilerSourceLocationAuthorityTests
                 tree),
             Is.True);
 
+        lineStart.Line++;
+        Assert.That(
+            CompilerSourceLocationAuthority.HasValidLocationGeometry(
+                lineStart,
+                tree),
+            Is.False);
+
         Assert.That(
             CompilerSourceLocationAuthority.TryMap(
                 tree.LineMap,

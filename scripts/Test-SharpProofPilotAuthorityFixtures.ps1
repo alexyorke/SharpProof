@@ -9,6 +9,44 @@ $packages = Join-Path $fixture 'packages'
 $commit = '1111111111111111111111111111111111111111'
 $version = '1.0.0-preview.1'
 
+# Execute the producer's result projection with controlled build evidence.
+# Hand-built report fixtures alone cannot detect a producer claiming a review
+# happened before a reviewer supplied a disposition.
+$producer = [Management.Automation.Language.Parser]::ParseFile(
+    (Join-Path $PSScriptRoot 'Test-SharpProofPilots.ps1'),
+    [ref]$null, [ref]$null)
+$projections = @($producer.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -ceq '$results' -and
+        $node.Operator -eq [Management.Automation.Language.TokenKind]::PlusEquals
+}, $true))
+if ($projections.Count -ne 1) { throw 'Expected one pilot result projection.' }
+& {
+    $pilot = [pscustomobject]@{
+        id='projection'; project='Projection.csproj'; category='contract-heavy'
+        library='Projection'; libraryVersion='1.0.0'; setupFriction='none'
+    }
+    $response = [pscustomobject]@{ runStatus='Complete' }
+    $claims = @([pscustomobject]@{ outcome='Proven' })
+    $claimEvidence = @()
+    $unknownReasons = @()
+    $diagnosticIds = @()
+    $build = [pscustomobject]@{
+        elapsedMilliseconds=1; observedPeakWorkingSetBytes=0
+    }
+    $negativeProbePassed = $true
+    $repositoryRoot = $PSScriptRoot
+    $resultPath = Join-Path $PSScriptRoot 'result.json'
+    $sarifPath = Join-Path $PSScriptRoot 'result.sarif'
+    $evidenceFiles = @()
+    $results = @()
+    . ([scriptblock]::Create($projections[0].Extent.Text))
+    if ($results.Count -ne 1 -or $null -ne $results[0].falsePositiveReports) {
+        throw 'A produced pilot result must leave false-positive review unreported.'
+    }
+}
+
 function Write-Package([string]$Id, [string]$Extension, [string]$Commit = $commit,
     [string]$PackageVersion = $version) {
     $path = Join-Path $packages "$Id.$version$Extension"
