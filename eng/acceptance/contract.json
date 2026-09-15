@@ -777,10 +777,10 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "Current audited production inventory; ceilings:220600/12767/6310.",
+    "ceilingRationale": "Audited production inventory including seven members added for concurrent effect-cache synchronization (three), per-thread method-cycle guards (two), and exception-reachability traversal preservation (two); ceilings:220600/12767/6317.",
     "maximumExpressionNodes": 220600,
     "maximumDecisionPoints": 12767,
-    "maximumMembers": 6310
+    "maximumMembers": 6317
   },
   "productionCoordinatorComplexity": {
     "measurement": "Roslyn expression nodes and decision points in coordination layers; whitespace, comments, line wrapping, and optional braces are excluded.",
