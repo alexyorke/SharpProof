@@ -9,6 +9,31 @@ namespace SharpProof.Fuzz.Test;
 public sealed class FuzzRunnerTests
 {
     [Test]
+    public async Task SerializedSummaryIsAcceptedByCampaignValidator()
+    {
+        var summary = new FuzzSummary(4, 10, 7, 1, 10, 0, 10, 10, 10,
+            new FrontendFuzzCoverage(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), true, []);
+        using var temporary = new TempDirectory("SharpProof.FuzzEvidence-");
+        var resultPath = Path.Combine(temporary.FullName, "result.json");
+        await File.WriteAllTextAsync(resultPath, System.Text.Json.JsonSerializer.Serialize(summary));
+        var scriptPath = Path.Combine(temporary.FullName, "validate.ps1");
+        await File.WriteAllTextAsync(scriptPath, """
+            param([string]$Validator, [string]$Result)
+            $ErrorActionPreference = 'Stop'
+            . $Validator
+            Assert-SharpProofFuzzRunnerResult -Path $Result -ExpectedCases 10 -ExpectedSeed 7 -ExpectedMaximumParallelism 1
+            """);
+        var root = TestRepository.FindRoot();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var start = ProcessRunner.CreateStartInfo(root, "pwsh",
+            ["-NoLogo", "-NoProfile", "-File", scriptPath,
+                "-Validator", Path.Combine(root, "scripts", "Assert-SharpProofFuzzRunnerResult.ps1"),
+                "-Result", resultPath]);
+        var result = await ProcessRunner.RunCapturedAsync(start, timeout.Token);
+        Assert.That(result.ExitCode, Is.Zero, result.Output + result.Error);
+    }
+
+    [Test]
     public void FailureEvidenceRetentionUsesDeterministicBoundedKeys()
     {
         var statuses = Enumerable.Repeat(

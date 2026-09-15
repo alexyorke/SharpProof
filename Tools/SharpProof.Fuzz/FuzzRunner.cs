@@ -1,6 +1,7 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
 
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
@@ -37,6 +38,7 @@ public sealed record FrontendFuzzCoverage(
     int IndexOutOfRangeExceptions,
     int InvalidCastExceptions)
 {
+    [JsonIgnore]
     public bool HasValidCounts =>
         TextParameters >= 0 &&
         StringLiterals >= 0 &&
@@ -52,6 +54,7 @@ public sealed record FrontendFuzzCoverage(
         IndexOutOfRangeExceptions >= 0 &&
         InvalidCastExceptions >= 0;
 
+    [JsonIgnore]
     public bool HasExpandedCategories =>
         TextParameters > 0 &&
         StringLiterals > 0 &&

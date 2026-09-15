@@ -77,6 +77,7 @@
                         '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Contracts.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Effects.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Ir.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers.Test' OR
@@ -90,6 +91,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Specs.Test' OR
@@ -101,6 +103,7 @@
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Gates.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Ir.Test' OR
