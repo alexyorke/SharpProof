@@ -158,6 +158,7 @@ $architectureFixtures = @(
     'ContainerAuthorityScriptTests',
     'ContainerSourceCleanlinessTests',
     'CoverageScriptTests',
+    'DeclarativeModelGenerationTests',
     'DependencyAutomationTests',
     'DevCheckCommandPlanTests',
     'DocumentationSupportContractTests',

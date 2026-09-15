@@ -602,6 +602,7 @@
           "SharpProof.Worker/Program.cs",
           "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
           "scripts/Generate-ProtocolModel.ps1",
+          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
           "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
@@ -714,6 +715,7 @@
           "scripts/SharpProof.PublicationPlanIdentity.psm1",
           "scripts/SharpProof.ReleaseBundle.ps1",
           "scripts/SharpProof.ReleaseJson.ps1",
+          "scripts/Read-SharpProofSdkPolicy.ps1",
           "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofGeneratedOutputs.ps1",
@@ -775,10 +777,10 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "Current audited production inventory; ceilings:220600/12767/6277.",
+    "ceilingRationale": "Current audited production inventory; ceilings:220600/12767/6310.",
     "maximumExpressionNodes": 220600,
     "maximumDecisionPoints": 12767,
-    "maximumMembers": 6277
+    "maximumMembers": 6310
   },
   "productionCoordinatorComplexity": {
     "measurement": "Roslyn expression nodes and decision points in coordination layers; whitespace, comments, line wrapping, and optional braces are excluded.",

@@ -424,6 +424,7 @@ function Update-SharpProofGeneratedFile
 
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+    [System.IO.Directory]::CreateDirectory($directory) | Out-Null
     $temporaryPath = [System.IO.Path]::Combine(
         $directory,
         '.' + [System.IO.Path]::GetFileName($fullPath) + '.' +

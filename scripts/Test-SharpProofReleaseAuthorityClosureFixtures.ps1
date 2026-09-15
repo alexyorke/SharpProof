@@ -53,6 +53,7 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
         Write-FixtureFile $leaf "# $leaf`n"
     }
     Write-FixtureFile 'SharpProof.Verifier/SharpProof.Verifier.nuspec' '<package />'
+    Write-FixtureFile 'SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props' '<Project />'
     Initialize-SharpProofFixtureRepository `
         -RepositoryRoot $fixture `
         -InitialBranch master `
