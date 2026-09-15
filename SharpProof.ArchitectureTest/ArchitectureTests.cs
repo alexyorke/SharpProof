@@ -1632,26 +1632,26 @@ public sealed class ArchitectureTests
             TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofTrustedMutations.ps1"));
-        var archiveExpansion = mutationDriver.IndexOf(
-            "Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot",
+        var sourceCheckout = mutationDriver.IndexOf(
+            "& git -C $sourceRoot checkout --quiet --detach $sourceCommit",
             StringComparison.Ordinal);
         var preflight = mutationDriver.IndexOf(
             "Assert-UniqueMutationTarget `",
-            archiveExpansion,
+            sourceCheckout,
             StringComparison.Ordinal);
         var restore = mutationDriver.IndexOf(
             "$restoreRun = Invoke-IsolatedDotnet",
-            archiveExpansion,
+            sourceCheckout,
             StringComparison.Ordinal);
         var baseline = mutationDriver.IndexOf(
             "$baselineTrxName =",
-            archiveExpansion,
+            sourceCheckout,
             StringComparison.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(archiveExpansion, Is.GreaterThanOrEqualTo(0));
-            Assert.That(preflight, Is.GreaterThan(archiveExpansion));
+            Assert.That(sourceCheckout, Is.GreaterThanOrEqualTo(0));
+            Assert.That(preflight, Is.GreaterThan(sourceCheckout));
             Assert.That(restore, Is.GreaterThan(preflight));
             Assert.That(baseline, Is.GreaterThan(restore));
         }

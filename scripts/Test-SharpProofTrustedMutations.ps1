@@ -364,7 +364,6 @@ $mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
 $workspace = Join-Path $mutationRoot (
     'workspace-' + [Guid]::NewGuid().ToString('N'))
 $sourceRoot = Join-Path $workspace 'source'
-$archive = Join-Path $workspace 'source.zip'
 $runId = $sourceCommit.Substring(0, 12) + '-' +
     [Guid]::NewGuid().ToString('N')
 $logs = Join-Path (Join-Path (Split-Path -Parent $output) 'mutation-logs') $runId
@@ -465,24 +464,26 @@ function Write-MutationEvidence {
 }
 
 try {
-    & git -C $repositoryRoot archive `
-        --format=zip `
-        --output=$archive `
-        $sourceCommit
+    # Package provenance tests require the exact commit as well as its files.
+    # Keep mutations in a private checkout, with no writes to the source repo.
+    & git clone --quiet --shared --no-checkout $repositoryRoot $sourceRoot
     if ($LASTEXITCODE -ne 0) {
-        throw "git archive failed with exit code $LASTEXITCODE."
+        throw "Mutation workspace clone failed with exit code $LASTEXITCODE."
     }
-    Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot
+    & git -C $sourceRoot checkout --quiet --detach $sourceCommit
+    if ($LASTEXITCODE -ne 0) {
+        throw "Mutation workspace checkout failed with exit code $LASTEXITCODE."
+    }
 
-    $archivedTargetCache = [Collections.Generic.Dictionary[string, string]]::new(
+    $checkoutTargetCache = [Collections.Generic.Dictionary[string, string]]::new(
         [StringComparer]::Ordinal)
     foreach ($mutation in $mutations) {
         $targetKey = ([string]$mutation.File).Replace('\', '/')
         $content = $null
-        if (-not $archivedTargetCache.TryGetValue($targetKey, [ref]$content)) {
+        if (-not $checkoutTargetCache.TryGetValue($targetKey, [ref]$content)) {
             $path = Join-Path $sourceRoot $targetKey
             $content = [IO.File]::ReadAllText($path)
-            $archivedTargetCache.Add($targetKey, $content)
+            $checkoutTargetCache.Add($targetKey, $content)
         }
         Assert-UniqueMutationTarget `
             -Content $content `
