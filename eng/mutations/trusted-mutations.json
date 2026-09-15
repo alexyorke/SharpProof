@@ -1549,7 +1549,7 @@
     "original": "                response.RunStatus == expectedStatus &&\n                response.FailureReason == expectedFailure,",
     "mutated": "                WorkerProtocolMetadata.MatchesRunFailure(\n                    response.RunStatus, response.FailureReason),",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
-    "filter": "FullyQualifiedName~AllProvenEvidenceRejectsFabricated"
+    "filter": "FullyQualifiedName~AllProvenEvidenceRejectsFabricatedInterruptedStatus"
   },
   {
     "name": "effects-rethrow-nearest-catch-owner",
