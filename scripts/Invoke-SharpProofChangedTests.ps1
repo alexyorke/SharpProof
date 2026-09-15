@@ -121,9 +121,38 @@ foreach ($relativePath in $projectPaths) {
         $projectInventoryIncomplete = $true
         continue
     }
-    [xml]$xml = Get-Content -LiteralPath $fullPath -Raw
-    foreach ($item in $xml.SelectNodes(
-            "//*[local-name()='Compile' or local-name()='ProjectReference']")) {
+    $buildFiles = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $pendingImports = [Collections.Generic.Stack[string]]::new()
+    $pendingImports.Push($fullPath)
+    $items = [Collections.Generic.List[object]]::new()
+    while ($pendingImports.Count -gt 0) {
+        $buildFile = $pendingImports.Pop()
+        if (-not $buildFiles.Add($buildFile)) { continue }
+        if (-not (Test-Path -LiteralPath $buildFile -PathType Leaf)) {
+            $projectInventoryIncomplete = $true
+            continue
+        }
+        [xml]$xml = Get-Content -LiteralPath $buildFile -Raw
+        foreach ($item in $xml.SelectNodes(
+                "//*[local-name()='Compile' or local-name()='ProjectReference']")) {
+            $items.Add($item)
+        }
+        foreach ($import in $xml.SelectNodes("//*[local-name()='Import']")) {
+            $importPath = [string]$import.GetAttribute('Project')
+            if ([string]::IsNullOrWhiteSpace($importPath) -or
+                $importPath -match '[$@%]\(|%[0-9a-f]{2}|[*?;]' -or
+                $import.HasAttribute('Sdk')) {
+                $projectInventoryIncomplete = $true
+                continue
+            }
+            $pendingImports.Push([IO.Path]::GetFullPath((Join-Path (
+                Split-Path -Parent $buildFile) $importPath)))
+        }
+    }
+    # Imported item paths are relative to the consuming project, whereas
+    # nested Import paths are relative to the file containing the import.
+    foreach ($item in $items) {
         $include = [string]$item.GetAttribute('Include')
         if ($include -match '[$@%]\(|%[0-9a-f]{2}' -or
             ($item.LocalName -eq 'ProjectReference' -and $include -match '[*?]')) {
@@ -134,7 +163,7 @@ foreach ($relativePath in $projectPaths) {
         }
     }
     $references = @(
-        $xml.SelectNodes("//*[local-name()='ProjectReference']") |
+        $items | Where-Object { $_.LocalName -eq 'ProjectReference' } |
             ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
             ForEach-Object { $_.Trim() } |
             Where-Object {
@@ -146,7 +175,7 @@ foreach ($relativePath in $projectPaths) {
                     Split-Path -Parent $fullPath) $_))
             })
     $compiledFilePatterns = @(
-        $xml.SelectNodes("//*[local-name()='Compile']") |
+        $items | Where-Object { $_.LocalName -eq 'Compile' } |
             ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
             ForEach-Object { $_.Trim() } |
             Where-Object {
@@ -175,6 +204,7 @@ foreach ($relativePath in $projectPaths) {
         Directory = Split-Path -Parent $fullPath
         References = $references
         CompiledFilePatterns = $compiledFilePatterns
+        BuildFiles = $buildFiles
     }
 }
 
@@ -229,7 +259,8 @@ foreach ($changedPath in $changedPaths) {
     foreach ($project in $projects.Values) {
         $directoryPrefix = $project.Directory +
             [IO.Path]::DirectorySeparatorChar
-        if ($fullChangedPath.StartsWith(
+        if ($project.BuildFiles.Contains($fullChangedPath) -or
+            $fullChangedPath.StartsWith(
                 $directoryPrefix,
                 [StringComparison]::Ordinal) -or
             @($project.CompiledFilePatterns | Where-Object {
