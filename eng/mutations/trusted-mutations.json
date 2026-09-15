@@ -261,7 +261,7 @@
     "original": "        type is null or { IsReferenceType: true, TypeKind: not TypeKind.Delegate, SpecialType: not (SpecialType.System_Delegate or SpecialType.System_MulticastDelegate) } ||",
     "mutated": "        type is null or { IsReferenceType: true } ||",
     "project": "SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj",
-    "filter": "FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality"
+    "filter": "FullyQualifiedName~UnsupportedValueDomains"
   },
   {
     "name": "analyzer-configuration-provider-failure",
@@ -645,7 +645,7 @@
     "original": "if (entryFeasibility.IsContradictory)",
     "mutated": "if (!entryFeasibility.IsUnknown)",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
-    "filter": "FullyQualifiedName~EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed"
+    "filter": "FullyQualifiedName~EffectOnlySelectionProducesAccountableProvenClaim"
   },
   {
     "name": "effect-invalid-contract-before-vacuity",
@@ -677,7 +677,7 @@
     "original": "                !string.Equals(payloadManifestHash, manifest.Hash, StringComparison.Ordinal) ||",
     "mutated": "false ||",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
-    "filter": "FullyQualifiedName~RehashedCacheSealedForDifferentManifestMissesAndRecomputes"
+    "filter": "FullyQualifiedName~RehashedCacheMissesAndRecomputesAfterMutation"
   },
   {
     "name": "cache-write-size-admission",
@@ -892,8 +892,8 @@
     "file": "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
     "original": "                stagedHandles[stagedCount++] = OpenRead(stagedPath);",
     "mutated": "                stagedHandles[stagedCount++] = OpenRead(component.Value);",
-    "project": "SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj",
-    "filter": "FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal"
+    "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
+    "filter": "FullyQualifiedName~RuntimeClosureRetainsStagedFileHandles"
   },
   {
     "name": "closure-preserves-linux-component-key-case",
@@ -1381,7 +1381,7 @@
     "original": "                SingleBits(leftValue) == SingleBits(rightValue),",
     "mutated": "                SingleBits(leftValue) == SingleBits(rightValue) || leftValue.Equals(rightValue),",
     "project": "SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj",
-    "filter": "FullyQualifiedName~FloatingDefaultBitsMustMatchExactly"
+    "filter": "FullyQualifiedName~DefaultValuesMustMatchExactly"
   },
   {
     "name": "contract-double-default-bits-are-exact",
@@ -1389,7 +1389,7 @@
     "original": "                BitConverter.DoubleToInt64Bits(leftValue) ==\n                BitConverter.DoubleToInt64Bits(rightValue),",
     "mutated": "                BitConverter.DoubleToInt64Bits(leftValue) ==\n                BitConverter.DoubleToInt64Bits(rightValue) || leftValue.Equals(rightValue),",
     "project": "SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj",
-    "filter": "FullyQualifiedName~FloatingDefaultBitsMustMatchExactly"
+    "filter": "FullyQualifiedName~DefaultValuesMustMatchExactly"
   },
   {
     "name": "requires-discovers-implicit-base-constructor",
@@ -1861,7 +1861,7 @@
     "original": "$stream.Length -eq 0 -or $stream.Length -gt 1048576",
     "mutated": "$stream.Length -eq 0 -or $false",
     "project": "SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj",
-    "filter": "FullyQualifiedName~FuzzResultFixtureIsStrictAndFailClosed"
+    "filter": "FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder"
   },
   {
     "name": "fuzz-runner-case-upper-bound",
@@ -1885,7 +1885,7 @@
     "original": "partialStatus == FuzzOracleStatus.Mismatch;",
     "mutated": "partialStatus != FuzzOracleStatus.Agreement;",
     "project": "SharpProof.Fuzz.Test/SharpProof.Fuzz.Test.csproj",
-    "filter": "FullyQualifiedName~PartialAbstentionIsNotClassifiedAsMismatchEvidence"
+    "filter": "FullyQualifiedName~PartialAbstentionIsRetainedAsFailureEvidence"
   },
   {
     "name": "frontend-fuzz-batch-compile-failure-isolation",

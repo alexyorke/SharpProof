@@ -164,6 +164,18 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void RuntimeClosureRetainsStagedFileHandles()
+    {
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
+            typeof(SharpProofWorker).Assembly.Location);
+        Assert.Throws<IOException>((Action)(() =>
+        {
+            using var exclusive = new FileStream(snapshot.ExecutionWorkerPath,
+                FileMode.Open, FileAccess.Read, FileShare.None);
+        }));
+    }
+
+    [Test]
     public void RuntimeClosureComponentPathsAreImmutable()
     {
 #pragma warning disable CA2000 // The alias mutant is deliberately not disposed through an unowned source path.
