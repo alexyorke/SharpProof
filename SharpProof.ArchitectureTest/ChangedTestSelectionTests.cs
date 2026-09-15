@@ -6,6 +6,35 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
+    [TestCase("<ProjectReference Include=\"../SharpProof.Product/SharpProof.Product.csproj;../SharpProof.Effects.Test/SharpProof.Effects.Test.csproj\" />")]
+    [TestCase("<ProjectReference Include=\"../SharpProof.Product/SharpProof.Product.csproj\" /><ProjectReference Update=\"../SharpProof.Product/SharpProof.Product.csproj\" PrivateAssets=\"all\" />")]
+    public async Task ProjectReferenceItemFormsPreserveDependentSelection(string references)
+    {
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        const string changedInput = "SharpProof.Product/Source.cs";
+        await CreateFixtureAsync(root, changedInput);
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "SharpProof.Product.Test", "SharpProof.Product.Test.csproj"),
+            $"<Project><ItemGroup>{references}</ItemGroup></Project>");
+        await ArchitectureGitRepository.InitializeAsync(
+            root, "test@example.invalid", "SharpProof Test");
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "add", "."));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "git", "commit", "--quiet", "-m", "baseline"));
+        await File.AppendAllTextAsync(Path.Combine(root, changedInput), "\n// changed\n");
+
+        var result = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "pwsh", "-NoLogo", "-NoProfile", "-File",
+                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+                "-ComparisonRef", "HEAD", "-PlanOnly"));
+        Assert.That(result.Output, Does.Contain(
+            "SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+    }
+
     [Test]
     public async Task RenamedSourceSelectsBothOldAndNewConsumers()
     {

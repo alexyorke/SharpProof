@@ -94,10 +94,12 @@ foreach ($relativePath in $projectPaths) {
     [xml]$xml = Get-Content -LiteralPath $fullPath -Raw
     $references = @(
         $xml.SelectNodes("//*[local-name()='ProjectReference']") |
+            ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
             ForEach-Object {
                 [IO.Path]::GetFullPath((Join-Path (
-                    Split-Path -Parent $fullPath) `
-                    ([string]$_.GetAttribute('Include'))))
+                    Split-Path -Parent $fullPath) $_))
             })
     $compiledFiles = @(
         $xml.SelectNodes("//*[local-name()='Compile']") |
