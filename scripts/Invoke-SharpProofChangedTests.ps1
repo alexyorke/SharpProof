@@ -121,11 +121,24 @@ foreach ($relativePath in $projectPaths) {
         continue
     }
     [xml]$xml = Get-Content -LiteralPath $fullPath -Raw
+    foreach ($item in $xml.SelectNodes(
+            "//*[local-name()='Compile' or local-name()='ProjectReference']")) {
+        $include = [string]$item.GetAttribute('Include')
+        if ($include -match '[$@%]\(' -or
+            ($item.LocalName -eq 'ProjectReference' -and $include -match '[*?]')) {
+            # Text parsing cannot evaluate MSBuild expressions or expand
+            # project-reference globs. Missing edges must not prune tests.
+            $projectInventoryIncomplete = $true
+        }
+    }
     $references = @(
         $xml.SelectNodes("//*[local-name()='ProjectReference']") |
             ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
             ForEach-Object { $_.Trim() } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace($_) -and
+                $_ -notmatch '[$@%]\(|[*?]'
+            } |
             ForEach-Object {
                 [IO.Path]::GetFullPath((Join-Path (
                     Split-Path -Parent $fullPath) $_))
@@ -135,7 +148,8 @@ foreach ($relativePath in $projectPaths) {
             ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
             ForEach-Object { $_.Trim() } |
             Where-Object {
-                -not [string]::IsNullOrWhiteSpace($_)
+                -not [string]::IsNullOrWhiteSpace($_) -and
+                $_ -notmatch '[$@%]\('
             } |
             ForEach-Object {
                 [IO.Path]::GetFullPath((Join-Path (
