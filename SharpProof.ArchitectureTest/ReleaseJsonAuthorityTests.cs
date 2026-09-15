@@ -175,7 +175,7 @@ public sealed class ReleaseJsonAuthorityTests
 
     private static string QuotePowerShellLiteral(string value)
     {
-        return "'" + value.Replace("'", "''") + "'";
+        return "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
     }
 
 }
