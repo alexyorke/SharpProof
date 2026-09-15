@@ -261,7 +261,7 @@
     "original": "        type is null or { IsReferenceType: true, TypeKind: not TypeKind.Delegate, SpecialType: not (SpecialType.System_Delegate or SpecialType.System_MulticastDelegate) } ||",
     "mutated": "        type is null or { IsReferenceType: true } ||",
     "project": "SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj",
-    "filter": "FullyQualifiedName~UnsupportedValueDomains"
+    "filter": "FullyQualifiedName~UnsupportedValueDomains_Delegate"
   },
   {
     "name": "analyzer-configuration-provider-failure",
