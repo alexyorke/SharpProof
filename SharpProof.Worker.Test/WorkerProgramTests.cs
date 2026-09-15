@@ -10,6 +10,12 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerProgramTests
 {
+    private static readonly string[] ExpectedWorkerInvocationTokens =
+    [
+        "verify", "--request", "<request>", "--result", "<result>",
+        "--start-stdin", "--parent-pid", "<pid>"
+    ];
+
     [Test]
     public void WorkerInvocationConstantsPreserveExactTokenSequence()
     {
@@ -27,11 +33,7 @@ public sealed class WorkerProgramTests
 
         Assert.That(
             actual,
-            Is.EqualTo(new[]
-            {
-                "verify", "--request", "<request>", "--result", "<result>",
-                "--start-stdin", "--parent-pid", "<pid>"
-            }));
+            Is.EqualTo(ExpectedWorkerInvocationTokens));
     }
 
     [Test]
