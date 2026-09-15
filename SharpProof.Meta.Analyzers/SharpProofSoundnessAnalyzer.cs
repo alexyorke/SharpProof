@@ -882,10 +882,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "Collections",
                 "Immutable"))
         {
-            return !string.Equals(
-                type.Name,
-                "Builder",
-                StringComparison.Ordinal);
+            return type.Name != "Builder";
         }
 
         if (IsExactNamespace(
@@ -941,7 +938,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         string name,
         params string[] containingNamespace)
     {
-        return string.Equals(type.Name, name, StringComparison.Ordinal) &&
+        return type.Name == name &&
             IsExactNamespace(type.ContainingNamespace, containingNamespace);
     }
 
@@ -1001,7 +998,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             if (current == null ||
                 current.IsGlobalNamespace ||
-                !string.Equals(current.Name, expected[index], StringComparison.Ordinal))
+                current.Name != expected[index])
             {
                 return false;
             }
@@ -1074,12 +1071,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             WorkerVerifyAsync = worker?.GetMembers("VerifyAsync").OfType<IMethodSymbol>().SingleOrDefault(candidate =>
                 candidate is { IsStatic: false, Arity: 0, Parameters.Length: 2 } &&
                 SymbolEqualityComparer.Default.Equals(candidate.ReturnType, workerTask) &&
-                candidate.Parameters[0].Name == "request" &&
-                candidate.Parameters[0].RefKind == RefKind.None &&
-                IsSameType(candidate.Parameters[0].Type, this[KnownType.WorkerVerifyRequest]) &&
-                candidate.Parameters[1].Name == "cancellationToken" &&
-                candidate.Parameters[1].RefKind == RefKind.None &&
-                IsSameType(candidate.Parameters[1].Type, this[KnownType.CancellationToken]));
+                candidate.Parameters[0] is { Name: "request", RefKind: RefKind.None, Type: var requestType } &&
+                IsSameType(requestType, this[KnownType.WorkerVerifyRequest]) &&
+                candidate.Parameters[1] is { Name: "cancellationToken", RefKind: RefKind.None, Type: var tokenType } &&
+                IsSameType(tokenType, this[KnownType.CancellationToken]));
         }
 
         internal INamedTypeSymbol? this[KnownType type] => _types[(int)type];
