@@ -27,11 +27,10 @@ public static partial class WorkerProtocolJson
                 StringComparison.Ordinal) &&
             value.Length > CompilerDiagnosticCodePrefix.Length &&
             value.Skip(CompilerDiagnosticCodePrefix.Length).All(
-                static character =>
-                    (character >= 'A' && character <= 'Z') ||
-                    (character >= 'a' && character <= 'z') ||
-                    (character >= '0' && character <= '9') ||
-                    character == '_');
+                static character => character is
+                    >= 'A' and <= 'Z' or
+                    >= 'a' and <= 'z' or
+                    >= '0' and <= '9' or '_');
     }
 
     internal static string ReadUtf8File(string path)
