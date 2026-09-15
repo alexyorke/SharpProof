@@ -6,6 +6,73 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
+    [Test]
+    public async Task RenamedSourceSelectsBothOldAndNewConsumers()
+    {
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        const string original = "SharpProof.Product/Source.cs";
+        const string destination = "SharpProof.Effects.Test/Source.cs";
+        await CreateFixtureAsync(root, original);
+        await ArchitectureGitRepository.InitializeAsync(
+            root, "test@example.invalid", "SharpProof Test");
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "add", "."));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "git", "commit", "--quiet", "-m", "baseline"));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "mv", original, destination));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "config", "diff.renames", "true"));
+
+        var result = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "pwsh", "-NoLogo", "-NoProfile", "-File",
+                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+                "-ComparisonRef", "HEAD", "-PlanOnly"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Output, Does.Contain(
+                "SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+            Assert.That(result.Output, Does.Contain(
+                "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj"));
+        }
+    }
+
+    [TestCase("../Shared/First.cs;../Shared/Second.cs", "Shared/Second.cs")]
+    [TestCase("../Shared/First.cs;../Shared/Second.cs", "Shared/First.cs")]
+    [TestCase("..\\Shared\\First.cs;..\\Shared\\Second.cs", "Shared/Second.cs")]
+    public async Task LinkedCompileItemListsSelectTheirConsumers(
+        string includes,
+        string changedInput)
+    {
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        await CreateFixtureAsync(root, changedInput);
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "SharpProof.Product", "SharpProof.Product.csproj"),
+            $"<Project><ItemGroup><Compile Include=\"{includes}\" /></ItemGroup></Project>");
+        await ArchitectureGitRepository.InitializeAsync(
+            root, "test@example.invalid", "SharpProof Test");
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "add", "."));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "git", "commit", "--quiet", "-m", "baseline"));
+        await File.AppendAllTextAsync(Path.Combine(root, changedInput), "\n// changed\n");
+
+        var result = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "pwsh", "-NoLogo", "-NoProfile", "-File",
+                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+                "-ComparisonRef", "HEAD", "-PlanOnly"));
+
+        Assert.That(result.Output, Does.Contain(
+            "SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+    }
+
     [TestCase("Directory.Build.props")]
     [TestCase("Directory.Packages.props")]
     [TestCase("Directory.Build.targets")]

@@ -59,7 +59,7 @@ Invoke-GitLines @('rev-parse', '--verify', $ComparisonRef) | Out-Null
 $changedPaths = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 foreach ($path in Invoke-GitLines @(
-        'diff', '--name-only', $ComparisonRef, '--')) {
+        'diff', '--no-renames', '--name-only', $ComparisonRef, '--')) {
     [void]$changedPaths.Add($path.Replace('\', '/'))
 }
 foreach ($path in Invoke-GitLines @(
@@ -101,7 +101,8 @@ foreach ($relativePath in $projectPaths) {
             })
     $compiledFiles = @(
         $xml.SelectNodes("//*[local-name()='Compile']") |
-            ForEach-Object { [string]$_.GetAttribute('Include') } |
+            ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
+            ForEach-Object { $_.Trim() } |
             Where-Object {
                 -not [string]::IsNullOrWhiteSpace($_) -and
                 -not $_.Contains('*', [StringComparison]::Ordinal)
