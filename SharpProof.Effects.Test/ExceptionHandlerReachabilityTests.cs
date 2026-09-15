@@ -169,6 +169,88 @@ public sealed class ExceptionHandlerReachabilityTests
     }
 
     [Test]
+    public void RecursiveMethodWithUsingDeclarationKeepsCycleGuard()
+    {
+        // Resolving the using declaration's disposal asks whether the rest of
+        // the block can exit abruptly. That query must stay in the active
+        // traversal, or re-entering Recursive recurses until stack overflow.
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() { }
+            }
+
+            public static class Sample {
+                public static void Recursive(bool again) {
+                    using var resource = new Resource();
+                    if (again) {
+                        Recursive(false);
+                    }
+
+                    throw new ApplicationException();
+                }
+
+                public static void Guarded() {
+                    try {
+                        Recursive(true);
+                    }
+                    catch (ApplicationException) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        Assert.That(
+            IsCatchReachable(compilation, session, "Guarded"),
+            Is.True);
+    }
+
+    [Test]
+    public void RecursiveCatchHandlerUnderFinallyKeepsCycleGuard()
+    {
+        // Deciding whether the finally is reachable asks whether the catch
+        // handler can exit abruptly; that query must stay in the active
+        // traversal, or the handler's recursive call never terminates.
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                public static void Recursive(bool again) {
+                    try {
+                        throw new InvalidOperationException();
+                    }
+                    catch (InvalidOperationException) {
+                        if (again) {
+                            Recursive(false);
+                        }
+
+                        throw new ApplicationException();
+                    }
+                    finally {
+                    }
+                }
+
+                public static void Guarded() {
+                    try {
+                        Recursive(true);
+                    }
+                    catch (ApplicationException) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        Assert.That(
+            IsCatchReachable(compilation, session, "Guarded"),
+            Is.True);
+    }
+
+    [Test]
     public void CallableExceptionWalkHonorsDepthCutoff()
     {
         const int lastForwardingMethod = 34;

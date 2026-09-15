@@ -1936,7 +1936,8 @@ internal sealed class ExceptionHandlerReachability(
                 catchOperation.Handler) ||
                 CanExitAbruptly(
                     catchOperation.Handler,
-                    catchOperation.Handler);
+                    catchOperation.Handler,
+                    traversal);
         }
         if (nestedTry.Finally is not { } finallyOperation ||
             !finallyReachable)
@@ -2162,14 +2163,24 @@ internal sealed class ExceptionHandlerReachability(
         {
             return UnknownPotential;
         }
+        // Abrupt-exit queries made while resolving disposal must stay inside
+        // this traversal: restarting from an empty context dropped the
+        // active-method guard, so a recursive method with a using declaration
+        // recursed until the stack overflowed.
+        bool CanExitAbruptlyInTraversal(IOperation candidate, IOperation scope)
+        {
+            return CanExitAbruptly(candidate, scope, traversal);
+        }
         var scopeExitReachable = operation switch
         {
-            IUsingOperation @using => CanExit(@using.Body),
+            IUsingOperation @using =>
+                canCompleteNormally(@using.Body) ||
+                CanExitAbruptlyInTraversal(@using.Body, @using.Body),
             IUsingDeclarationOperation declaration =>
                 UsingDisposalGraph.CanReachDeclarationDisposal(
                     declaration,
                     canCompleteNormally,
-                    CanExitAbruptly,
+                    CanExitAbruptlyInTraversal,
                     CanDisposalsCompleteNormally),
             _ => false
         };
@@ -2190,7 +2201,7 @@ internal sealed class ExceptionHandlerReachability(
             var (acquired, reachableDisposalCount) = UsingDisposalGraph.AcquireResources(
                 group,
                 canCompleteNormally,
-                CanExitAbruptly,
+                CanExitAbruptlyInTraversal,
                 scopeExitReachable);
             if (reachableDisposalCount == 0)
             {
@@ -2234,17 +2245,39 @@ internal sealed class ExceptionHandlerReachability(
         IOperation operation,
         IOperation scope)
     {
-        if (_abruptExitCache.TryGetValue(
+        return CanExitAbruptly(operation, scope, TraversalContext.Create());
+    }
+
+    private bool CanExitAbruptly(
+        IOperation operation,
+        IOperation scope,
+        TraversalContext traversal)
+    {
+        // Like callable exceptions, only a root query may use the
+        // context-free cache; a nested query depends on the callers already
+        // active in its traversal.
+        var cacheResult = traversal.ActiveMethods.Count == 0;
+        if (cacheResult &&
+            _abruptExitCache.TryGetValue(
                 (operation, scope),
                 out var cached))
         {
             return cached;
         }
 
-        var potential = GetPotentialExceptions(operation);
+        var potential = cacheResult
+            ? GetPotentialExceptions(operation)
+            : GetPotentialExceptions(
+                operation,
+                traversal,
+                keepEscaping: false);
         var abrupt = potential.Unknown || !potential.Known.IsEmpty ||
             CanExitAbruptlyWithoutExceptions(operation, scope);
-        _abruptExitCache.Add((operation, scope), abrupt);
+        if (cacheResult)
+        {
+            _abruptExitCache[(operation, scope)] = abrupt;
+        }
+
         return abrupt;
     }
 
