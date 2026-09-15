@@ -7,6 +7,37 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
+    [TestCase("caf\u00e9.cs", false)]
+    [TestCase("quoted\".cs", false)]
+    [TestCase("line\nbreak.cs", false)]
+    [TestCase("tab\tname.cs", false)]
+    [TestCase("caf\u00e9.cs", true)]
+    [TestCase("quoted\".cs", true)]
+    [TestCase("line\nbreak.cs", true)]
+    [TestCase("tab\tname.cs", true)]
+    public async Task QuotedGitPathsSelectTheirConsumers(string filename, bool untracked)
+    {
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        var changedInput = "SharpProof.Product/" + filename;
+        await CreateFixtureAsync(root, changedInput);
+        if (untracked)
+        {
+            File.Delete(Path.Combine(root, changedInput));
+        }
+        await ArchitectureGitRepository.InitializeAsync(root, "test@example.invalid", "SharpProof Test");
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "add", "."));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "commit", "--quiet", "-m", "baseline"));
+        await File.AppendAllTextAsync(Path.Combine(root, changedInput), "\n// changed\n");
+        var result = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "pwsh", "-NoLogo", "-NoProfile", "-File",
+                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+                "-ComparisonRef", "HEAD", "-PlanOnly"));
+        Assert.That(result.Output, Does.Contain("SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+    }
+
     [TestCase("<ProjectReference Include=\"../SharpProof.Product/SharpProof.Product.csproj;../SharpProof.Effects.Test/SharpProof.Effects.Test.csproj\" />")]
     [TestCase("<ProjectReference Include=\"../SharpProof.Product/SharpProof.Product.csproj\" /><ProjectReference Update=\"../SharpProof.Product/SharpProof.Product.csproj\" PrivateAssets=\"all\" />")]
     public async Task ProjectReferenceItemFormsPreserveDependentSelection(string references)

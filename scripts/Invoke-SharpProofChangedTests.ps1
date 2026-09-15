@@ -40,6 +40,35 @@ function Invoke-GitLines {
     return @($lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
+function Invoke-GitPaths {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+    # Read raw NUL-delimited output: line-based native output parsing loses
+    # embedded newlines, and ordinary Git output quotes non-ASCII paths.
+    $start = [Diagnostics.ProcessStartInfo]::new('git')
+    $start.UseShellExecute = $false
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $start.StandardOutputEncoding = [Text.Encoding]::UTF8
+    foreach ($argument in @('-C', $repositoryRoot) + $Arguments) {
+        $start.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::Start($start)
+    try {
+        $errorOutput = $process.StandardError.ReadToEndAsync()
+        $output = $process.StandardOutput.ReadToEnd()
+        $process.WaitForExit()
+        $errorText = $errorOutput.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw "git $($Arguments -join ' ') failed: $errorText"
+        }
+        return $output.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $configured = [Environment]::GetEnvironmentVariable(
         'SHARPPROOF_CHANGED_BASE_REF',
@@ -58,12 +87,12 @@ if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
 Invoke-GitLines @('rev-parse', '--verify', $ComparisonRef) | Out-Null
 $changedPaths = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
-foreach ($path in Invoke-GitLines @(
-        'diff', '--no-renames', '--name-only', $ComparisonRef, '--')) {
+foreach ($path in Invoke-GitPaths @(
+        'diff', '-z', '--no-renames', '--name-only', $ComparisonRef, '--')) {
     [void]$changedPaths.Add($path.Replace('\', '/'))
 }
-foreach ($path in Invoke-GitLines @(
-        'ls-files', '--others', '--exclude-standard')) {
+foreach ($path in Invoke-GitPaths @(
+        'ls-files', '-z', '--others', '--exclude-standard')) {
     [void]$changedPaths.Add($path.Replace('\', '/'))
 }
 if ($changedPaths.Count -eq 0) {
@@ -73,7 +102,7 @@ if ($changedPaths.Count -eq 0) {
 
 $projectPaths = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
-foreach ($projectPath in Invoke-GitLines @('ls-files', '*.csproj')) {
+foreach ($projectPath in Invoke-GitPaths @('ls-files', '-z', '*.csproj')) {
     [void]$projectPaths.Add($projectPath.Replace('\', '/'))
 }
 foreach ($changedPath in $changedPaths) {
