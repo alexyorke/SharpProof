@@ -39,6 +39,9 @@ public sealed class EffectAnalysisSession
     private readonly object _gate = new();
     private ImmutableArray<EffectModuleInitializer> _moduleInitializers;
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
+    // Read and written by concurrent callers outside _gate; guarded separately
+    // so the (deterministic) computation itself is not serialized.
+    private readonly object _staticInitializationFailureGate = new();
     private readonly Dictionary<INamedTypeSymbol, bool>
         _staticInitializationFailureCache = new(SymbolEqualityComparer.Default);
     private ImmutableDictionary<IMethodSymbol, EffectSummary> _bodySummaries =
@@ -451,9 +454,12 @@ public sealed class EffectAnalysisSession
     private bool StaticInitializationCannotComplete(INamedTypeSymbol type)
     {
         type = type.OriginalDefinition;
-        if (_staticInitializationFailureCache.TryGetValue(type, out var cached))
+        lock (_staticInitializationFailureGate)
         {
-            return cached;
+            if (_staticInitializationFailureCache.TryGetValue(type, out var cached))
+            {
+                return cached;
+            }
         }
 
         var facts = new DefiniteOperationFacts(
@@ -464,7 +470,11 @@ public sealed class EffectAnalysisSession
             type.StaticConstructors.Any(
             constructor => constructor.DeclaringSyntaxReferences.Length != 0 &&
                 !facts.MethodCanCompleteNormally(constructor));
-        _staticInitializationFailureCache.Add(type, result);
+        lock (_staticInitializationFailureGate)
+        {
+            _staticInitializationFailureCache[type] = result;
+        }
+
         return result;
     }
 

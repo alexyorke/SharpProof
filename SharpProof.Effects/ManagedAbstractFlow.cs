@@ -2192,13 +2192,42 @@ internal readonly record struct ManagedAbstractValue
 /// <summary>Fail-closed execution facts shared by analyzer and effect witnesses.</summary>
 internal sealed class DefiniteOperationFacts(Compilation compilation, CancellationToken cancellationToken)
 {
-    // Explicit comparer: this set is the cycle guard for CompletesNormally, so
-    // if it ever degraded to reference equality the failure mode would be
-    // unbounded recursion rather than a wrong answer.
-    private readonly HashSet<IMethodSymbol> _activeMethods =
-        new(SymbolEqualityComparer.Default);
+    // The active-method sets are the cycle guard for CompletesNormally and
+    // MethodCanCompleteNormally.  ManagedAbstractFlow shares one instance per
+    // compilation across Roslyn's concurrent analysis threads, and recursive
+    // re-entry always stays on one thread, so each set is per thread and per
+    // instance rather than an instance field.
+    [ThreadStatic]
+    private static Dictionary<DefiniteOperationFacts, HashSet<IMethodSymbol>>?
+        s_activeMethods;
     private readonly INamedTypeSymbol? _contractApi =
         ContractApiIdentityResolver.ForCompilation(compilation).Contract;
+
+    private bool TryEnterMethod(IMethodSymbol method)
+    {
+        var active = s_activeMethods ??= [];
+        if (!active.TryGetValue(this, out var methods))
+        {
+            // Explicit comparer: if the guard ever degraded to reference
+            // equality the failure mode would be unbounded recursion rather
+            // than a wrong answer.
+            methods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            active.Add(this, methods);
+        }
+
+        return methods.Add(method);
+    }
+
+    private void ExitMethod(IMethodSymbol method)
+    {
+        var active = s_activeMethods!;
+        var methods = active[this];
+        methods.Remove(method);
+        if (methods.Count == 0)
+        {
+            active.Remove(this);
+        }
+    }
 
     internal bool CompletesNormally(IOperation? operation)
     {
@@ -2267,7 +2296,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         var normalized = method.OriginalDefinition;
-        if (normalized.DeclaringSyntaxReferences.Length != 1 || !_activeMethods.Add(normalized))
+        if (normalized.DeclaringSyntaxReferences.Length != 1 || !TryEnterMethod(normalized))
         {
             return false;
         }
@@ -2286,7 +2315,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
         finally
         {
-            _activeMethods.Remove(normalized);
+            ExitMethod(normalized);
         }
     }
 
@@ -2315,7 +2344,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             return false;
         }
-        if (!_activeMethods.Add(normalized))
+        if (!TryEnterMethod(normalized))
         {
             // This is a may-complete query. Recursive re-entry is uncertainty,
             // not evidence that every invocation is nonreturning.
@@ -2358,7 +2387,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
         finally
         {
-            _activeMethods.Remove(normalized);
+            ExitMethod(normalized);
         }
     }
 

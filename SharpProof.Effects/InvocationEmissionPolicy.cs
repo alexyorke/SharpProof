@@ -8,6 +8,11 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
     private readonly INamedTypeSymbol? _conditionalAttribute =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.ConditionalAttribute);
+    // One policy is shared by every concurrent analyzer callback on a
+    // compilation session, so the caches are guarded.  Values are pure
+    // functions of their keys: compute outside the gate and let the last
+    // writer store the identical result.
+    private readonly object _cacheGate = new();
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
         _definedPreprocessorSymbols = [];
     private readonly Dictionary<IMethodSymbol, bool>
@@ -19,11 +24,10 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
     {
         var target = invocation.TargetMethod.ReducedFrom ??
             invocation.TargetMethod;
-        if (!_unimplementedPartials.TryGetValue(target, out var isUnimplementedPartial))
-        {
-            isUnimplementedPartial = IsUnimplementedPartial(target);
-            _unimplementedPartials.Add(target, isUnimplementedPartial);
-        }
+        var isUnimplementedPartial = GetOrAdd(
+            _unimplementedPartials,
+            target,
+            IsUnimplementedPartial);
         if (isUnimplementedPartial)
         {
             return true;
@@ -34,9 +38,10 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
         {
             return false;
         }
-        if (!_conditionalSymbols.TryGetValue(target, out var conditionalSymbols))
-        {
-            conditionalSymbols = target.GetAttributes()
+        var conditionalSymbols = GetOrAdd(
+            _conditionalSymbols,
+            target,
+            method => method.GetAttributes()
                 .Where(attribute => SymbolEqualityComparer.Default.Equals(
                     attribute.AttributeClass?.OriginalDefinition,
                     _conditionalAttribute.OriginalDefinition))
@@ -46,25 +51,40 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
                         : null)
                 .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
                 .Select(static symbol => symbol!)
-                .ToImmutableArray();
-            _conditionalSymbols.Add(target, conditionalSymbols);
-        }
+                .ToImmutableArray());
         if (conditionalSymbols.IsDefaultOrEmpty)
         {
             return false;
         }
-        if (!_definedPreprocessorSymbols.TryGetValue(
-                invocation.Syntax.SyntaxTree,
-                out var definedSymbols))
-        {
-            definedSymbols = CSharpPreprocessorSymbols.GetDefined(
-                invocation.Syntax.SyntaxTree);
-            _definedPreprocessorSymbols.Add(
-                invocation.Syntax.SyntaxTree,
-                definedSymbols);
-        }
+        var definedSymbols = GetOrAdd(
+            _definedPreprocessorSymbols,
+            invocation.Syntax.SyntaxTree,
+            static tree => CSharpPreprocessorSymbols.GetDefined(tree));
         return conditionalSymbols.All(symbol =>
             !definedSymbols.Contains(symbol));
+    }
+
+    private TValue GetOrAdd<TKey, TValue>(
+        Dictionary<TKey, TValue> cache,
+        TKey key,
+        Func<TKey, TValue> create)
+        where TKey : notnull
+    {
+        lock (_cacheGate)
+        {
+            if (cache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+        }
+
+        var value = create(key);
+        lock (_cacheGate)
+        {
+            cache[key] = value;
+        }
+
+        return value;
     }
 
     internal static bool IsUnimplementedPartial(IMethodSymbol method)
