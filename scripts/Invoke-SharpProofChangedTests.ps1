@@ -172,8 +172,8 @@ foreach ($relativePath in $projectPaths) {
                 $projectInventoryIncomplete = $true
                 continue
             }
-            $pendingImports.Push([IO.Path]::GetFullPath((Join-Path (
-                Split-Path -Parent $buildFile) $importPath)))
+            $pendingImports.Push([IO.Path]::GetFullPath(
+                $importPath.Replace('\', '/'), (Split-Path -Parent $buildFile)))
         }
     }
     # Imported item paths are relative to the consuming project, whereas
@@ -197,8 +197,8 @@ foreach ($relativePath in $projectPaths) {
                 $_ -notmatch '[$@%]\(|%[0-9a-f]{2}|[*?]'
             } |
             ForEach-Object {
-                [IO.Path]::GetFullPath((Join-Path (
-                    Split-Path -Parent $fullPath) $_))
+                [IO.Path]::GetFullPath(
+                    $_.Replace('\', '/'), (Split-Path -Parent $fullPath))
             })
     $compiledFilePatterns = @(
         $items | Where-Object { $_.LocalName -eq 'Compile' } |
@@ -209,8 +209,8 @@ foreach ($relativePath in $projectPaths) {
                 $_ -notmatch '[$@%]\(|%[0-9a-f]{2}'
             } |
             ForEach-Object {
-                [IO.Path]::GetFullPath((Join-Path (
-                    Split-Path -Parent $fullPath) $_)).Replace('\', '/')
+                [IO.Path]::GetFullPath(
+                    $_.Replace('\', '/'), (Split-Path -Parent $fullPath)).Replace('\', '/')
             } |
             ForEach-Object {
                 # Match the changed path itself, including deleted files.

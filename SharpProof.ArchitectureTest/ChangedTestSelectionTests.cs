@@ -52,27 +52,34 @@ public sealed class ChangedTestSelectionTests
         Assert.That(result.Output, Does.Not.Contain("duration-aware sharder"));
     }
 
-    [TestCase(false, false, false)]
-    [TestCase(false, true, false)]
-    [TestCase(true, false, false)]
-    [TestCase(true, true, false)]
-    [TestCase(false, false, true)]
-    [TestCase(true, false, true)]
-    public async Task ImportedDependencyItemsSelectConsumers(bool nested, bool compile, bool changeImport)
+    [TestCase(false, false, false, false)]
+    [TestCase(false, true, false, false)]
+    [TestCase(true, false, false, false)]
+    [TestCase(true, true, false, false)]
+    [TestCase(false, false, true, false)]
+    [TestCase(true, false, true, false)]
+    [TestCase(false, false, false, true)]
+    [TestCase(false, true, false, true)]
+    [TestCase(true, false, false, true)]
+    public async Task ImportedDependencyItemsSelectConsumers(bool nested, bool compile, bool changeImport, bool absolute)
     {
         using var temporary = new TempDirectory("SharpProof.ChangedTests-");
         var root = temporary.FullName;
         var changedInput = compile ? "Shared/Source.cs" : "SharpProof.Product/Source.cs";
         await CreateFixtureAsync(root, changedInput);
         Directory.CreateDirectory(Path.Combine(root, "Shared"));
+        var itemPath = compile ? "Shared/Source.cs" : "SharpProof.Product/SharpProof.Product.csproj";
+        var include = absolute ? Path.Combine(root, itemPath) : "../" + itemPath;
+        var itemName = compile ? "Compile" : "ProjectReference";
         await File.WriteAllTextAsync(Path.Combine(root, "Shared", "Dependencies.proj"),
-            compile
-                ? "<Project><ItemGroup><Compile Include=\"../Shared/Source.cs\" /></ItemGroup></Project>"
-                : "<Project><ItemGroup><ProjectReference Include=\"../SharpProof.Product/SharpProof.Product.csproj\" /></ItemGroup></Project>");
+            $"<Project><ItemGroup><{itemName} Include=\"{include}\" /></ItemGroup></Project>");
+        var innerImport = absolute ? Path.Combine(root, "Shared", "Dependencies.proj") : "Dependencies.proj";
         await File.WriteAllTextAsync(Path.Combine(root, "Shared", "Outer.proj"),
-            "<Project><Import Project=\"Dependencies.proj\" /></Project>");
+            $"<Project><Import Project=\"{innerImport}\" /></Project>");
+        var importName = (nested ? "Outer" : "Dependencies") + ".proj";
+        var importPath = absolute ? Path.Combine(root, "Shared", importName) : "../Shared/" + importName;
         await File.WriteAllTextAsync(Path.Combine(root, "SharpProof.Effects.Test", "SharpProof.Effects.Test.csproj"),
-            $"<Project><Import Project=\"../Shared/{(nested ? "Outer" : "Dependencies")}.proj\" /></Project>");
+            $"<Project><Import Project=\"{importPath}\" /></Project>");
         var evaluated = await ArchitectureRepository.AssertSuccessAsync(
             ArchitectureRepository.RunProcessAsync(root, "dotnet", "msbuild",
                 Path.Combine(root, "SharpProof.Effects.Test", "SharpProof.Effects.Test.csproj"),
