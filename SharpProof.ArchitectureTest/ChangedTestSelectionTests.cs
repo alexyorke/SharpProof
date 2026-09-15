@@ -7,6 +7,30 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
+    [Test]
+    public async Task CaseDistinctProjectsRemainSeparateOnLinux()
+    {
+        using var temporary = new TempDirectory("SharpProof.ChangedTests-");
+        var root = temporary.FullName;
+        await CreateFixtureAsync(root, "Directory.Build.props");
+        var otherDirectory = Path.Combine(root, "SharpProof.product.Test");
+        Directory.CreateDirectory(otherDirectory);
+        await File.WriteAllTextAsync(Path.Combine(otherDirectory, "SharpProof.product.Test.csproj"),
+            "<Project />");
+        await ArchitectureGitRepository.InitializeAsync(root, "test@example.invalid", "SharpProof Test");
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "add", "."));
+        await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "git", "commit", "--quiet", "-m", "baseline"));
+        await File.AppendAllTextAsync(Path.Combine(root, "Directory.Build.props"), "\n<!-- changed -->\n");
+        var result = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(root, "pwsh", "-NoLogo", "-NoProfile", "-File",
+                Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
+                "-ComparisonRef", "HEAD", "-PlanOnly"));
+        Assert.That(result.Output, Does.Contain("SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+        Assert.That(result.Output, Does.Contain("SharpProof.product.Test\\SharpProof.product.Test.csproj"));
+    }
+
     [TestCase("<ItemGroup><ProjectReference Include=\"../SharpProof.Product/%53harpProof.Product.csproj\" /></ItemGroup>", "SharpProof.Product/Source.cs")]
     [TestCase("<ItemGroup><Compile Include=\"../Shared/%53ource.cs\" /></ItemGroup>", "Shared/Source.cs")]
     [TestCase("<PropertyGroup><Dependency>../SharpProof.Product/SharpProof.Product.csproj</Dependency></PropertyGroup><ItemGroup><ProjectReference Include=\"$(Dependency)\" /></ItemGroup>", "SharpProof.Product/Source.cs")]

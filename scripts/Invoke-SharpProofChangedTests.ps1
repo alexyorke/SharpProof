@@ -110,7 +110,8 @@ foreach ($changedPath in $changedPaths) {
         [void]$projectPaths.Add($changedPath)
     }
 }
-$projects = @{}
+$projects = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
 $projectInventoryIncomplete = $false
 foreach ($relativePath in $projectPaths) {
     $relative = $relativePath.Replace('\', '/')
@@ -247,7 +248,8 @@ if ($globalImpact) {
     }
 }
 else {
-    $reverseReferences = @{}
+    $reverseReferences = [Collections.Generic.Dictionary[string, object]]::new(
+        [StringComparer]::Ordinal)
     foreach ($project in $projects.Values) {
         if (-not $reverseReferences.ContainsKey($project.FullPath)) {
             $reverseReferences[$project.FullPath] =
