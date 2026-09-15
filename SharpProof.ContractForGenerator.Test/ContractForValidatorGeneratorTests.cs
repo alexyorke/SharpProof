@@ -235,7 +235,7 @@ public sealed class ContractForValidatorGeneratorTests
 
     [TestCase("interface", "void Read(ref readonly int value);")]
     [TestCase("abstract class", "public abstract void Read(ref readonly int value);")]
-    public void RefReadonlyParameterMatchesExactStaticCompanion(
+    public void AbstractRefReadonlyParameterMatchesExactStaticCompanion(
         string targetKind,
         string member)
     {

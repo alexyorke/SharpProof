@@ -1357,7 +1357,7 @@
     "original": "return refKind is RefKind.In or RefKind.RefReadOnlyParameter;",
     "mutated": "return refKind is RefKind.In;",
     "project": "SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj",
-    "filter": "FullyQualifiedName~RefReadonlyParameterMatchesExactStaticCompanion"
+    "filter": "FullyQualifiedName~AbstractRefReadonlyParameterMatchesExactStaticCompanion"
   },
   {
     "name": "contract-ref-expression-uses-declaration-operation-root",
