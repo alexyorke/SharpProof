@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -70,12 +71,21 @@ public sealed class ChangedTestSelectionTests
         }
     }
 
-    [TestCase("../Shared/First.cs;../Shared/Second.cs", "Shared/Second.cs")]
-    [TestCase("../Shared/First.cs;../Shared/Second.cs", "Shared/First.cs")]
-    [TestCase("..\\Shared\\First.cs;..\\Shared\\Second.cs", "Shared/Second.cs")]
-    public async Task LinkedCompileItemListsSelectTheirConsumers(
+    [TestCase("../Shared/First.cs;../Shared/Second.cs", "Shared/Second.cs", false, true)]
+    [TestCase("../Shared/First.cs;../Shared/Second.cs", "Shared/First.cs", false, true)]
+    [TestCase("..\\Shared\\First.cs;..\\Shared\\Second.cs", "Shared/Second.cs", false, true)]
+    [TestCase("../Shared/**/*.cs", "Shared/First.cs", false, true)]
+    [TestCase("../Shared/**/*.cs", "Shared/Nested/First.cs", false, true)]
+    [TestCase("../Shared/**/*.cs", "Shared/Nested/First.cs", true, true)]
+    [TestCase("..\\Shared\\**\\*.cs", "Shared/Nested/First.cs", false, true)]
+    [TestCase("../Shared/File?.cs", "Shared/File1.cs", false, true)]
+    [TestCase("../Shared/*.cs", "Shared/Nested/First.cs", false, false)]
+    [TestCase("../Shared/**/*.cs", "Shared/First.txt", false, false)]
+    public async Task LinkedCompileInputsSelectTheirConsumers(
         string includes,
-        string changedInput)
+        string changedInput,
+        bool deleted,
+        bool selectsConsumer)
     {
         using var temporary = new TempDirectory("SharpProof.ChangedTests-");
         var root = temporary.FullName;
@@ -83,6 +93,16 @@ public sealed class ChangedTestSelectionTests
         await File.WriteAllTextAsync(
             Path.Combine(root, "SharpProof.Product", "SharpProof.Product.csproj"),
             $"<Project><ItemGroup><Compile Include=\"{includes}\" /></ItemGroup></Project>");
+        var evaluated = await ArchitectureRepository.AssertSuccessAsync(
+            ArchitectureRepository.RunProcessAsync(
+                root, "dotnet", "msbuild",
+                Path.Combine(root, "SharpProof.Product", "SharpProof.Product.csproj"),
+                "-getItem:Compile", "-nologo"));
+        using var inventory = JsonDocument.Parse(evaluated.Output);
+        Assert.That(inventory.RootElement.GetProperty("Items").GetProperty("Compile")
+            .EnumerateArray().Any(item => string.Equals(
+                item.GetProperty("FullPath").GetString(), Path.Combine(root, changedInput),
+                StringComparison.Ordinal)), Is.EqualTo(selectsConsumer));
         await ArchitectureGitRepository.InitializeAsync(
             root, "test@example.invalid", "SharpProof Test");
         await ArchitectureRepository.AssertSuccessAsync(
@@ -90,7 +110,14 @@ public sealed class ChangedTestSelectionTests
         await ArchitectureRepository.AssertSuccessAsync(
             ArchitectureRepository.RunProcessAsync(
                 root, "git", "commit", "--quiet", "-m", "baseline"));
-        await File.AppendAllTextAsync(Path.Combine(root, changedInput), "\n// changed\n");
+        if (deleted)
+        {
+            File.Delete(Path.Combine(root, changedInput));
+        }
+        else
+        {
+            await File.AppendAllTextAsync(Path.Combine(root, changedInput), "\n// changed\n");
+        }
 
         var result = await ArchitectureRepository.AssertSuccessAsync(
             ArchitectureRepository.RunProcessAsync(
@@ -98,8 +125,11 @@ public sealed class ChangedTestSelectionTests
                 Path.Combine(root, "scripts", "Invoke-SharpProofChangedTests.ps1"),
                 "-ComparisonRef", "HEAD", "-PlanOnly"));
 
-        Assert.That(result.Output, Does.Contain(
-            "SharpProof.Product.Test\\SharpProof.Product.Test.csproj"));
+        Assert.That(result.Output.Contains(
+            "SharpProof.Product.Test\\SharpProof.Product.Test.csproj",
+            StringComparison.Ordinal), Is.EqualTo(selectsConsumer));
+        Assert.That(result.Output, Does.Not.Contain(
+            "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj"));
     }
 
     [TestCase("Directory.Build.props")]

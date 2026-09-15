@@ -101,24 +101,35 @@ foreach ($relativePath in $projectPaths) {
                 [IO.Path]::GetFullPath((Join-Path (
                     Split-Path -Parent $fullPath) $_))
             })
-    $compiledFiles = @(
+    $compiledFilePatterns = @(
         $xml.SelectNodes("//*[local-name()='Compile']") |
             ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
             ForEach-Object { $_.Trim() } |
             Where-Object {
-                -not [string]::IsNullOrWhiteSpace($_) -and
-                -not $_.Contains('*', [StringComparison]::Ordinal)
+                -not [string]::IsNullOrWhiteSpace($_)
             } |
             ForEach-Object {
                 [IO.Path]::GetFullPath((Join-Path (
-                    Split-Path -Parent $fullPath) $_))
+                    Split-Path -Parent $fullPath) $_)).Replace('\', '/')
+            } |
+            ForEach-Object {
+                # Match the changed path itself, including deleted files.
+                # A recursive directory wildcard also matches zero directories;
+                # ordinary wildcards cannot cross directory separators.
+                $pattern = [regex]::Escape($_).
+                    Replace('\*\*/', '(?:.*/)?').
+                    Replace('\*\*', '.*').
+                    Replace('\*', '[^/]*').
+                    Replace('\?', '[^/]')
+                [regex]::new('\A' + $pattern + '\z',
+                    [Text.RegularExpressions.RegexOptions]::CultureInvariant)
             })
     $projects[$fullPath] = [pscustomobject]@{
         FullPath = $fullPath
         RelativePath = $relative
         Directory = Split-Path -Parent $fullPath
         References = $references
-        CompiledFiles = $compiledFiles
+        CompiledFilePatterns = $compiledFilePatterns
     }
 }
 
@@ -174,7 +185,9 @@ foreach ($changedPath in $changedPaths) {
         if ($fullChangedPath.StartsWith(
                 $directoryPrefix,
                 [StringComparison]::Ordinal) -or
-            $project.CompiledFiles -contains $fullChangedPath) {
+            @($project.CompiledFilePatterns | Where-Object {
+                $_.IsMatch($fullChangedPath.Replace('\', '/'))
+            }).Count -ne 0) {
             [void]$changedProjectPaths.Add($project.FullPath)
         }
     }
