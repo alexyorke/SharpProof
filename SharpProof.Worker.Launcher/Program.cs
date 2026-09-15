@@ -1111,6 +1111,7 @@ internal sealed partial class LauncherArguments
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path);
         artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
+        CompilerSourceRebinding.Validate(artifact);
         return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
     }
 

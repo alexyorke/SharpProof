@@ -1,6 +1,6 @@
 # Bug backlog
 
-1 open bug, reprioritized by impact, reachability, and affected scope.
+0 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,9 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (1)
-
-- **BUG-146 [P0] - Source-location authority is not bound to claim ownership:** CompilerManifestArtifact validates owner and location pairs against mutable manifest rows and source geometry but never independently binds a predicate or callable to that span. Resealed evidence can report a verified claim at another valid source location while passing authority checks.
+## P0 - Critical (0)
 
 ## P1 - High (0)
 

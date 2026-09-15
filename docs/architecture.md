@@ -274,6 +274,18 @@ also rejects a changed effect-event order, source tree/span, event or
 constraint hash, identity field, or witness relationship before semantic
 replay.
 
+Location authorities bind every manifest callable and claim to one captured
+tree and valid mapped geometry. Hydration also requires each direct-clause
+claim to lie strictly inside its callable's implementation declaration and a
+callable's direct clauses to keep source order, so a resealed artifact cannot
+move a claim into another declaration or swap claim locations. Because the
+worker has no source text, the launcher, which runs beside the build's
+sources, rereads each owning tree, requires its captured length and content
+hash, and requires callable spans to be declarations, clause claims to be
+`Ensures` invocations, and attribute claims to be attribute syntax. In-memory
+source-generator output has no file to reread and keeps only the hydration
+checks.
+
 The worker project contains no direct Roslyn dependency and performs no
 compiler reconstruction or source parsing. It does not reread reference files.
 Compiler versions and MVIDs and reference paths/hashes/identities/aliases are

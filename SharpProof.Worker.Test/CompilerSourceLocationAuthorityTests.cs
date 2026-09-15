@@ -4,6 +4,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
+using System.Text;
 using System.Text.Json;
 
 namespace SharpProof.Worker.Test;
@@ -100,6 +101,79 @@ public sealed class CompilerSourceLocationAuthorityTests
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingAcceptsCapturedSource()
+    {
+        var artifact = CreateOnDiskContractArtifact(out _);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingRejectsResealedRelocationWithinCallable()
+    {
+        var artifact = CreateOnDiskContractArtifact(out var source);
+        var claim = artifact.Manifest.Claims.Single();
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        var start = source.IndexOf("return value", StringComparison.Ordinal);
+        Assert.That(
+            CompilerSourceLocationAuthority.TryMap(
+                tree.LineMap,
+                start,
+                out var mappedPath,
+                out var mappedLine,
+                out var mappedColumn),
+            Is.True);
+        claim.Location = new WorkerSourceLocation
+        {
+            Path = mappedPath,
+            Start = start,
+            Length = "return value".Length,
+            Line = mappedLine + 1,
+            Column = mappedColumn + 1
+        };
+        artifact.LocationAuthorities.Single(authority =>
+                authority.OwnerKind == CompilerSourceLocationOwnerKind.Claim)
+            .Location = CompilerSourceLocationAuthority.CopyLocation(
+                claim.Location);
+        artifact.Manifest.Hash =
+            WorkerProtocolJson.ComputeManifestHash(artifact.Manifest);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        using (Assert.EnterMultipleScope())
+        {
+            // The relocation stays inside the callable, so hydration alone
+            // cannot tell it apart from the collector's own span.
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerSourceRebinding.Validate(artifact)));
+        }
+    }
+
+    [Test]
+    public void SourceRebindingSkipsTreesWithoutAFile()
+    {
+        var artifact = CreateOnDiskContractArtifact(out _);
+        File.Delete(artifact.Compilation.SyntaxTrees.Single().Path);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingRejectsChangedSource()
+    {
+        var artifact = CreateOnDiskContractArtifact(out _);
+        var path = artifact.Compilation.SyntaxTrees.Single().Path;
+        File.AppendAllText(path, "// changed\n");
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
     }
 
     [TestCase("callable-declaration")]
@@ -468,6 +542,31 @@ public sealed class CompilerSourceLocationAuthorityTests
             "}\n")
     {
         var compilation = CreateCompilation(source, includeContractReference: true);
+        return CreateArtifact(compilation);
+    }
+
+    private static CompilerManifestArtifact CreateOnDiskContractArtifact(
+        out string source)
+    {
+        source = "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "  internal static int Identity(int value) {\n" +
+            "    Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "    return value;\n" +
+            "  }\n" +
+            "}\n";
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SourceRebindingSubject-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(path, source, new UTF8Encoding(false));
+        var compilation = CSharpCompilation.Create(
+            "CompilerSourceRebindingTest",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                path)],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         return CreateArtifact(compilation);
     }
 
