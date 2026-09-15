@@ -32,8 +32,13 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
             {
                 callSyntax = syntax;
             }
-            if (syntax is StatementSyntax or AnonymousFunctionExpressionSyntax or
-                MemberDeclarationSyntax)
+            // A lowered delegate creation can use the lambda's own syntax;
+            // only operations inside its body establish a callable boundary.
+            if (syntax is StatementSyntax or MemberDeclarationSyntax ||
+                syntax is AnonymousFunctionExpressionSyntax &&
+                !(ReferenceEquals(syntax, operation.Syntax) &&
+                    operation is IDelegateCreationOperation or IFlowCaptureOperation or
+                        IFlowAnonymousFunctionOperation))
             {
                 break;
             }

@@ -6,6 +6,75 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class InvocationEmissionPolicyConcurrencyTests
 {
+    [TestCase(false, "expression")]
+    [TestCase(true, "expression")]
+    [TestCase(false, "block")]
+    [TestCase(true, "block")]
+    [TestCase(false, "anonymous")]
+    [TestCase(true, "anonymous")]
+    public void OmittedBranchingLambdaCreationPreservesNestedBodyAnalysis(bool enabled, string form)
+    {
+        var first = form switch
+        {
+            "expression" => "() => State++",
+            "block" => "() => { State++; }",
+            "anonymous" => "delegate { State++; }",
+            _ => throw new ArgumentOutOfRangeException(nameof(form))
+        };
+        var second = first.Replace("++", "--", StringComparison.Ordinal);
+        var compilation = EffectTestHost.CreateCompilation(
+            (enabled ? "#define TRACE_CALL\n" : "") +
+            $$"""
+            public static class Sample {
+                public static int State;
+                [System.Diagnostics.Conditional("TRACE_CALL")]
+                public static void Accept(System.Action action) { action(); }
+                public static void Caller() {
+                    Accept(State == 0 ? (System.Action)({{first}}) : {{second}});
+                }
+            }
+            """);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly(
+            "ConditionalLambda", EffectTestHost.EmitImage(compilation).Image, assembly =>
+            {
+                var sample = assembly.GetType("Sample")!;
+                sample.GetMethod("Caller")!.Invoke(null, null);
+                Assert.That(sample.GetField("State")!.GetValue(null),
+                    Is.EqualTo(enabled ? 1 : 0));
+            });
+        var session = new EffectAnalysisSession(compilation);
+        var result = session.Analyze(EffectTestHost.SampleMethod(compilation, "Caller"));
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var caller = EffectTestHost.SampleMethod(compilation, "Caller");
+        var body = (IMethodBodyOperation)model.GetOperation(
+            caller.DeclaringSyntaxReferences.Single().GetSyntax())!;
+        var graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(body);
+        var policy = new InvocationEmissionPolicy(compilation);
+        foreach (var operation in graph.Blocks.SelectMany(block => block.Operations)
+                     .SelectMany(operation => operation.DescendantsAndSelf())
+                     .OfType<IDelegateCreationOperation>())
+        {
+            Assert.That(policy.IsElided(operation), Is.EqualTo(!enabled));
+        }
+        if (enabled)
+        {
+            Assert.That(result.Summary.Allocation, Is.Not.EqualTo(EffectAllocationKind.None));
+        }
+        else
+        {
+            Assert.That(result.Summary.Allocation, Is.EqualTo(EffectAllocationKind.None));
+        }
+        foreach (var syntax in tree.GetRoot().DescendantNodes()
+                     .OfType<AnonymousFunctionExpressionSyntax>())
+        {
+            var lambda = (IAnonymousFunctionOperation)model.GetOperation(syntax)!;
+            Assert.That(policy.IsElided(lambda.Body), Is.False);
+            Assert.That(session.Analyze(lambda.Symbol).Summary.Writes.Contains(
+                EffectRegionId.Static()), Is.True);
+        }
+    }
+
     [TestCase("Caller", false)]
     [TestCase("Caller", true)]
     [TestCase("After", false)]
