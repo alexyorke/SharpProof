@@ -1052,7 +1052,84 @@ internal static class CompilerManifestArtifactJson
             }
         }
 
+        return HasOwnedDirectClauseLocations(manifest, authorities);
+    }
+
+    // Geometry alone accepts any valid span.  A direct clause is an invocation
+    // inside its callable's own (implementation) declaration, and the collector
+    // numbers a callable's direct clauses in (tree, start, length) order, so a
+    // resealed relocation to another declaration or a swap of claim locations
+    // cannot preserve both facts.  Companion clauses live elsewhere.
+    private static bool HasOwnedDirectClauseLocations(
+        WorkerClaimManifest manifest,
+        CompilerLocationAuthorityArtifact[] authorities)
+    {
+        var callableAuthorities =
+            new Dictionary<string, CompilerLocationAuthorityArtifact>(
+                StringComparer.Ordinal);
+        var claimAuthorities =
+            new Dictionary<string, CompilerLocationAuthorityArtifact>(
+                StringComparer.Ordinal);
+        foreach (var authority in authorities)
+        {
+            (authority.OwnerKind == CompilerSourceLocationOwnerKind.Claim
+                ? claimAuthorities
+                : callableAuthorities)[authority.OwnerId] = authority;
+        }
+
+        foreach (var claims in manifest.Claims
+                     .Where(static claim =>
+                         claim.Evidence == WorkerClaimEvidence.DirectClause)
+                     .GroupBy(
+                         static claim => claim.CallableId,
+                         StringComparer.Ordinal))
+        {
+            var owner = callableAuthorities[claims.Key];
+            CompilerLocationAuthorityArtifact? previous = null;
+            foreach (var claim in claims.OrderBy(static claim => claim.Ordinal))
+            {
+                var current = claimAuthorities[claim.ClaimId];
+                if ((previous != null &&
+                        CompareSourceOrder(previous, current) >= 0) ||
+                    (!CompilerSourceLocationAuthority.IsNone(owner.Location) &&
+                        !IsStrictlyContained(current, owner)))
+                {
+                    return false;
+                }
+
+                previous = current;
+            }
+        }
+
         return true;
+    }
+
+    private static bool IsStrictlyContained(
+        CompilerLocationAuthorityArtifact inner,
+        CompilerLocationAuthorityArtifact outer)
+    {
+        var innerEnd = (long)inner.Location.Start + inner.Location.Length;
+        var outerEnd = (long)outer.Location.Start + outer.Location.Length;
+        return !CompilerSourceLocationAuthority.IsNone(inner.Location) &&
+            inner.SourceTreeOrdinal == outer.SourceTreeOrdinal &&
+            inner.Location.Start >= outer.Location.Start &&
+            innerEnd <= outerEnd &&
+            inner.Location.Length < outer.Location.Length;
+    }
+
+    private static int CompareSourceOrder(
+        CompilerLocationAuthorityArtifact left,
+        CompilerLocationAuthorityArtifact right)
+    {
+        var result = left.SourceTreeOrdinal.CompareTo(right.SourceTreeOrdinal);
+        if (result == 0)
+        {
+            result = left.Location.Start.CompareTo(right.Location.Start);
+        }
+
+        return result != 0
+            ? result
+            : left.Location.Length.CompareTo(right.Location.Length);
     }
 
     private static int CompareAuthorities(

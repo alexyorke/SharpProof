@@ -102,6 +102,98 @@ public sealed class CompilerSourceLocationAuthorityTests
             CompilerManifestArtifactJson.Serialize(artifact)));
     }
 
+    [TestCase("callable-declaration")]
+    [TestCase("other-callable")]
+    public void HydrationRejectsResealedDirectClauseRelocation(string target)
+    {
+        var artifact = CreateContractArtifact(
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "  internal static int Identity(int value) {\n" +
+            "    Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "    return value;\n" +
+            "  }\n" +
+            "  internal static int Same(int value) {\n" +
+            "    Contract.Ensures(Contract.Result<int>() >= value);\n" +
+            "    return value;\n" +
+            "  }\n" +
+            "}\n");
+        var claims = artifact.Manifest.Claims;
+        Assert.That(claims, Has.Length.EqualTo(2));
+        var moved = claims[0];
+        var location = target == "callable-declaration"
+            ? artifact.Manifest.Callables.Single(callable =>
+                callable.CallableId == moved.CallableId).Location
+            : claims[1].Location;
+        moved.Location = CompilerSourceLocationAuthority.CopyLocation(location);
+        if (target == "other-callable")
+        {
+            // Keep geometry unique so only ownership distinguishes the rows.
+            moved.Location.Length--;
+        }
+
+        artifact.LocationAuthorities.Single(authority =>
+                authority.OwnerKind == CompilerSourceLocationOwnerKind.Claim &&
+                authority.OwnerId == moved.ClaimId).Location =
+            CompilerSourceLocationAuthority.CopyLocation(moved.Location);
+        artifact.Manifest.Hash =
+            WorkerProtocolJson.ComputeManifestHash(artifact.Manifest);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void HydrationRejectsResealedDirectClauseLocationSwap(bool swap)
+    {
+        var artifact = CreateContractArtifact(
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "  internal static int Identity(int value) {\n" +
+            "    Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "    Contract.Ensures(Contract.Result<int>() >= value);\n" +
+            "    return value;\n" +
+            "  }\n" +
+            "}\n");
+        var claims = artifact.Manifest.Claims
+            .OrderBy(static claim => claim.Ordinal)
+            .ToArray();
+        Assert.That(claims, Has.Length.EqualTo(2));
+        if (swap)
+        {
+            var first = claims[0].Location;
+            claims[0].Location = claims[1].Location;
+            claims[1].Location = first;
+            foreach (var claim in claims)
+            {
+                artifact.LocationAuthorities.Single(authority =>
+                        authority.OwnerKind ==
+                            CompilerSourceLocationOwnerKind.Claim &&
+                        authority.OwnerId == claim.ClaimId).Location =
+                    CompilerSourceLocationAuthority.CopyLocation(claim.Location);
+            }
+        }
+
+        artifact.Manifest.Hash =
+            WorkerProtocolJson.ComputeManifestHash(artifact.Manifest);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        if (swap)
+        {
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
+        }
+        else
+        {
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
+        }
+    }
+
     [Test]
     public void LineMapBindsLineDirectiveAndExactEndCoordinates()
     {
@@ -365,15 +457,16 @@ public sealed class CompilerSourceLocationAuthorityTests
         return CreateArtifact(compilation);
     }
 
-    private static CompilerManifestArtifact CreateContractArtifact()
-    {
-        var source = "using SharpProof.Attributes;\n" +
+    private static CompilerManifestArtifact CreateContractArtifact(
+        string source =
+            "using SharpProof.Attributes;\n" +
             "internal static class Subject {\n" +
             "  internal static int Identity(int value) {\n" +
             "    Contract.Ensures(Contract.Result<int>() == value);\n" +
             "    return value;\n" +
             "  }\n" +
-            "}\n";
+            "}\n")
+    {
         var compilation = CreateCompilation(source, includeContractReference: true);
         return CreateArtifact(compilation);
     }
