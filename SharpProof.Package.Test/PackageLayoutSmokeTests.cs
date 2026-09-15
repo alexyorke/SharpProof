@@ -416,8 +416,8 @@ public sealed class PackageLayoutSmokeTests
             JsonAssert.Equal(
                 artifact,
                 "sha256",
-                Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))
-                    .ToLowerInvariant(),
+                Convert.ToHexStringLower(SHA256.HashData(
+                    await File.ReadAllBytesAsync(path))),
                 fileName);
         }
         var thirdPartyComponents = root

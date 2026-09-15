@@ -805,9 +805,8 @@ public sealed class ReleasePublicationScriptTests
         foreach (var artifact in artifacts)
         {
             var path = artifact.GetProperty("path").GetString()!;
-            var actual = Convert.ToHexString(
-                    SHA256.HashData(File.ReadAllBytes(path)))
-                .ToLowerInvariant();
+            var actual = Convert.ToHexStringLower(
+                SHA256.HashData(File.ReadAllBytes(path)));
             var digest = artifact.GetProperty("sha256").GetString();
             Assert.That(digest, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(digest, Is.EqualTo(actual));
