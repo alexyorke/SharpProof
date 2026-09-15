@@ -170,12 +170,25 @@ public sealed class ChangedTestSelectionTests
     [TestCase("SharpProof.PackageMetadata.props")]
     [TestCase("SharpProof.Release.props")]
     [TestCase("eng/testing/TestRepository.cs")]
-    public async Task RootBuildInputsSelectTheCompleteTestGraph(
+    [TestCase("build/shared.props")]
+    [TestCase("eng/build/shared.targets")]
+    [TestCase("SharpProof.Product/build/Directory.Build.props")]
+    public async Task SharedBuildInputsSelectTheCompleteTestGraph(
         string changedInput)
     {
+        ArgumentNullException.ThrowIfNull(changedInput);
         using var temporary = new TempDirectory("SharpProof.ChangedTests-");
         var root = temporary.FullName;
         await CreateFixtureAsync(root, changedInput);
+        if (changedInput.EndsWith(".props", StringComparison.Ordinal) ||
+            changedInput.EndsWith(".targets", StringComparison.Ordinal))
+        {
+            var projectDirectory = Path.Combine(root, "SharpProof.Product");
+            var importPath = Path.GetRelativePath(projectDirectory,
+                Path.Combine(root, changedInput)).Replace('\\', '/');
+            await File.WriteAllTextAsync(Path.Combine(projectDirectory, "SharpProof.Product.csproj"),
+                $"<Project><Import Project=\"{importPath}\" /></Project>\n");
+        }
         await ArchitectureGitRepository.InitializeAsync(
             root,
             "test@example.invalid",

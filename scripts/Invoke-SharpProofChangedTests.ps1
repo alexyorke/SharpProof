@@ -195,8 +195,10 @@ foreach ($changedPath in $changedPaths) {
         $globalImpact = $true
         continue
     }
+    # Imported build files can affect projects outside their own directory.
+    # Without an evaluated import graph, retain the full test graph.
     if ($changedPath -match '^Directory\.' -or
-        $changedPath -match '^[^/]+\.(props|targets)$' -or
+        $changedPath -match '\.(props|targets)$' -or
         $changedPath -in @('global.json', 'NuGet.Config', 'SharpProof.slnx')) {
         $globalImpact = $true
         continue
