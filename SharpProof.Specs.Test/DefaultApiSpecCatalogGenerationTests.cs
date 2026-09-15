@@ -10,6 +10,9 @@ namespace SharpProof.Specs.Test;
 [Parallelizable(ParallelScope.Children)]
 public sealed class DefaultApiSpecCatalogGenerationTests
 {
+    private static readonly string[] ExpectedRelationalPackProperties =
+        ["id", "version", "methods"];
+
     private const string ExpectedContentSha256 =
         "8e177ed0d36d9c78603c634aa1abe6fcc5e765e08d9607f8702277d38c0d1386";
 
@@ -171,7 +174,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
             .Single();
         Assert.That(
             pack.EnumerateObject().Select(static property => property.Name),
-            Is.EqualTo(new[] { "id", "version", "methods" }));
+            Is.EqualTo(ExpectedRelationalPackProperties));
 
         using var workspace = GenerationWorkspace.Create();
         await File.WriteAllTextAsync(
