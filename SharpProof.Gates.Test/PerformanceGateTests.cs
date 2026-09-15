@@ -561,6 +561,7 @@ public sealed class PerformanceGateTests
                      ("SharpProof.Package", "SharpProof.props"),
                          ("SharpProof.Package", "SharpProof.targets"),
                          ("SharpProof.Verifier", "SharpProof.Verifier.props"),
+                         ("SharpProof.Verifier", "SharpProof.Verifier.defaults.props"),
                          ("SharpProof.Verifier", "SharpProof.Verifier.targets")
                      })
         {

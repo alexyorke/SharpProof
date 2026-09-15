@@ -1212,12 +1212,16 @@ internal static class PerformanceGate
         var verifierTargets = XDocument.Load(Path.Combine(
             verifierRoot,
             "SharpProof.Verifier.targets"));
+        var verifierDefaults = XDocument.Load(Path.Combine(
+            verifierRoot,
+            "SharpProof.Verifier.defaults.props"));
         ValidateClosedPackagePolicy(
             portableProps,
             portableTargets,
             portableContract,
             verifierProps,
-            verifierTargets);
+            verifierTargets,
+            verifierDefaults);
         ValidateAdvisoryPackagePolicy(
             portableProps,
             portableTargets,
@@ -1234,7 +1238,8 @@ internal static class PerformanceGate
         XDocument portableTargets,
         XDocument portableContract,
         XDocument verifierProps,
-        XDocument verifierTargets)
+        XDocument verifierTargets,
+        XDocument verifierDefaults)
     {
         var portableImports = portableTargets.Descendants("Import").ToArray();
         if (portableImports.Length != 1 ||
@@ -1248,18 +1253,35 @@ internal static class PerformanceGate
                 "consumer contract.");
         }
 
+        // The verifier props file imports only its schema-generated defaults,
+        // which are themselves closed; nothing else may be imported.
+        var verifierImports = verifierProps.Descendants("Import").ToArray();
+        if (verifierImports.Length != 1 ||
+            !string.Equals(
+                (string?)verifierImports[0].Attribute("Project"),
+                "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props",
+                StringComparison.Ordinal) ||
+            verifierImports[0].Attribute("Condition") != null)
+        {
+            throw new InvalidDataException(
+                "The verifier package must import only its generated defaults.");
+        }
+
         foreach (var document in new[]
                  {
                      portableProps,
                      portableContract,
                      verifierProps,
-                     verifierTargets
+                     verifierTargets,
+                     verifierDefaults
                  })
         {
             if (document.Root?.Attribute("Sdk") != null ||
-                document.Descendants().Any(static element =>
-                    element.Name.LocalName is
-                        "Import" or "ImportGroup" or "Sdk"))
+                document.Descendants().Any(element =>
+                    element.Name.LocalName is "ImportGroup" or "Sdk" ||
+                    (element.Name.LocalName == "Import" &&
+                        !(document == verifierProps &&
+                            element == verifierImports[0]))))
             {
                 throw new InvalidDataException(
                     "Package policy files must be closed over their MSBuild " +
@@ -1267,7 +1289,7 @@ internal static class PerformanceGate
             }
         }
 
-        foreach (var props in new[] { portableProps, verifierProps })
+        foreach (var props in new[] { portableProps, verifierProps, verifierDefaults })
         {
             if (props.Descendants().Any(static element =>
                     element.Name.LocalName is "Target" or "UsingTask"))
