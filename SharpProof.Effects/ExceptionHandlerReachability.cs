@@ -20,7 +20,7 @@ internal sealed class ExceptionHandlerReachability(
     ExternalEffectResolver externalEffects,
     EffectKnownSymbols knownSymbols,
     Func<IMethodSymbol, bool> isKnownNonThrowing,
-    Func<IInvocationOperation, bool> isConditionallyElided)
+    Func<IOperation, bool> isConditionallyElided)
 {
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
     private readonly Dictionary<IOperation, PotentialExceptions>
@@ -142,8 +142,7 @@ internal sealed class ExceptionHandlerReachability(
         while (remaining.Count != 0)
         {
             var operation = remaining.Pop();
-            if (operation is IInvocationOperation elided &&
-                isConditionallyElided(elided))
+            if (isConditionallyElided(operation))
             {
                 continue;
             }

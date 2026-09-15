@@ -62,6 +62,10 @@ internal sealed class OperationCompletionEvaluator
 
     private bool CanCompleteNormallyCore(IOperation operation)
     {
+        if (_session.IsConditionallyElided(operation))
+        {
+            return true;
+        }
         return operation switch
         {
             IThrowOperation => false,
@@ -76,7 +80,6 @@ internal sealed class OperationCompletionEvaluator
                     instance: null,
                     invocation),
             IInvocationOperation invocation =>
-                _session.IsConditionallyElided(invocation) ||
                 !_isImplicitLockEnterWithNullValue(invocation) &&
                 CanCompleteInvocation(
                     invocation.TargetMethod,

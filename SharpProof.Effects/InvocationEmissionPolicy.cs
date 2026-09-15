@@ -20,8 +20,41 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
     private readonly Dictionary<IMethodSymbol, ImmutableArray<string>>
         _conditionalSymbols = new(SymbolEqualityComparer.Default);
 
-    internal bool IsElided(IInvocationOperation invocation)
+    internal bool IsElided(IOperation operation)
     {
+        // CFG lowering separates receivers and branching arguments from their
+        // invocation. Recover the enclosing source call so they are omitted
+        // together, without crossing into an enclosing callable's body.
+        SyntaxNode? callSyntax = null;
+        for (var syntax = operation.Syntax; syntax != null; syntax = syntax.Parent)
+        {
+            if (syntax is ConditionalAccessExpressionSyntax or InvocationExpressionSyntax)
+            {
+                callSyntax = syntax;
+            }
+            if (syntax is StatementSyntax or AnonymousFunctionExpressionSyntax or
+                MemberDeclarationSyntax)
+            {
+                break;
+            }
+        }
+        if (callSyntax != null &&
+            (!ReferenceEquals(callSyntax, operation.Syntax) ||
+                operation is not (IInvocationOperation or IConditionalAccessOperation)) &&
+            SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+                compilation, callSyntax.SyntaxTree).GetOperation(callSyntax)
+                is { } sourceCall)
+        {
+            operation = sourceCall;
+        }
+        while (operation is IConditionalAccessOperation conditional)
+        {
+            operation = conditional.WhenNotNull;
+        }
+        if (operation is not IInvocationOperation invocation)
+        {
+            return false;
+        }
         var target = invocation.TargetMethod.ReducedFrom ??
             invocation.TargetMethod;
         var isUnimplementedPartial = GetOrAdd(

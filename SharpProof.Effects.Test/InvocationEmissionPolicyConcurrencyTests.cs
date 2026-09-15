@@ -6,6 +6,73 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class InvocationEmissionPolicyConcurrencyTests
 {
+    [TestCase("Caller", false)]
+    [TestCase("Caller", true)]
+    [TestCase("After", false)]
+    [TestCase("After", true)]
+    [TestCase("Catch", false)]
+    [TestCase("Catch", true)]
+    [TestCase("Local", false)]
+    [TestCase("Local", true)]
+    [TestCase("Nested", false)]
+    [TestCase("Nested", true)]
+    [TestCase("PlainArgument", false)]
+    [TestCase("PlainArgument", true)]
+    public void ConditionalAccessReceiverEffectsMatchEmittedCode(string methodName, bool enabled)
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            (enabled ? "#define TRACE_CALL\n" : "") +
+            """
+            public sealed class Sample {
+                public static int State;
+                [System.Diagnostics.Conditional("TRACE_CALL")]
+                public void Trace() { }
+                public static Sample Receiver() { State++; return null; }
+                public static void Caller() { Receiver()?.Trace(); }
+                public static Sample ThrowReceiver() { throw new System.InvalidOperationException(); }
+                public static void After() { ThrowReceiver()?.Trace(); State++; }
+                public static void Catch() {
+                    try { ThrowReceiver()?.Trace(); }
+                    catch (System.InvalidOperationException) { State++; }
+                }
+                public static Sample GetSample(int value) { return null; }
+                public static void Local() {
+                    int value = 1;
+                    GetSample(value = 0)?.Trace();
+                    if (value == 1) State++;
+                }
+                public Sample Next() { return this; }
+                public static void Nested() { Receiver()?.Next()?.Trace(); }
+                [System.Diagnostics.Conditional("TRACE_CALL")]
+                public static void ConditionalValue(int value) { }
+                public static void PlainArgument() {
+                    int value = 1;
+                    ConditionalValue((value = 0) == 0 ? 1 : 2);
+                    if (value == 1) State++;
+                }
+            }
+            """);
+        var runtimeWrites = false;
+        RuntimeAssemblyTestHost.WithRuntimeAssembly(
+            "ConditionalAccess", EffectTestHost.EmitImage(compilation).Image, assembly =>
+            {
+                var sample = assembly.GetType("Sample")!;
+                try
+                {
+                    sample.GetMethod(methodName)!.Invoke(null, null);
+                }
+                catch (System.Reflection.TargetInvocationException exception)
+                    when (exception.InnerException is InvalidOperationException)
+                {
+                }
+                runtimeWrites = (int)sample.GetField("State")!.GetValue(null)! != 0;
+            });
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            EffectTestHost.SampleMethod(compilation, methodName));
+        Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.EqualTo(runtimeWrites));
+    }
+
     [TestCase("After", false, true)]
     [TestCase("After", true, false)]
     [TestCase("Catch", false, false)]

@@ -380,9 +380,9 @@ public sealed class EffectAnalysisSession
                     FrameworkTypeMetadataNames.TypeInitializationException));
     }
 
-    internal bool IsConditionallyElided(IInvocationOperation invocation)
+    internal bool IsConditionallyElided(IOperation operation)
     {
-        return _invocationEmission.IsElided(invocation);
+        return _invocationEmission.IsElided(operation);
     }
 
     internal EffectThrowSet ResolveThrownException(IOperation? exception)

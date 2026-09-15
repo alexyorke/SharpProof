@@ -283,6 +283,10 @@ internal sealed partial class OperationEffectScanner
         EffectAccess access,
         EffectStep? evaluatedLocation = null)
     {
+        if (_session.IsConditionallyElided(operation))
+        {
+            return EffectSummary.Empty;
+        }
         if (ManagedFlowResult.HasSameIdentity(operation, _directOperation))
         {
             RecordDirect(operation);
@@ -671,11 +675,6 @@ internal sealed partial class OperationEffectScanner
         if (IsSynthesizedLockMonitorCall(invocation))
         {
             return ScanArgumentValues(invocation.Arguments);
-        }
-
-        if (_session.IsConditionallyElided(invocation))
-        {
-            return EffectSummary.Empty;
         }
 
         var argumentProjection = ProjectArguments(

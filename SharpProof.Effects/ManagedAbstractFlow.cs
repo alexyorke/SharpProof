@@ -227,6 +227,12 @@ internal sealed class ManagedAbstractFlow
         ManagedFlowState state, IOperation operation, ManagedFlowResult result, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!(operation is IInvocationOperation requires && IsRequires(requires)) &&
+            _completionFacts.IsConditionallyElided(operation))
+        {
+            result.Record(operation, state);
+            return state;
+        }
         switch (operation)
         {
             case IAnonymousFunctionOperation or ILocalFunctionOperation:
@@ -313,12 +319,6 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case IInvocationOperation invocation:
-                if (!IsRequires(invocation) &&
-                    _completionFacts.IsConditionallyElided(invocation))
-                {
-                    result.Record(operation, state);
-                    return state;
-                }
                 state = TransferMany(state, invocation.ChildOperations, result, cancellationToken);
                 result.Record(operation, state);
                 return IsRequires(invocation) ? Assume(state, invocation.Arguments[0].Value, true)
@@ -2205,9 +2205,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 {
     private readonly InvocationEmissionPolicy _invocationEmission = new(compilation);
 
-    internal bool IsConditionallyElided(IInvocationOperation invocation)
+    internal bool IsConditionallyElided(IOperation operation)
     {
-        return _invocationEmission.IsElided(invocation);
+        return _invocationEmission.IsElided(operation);
     }
 
     // The active-method sets are the cycle guard for CompletesNormally and
@@ -2250,6 +2250,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     internal bool CompletesNormally(IOperation? operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (operation != null && IsConditionallyElided(operation))
+        {
+            return true;
+        }
         return operation switch
         {
             null => false,
@@ -2298,7 +2302,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     private bool CompletesNormally(IInvocationOperation invocation)
     {
-        return IsConditionallyElided(invocation) || IsContractClause(invocation) ||
+        return IsContractClause(invocation) ||
         !invocation.IsVirtual &&
         (invocation.Instance == null ||
          invocation.Instance is IInstanceReferenceOperation && CompletesNormally(invocation.Instance)) &&
@@ -2521,6 +2525,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     internal bool MayCompleteNormally(IOperation? operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (operation != null && IsConditionallyElided(operation))
+        {
+            return true;
+        }
         return operation switch
         {
             null => true,
@@ -2862,10 +2870,6 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
     {
-        if (IsConditionallyElided(invocation))
-        {
-            return true;
-        }
         if (!MayCompleteNormally(invocation.Instance) ||
             invocation.Arguments.Any(argument =>
                 !MayCompleteNormally(argument.Value)))
