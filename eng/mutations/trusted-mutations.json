@@ -141,7 +141,7 @@
     "original": "                if (semantics.RequiresCheckedArithmetic && !operation.IsChecked)\n                {\n                    return OpaqueBinary(",
     "mutated": "                if (semantics.RequiresCheckedArithmetic && operation.IsChecked)\n                {\n                    return OpaqueBinary(",
     "project": "SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj",
-    "filter": "FullyQualifiedName~ClassificationCasesRemainClosedAndExact"
+    "filter": "FullyQualifiedName~OverflowAndConversionShapes_UncheckedLongAddition"
   },
   {
     "name": "lowering-global-constant-bypass",
@@ -149,7 +149,7 @@
     "original": "                if (_owner._allowCompilerConstants &&\n                    operation.ConstantValue.HasValue)",
     "mutated": "                if (_owner._allowCompilerConstants ||\n                    operation.ConstantValue.HasValue)",
     "project": "SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj",
-    "filter": "FullyQualifiedName~ClassificationCasesRemainClosedAndExact"
+    "filter": "FullyQualifiedName~ConstantFolding_Sizeof"
   },
   {
     "name": "requires-concrete-compiler-constant-replay",
