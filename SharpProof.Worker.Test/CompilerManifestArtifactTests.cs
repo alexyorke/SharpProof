@@ -889,8 +889,13 @@ public sealed class CompilerManifestArtifactTests
     public void SpecificationPackAuthorityFieldsCannotSilentlyDefaultOnWire()
     {
         var json = CompilerManifestArtifactJson.Serialize(CreateArtifact());
+        var catalogVersionProperty =
+            "\"specificationPackCatalogVersion\":" +
+            CompilerSpecificationPackCatalogVersions.Current.ToString(
+                CultureInfo.InvariantCulture) + ",";
+        Assert.That(json, Does.Contain(catalogVersionProperty));
         var withoutCatalogVersion = json.Replace(
-            "\"specificationPackCatalogVersion\":1,",
+            catalogVersionProperty,
             string.Empty,
             StringComparison.Ordinal);
 

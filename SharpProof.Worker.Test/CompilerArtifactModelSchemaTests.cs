@@ -723,10 +723,15 @@ public sealed class CompilerArtifactModelSchemaTests
 
     private static object CreateObject(Type type)
     {
+        // Records synthesize a one-argument copy constructor; invoking it
+        // with a null original throws instead of creating a fresh value.
         var constructor = type.GetConstructors(
                 BindingFlags.Public |
                 BindingFlags.NonPublic |
                 BindingFlags.Instance)
+            .Where(candidate => candidate.GetParameters() is not
+                [{ ParameterType: var parameterType }] ||
+                parameterType != type)
             .OrderBy(static candidate => candidate.GetParameters().Length)
             .First();
         var parameters = constructor.GetParameters();
