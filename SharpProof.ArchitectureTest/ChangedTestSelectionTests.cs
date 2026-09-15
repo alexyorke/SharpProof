@@ -7,6 +7,8 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
+    [TestCase("<ItemGroup><ProjectReference Include=\"../SharpProof.Product/%53harpProof.Product.csproj\" /></ItemGroup>", "SharpProof.Product/Source.cs")]
+    [TestCase("<ItemGroup><Compile Include=\"../Shared/%53ource.cs\" /></ItemGroup>", "Shared/Source.cs")]
     [TestCase("<PropertyGroup><Dependency>../SharpProof.Product/SharpProof.Product.csproj</Dependency></PropertyGroup><ItemGroup><ProjectReference Include=\"$(Dependency)\" /></ItemGroup>", "SharpProof.Product/Source.cs")]
     [TestCase("<ItemGroup><ProjectReference Include=\"../SharpProof.Product/*.csproj\" /></ItemGroup>", "SharpProof.Product/Source.cs")]
     [TestCase("<ItemGroup><Dependencies Include=\"../SharpProof.Product/SharpProof.Product.csproj\" /><ProjectReference Include=\"@(Dependencies)\" /></ItemGroup>", "SharpProof.Product/Source.cs")]

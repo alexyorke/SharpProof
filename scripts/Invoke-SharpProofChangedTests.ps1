@@ -124,10 +124,11 @@ foreach ($relativePath in $projectPaths) {
     foreach ($item in $xml.SelectNodes(
             "//*[local-name()='Compile' or local-name()='ProjectReference']")) {
         $include = [string]$item.GetAttribute('Include')
-        if ($include -match '[$@%]\(' -or
+        if ($include -match '[$@%]\(|%[0-9a-f]{2}' -or
             ($item.LocalName -eq 'ProjectReference' -and $include -match '[*?]')) {
-            # Text parsing cannot evaluate MSBuild expressions or expand
-            # project-reference globs. Missing edges must not prune tests.
+            # Text parsing cannot evaluate MSBuild expressions, decode item
+            # escapes, or expand project-reference globs. Missing edges must
+            # not prune tests.
             $projectInventoryIncomplete = $true
         }
     }
@@ -137,7 +138,7 @@ foreach ($relativePath in $projectPaths) {
             ForEach-Object { $_.Trim() } |
             Where-Object {
                 -not [string]::IsNullOrWhiteSpace($_) -and
-                $_ -notmatch '[$@%]\(|[*?]'
+                $_ -notmatch '[$@%]\(|%[0-9a-f]{2}|[*?]'
             } |
             ForEach-Object {
                 [IO.Path]::GetFullPath((Join-Path (
@@ -149,7 +150,7 @@ foreach ($relativePath in $projectPaths) {
             ForEach-Object { $_.Trim() } |
             Where-Object {
                 -not [string]::IsNullOrWhiteSpace($_) -and
-                $_ -notmatch '[$@%]\('
+                $_ -notmatch '[$@%]\(|%[0-9a-f]{2}'
             } |
             ForEach-Object {
                 [IO.Path]::GetFullPath((Join-Path (
