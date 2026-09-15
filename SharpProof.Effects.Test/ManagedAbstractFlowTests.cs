@@ -33,6 +33,60 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void IntegerRefinementIsMonotoneInTheBound()
+    {
+        var state = ManagedFlowState.Empty.Set(
+            "value",
+            ManagedAbstractValue.Integer(IntervalValue.Range(-10, 100)));
+        var fromSingleton = ManagedAbstractFlow.Refine(
+            state,
+            "value",
+            BinaryOperatorKind.GreaterThan,
+            ManagedAbstractValue.Integer(IntervalValue.Constant(5)),
+            expected: true).Get("value");
+        var fromRange = ManagedAbstractFlow.Refine(
+            state,
+            "value",
+            BinaryOperatorKind.GreaterThan,
+            ManagedAbstractValue.Integer(IntervalValue.Range(4, 5)),
+            expected: true).Get("value");
+
+        // The range bound is the larger input, so its refinement must be at
+        // least as large as the singleton bound's refinement.
+        Assert.That(
+            ManagedAbstractValue.Join(fromSingleton, fromRange),
+            Is.EqualTo(fromRange));
+    }
+
+    [Test]
+    public void RefinementAgainstJoinedSwitchBoundCompletes()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(string key, long length, ref long total) {
+                    var maximum = key switch {
+                        "dependencies" => 1024L * 1024,
+                        "runtimeConfig" => 64L * 1024,
+                        _ when key.EndsWith(".json", System.StringComparison.Ordinal) =>
+                            1024L * 1024,
+                        _ => 32L * 1024 * 1024
+                    };
+                    if (length > maximum || total > 64L * 1024 * 1024 - length) {
+                        throw new System.InvalidOperationException();
+                    }
+
+                    total += length;
+                }
+            }
+            """);
+
+        var (_, _, analysis) = AnalyzeCalls(compilation);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+    }
+
+    [Test]
     public void BottomBlockStateSkipsBranchWorkButLiveStateStillHonorsCancellation()
     {
         var compilation = EffectTestHost.CreateCompilation(

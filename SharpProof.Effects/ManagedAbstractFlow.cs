@@ -540,14 +540,19 @@ internal sealed class ManagedAbstractFlow
             _ => interval
         };
 
+        // The zero-exclusion fact must follow from the refined interval for
+        // every bound shape: deriving it only for range bounds made a joined
+        // (larger) bound more precise than a singleton one, breaking the
+        // monotone transfer the fixpoint requires.
         return refined.IsBottom
             ? Bottom
             : Integer(
                 refined,
-                current.ExcludesZero || (value.IsSingleton
-                    ? normalized == BinaryOperatorKind.NotEquals &&
-                      value.SingletonValue == 0
-                    : !refined.Contains(0)));
+                current.ExcludesZero ||
+                !refined.Contains(0) ||
+                (normalized == BinaryOperatorKind.NotEquals &&
+                    value.IsSingleton &&
+                    value.SingletonValue == 0));
     }
 
     private static IntervalValue Intersect(

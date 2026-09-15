@@ -271,7 +271,9 @@ public sealed class ManagedAbstractValueLatticeTests
         {
             Assert.That(
                 refinedInteger.Get(FirstStorage),
-                Is.EqualTo(ManagedAbstractValue.Integer(IntervalValue.Range(6, 10))));
+                Is.EqualTo(ManagedAbstractValue.Integer(
+                    IntervalValue.Range(6, 10),
+                    excludesZero: true)));
             Assert.That(impossibleInteger, Is.SameAs(ManagedFlowState.Bottom));
             Assert.That(
                 refinedBoolean.Get(FirstStorage),
