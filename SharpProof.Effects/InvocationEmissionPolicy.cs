@@ -41,17 +41,26 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
         var conditionalSymbols = GetOrAdd(
             _conditionalSymbols,
             target,
-            method => method.GetAttributes()
-                .Where(attribute => SymbolEqualityComparer.Default.Equals(
-                    attribute.AttributeClass?.OriginalDefinition,
-                    _conditionalAttribute.OriginalDefinition))
-                .Select(attribute =>
-                    attribute.ConstructorArguments.Length == 1
-                        ? attribute.ConstructorArguments[0].Value as string
-                        : null)
-                .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
-                .Select(static symbol => symbol!)
-                .ToImmutableArray());
+            method =>
+            {
+                // Overrides inherit the conditional symbols of the original
+                // virtual declaration, even though GetAttributes is local.
+                while (method.OverriddenMethod is { } overridden)
+                {
+                    method = overridden;
+                }
+                return method.GetAttributes()
+                    .Where(attribute => SymbolEqualityComparer.Default.Equals(
+                        attribute.AttributeClass?.OriginalDefinition,
+                        _conditionalAttribute.OriginalDefinition))
+                    .Select(attribute =>
+                        attribute.ConstructorArguments.Length == 1
+                            ? attribute.ConstructorArguments[0].Value as string
+                            : null)
+                    .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
+                    .Select(static symbol => symbol!)
+                    .ToImmutableArray();
+            });
         if (conditionalSymbols.IsDefaultOrEmpty)
         {
             return false;
