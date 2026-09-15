@@ -1596,6 +1596,36 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void MutationCatalogTargetsMatchCurrentSource()
+    {
+        var root = TestRepository.FindRoot();
+        using var catalog = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "eng", "mutations", "trusted-mutations.json")));
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var mutation in catalog.RootElement.EnumerateArray())
+            {
+                var path = mutation.GetProperty("file").GetString()!;
+                if (!sources.TryGetValue(path, out var source))
+                {
+                    source = File.ReadAllText(Path.Combine(root, path));
+                    sources.Add(path, source);
+                }
+                var original = mutation.GetProperty("original").GetString()!;
+                var name = mutation.GetProperty("name").GetString();
+                var first = source.IndexOf(original, StringComparison.Ordinal);
+                Assert.That(first, Is.GreaterThanOrEqualTo(0), $"{name}: missing target");
+                if (first >= 0)
+                {
+                    Assert.That(source.IndexOf(original, first + original.Length, StringComparison.Ordinal),
+                        Is.EqualTo(-1), $"{name}: ambiguous target");
+                }
+            }
+        }
+    }
+
+    [Test]
     public void MutationCatalogTargetsArePreflightedBeforeTests()
     {
         var mutationDriver = File.ReadAllText(Path.Combine(

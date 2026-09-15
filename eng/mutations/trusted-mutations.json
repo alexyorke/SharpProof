@@ -690,7 +690,7 @@
   {
     "name": "cache-read-lock-coordination",
     "file": "SharpProof.Worker/VerificationCache.cs",
-    "original": "            cacheLock = AcquireLock(_directory);\n            RecoverInterruptedTransactions(cancellationToken);\n            ValidatePath(path);",
+    "original": "            cacheLock = AcquireLock();\n            RecoverInterruptedTransactions(cancellationToken);\n            ValidatePath(path);",
     "mutated": "            RecoverInterruptedTransactions(cancellationToken);\n            ValidatePath(path);",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable"
@@ -698,7 +698,7 @@
   {
     "name": "cache-write-lock-coordination",
     "file": "SharpProof.Worker/VerificationCache.cs",
-    "original": "            cacheLock = AcquireLock(_directory);\n            RecoverInterruptedTransactions(cancellationToken);\n            var payload = JsonSerializer.Serialize(new CachePayload(",
+    "original": "            cacheLock = AcquireLock();\n            RecoverInterruptedTransactions(cancellationToken);\n            var payload = JsonSerializer.Serialize(new CachePayload(",
     "mutated": "            RecoverInterruptedTransactions(cancellationToken);\n            var payload = JsonSerializer.Serialize(new CachePayload(",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable"
