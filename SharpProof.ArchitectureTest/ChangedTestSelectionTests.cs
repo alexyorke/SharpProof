@@ -7,11 +7,13 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class ChangedTestSelectionTests
 {
-    [TestCase("Directory.Build.props", false)]
-    [TestCase("Directory.Build.targets", false)]
-    [TestCase("Directory.Build.props", true)]
-    [TestCase("Directory.Build.targets", true)]
-    public async Task ImplicitBuildImportsSelectLinkedSourceConsumers(string importName, bool parent)
+    [TestCase("Directory.Build.props", false, false)]
+    [TestCase("Directory.Build.targets", false, false)]
+    [TestCase("Directory.Build.props", true, false)]
+    [TestCase("Directory.Build.targets", true, false)]
+    [TestCase("custom-build.proj", false, true)]
+    [TestCase("custom-build.proj", true, true)]
+    public async Task ImplicitBuildImportsSelectLinkedSourceConsumers(string importName, bool parent, bool custom)
     {
         using var temporary = new TempDirectory("SharpProof.ChangedTests-");
         var root = temporary.FullName;
@@ -22,8 +24,11 @@ public sealed class ChangedTestSelectionTests
         Directory.CreateDirectory(projectDirectory);
         await File.WriteAllTextAsync(Path.Combine(importDirectory, importName),
             $"<Project><ItemGroup><Compile Include=\"{(parent ? "../../" : "../")}Shared/Source.cs\" /></ItemGroup></Project>");
+        var overrideProperty = custom
+            ? $"<DirectoryBuildTargetsPath>{Path.Combine(importDirectory, importName)}</DirectoryBuildTargetsPath>"
+            : "";
         await File.WriteAllTextAsync(Path.Combine(projectDirectory, "SharpProof.Effects.Test.csproj"),
-            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>");
+            $"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework>{overrideProperty}</PropertyGroup></Project>");
         var evaluated = await ArchitectureRepository.AssertSuccessAsync(
             ArchitectureRepository.RunProcessAsync(root, "dotnet", "msbuild",
                 Path.Combine(projectDirectory, "SharpProof.Effects.Test.csproj"),

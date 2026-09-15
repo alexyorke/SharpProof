@@ -148,6 +148,18 @@ foreach ($relativePath in $projectPaths) {
             continue
         }
         [xml]$xml = Get-Content -LiteralPath $buildFile -Raw
+        foreach ($override in $xml.SelectNodes(
+                "//*[local-name()='DirectoryBuildPropsPath' or local-name()='DirectoryBuildTargetsPath']")) {
+            $overridePath = $override.InnerText.Trim()
+            if ([string]::IsNullOrWhiteSpace($overridePath)) { continue }
+            # Relative overrides depend on the SDK's importing file location.
+            if (-not [IO.Path]::IsPathRooted($overridePath) -or
+                $overridePath -match '[$@%]\(|%[0-9a-f]{2}|[*?;]') {
+                $projectInventoryIncomplete = $true
+                continue
+            }
+            $pendingImports.Push([IO.Path]::GetFullPath($overridePath))
+        }
         foreach ($item in $xml.SelectNodes(
                 "//*[local-name()='Compile' or local-name()='ProjectReference']")) {
             $items.Add($item)
