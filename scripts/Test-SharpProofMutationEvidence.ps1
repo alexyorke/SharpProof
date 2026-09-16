@@ -933,9 +933,9 @@ try {
     $multipleAssertion = New-TestParts `
         -Outcome Failed `
         -Message ("Multiple failures or warnings in test:`n" +
-            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
-            " Expected: 1`n" +
-            " But was: 2`n" +
+            " 1) Field`nAssert.That(first, Is.EqualTo(expected))`n" +
+            " Expected: System.ArrayTypeMismatchException`n" +
+            " But was: System.InvalidOperationException`n" +
             " at test.cs:10`n" +
             " 2) Assert.That(second, Is.True)`n" +
             " Expected: True`n" +

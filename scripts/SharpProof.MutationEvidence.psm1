@@ -34,8 +34,12 @@ function Test-NUnitMultipleAssertionLines {
         $actualCount = 0
         $butWasCount = 0
         $exceptionCount = 0
+        $hasAssertion = $false
         for ($lineIndex = $start; $lineIndex -lt $end; $lineIndex++) {
             $line = $Lines[$lineIndex]
+            if ($line -match '^(?:\d+\)\s+)?Assert\.That\(') {
+                $hasAssertion = $true
+            }
             if ($line -match '^Expected(:| is\b| and actual are both\b)') {
                 $hasExpected = $true
             }
@@ -45,11 +49,11 @@ function Test-NUnitMultipleAssertionLines {
             if ($line -match '^But was:') {
                 $butWasCount++
             }
-            if ($line -match '(?i)\bSystem\.[A-Za-z]+Exception\b') {
+            if ($line -match '(?i)^(?:\d+\)\s+)?(?:System\.[A-Za-z.]+Exception\s*:|(?:fatal|unhandled)\s+exception\b)') {
                 $exceptionCount++
             }
         }
-        if ($Lines[$start] -notmatch '^\d+\)\s+Assert\.That\(' -or
+        if (-not $hasAssertion -or
             $exceptionCount -ne 0 -or
             -not $hasExpected -or
             ($actualCount -ne 1 -and $butWasCount -ne 1)) {
