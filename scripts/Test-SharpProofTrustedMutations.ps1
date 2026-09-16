@@ -470,6 +470,14 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Mutation workspace clone failed with exit code $LASTEXITCODE."
     }
+    $sourceOrigin = (& git -C $repositoryRoot remote get-url origin).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceOrigin)) {
+        throw 'Mutation workspace requires the source repository origin for Source Link.'
+    }
+    & git -C $sourceRoot remote set-url origin $sourceOrigin
+    if ($LASTEXITCODE -ne 0) {
+        throw "Mutation workspace origin setup failed with exit code $LASTEXITCODE."
+    }
     & git -C $sourceRoot checkout --quiet --detach $sourceCommit
     if ($LASTEXITCODE -ne 0) {
         throw "Mutation workspace checkout failed with exit code $LASTEXITCODE."
