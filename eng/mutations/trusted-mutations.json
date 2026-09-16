@@ -451,7 +451,7 @@
     "name": "contract-api-exported-attribute-parity",
     "file": "SharpProof.Frontend/ContractApiMetadata.generated.cs",
     "original": "            new(\n                ContractFor,\n                \"ContractForAttribute\",\n                ContractApiAttributeCategory.Companion,",
-    "mutated": "            new(\n                EnforcePure,\n                \"ContractForAttribute\",\n                ContractApiAttributeCategory.Companion,",
+    "mutated": "            new(\n                ContractFor + \"Unexpected\",\n                \"ContractForAttribute\",\n                ContractApiAttributeCategory.Companion,",
     "project": "SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj",
     "filter": "FullyQualifiedName~CatalogExactlyMatchesTheExportedContractApi"
   },
