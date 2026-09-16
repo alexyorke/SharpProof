@@ -585,7 +585,7 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(WireEnumMutation.HavocKind)]
     public void DecoderRejectsUnknownWireEnumCodes(WireEnumMutation mutation)
     {
-        AssertDecoderRejects(graph =>
+        var exception = AssertDecoderRejects(graph =>
         {
             switch (mutation)
             {
@@ -606,6 +606,8 @@ public sealed class PortableIrGraphCodecTests
                     throw new AssertionException("Unknown mutation.");
             }
         });
+        Assert.That(exception.Message,
+            Is.EqualTo("Portable IR contains an unknown enum value."));
     }
 
     [Test]
@@ -725,6 +727,11 @@ public sealed class PortableIrGraphCodecTests
             Assert.That(
                 exception!.Message,
                 Is.EqualTo("Portable IR operation description cannot be whitespace."));
+        }
+        if (mutation == MalformedMutation.DuplicateHavocVariable)
+        {
+            Assert.That(exception.Message,
+                Is.EqualTo("Portable IR havoc variables are not canonical."));
         }
     }
 
