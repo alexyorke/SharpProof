@@ -1611,6 +1611,33 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateContractArtifact(
             """
             using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static IEnumerable<int> Values() {
+                    yield return 1;
+                    throw new InvalidOperationException();
+                }
+            }
+            """);
+        var evidence = artifact.Callables.Single().EffectClaims.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(evidence.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+            Assert.That(evidence.Certainty, Is.EqualTo(WorkerEffectEvidenceCertainty.Unavailable));
+            Assert.That(evidence.Witness, Is.Null);
+            Assert.That(evidence.Replay, Is.Null);
+        }
+    }
+
+    [Test]
+    public void SupportedExplicitThrowIncludesReplayEvidence()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using System;
             using SharpProof.Attributes;
             internal static class Subject {
                 [DoesNotThrow]

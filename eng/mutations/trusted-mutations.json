@@ -787,7 +787,7 @@
     "name": "release-configuration-empty-expected-set",
     "file": "scripts/Test-SharpProofReleaseConfiguration.ps1",
     "original": "        [AllowEmptyCollection()][object[]]$Expected = @(),",
-    "mutated": "        [object[]]$Expected = @(),",
+    "mutated": "        [Parameter(Mandatory = $true)][object[]]$Expected = @(),",
     "project": "SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj",
     "filter": "FullyQualifiedName~EffectiveReleaseRefSetsMustEqualTheContract"
   },
