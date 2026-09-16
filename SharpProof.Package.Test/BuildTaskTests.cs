@@ -1436,7 +1436,11 @@ public sealed class BuildTaskTests
     public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
     {
         using var directory = new TempDirectory("sharpproof-cancel-");
-        var helper = CreateTimedProcessAssembly(directory.FullName);
+        var marker = Path.Combine(directory.FullName, "started.txt");
+        var helper = CreateTimedProcessAssembly(
+            directory.FullName,
+            "using System.IO; using System.Threading; " +
+            "File.WriteAllText(\"started.txt\", \"started\"); Thread.Sleep(3000);");
         var containmentFailure = string.Empty;
         using var task = CreateVerifier(directory, helper);
         task.ContainmentAuthenticationFailureOverride = message =>
@@ -1445,7 +1449,7 @@ public sealed class BuildTaskTests
         var execution = System.Threading.Tasks.Task.Run(task.Execute);
         Assert.That(
             SpinWait.SpinUntil(
-                () => task.HasActiveProcess,
+                () => task.HasActiveProcess && File.Exists(marker),
                 TimeSpan.FromSeconds(5)),
             Is.True,
             "The verifier child did not start.");
