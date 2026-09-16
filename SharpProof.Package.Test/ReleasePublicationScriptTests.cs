@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Buffers.Binary;
+using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -444,6 +446,7 @@ public sealed class ReleasePublicationScriptTests
     [TestCase("renamed-symbols")]
     [TestCase("cross-id")]
     [TestCase("wrong-commit")]
+    [TestCase("codeview-age")]
     public async Task ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs(
         string mutation)
     {
@@ -498,6 +501,28 @@ public sealed class ReleasePublicationScriptTests
                 break;
             case "wrong-commit":
                 RewriteRepositoryCommit(symbolsPath, new string('0', 40));
+                break;
+            case "codeview-age":
+                using (var archive = ZipFile.Open(mainPath, ZipArchiveMode.Update))
+                {
+                    var assembly = archive.Entries.Single(entry =>
+                        entry.FullName.EndsWith("/SharpProof.Attributes.dll", StringComparison.Ordinal));
+                    using var image = new MemoryStream();
+                    using (var input = assembly.Open())
+                    {
+                        await input.CopyToAsync(image);
+                    }
+                    image.Position = 0;
+                    using var reader = new PEReader(image);
+                    var codeView = reader.ReadDebugDirectory().Single(entry =>
+                        entry.Type == DebugDirectoryEntryType.CodeView);
+                    var bytes = image.ToArray();
+                    // RSDS signature (4 bytes), GUID (16 bytes), then age.
+                    BinaryPrimitives.WriteInt32LittleEndian(
+                        bytes.AsSpan(codeView.DataPointer + 20, 4), 2);
+                    RewriteEntry(archive, assembly, assembly.FullName,
+                        output => output.Write(bytes));
+                }
                 break;
             default:
                 throw new ArgumentOutOfRangeException(
