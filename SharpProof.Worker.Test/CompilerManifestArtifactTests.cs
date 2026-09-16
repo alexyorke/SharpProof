@@ -1608,7 +1608,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay()
     {
-        var artifact = CreateContractArtifact(
+        const string source =
             """
             using System;
             using System.Collections.Generic;
@@ -1620,8 +1620,19 @@ public sealed class CompilerManifestArtifactTests
                     throw new InvalidOperationException();
                 }
             }
-            """);
-        var evidence = artifact.Callables.Single().EffectClaims.Single();
+            """;
+        CompilerManifestArtifact? artifact = null;
+        try
+        {
+            artifact = CreateContractArtifact(source);
+        }
+        catch (JsonException)
+        {
+            // Unsupported bodies must still produce a valid, unavailable claim.
+        }
+        Assert.That(artifact, Is.Not.Null,
+            "Unsupported effect evidence must remain a valid compiler artifact.");
+        var evidence = artifact!.Callables.Single().EffectClaims.Single();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
