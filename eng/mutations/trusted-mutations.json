@@ -755,7 +755,7 @@
     "name": "launcher-single-termination-grace-deadline",
     "file": "SharpProof.Host/LinuxWorkerProcess.cs",
     "original": "        return Terminate(process, stopwatch, finalLimit)",
-    "mutated": "        return Terminate(process, Stopwatch.StartNew(), finalLimit)",
+    "mutated": "        stopwatch.Restart();\n        return Terminate(process, stopwatch, finalLimit)",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~LinuxWorkerTimeoutTerminatesTheDirectChild"
   },
