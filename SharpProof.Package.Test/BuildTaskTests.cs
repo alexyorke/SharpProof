@@ -1440,7 +1440,7 @@ public sealed class BuildTaskTests
         var helper = CreateTimedProcessAssembly(
             directory.FullName,
             "using System.IO; using System.Threading; " +
-            "File.WriteAllText(\"started.txt\", \"started\"); Thread.Sleep(3000);");
+            "File.WriteAllText(\"started.txt\", System.Environment.ProcessId.ToString()); Thread.Sleep(3000);");
         var containmentFailure = string.Empty;
         using var task = CreateVerifier(directory, helper);
         task.ContainmentAuthenticationFailureOverride = message =>
@@ -1454,6 +1454,8 @@ public sealed class BuildTaskTests
             Is.True,
             "The verifier child did not start.");
 
+        var childProcessId = int.Parse(
+            await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
         task.Cancel();
 
         var completed = await System.Threading.Tasks.Task.WhenAny(
@@ -1461,8 +1463,12 @@ public sealed class BuildTaskTests
             System.Threading.Tasks.Task.Delay(TimeSpan.FromMilliseconds(500)));
         var canceledPromptly = ReferenceEquals(completed, execution);
         await execution.WaitAsync(TimeSpan.FromSeconds(5));
+        var childStopped = SpinWait.SpinUntil(
+            () => !IsProcessRunning(childProcessId),
+            TimeSpan.FromMilliseconds(500));
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(childStopped, Is.True, "Cancellation must stop the verifier child.");
             Assert.That(canceledPromptly, Is.True);
             Assert.That(await execution, Is.True);
             Assert.That(task.ExitCode, Is.Not.Zero);

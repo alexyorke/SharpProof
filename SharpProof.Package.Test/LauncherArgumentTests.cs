@@ -794,8 +794,7 @@ public sealed class LauncherArgumentTests
     {
         var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
         using var ioTemporary = new TempDirectory(
-            "sharpproof-malformed-worker-io-",
-            TestContext.CurrentContext.WorkDirectory);
+            "sharpproof-malformed-worker-io-");
         using var workerTemporary = new TempDirectory(
             "sharpproof-malformed-worker-",
             TestContext.CurrentContext.WorkDirectory);
@@ -812,8 +811,11 @@ public sealed class LauncherArgumentTests
 
         var escaped = false;
         var exitCode = 0;
+        var originalError = Console.Error;
+        using var error = new StringWriter();
         try
         {
+            Console.SetError(error);
             exitCode = await Program.Main(ProjectionArguments(
                 worker: worker,
                 request: Path.Combine(ioDirectory, "request.json"),
@@ -832,9 +834,14 @@ public sealed class LauncherArgumentTests
         {
             escaped = true;
         }
+        finally
+        {
+            Console.SetError(originalError);
+        }
 
         Assert.That(escaped, Is.False);
         Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(error.ToString(), Does.Contain("JsonReaderException"));
     }
 
     [Test]
