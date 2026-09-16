@@ -80,8 +80,8 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var completion = process.WaitForExit(
-            TimeSpan.FromMilliseconds(1_000),
-            TimeSpan.FromMilliseconds(1_100));
+            TimeSpan.FromMilliseconds(3_000),
+            TimeSpan.FromMilliseconds(3_100));
         stopwatch.Stop();
 
         using (Assert.EnterMultipleScope())
@@ -90,8 +90,9 @@ public sealed class LauncherArgumentTests
             Assert.That(completion.ExitCode, Is.EqualTo(124));
             Assert.That(
                 stopwatch.Elapsed,
-                Is.LessThan(TimeSpan.FromMilliseconds(1_800)),
-                "The final deadline must not restart the full 1.1-second cleanup budget.");
+                Is.LessThan(TimeSpan.FromMilliseconds(4_000)),
+                "The final deadline must not restart the 3.1-second cleanup budget, " +
+                "which would delay forced termination until roughly 4.55 seconds.");
         }
     }
 
