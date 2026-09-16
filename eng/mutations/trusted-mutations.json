@@ -157,7 +157,7 @@
     "original": "            var lowerer = RoslynOperationLowerer.CreateForConcreteReplay(\n                _factory,\n                session.IsKnownPure);",
     "mutated": "            var lowerer = new RoslynOperationLowerer(_factory, session.IsKnownPure);",
     "project": "SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj",
-    "filter": "FullyQualifiedName~UncheckedOverflowFailsClosedButConcreteViolationsReport"
+    "filter": "FullyQualifiedName~CompilerConstantArgumentsReplayPreconditionViolations"
   },
   {
     "name": "smt-strict-less-than",

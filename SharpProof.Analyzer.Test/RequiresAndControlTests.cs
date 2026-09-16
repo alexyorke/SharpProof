@@ -468,6 +468,19 @@ public sealed class RequiresAndControlTests
             }
             """, "SP0027", 3),
         RequiresCase(
+            "CompilerConstantArgumentsReplayPreconditionViolations",
+            """
+            using SharpProof.Attributes;
+            public static class Fixture {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+                public static void Caller() {
+                    Positive(sizeof(int) - 5);
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
             "UncheckedOverflowFailsClosedButConcreteViolationsReport",
             """
             using SharpProof.Attributes;
