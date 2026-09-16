@@ -536,7 +536,7 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderRejectsNonCanonicalSlotsAfterSerialization(
         CanonicalSlotMutation mutation)
     {
-        AssertDecoderRejects(
+        var exception = AssertDecoderRejects(
             graph =>
             {
                 switch (mutation)
@@ -577,6 +577,11 @@ public sealed class PortableIrGraphCodecTests
                 }
             },
             serialize: true);
+        if (mutation == CanonicalSlotMutation.TermUnusedIndex)
+        {
+            Assert.That(exception.Message,
+                Is.EqualTo("Portable IR Boolean slots are not canonical."));
+        }
     }
 
     [TestCase(WireEnumMutation.OpaquePurity)]
