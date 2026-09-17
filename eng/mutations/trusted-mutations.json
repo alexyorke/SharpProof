@@ -1059,7 +1059,7 @@
     "name": "verifier-task-requires-authenticated-cleanup-receipt",
     "file": "SharpProof.BuildTasks/RunVerifier.cs",
     "original": "        if (!authenticationRequired || cleanupAuthenticated)",
-    "mutated": "        if (true || !authenticationRequired || cleanupAuthenticated)",
+    "mutated": "        if (!authenticationRequired || !cleanupAuthenticated)",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~MissingCleanupReceiptInvokesContainmentFailureDecision"
   },
