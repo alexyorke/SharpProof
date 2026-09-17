@@ -677,6 +677,12 @@ public sealed class LinuxPublicationSetTests
             File.Delete(path);
         }
 
+        Assert.That(paths.Select(LinuxPathIdentity.PublicationLockName),
+            Has.All.Matches<string>(path => Path.GetFileName(path).Length <= 255),
+            "Publication lock names must fit even when member names reach NAME_MAX.");
+        Assert.That(paths.Select(LinuxPathIdentity.PublicationMarkerPath),
+            Has.All.Matches<string>(path => Path.GetFileName(path).Length <= 255),
+            "Publication marker names must fit even when member names reach NAME_MAX.");
         using var publication = LinuxPathIdentity.AcquirePublicationSet(
             paths,
             TimeSpan.FromSeconds(1));

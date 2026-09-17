@@ -162,8 +162,13 @@ public sealed class BuildTaskTests
             armed);
         try
         {
+            var completed = await System.Threading.Tasks.Task.WhenAny(
+                armed.Task,
+                System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1)));
+            Assert.That(completed, Is.SameAs(armed.Task),
+                "The armed signal must arrive before output completion.");
             Assert.That(
-                await armed.Task.WaitAsync(TimeSpan.FromSeconds(1)),
+                await armed.Task,
                 Is.True);
             Assert.That(read.IsCompleted, Is.False);
         }

@@ -555,7 +555,7 @@
     "name": "modeled-call-flow-definedness",
     "file": "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
     "original": "predicate = application.Value.Predicate;",
-    "mutated": "predicate = factory.Boolean(true);",
+    "mutated": "predicate = inputs.Factory.Boolean(true);",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow"
   },
@@ -827,7 +827,7 @@
     "name": "protocol-json-nested-shape-authority",
     "file": "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs",
     "original": "            EnsureObjectShape(root, shape);",
-    "mutated": "            _ = shape;",
+    "mutated": "            _ = shape;\n            _ = root;",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~OmittedNestedManifestSchemaVersionIsRejectedDuringDeserialization"
   },
