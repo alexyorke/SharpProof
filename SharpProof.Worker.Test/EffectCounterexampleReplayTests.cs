@@ -96,6 +96,12 @@ public sealed class EffectCounterexampleReplayTests
                     nameof(tampering));
         }
 
+        if (tampering == "tree-identity")
+        {
+            Assert.That(CompilerEffectClaimArtifactCodec.HasValidReplayGeometry(
+                fixture.Evidence, fixture.Target.Compilation), Is.False);
+        }
+
         Assert.Throws<InvalidDataException>((Action)(() =>
             EffectClaimResultAssembler.Assemble(
                 fixture.Target,

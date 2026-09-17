@@ -617,9 +617,9 @@
   },
   {
     "name": "effect-replay-tree-identity",
-    "file": "SharpProof.Worker/EffectCounterexampleReplayer.cs",
-    "original": "            effectEvent.SyntaxTreeSha256 != tree.Sha256 ||",
-    "mutated": "            false && effectEvent.SyntaxTreeSha256 != tree.Sha256 ||",
+    "file": "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
+    "original": "                effectEvent.SyntaxTreeSha256 != syntaxTree.Sha256 ||",
+    "mutated": "                false && effectEvent.SyntaxTreeSha256 != syntaxTree.Sha256 ||",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~StructurallyMalformedReplayEvidenceIsRejected"
   },
