@@ -795,7 +795,7 @@
     "name": "release-qualification-matrix-receipt-projection",
     "file": "scripts/Invoke-SharpProofReleaseContainer.ps1",
     "original": "        $requiredGates = @($matrix.releaseQualificationMatrix |",
-    "mutated": "        $requiredGates = @() # mutation removes qualification rows",
+    "mutated": "        $requiredGates = @($matrix.releaseQualificationMatrix | Where-Object { $false } |",
     "project": "SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj",
     "filter": "FullyQualifiedName~WorkflowExecutesTheExactCatalogOwnedQualificationMatrix"
   },

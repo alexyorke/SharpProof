@@ -22,10 +22,10 @@ public sealed partial class ReleaseQualificationMatrixTests
     ];
 
     [Test]
-    public void WorkflowExecutesTheExactCatalogOwnedQualificationMatrix()
+    public async Task WorkflowExecutesTheExactCatalogOwnedQualificationMatrix()
     {
         var root = TestRepository.FindRoot();
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
             root, "eng", "acceptance", "preview-evidence.v1.json")));
         var matrix = document.RootElement
             .GetProperty("releaseQualificationMatrix")
@@ -39,7 +39,24 @@ public sealed partial class ReleaseQualificationMatrixTests
             matrix.Select(row => row.Receipt).Distinct(),
             Is.EqualTo(s_receipts));
 
-        var workflow = File.ReadAllText(Path.Combine(
+        var projected = await RunAsync(root, "pwsh", "-NoLogo", "-NoProfile", "-Command",
+            """
+            $ErrorActionPreference = 'Stop'
+            $matrix = Get-Content eng/acceptance/preview-evidence.v1.json -Raw | ConvertFrom-Json
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                (Join-Path $PWD 'scripts/Invoke-SharpProofReleaseContainer.ps1'),
+                [ref]$null, [ref]$null)
+            $assignments = @($ast.FindAll({ param($node)
+                $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $node.Left.Extent.Text -ceq '$requiredGates'
+            }, $true))
+            if ($assignments.Count -ne 1) { throw 'Expected one receipt projection.' }
+            . ([scriptblock]::Create($assignments[0].Extent.Text))
+            ConvertTo-Json -InputObject @($requiredGates) -Compress
+            """);
+        Assert.That(JsonSerializer.Deserialize<string[]>(projected), Is.EqualTo(s_receipts));
+
+        var workflow = await File.ReadAllTextAsync(Path.Combine(
             root, ".github", "workflows", "package-consumers.yml"));
         var portable = Job(workflow, "portable-consumers", "release-qualification");
         var qualification = Job(
@@ -62,7 +79,7 @@ public sealed partial class ReleaseQualificationMatrixTests
                 Does.Contain("Test-SharpProofReleaseConfiguration.ps1"));
         }
 
-        var dispatcher = File.ReadAllText(Path.Combine(
+        var dispatcher = await File.ReadAllTextAsync(Path.Combine(
             root, "scripts", "Invoke-SharpProofContainer.ps1"));
         Assert.That(
             dispatcher,
