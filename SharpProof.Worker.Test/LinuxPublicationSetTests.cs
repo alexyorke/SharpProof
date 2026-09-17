@@ -33,7 +33,7 @@ public sealed class LinuxPublicationSetTests
                 TimeSpan.FromSeconds(1));
         }));
 
-        Assert.That(error, Is.TypeOf<ArgumentException>());
+        Assert.That(error!.GetType(), Is.EqualTo(typeof(ArgumentException)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(error!.Message, Does.Contain("ancestor"));
