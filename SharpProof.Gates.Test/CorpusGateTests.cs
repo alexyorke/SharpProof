@@ -349,7 +349,16 @@ public sealed class CorpusGateTests
     {
         const string data = "case|Proven|Proven|";
         var canonical = Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n");
-        Assert.That(CorpusSnapshotFormat.Parse(canonical), Is.EqualTo(new[] { data }));
+        string[]? parsed = null;
+        try
+        {
+            parsed = CorpusSnapshotFormat.Parse(canonical);
+        }
+        catch (InvalidDataException)
+        {
+            Assert.Fail("The canonical schema-three snapshot must be accepted.");
+        }
+        Assert.That(parsed, Is.EqualTo(new[] { data }));
         Assert.That(CorpusSnapshotFormat.Render(new[] { data }), Is.EqualTo(CorpusSnapshotHeader + data + "\n"));
         var invalid = new[]
         {

@@ -1848,6 +1848,9 @@ public sealed class BuildTaskTests
             ManifestPath = manifest
         };
         Assert.That(reset.Execute(), Is.True);
+        Assert.That(
+            setA.Any(path => File.Exists(LinuxPathIdentity.PublicationMarkerPath(path))),
+            Is.False, "Reset must remove every marker owned by the original set.");
         using (LinuxPathIdentity.AcquirePublicationSet(
                    setB,
                    TimeSpan.FromSeconds(5)))
