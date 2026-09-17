@@ -1099,7 +1099,7 @@
     "name": "verifier-interrupted-authentication-defers-protocol-drain",
     "file": "SharpProof.BuildTasks/RunVerifier.cs",
     "original": "        return authenticationRequired && !outputCompleted;",
-    "mutated": "        return false;",
+    "mutated": "        return authenticationRequired && outputCompleted;",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~InterruptedAuthenticationWaitDefersIncompleteProtocolDrain"
   },
@@ -1211,7 +1211,7 @@
     "name": "publication-lock-construction-cleanup-ownership",
     "file": "SharpProof.Host/LinuxPathIdentity.cs",
     "original": "                locks.Add(publicationLock);",
-    "mutated": "                _ = publicationLock;",
+    "mutated": "                if (lockPath.Length < 0)\n                {\n                    locks.Add(publicationLock);\n                }",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~ConstructorFailureDisposesEveryEarlierLock"
   },
