@@ -1539,7 +1539,7 @@
     "name": "analyzer-partial-executable-owner",
     "file": "SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs",
     "original": "        if (method.PartialImplementationPart != null)\n        {\n            return;\n        }\n        if (method.PartialDefinitionPart != null &&",
-    "mutated": "        if (false)\n        {\n            return;\n        }\n        if (method.PartialDefinitionPart != null &&",
+    "mutated": "        if (method.PartialDefinitionPart != null &&",
     "project": "SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj",
     "filter": "FullyQualifiedName~PartialMethodHasOneExecutableEffectOwner"
   },
