@@ -1154,8 +1154,8 @@
   {
     "name": "generated-contract-for-final-compilation-validation",
     "file": "SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs",
-    "original": "        if (configuration.ContractsEnabled)",
-    "mutated": "        if (false && configuration.ContractsEnabled)",
+    "original": "        context.RegisterCompilationEndAction(\n            ValidateContractForCompanions);",
+    "mutated": "        _ = (Action<CompilationAnalysisContext>)ValidateContractForCompanions;",
     "project": "SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj",
     "filter": "FullyQualifiedName~GeneratedCompanionIsValidatedFromFinalCompilation"
   },
