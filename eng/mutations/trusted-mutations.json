@@ -954,8 +954,8 @@
   {
     "name": "launcher-checks-launcher-runtime-paths",
     "file": "SharpProof.Worker.Launcher/Program.cs",
-    "original": "        string?[] candidates = [..runtimeRoots,\n            ..launcherRuntimePaths,",
-    "mutated": "        string?[] candidates = [..runtimeRoots,\n            ..launcherRuntimePaths.Skip(1),",
+    "original": "        var launcherRuntimePaths = LauncherArguments.LauncherRuntimePaths;",
+    "mutated": "        var launcherRuntimePaths = LauncherArguments.LauncherRuntimePaths.Take(0).ToArray();",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead"
   },
@@ -1363,7 +1363,7 @@
     "name": "contract-ref-expression-uses-declaration-operation-root",
     "file": "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
     "original": "return expression is RefExpressionSyntax ? declaration : expression;",
-    "mutated": "_ = declaration; return expression;",
+    "mutated": "return expression is RefExpressionSyntax ? expression : declaration;",
     "project": "SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj",
     "filter": "FullyQualifiedName~RefReturningExpressionBodiedCompanionHasAnOperationBody"
   },
