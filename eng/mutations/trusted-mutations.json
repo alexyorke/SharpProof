@@ -1891,7 +1891,7 @@
     "name": "frontend-fuzz-batch-compile-failure-isolation",
     "file": "Tools/SharpProof.Fuzz/FrontendFuzzing.cs",
     "original": "            if (generatedCases.Count == 1)",
-    "mutated": "            if (true)",
+    "mutated": "            if (generatedCases.Count >= 1)",
     "project": "SharpProof.Fuzz.Test/SharpProof.Fuzz.Test.csproj",
     "filter": "FullyQualifiedName~FrontendBatchCompileFailureIsIsolatedToInvalidCase"
   },
