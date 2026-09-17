@@ -2468,7 +2468,8 @@ public sealed class ArchitectureTests
         {
             Assert.That(nightlyCases, Is.Positive);
             Assert.That(maximumCampaignCases, Is.GreaterThan(nightlyCases));
-            Assert.That(workflow, Does.Contain("tooling nightly"));
+            Assert.That(workflow.Contains("tooling nightly", StringComparison.Ordinal), Is.True,
+                "The nightly workflow must invoke the nightly tooling profile.");
             Assert.That(
                 WorkflowFiles()
                     .Where(path => !path.EndsWith(

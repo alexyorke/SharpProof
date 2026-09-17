@@ -923,7 +923,7 @@
     "name": "closure-component-paths-immutable",
     "file": "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
     "original": "        ImmutableArray.CreateRange(componentPaths);",
-    "mutated": "        componentPaths;",
+    "mutated": "        componentPaths.ToArray();",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~RuntimeClosureComponentPathsAreImmutable"
   },
