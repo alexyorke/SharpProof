@@ -1067,7 +1067,7 @@
     "name": "verifier-output-drain-detects-capture-limit",
     "file": "SharpProof.BuildTasks/RunVerifier.cs",
     "original": "            if (count > remaining)",
-    "mutated": "            if (false && count > remaining)",
+    "mutated": "            if (count > remaining && count < 0)",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~VerifierOutputDrainIsBoundedAndStillAuthenticatesCleanup"
   },
@@ -1082,8 +1082,8 @@
   {
     "name": "verifier-output-limit-interrupts-output-wait",
     "file": "SharpProof.BuildTasks/RunVerifier.cs",
-    "original": "_outputLimitSignal.IsSet;",
-    "mutated": "false;",
+    "original": "                    _outputLimitSignal.IsSet);",
+    "mutated": "                    _cancellationSignal.IsSet);",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~OversizedOutputWithIncompleteCleanupReturnsPromptly"
   },
@@ -1762,8 +1762,8 @@
   {
     "name": "managed-flow-raw-syntactic-cycle",
     "file": "SharpProof.Effects/ManagedAbstractFlow.cs",
-    "original": "        return !expected.HasValue ||",
-    "mutated": "        return expected.HasValue ||",
+    "original": "               expected.Value == constant.Value;",
+    "mutated": "               expected.HasValue || expected.Value == constant.Value;",
     "project": "SharpProof.Effects.Test/SharpProof.Effects.Test.csproj",
     "filter": "FullyQualifiedName~CompileTimeLoopConditionsControlReachabilityAndTermination"
   },
