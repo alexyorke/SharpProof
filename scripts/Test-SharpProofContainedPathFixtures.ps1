@@ -52,6 +52,11 @@ try {
     }
     else {
         Require-Rejection $caseVariant case-distinct-sibling
+        $caseTarget = Join-Path $fixture 'repo'
+        [IO.Directory]::CreateDirectory($caseTarget) | Out-Null
+        [IO.Directory]::CreateSymbolicLink(
+            (Join-Path $root 'case-link'), $caseTarget) | Out-Null
+        Require-Rejection 'case-link/out.json' case-distinct-symbolic-link
     }
     Require-Rejection (Join-Path $fixture 'RepoSibling/out.json') prefix-sibling
     Require-Rejection '../outside.json' traversal-escape

@@ -81,6 +81,19 @@ function Assert-Rejected(
 }
 
 try {
+    $missingPropertyRejected = $false
+    try {
+        Assert-SharpProofExactJsonProperties -Actual @('Cases') `
+            -Expected @('Cases', 'Seed') -Description 'Missing property fixture'
+    }
+    catch {
+        if ($_.Exception.Message -cne
+            'Missing property fixture has an unexpected property set.') { throw }
+        $missingPropertyRejected = $true
+    }
+    if (-not $missingPropertyRejected) {
+        throw 'The exact property validator accepted an incomplete property set.'
+    }
     $canonical = New-CanonicalResult 10 123
     Assert-Accepted $canonical 'canonical-rotating'
     $racePath = Write-Result $canonical 'canonical-race'
