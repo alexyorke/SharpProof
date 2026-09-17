@@ -971,7 +971,7 @@
     "name": "targets-protect-protocol-companion-path",
     "file": "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
     "original": "            .Append(WorkerProtocolPath)",
-    "mutated": "            .Append(InvocationManifestPath)",
+    "mutated": "            .Append(InvocationManifestPath ?? string.Empty)",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~LauncherProtocolAssetRemainsProtectedByTargets"
   },
@@ -1051,7 +1051,7 @@
     "name": "verifier-task-retains-incomplete-cleanup-anchor",
     "file": "SharpProof.BuildTasks/RunVerifier.cs",
     "original": "                if (retainCleanupAnchor && process != null)",
-    "mutated": "                if ($false && retainCleanupAnchor && process != null)",
+    "mutated": "                if (retainCleanupAnchor && process != null && processGroupPidFd < 0)",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~VerifierExecutionRetainsLiveIncompleteCleanupAnchor"
   },
@@ -1571,7 +1571,7 @@
     "name": "protocol-exact-runtime-provenance",
     "file": "SharpProof.Worker.Protocol/ProtocolJson.cs",
     "original": "                response.Summary?.Versions != null &&\n                VersionsEqual(response.Summary.Versions, expectedVersions),",
-    "mutated": "                response.Summary?.Versions != null,",
+    "mutated": "                response.Summary?.Versions != null &&\n                VersionsEqual(expectedVersions, expectedVersions),",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~RequestBoundValidationAuthenticatesRuntimeProvenance"
   },
@@ -1587,7 +1587,7 @@
     "name": "summary-unique-term-budget",
     "file": "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
     "original": "                if (_visitedTerms.Add(term.Id) && !Spend())",
-    "mutated": "                if (false)",
+    "mutated": "                if (_visitedTerms.Add(term.Id) && _visitedTerms.Count < 0)",
     "project": "SharpProof.Summaries.Test/SharpProof.Summaries.Test.csproj",
     "filter": "FullyQualifiedName~SymbolicBudgetRejectsBroadUniqueTermDag"
   },
