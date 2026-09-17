@@ -1162,8 +1162,8 @@
   {
     "name": "configuration-authoritative-alias-order",
     "file": "SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs",
-    "original": "        foreach (var key in keys)",
-    "mutated": "        foreach (var key in keys.Reverse())",
+    "original": "        foreach (var key in new[] {\n                     option.Key,\n                     \"build_property.\" + option.Key,\n                     \"build_property.\" + option.BuildPropertyName\n                 })",
+    "mutated": "        foreach (var key in new[] {\n                     option.Key,\n                     \"build_property.\" + option.Key,\n                     \"build_property.\" + option.BuildPropertyName\n                 }.Reverse())",
     "project": "SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj",
     "filter": "FullyQualifiedName~GeneratorUsesTheAuthoritativeConfigurationAliasOrder"
   },

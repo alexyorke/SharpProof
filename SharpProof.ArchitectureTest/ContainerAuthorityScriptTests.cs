@@ -188,11 +188,12 @@ public sealed class ContainerAuthorityScriptTests
         string repositoryRoot,
         string command)
     {
+        Assert.That(stage.Contains("USER sharpproof", StringComparison.Ordinal),
+            Is.True, "The stage must execute as the sharpproof user.");
         Assert.That(
             stage,
             Does.Contain("ENV SHARPPROOF_REPO_ROOT=" + repositoryRoot)
                 .And.Contain("WORKDIR " + repositoryRoot)
-                .And.Contain("USER sharpproof")
                 .And.Contain("ENTRYPOINT [\"/usr/local/bin/sharpproof-container\"]")
                 .And.Contain("CMD [\"" + command + "\"]"));
     }

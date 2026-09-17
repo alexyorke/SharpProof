@@ -1065,9 +1065,10 @@ public sealed class ContractForValidatorGeneratorTests
             public static class ReferencedTargetContracts { }
             """));
 
-        var diagnostic = AssertSingle(
-            GeneratorTestHost.RunAnalyzer(compilation),
-            "SPCF0004");
+        var run = GeneratorTestHost.RunAnalyzer(compilation);
+        Assert.That(run.Diagnostics.Length, Is.EqualTo(1));
+        Assert.That(run.Diagnostics[0].Id, Is.EqualTo("SPCF0004"));
+        var diagnostic = AssertSingle(run, "SPCF0004");
 
         using (Assert.EnterMultipleScope())
         {
@@ -1788,6 +1789,9 @@ public sealed class ContractForValidatorGeneratorTests
         "build_property.SharpProofProfile", "advisory", true)]
     [TestCase(
         "sharpproof_features", "invalid",
+        "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "   ",
         "build_property.SharpProofProfile", "advisory", false)]
     public void GeneratorUsesTheAuthoritativeConfigurationAliasOrder(
         string firstKey,

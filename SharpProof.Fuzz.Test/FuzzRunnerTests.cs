@@ -402,6 +402,7 @@ public sealed class FuzzRunnerTests
 
         var results = FrontendDifferentialOracle.CompareBatch([valid, invalid]);
 
+        Assert.That(results.Length, Is.EqualTo(2));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
