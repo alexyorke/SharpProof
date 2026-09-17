@@ -1210,8 +1210,8 @@
   {
     "name": "publication-lock-construction-cleanup-ownership",
     "file": "SharpProof.Host/LinuxPathIdentity.cs",
-    "original": "                locks.Add(publicationLock);",
-    "mutated": "                if (lockPath.Length < 0)\n                {\n                    locks.Add(publicationLock);\n                }",
+    "original": "                ReleaseLocks([.. locks], acquired);",
+    "mutated": "                if (locks.Count < 0)\n                {\n                    ReleaseLocks([.. locks], acquired);\n                }",
     "project": "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj",
     "filter": "FullyQualifiedName~ConstructorFailureDisposesEveryEarlierLock"
   },

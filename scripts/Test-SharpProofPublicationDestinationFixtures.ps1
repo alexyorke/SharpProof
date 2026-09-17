@@ -209,6 +209,11 @@ try {
         else { $null }
         $action = New-SharpProofPublicationActionAuthority `
             -Mode $mode -MainState $mainState
+        if ($mode -ceq 'registry' -and
+            ($action.symbolsState -cne 'Unchecked' -or
+                $action.symbolsAction -cne 'CollisionOnPush')) {
+            throw 'Registry symbols must remain unchecked until collision-aware push.'
+        }
         if ($Mutation -eq 'actions-symbol-preflight') {
             $action.symbolsAction = 'PreflightThenPush'
         }

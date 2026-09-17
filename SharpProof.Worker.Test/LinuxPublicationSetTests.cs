@@ -26,13 +26,14 @@ public sealed class LinuxPublicationSetTests
             ? new[] { descendant, parent }
             : new[] { parent, descendant };
 
-        var error = Assert.Throws<ArgumentException>((Action)(() =>
+        var error = Assert.Catch<Exception>((Action)(() =>
         {
             using var publication = LinuxPathIdentity.AcquirePublicationSet(
                 paths,
                 TimeSpan.FromSeconds(1));
         }));
 
+        Assert.That(error, Is.TypeOf<ArgumentException>());
         using (Assert.EnterMultipleScope())
         {
             Assert.That(error!.Message, Does.Contain("ancestor"));
@@ -297,12 +298,11 @@ public sealed class LinuxPublicationSetTests
             }));
         }
         var after = CountOwnedFileDescriptors(metadataDirectory);
+        Assert.That(after, Is.EqualTo(before));
         Directory.Delete(lockPaths[failureIndex]);
         using var reacquired = LinuxPathIdentity.AcquirePublicationSet(
             ordered,
             TimeSpan.FromSeconds(1));
-
-        Assert.That(after, Is.EqualTo(before));
 
         static int CountOwnedFileDescriptors(string directory)
         {
