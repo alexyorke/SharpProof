@@ -82,6 +82,8 @@ try {
     $env:SHARPPROOF_CONTAINER = '1'
     Invoke-TagCase exact-annotated "refs/tags/$tag" $tag $head $true
     Invoke-TagCase branch refs/heads/master master $head $false
+    Invoke-TagCase branch-with-valid-tag-name refs/heads/master $tag $head $false
+    Invoke-TagCase wrong-ref-with-valid-tag-name refs/tags/v9.9.9 $tag $head $false
     Invoke-TagCase empty-ref '' $tag $head $false
     Invoke-TagCase non-version-tag refs/tags/release release $head $false
     Invoke-TagCase wrong-version refs/tags/v9.9.9 v9.9.9 $head $false
