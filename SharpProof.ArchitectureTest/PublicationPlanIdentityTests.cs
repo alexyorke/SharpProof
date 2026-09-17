@@ -46,8 +46,13 @@ public sealed class PublicationPlanIdentityTests
             TestRepository.FindRoot(), "scripts", "Publish-SharpProofRelease.ps1"));
         var create = script.IndexOf(
             "New-SharpProofPublicationPlanIdentities", StringComparison.Ordinal);
-        var validate = script.IndexOf(
-            "Test-SharpProofPublicationPlanIdentity -Plan $plan", StringComparison.Ordinal);
+        var validationCall = System.Text.RegularExpressions.Regex.Match(
+            script,
+            @"^Test-SharpProofPublicationPlanIdentity -Plan \$plan\r?$",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+        Assert.That(validationCall.Success, Is.True,
+            "The publisher must execute plan identity validation before writing the plan.");
+        var validate = validationCall.Index;
         var write = script.IndexOf(
             "Write-PublicationPlan `", validate, StringComparison.Ordinal);
         var replay = script.IndexOf(
