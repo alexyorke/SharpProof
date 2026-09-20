@@ -615,7 +615,16 @@ internal sealed partial class SharpProofAnalyzerEngine
             diagnostics.Add(
                 CreateInvalidConfigurationDiagnostic(invalidValue));
         }
-        if (!configuration.InvalidConfigurationValues.IsEmpty)
+        // A failed options provider cannot be queried again safely. Other
+        // global configuration errors are independent from tree-local values,
+        // so continue collecting those values instead of hiding them behind
+        // the first global diagnostic.
+        var optionsProviderFailed = configuration.InvalidConfigurationValues
+            .Any(static invalidValue => string.Equals(
+                invalidValue.Key,
+                "AnalyzerConfigOptionsProvider",
+                StringComparison.Ordinal));
+        if (optionsProviderFailed)
         {
             return diagnostics.ToImmutable();
         }

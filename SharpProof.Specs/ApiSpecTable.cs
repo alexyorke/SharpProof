@@ -195,11 +195,36 @@ public sealed partial class ApiSpecTable
                 nameof(declaration));
         }
 
+        if (target.MemberKind == SpecTargetMemberKind.Constructor &&
+            target.ResultType.HasValue)
+        {
+            throw new ArgumentException(
+                "Spec constructors cannot declare a result type.",
+                nameof(declaration));
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.Constructor &&
+            target.GenericArity != 0)
+        {
+            throw new ArgumentException(
+                "Spec constructors cannot declare generic arity.",
+                nameof(declaration));
+        }
+
         if (target.MemberKind == SpecTargetMemberKind.PropertyGet &&
             target.GenericArity != 0)
         {
             throw new ArgumentException(
                 "Spec properties cannot declare generic arity.",
+                nameof(declaration));
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.PropertyGet &&
+            !target.ResultType.HasValue &&
+            target.ContainingTypeMetadataName.IndexOf('`') < 0)
+        {
+            throw new ArgumentException(
+                "Spec properties must declare a result type.",
                 nameof(declaration));
         }
 

@@ -63,8 +63,18 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         var ownershipTransferred = false;
         try
         {
-            process.StandardInput.WriteLine(StartMessage);
-            process.StandardInput.Close();
+            try
+            {
+                process.StandardInput.WriteLine(StartMessage);
+                process.StandardInput.Close();
+            }
+            catch (IOException) when (process.WaitForExit(0))
+            {
+                // A short-lived process can finish before the startup frame
+                // reaches its stdin pipe. Preserve the process so callers can
+                // observe its exit code instead of turning that race into a
+                // host-side startup failure.
+            }
             var worker = new LinuxWorkerProcess(process);
             ownershipTransferred = true;
             return worker;
@@ -203,16 +213,38 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             throw NativeFailure(
                 "SharpProof could not terminate the worker process.");
         }
+        // A worker can create a child from its SIGTERM handler. Keep sampling
+        // while the worker has a chance to exit so that child is included in
+        // the same start-time-checked cleanup set before it is orphaned.
         var remainingForTerminate = finalLimit - stopwatch.Elapsed;
         var terminateWait = checked((int)Math.Min(
             Math.Max(0, remainingForTerminate.TotalMilliseconds / 2),
             int.MaxValue));
-        if (!process.WaitForExit(terminateWait))
+        var terminateDeadline = stopwatch.Elapsed +
+            TimeSpan.FromMilliseconds(terminateWait);
+        while (!process.WaitForExit(0) &&
+            stopwatch.Elapsed < terminateDeadline)
+        {
+            AddDescendants(
+                process.Id,
+                descendants);
+            var remaining = terminateDeadline - stopwatch.Elapsed;
+            var delay = remaining < TimeSpan.FromMilliseconds(PollMilliseconds)
+                ? remaining
+                : TimeSpan.FromMilliseconds(PollMilliseconds);
+            if (delay > TimeSpan.Zero)
+            {
+                Thread.Sleep(delay);
+            }
+        }
+        AddDescendants(process.Id, descendants);
+        if (!process.WaitForExit(0))
         {
             try
             {
                 if (!process.HasExited)
                 {
+                    AddDescendants(process.Id, descendants);
                     process.Kill(entireProcessTree: true);
                 }
             }
@@ -228,9 +260,23 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                 throw new InvalidOperationException(
                     "The SharpProof worker did not terminate within its grace period.");
             }
+            AddDescendants(process.Id, descendants);
         }
         KillCapturedDescendants(descendants);
         return true;
+    }
+
+    private static void AddDescendants(
+        int rootProcessId,
+        List<(int ProcessId, ulong StartTime)> descendants)
+    {
+        foreach (var descendant in CaptureDescendants(rootProcessId))
+        {
+            if (!descendants.Contains(descendant))
+            {
+                descendants.Add(descendant);
+            }
+        }
     }
 
     private static List<(int ProcessId, ulong StartTime)> CaptureDescendants(

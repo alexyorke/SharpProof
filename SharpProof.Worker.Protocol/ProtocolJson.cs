@@ -1281,6 +1281,12 @@ public static partial class WorkerProtocolJson
     private static T? Deserialize<T>(string json)
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
+        if (Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
+        {
+            throw new JsonException(
+                $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
         using var document = JsonDocument.Parse(
             json,
             new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });

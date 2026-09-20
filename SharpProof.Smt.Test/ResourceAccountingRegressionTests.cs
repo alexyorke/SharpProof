@@ -4,6 +4,14 @@ namespace SharpProof.Smt.Test;
 public sealed class ResourceAccountingRegressionTests
 {
     [Test]
+    public void NativeResourceCounterWrapIsChargedAsUnsignedDelta()
+    {
+        Assert.That(
+            IrSmtBackend.ComputeResourceDelta(uint.MaxValue - 2, 1),
+            Is.EqualTo(4));
+    }
+
+    [Test]
     public async Task NativeResourceAccountingChargesOnlyTheCurrentQuery()
     {
         const uint queryLimit = 1_000_000;

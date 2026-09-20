@@ -986,6 +986,25 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void InterpreterEvaluatesKnownStringToObjectReferenceCasts()
+    {
+        var factory = new IrFactory();
+        var cast = factory.Cast(
+            factory.ObjectType,
+            factory.String("sharp"));
+
+        var result = new IrInterpreter(factory).Evaluate(cast);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+            Assert.That(result.Value!.Type, Is.EqualTo(factory.ObjectType));
+            Assert.That(result.Value.Kind, Is.EqualTo(IrValueKind.Reference));
+            Assert.That(result.Value.Reference, Is.EqualTo("sharp"));
+        }
+    }
+
+    [Test]
     public void InterpreterUsesConcreteStringReferenceTypeForStringCasts()
     {
         var factory = new IrFactory();

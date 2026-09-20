@@ -421,6 +421,19 @@ public sealed class IrInterpreter(IrFactory factory)
             return Fault(IrExceptionKind.NullReference,
                 "Null cannot be unboxed to a non-nullable IR type.");
         }
+
+        // Every string has a known reference conversion to object. Preserve
+        // the concrete identity so a later reference comparison observes the
+        // same object rather than abstaining on a relation the IR already
+        // knows exactly.
+        if (cast.Type == _factory.ObjectType &&
+            operand.Value.Kind == IrValueKind.String)
+        {
+            return Value(_factory.CreateReferenceValue(
+                cast.Type,
+                operand.Value.String));
+        }
+
         if (operand.Value.Kind != IrValueKind.Reference)
         {
             return Unsupported(IrUnsupportedReason.UnsupportedCast,

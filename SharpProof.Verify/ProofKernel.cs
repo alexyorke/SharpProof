@@ -36,11 +36,24 @@ public sealed class ProofKernel(ISmtBackend backend)
         {
             BackendCheckStatus.Unsatisfiable => CreateProven(query, result, cancellationToken),
             BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
-            BackendCheckStatus.Unknown => Unknown(
-                VerificationProjections.MapFailure(result.FailureReason)),
+            BackendCheckStatus.Unknown => CreateUnknown(result),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
     }
+    private static UnknownOutcome CreateUnknown(BackendCheckResult result)
+    {
+        // An unknown result carries only its failure classification. Accepting
+        // a model or core here would hide a malformed backend response behind
+        // a typed semantic failure and make the result shape ambiguous.
+        if (result.Model != null || !result.UnsatCore.IsDefaultOrEmpty ||
+            result.FailureReason == BackendFailureReason.None)
+        {
+            return Unknown(AbstentionReason.MalformedBackendResult);
+        }
+
+        return Unknown(VerificationProjections.MapFailure(result.FailureReason));
+    }
+
     private static ProofOutcome CreateProven(
         VerificationQuery query,
         BackendCheckResult result,

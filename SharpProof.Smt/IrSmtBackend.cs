@@ -249,8 +249,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             var resourceCountBeforeCheck = ReadResourceCount(solver);
             var status = solver.Check();
             var resourceCountAfterCheck = ReadResourceCount(solver);
-            meter.ConsumeNative(checked(
-                resourceCountAfterCheck - resourceCountBeforeCheck));
+            if (resourceCountAfterCheck.HasValue)
+            {
+                meter.ConsumeNative(ComputeResourceDelta(
+                    resourceCountBeforeCheck.GetValueOrDefault(),
+                    resourceCountAfterCheck.Value));
+            }
             cancellationToken.ThrowIfCancellationRequested();
             return status switch
             {
@@ -287,7 +291,18 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         return BackendFailureReason.InfrastructureFailure;
     }
 
-    private static long ReadResourceCount(Solver solver)
+    internal static long ComputeResourceDelta(uint before, uint after)
+    {
+        // StatisticsEntry exposes Z3's native rlimit counter as a uint. The
+        // context counter can wrap while a backend remains alive, so subtract
+        // in the counter's unsigned domain instead of allowing a negative
+        // delta to undercharge the query.
+        return after >= before
+            ? after - before
+            : (long)uint.MaxValue + 1 - before + after;
+    }
+
+    private static uint? ReadResourceCount(Solver solver)
     {
         // Statistics is a caller-owned Z3 object holding a native reference, the
         // same as Model in CreateSatisfiable. This backend outlives hundreds of
@@ -307,7 +322,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             return entry.UIntValue;
         }
 
-        return 0;
+        return null;
     }
 
     internal static void AddOwnedParameter(

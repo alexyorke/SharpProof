@@ -253,6 +253,42 @@ public sealed class ProofKernelTests
         }
     }
 
+    [Test]
+    public async Task UnknownResultsWithProofPayloadsAreMalformed()
+    {
+        var fixture = CreateFixture();
+        var model = new BackendModel([
+            KeyValuePair.Create(
+                fixture.Variable,
+                fixture.Factory.CreateIntegerValue(0))]);
+        var results = new[]
+        {
+            new BackendCheckResult(
+                BackendCheckStatus.Unknown,
+                [],
+                model,
+                BackendFailureReason.Timeout,
+                default),
+            new BackendCheckResult(
+                BackendCheckStatus.Unknown,
+                [0],
+                null,
+                BackendFailureReason.Timeout,
+                default)
+        };
+
+        foreach (var result in results)
+        {
+            var outcome = await new ProofKernel(new StubBackend(result))
+                .VerifyAsync(fixture.Query);
+
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(
+                ((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.MalformedBackendResult));
+        }
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public async Task BackendExceptionsBecomeTypedInfrastructureFailures(

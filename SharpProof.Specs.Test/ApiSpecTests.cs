@@ -280,6 +280,15 @@ public sealed class ApiSpecTests
         var genericProperty = DeclarationWithTarget(
             property,
             property.Target with { GenericArity = 1 });
+        var constructorResult = DeclarationWithTarget(
+            constructor,
+            constructor.Target with { ResultType = IrTypeKind.Reference });
+        var genericConstructor = DeclarationWithTarget(
+            constructor,
+            constructor.Target with { GenericArity = 1 });
+        var propertyWithoutResult = DeclarationWithTarget(
+            property,
+            property.Target with { ResultType = null });
 
         using (Assert.EnterMultipleScope())
         {
@@ -291,6 +300,18 @@ public sealed class ApiSpecTests
                 () => ApiSpecTable.Create([genericProperty]),
                 Throws.ArgumentException.With.Message.Contains(
                     "properties cannot declare generic arity"));
+            Assert.That(
+                () => ApiSpecTable.Create([constructorResult]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "constructors cannot declare a result type"));
+            Assert.That(
+                () => ApiSpecTable.Create([genericConstructor]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "constructors cannot declare generic arity"));
+            Assert.That(
+                () => ApiSpecTable.Create([propertyWithoutResult]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "properties must declare a result type"));
         }
     }
 
@@ -727,20 +748,15 @@ public sealed class ApiSpecTests
             .Concat(invalidOperation.InstanceConstructors)
             .Where(static constructor =>
                 constructor.Parameters.Length == 0 ||
-                constructor.Parameters is [
-                {
-                    Type.SpecialType: SpecialType.System_String
-                }])
+                constructor.Parameters.Length == 1 &&
+                constructor.Parameters[0].Type.SpecialType ==
+                    SpecialType.System_String)
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
-                constructor.Parameters is [
-                    {
-                        Type: INamedTypeSymbol
-                        {
-                            MetadataName: "IEnumerable`1"
-                        }
-                    }]);
+                constructor.Parameters.Length == 1 &&
+                constructor.Parameters[0].Type is INamedTypeSymbol type &&
+                type.MetadataName == "IEnumerable`1");
         var standard = supported
             .Where(static constructor =>
                 constructor.ContainingType.MetadataName == "Exception")

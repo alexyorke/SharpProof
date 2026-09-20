@@ -86,6 +86,26 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ProtocolDeserializersRejectDocumentsBeyondReaderLimit()
+    {
+        var json = WorkerProtocolJson.SerializeRequest(CreateRequest());
+        var oversizedValue = new string(
+            'x',
+            WorkerProtocolJson.MaximumJsonBytes);
+        var oversizedJson = json.Replace(
+            "\"compiler.manifest.json\"",
+            JsonSerializer.Serialize(oversizedValue),
+            StringComparison.Ordinal);
+
+        Assert.That(
+            Encoding.UTF8.GetByteCount(oversizedJson),
+            Is.GreaterThan(WorkerProtocolJson.MaximumJsonBytes));
+        Assert.That(
+            (Action)(() => WorkerProtocolJson.DeserializeRequest(oversizedJson)),
+            Throws.TypeOf<JsonException>());
+    }
+
+    [Test]
     public void ProtocolDeserializersRejectLoneUtf16Surrogates()
     {
         var json = WorkerProtocolJson.SerializeRequest(CreateRequest())

@@ -223,4 +223,38 @@ public sealed class OperationCompletionEdgeCaseRegressionTests
         }
     }
 
+    [Test]
+    public void NonCompletingTryBodyDoesNotMakeCatchReachableForCompletion()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample
+            {
+                public static void Run()
+                {
+                    try
+                    {
+                        while (true)
+                        {
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            """);
+        var method = EffectTestHost.SampleMethod(compilation, "Run");
+        var facts = EffectTestHost.CreateCompletionFacts(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(facts.MethodCanCompleteNormally(method), Is.False);
+            Assert.That(
+                EffectTestHost.CreateCompletionEvaluator(compilation, method)
+                    .CanMethodCompleteNormally(method),
+                Is.False);
+        }
+    }
+
 }
