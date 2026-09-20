@@ -276,11 +276,14 @@ and replay details, and the build fails. This is a semantic refutation, not an
 incomplete-analysis or infrastructure diagnostic.
 
 <a id="contractfor-generator-diagnostics"></a>
-## ContractFor generator diagnostics
+## ContractFor validation diagnostics
 
-The incremental `ContractFor` generator validates companions and emits no
-source. All ten rules are enabled-by-default errors once the generator is
-loaded.
+The SharpProof analyzer validates `ContractFor` companions in a
+compilation-end action after all generators have contributed their syntax
+trees. The package keeps an empty incremental generator as a loading hook; it
+does not own or emit these diagnostics. All ten SPCF rules are
+enabled-by-default errors when the SharpProof analyzer runs with a non-`off`
+profile.
 
 A valid instance-member companion uses a static class and an explicit receiver
 parameter:

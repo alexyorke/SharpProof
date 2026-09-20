@@ -153,9 +153,10 @@ their summary-incompleteness propagation are declared parts of the
 
 `Contract.Requires`, `Ensures`, `Assume`, `Result`, and `Old` bind as normal C#
 operations. `Old` is pre-state substitution. `[ContractFor]` companions are
-validated by an incremental, no-source generator using exact symbol identity,
-including generics, constraints, ref/scoped kinds, nullability, defaults, and
-return shape.
+validated by the analyzer's compilation-end action after all generators have
+contributed their syntax trees. The package's incremental generator is an
+empty loading hook; validation uses exact symbol identity, including generics,
+constraints, ref/scoped kinds, nullability, defaults, and return shape.
 
 The worker composes quantifier-free callee relations inferred from exact
 acyclic source bodies, exact implementation PE bodies, or explicitly enabled

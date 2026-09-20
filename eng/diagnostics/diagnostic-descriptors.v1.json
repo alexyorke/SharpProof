@@ -79,7 +79,7 @@
           "isEnabledByDefault": true,
           "description": "Reports invalid compilation-global SharpProof analyzer options.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0025",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "RequiresNotProvenRule",
@@ -163,7 +163,7 @@
           "isEnabledByDefault": true,
           "description": "Reports that the contract API assembly could not be read or attested, which silently disables all contract analysis.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0050",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         }
       ]
     },
@@ -185,7 +185,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0001",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "DuplicateCompanion",
@@ -197,7 +197,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0002",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "InvalidCompanionType",
@@ -209,7 +209,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0003",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "MissingMember",
@@ -221,7 +221,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0004",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "SignatureMismatch",
@@ -233,7 +233,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0005",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "AmbiguousMember",
@@ -245,7 +245,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0006",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "BodyRequired",
@@ -257,7 +257,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0007",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "InvalidClausePlacement",
@@ -269,7 +269,7 @@
           "isEnabledByDefault": true,
           "description": "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0008",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "SelfTarget",
@@ -281,7 +281,7 @@
           "isEnabledByDefault": true,
           "description": "Rejects ContractFor relationships whose companion and target are the same type.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0009",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         },
         {
           "symbol": "CyclicRelationship",
@@ -293,7 +293,7 @@
           "isEnabledByDefault": true,
           "description": "Rejects ContractFor relationships that participate in a cycle of companion and target types.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0010",
-          "customTags": []
+          "customTags": ["CompilationEnd"]
         }
       ]
     },

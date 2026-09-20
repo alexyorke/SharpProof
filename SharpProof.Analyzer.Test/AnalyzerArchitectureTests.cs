@@ -276,6 +276,39 @@ public sealed class AnalyzerArchitectureTests
         }
     }
 
+    [Test]
+    public void CompilationEndOnlyDescriptorsCarryCompilationEndTag()
+    {
+        var descriptors = new SharpProofAnalyzer()
+            .SupportedDiagnostics
+            .ToDictionary(
+                static descriptor => descriptor.Id,
+                StringComparer.Ordinal);
+        var expected = new[]
+        {
+            "SP0025",
+            "SP0050",
+            "SPCF0001",
+            "SPCF0002",
+            "SPCF0003",
+            "SPCF0004",
+            "SPCF0005",
+            "SPCF0006",
+            "SPCF0007",
+            "SPCF0008",
+            "SPCF0009",
+            "SPCF0010"
+        };
+
+        foreach (var id in expected)
+        {
+            Assert.That(
+                descriptors[id].CustomTags,
+                Does.Contain(WellKnownDiagnosticTags.CompilationEnd),
+                id);
+        }
+    }
+
     private static Dictionary<string, ReleaseRule>
         ReadReleaseSection(
             string path,

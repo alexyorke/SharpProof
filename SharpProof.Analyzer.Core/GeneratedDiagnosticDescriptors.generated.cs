@@ -74,7 +74,7 @@ internal static class GeneratedDiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports invalid compilation-global SharpProof analyzer options.",
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0025",
-        customTags: []);
+        customTags: ["CompilationEnd"]);
 
     internal static readonly DiagnosticDescriptor RequiresNotProvenRule = new(
         id: "SP0027",
@@ -151,7 +151,7 @@ internal static class GeneratedDiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports that the contract API assembly could not be read or attested, which silently disables all contract analysis.",
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0050",
-        customTags: []);
+        customTags: ["CompilationEnd"]);
 
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         PurityNotVerifiedRule,

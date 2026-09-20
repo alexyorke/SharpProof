@@ -29,10 +29,11 @@ specifications, and produce SP0047. A rejected `ContractForAttribute`
 lookalike produces SPCF0001.
 
 `ContractForAttribute` associates a static companion class with a target
-interface or class. The generator validates the association and member
-matching by compiler symbol identity. The companion must be distinct from its
-target (SPCF0009), and companion-to-target relationships must be acyclic
-(SPCF0010).
+interface or class. The analyzer validates the association and member matching
+at compilation end, after all generators have contributed their syntax trees,
+using compiler symbol identity. The package generator is a loading hook and
+emits no source. The companion must be distinct from its target (SPCF0009), and
+companion-to-target relationships must be acyclic (SPCF0010).
 
 Direct and companion clauses are alternative sources, not additive ones. Any
 valid direct clause on a target member makes that member the source for all of

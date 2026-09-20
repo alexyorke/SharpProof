@@ -32,69 +32,11 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 11 entries: 0 P0, 0 P1 and 11 P3. The final
+The list currently has 10 entries: 0 P0, 0 P1 and 10 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
 
-
-### ContractFor validation is documented as a generator but runs as an untagged compilation-end analyzer action
-
-- **File:** `SharpProof.ContractForGenerator/ContractForValidatorGenerator.cs`
-  (empty `Initialize`), `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs`
-  (`ValidateContractForCompanions` registered with
-  `RegisterCompilationEndAction`),
-  `eng/diagnostics/diagnostic-descriptors.v1.json` and the generated
-  `ContractForDiagnosticDescriptors.generated.cs` /
-  `GeneratedDiagnosticDescriptors.generated.cs` (`customTags: []` on every
-  descriptor), and the docs that describe the generator:
-  `docs/diagnostic-examples.md` ("ContractFor generator diagnostics"),
-  `docs/coverage-and-limits.md` (the `ContractFor` validation row and the
-  paragraph after the closed-attribute table), `docs/architecture.md`
-  ("validated by an incremental, no-source generator") and
-  `docs/public-api.md` ("The generator validates the association").
-- **Confidence:** High for the mismatch (read from the code; the generator
-  registers nothing and the SPCF rules are reported by the analyzer's
-  compilation-end action, which runs for every non-`off` profile). Medium for
-  the IDE consequence, which depends on Roslyn's handling of compilation-end
-  diagnostics and was not observed in an IDE.
-- **What is wrong:** The docs say an incremental generator validates
-  `[ContractFor]` companions, that "the SPCF rules are errors once the
-  generator is loaded", and that the row is enforced by the "incremental
-  generator loaded with any non-`off` profile". The generator's `Initialize`
-  is now empty (its comment says companions are reconciled by the analyzer),
-  and all ten SPCF rules come from `SharpProofAnalyzerEngine`, in a
-  compilation-end action. The same is true of SP0025 configuration errors and
-  SP0050 (unverifiable contract API), which are also only reported from
-  compilation-end actions. None of these descriptors carries
-  `WellKnownDiagnosticTags.CompilationEnd`. Roslyn uses that tag to know a
-  diagnostic can only come from whole-compilation analysis (it is what
-  analyzer rule RS1037 asks for). RS1037 cannot flag it here because the
-  diagnostics are created in helper classes and returned to the action.
-  Two more IDs are mixed: SP0047 is reported from a compilation-end action
-  for selected auto-property accessors (`ReconcileSelectedSemicolonAccessors`)
-  and SP0024 for assembly-level control attributes (`ValidateDeclaredScope`
-  on the assembly), while the same IDs are reported from ordinary symbol
-  and operation actions everywhere else, so those descriptors cannot simply
-  be tagged without splitting the compilation-end cases into their own IDs
-  or moving them into symbol actions.
-- **Failure scenario:** In an IDE with the default (document-scoped) live
-  analysis, compilation-end actions do not run, so a malformed companion
-  (SPCF0005 signature mismatch, SPCF0002 duplicate, SPCF0010 cycle) or a
-  broken `SharpProofFeatures` value (SP0025) produces no squiggle while the
-  user edits. Because the descriptors are not tagged as compilation-end, the
-  IDE can also treat the same errors from the last build as live-analyzable
-  and drop them from the Error List once live analysis refreshes the file.
-  A user who reads the docs and disables or removes the generator
-  reference expecting to lose only SPCF validation (or who keeps only the
-  generator) gets the opposite of what the docs describe.
-- **Suggested fix:** Either move the validation back into the generator (it
-  can report diagnostics live) or update the docs to say the analyzer
-  reports SPCF rules at compilation end and drop the generator from the
-  package. Add `WellKnownDiagnosticTags.CompilationEnd` to every descriptor
-  that is only reported from a compilation-end action (SPCF0001-SPCF0010,
-  SP0025, SP0050) in `diagnostic-descriptors.v1.json`, and add a test that
-  compares each descriptor's tags with the actions that report it.
 
 ### Verifier locations keep raw `#line` paths, so launcher and SARIF results point at the wrong file
 
