@@ -1199,6 +1199,12 @@ public sealed class PackageLayoutSmokeTests
             Is.True,
             verification.Output);
 
+        var expectedMappedPath = Path.GetFullPath(
+            Path.Combine(
+                Path.GetDirectoryName(workspace.LinkedSourcePath)!,
+                "mapped",
+                "contracts",
+                "Identity.cs"));
         using (var manifest = JsonDocument.Parse(
                    await File.ReadAllTextAsync(
                        workspace.CompilerManifestPath)))
@@ -1226,7 +1232,7 @@ public sealed class PackageLayoutSmokeTests
                 .ToArray();
             Assert.That(claims, Has.Length.EqualTo(1));
             var location = claims[0].GetProperty("location");
-            JsonAssert.Equal(location, "path", "mapped/contracts/Identity.cs");
+            JsonAssert.Equal(location, "path", expectedMappedPath);
             JsonAssert.Equal(location, "line", 73);
         }
 
@@ -1242,7 +1248,10 @@ public sealed class PackageLayoutSmokeTests
         var physicalLocation = refuted
             .GetProperty("locations")[0]
             .GetProperty("physicalLocation");
-        JsonAssert.Equal(physicalLocation, "artifactLocation.uri", "mapped/contracts/Identity.cs");
+        JsonAssert.Equal(
+            physicalLocation,
+            "artifactLocation.uri",
+            new Uri(expectedMappedPath).AbsoluteUri);
         JsonAssert.Equal(physicalLocation, "region.startLine", 73);
     }
 

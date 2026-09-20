@@ -276,14 +276,7 @@ internal static class CompilerCompilationCapture
         SyntaxTree tree,
         FileLinePositionSpan mapped)
     {
-        var path = mapped.Path;
-        if (!string.IsNullOrEmpty(path))
-        {
-            return path;
-        }
-
-        path = tree.FilePath;
-        return string.IsNullOrEmpty(path) ? "<compiler-generated>" : path;
+        return CompilerSourceLocationProjection.MappedPath(tree, mapped);
     }
     internal static CompilerReferenceSnapshot[] CaptureReferences(
         IEnumerable<MetadataReference> references,

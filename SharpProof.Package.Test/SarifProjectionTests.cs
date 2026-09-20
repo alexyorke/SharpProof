@@ -88,7 +88,7 @@ public sealed class SarifProjectionTests
             Assert.That(
                 relativeUri,
                 Is.EqualTo(
-                    "generated/mapped%23source%3F%5CIdentity%20%25.cs"));
+                    "generated/mapped%23source%3F/Identity%20%25.cs"));
         }
 
         var resolved = new Uri(new Uri(sourceRoot!), relativeUri!);
@@ -98,7 +98,8 @@ public sealed class SarifProjectionTests
             Assert.That(resolved.Query, Is.Empty);
             Assert.That(
                 resolved.LocalPath,
-                Is.EqualTo(projectDirectory + "/" + mappedPath));
+                Is.EqualTo(
+                    projectDirectory + "/" + mappedPath.Replace('\\', '/')));
         }
     }
 

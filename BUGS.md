@@ -32,50 +32,11 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 10 entries: 0 P0, 0 P1 and 10 P3. The final
+The list currently has 9 entries: 0 P0, 0 P1 and 9 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
 
-
-### Verifier locations keep raw `#line` paths, so launcher and SARIF results point at the wrong file
-
-- **File:** `SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceLocationProjection.cs`
-  (`Create` stores `GetMappedLineSpan().Path` verbatim),
-  `SharpProof.Worker.Launcher/SarifProjection.cs` (`ArtifactLocation`,
-  `EscapePath`), and `SharpProof.Worker.Launcher/Program.cs`
-  (`ReportDiagnostic` prints `path(line,col)`).
-- **Confidence:** Confirmed for the manifest contents; High for the
-  downstream effect (read from the code, not run through the launcher). A
-  source file in a subdirectory containing `#line 40 "..\Views\Page.cshtml"` before a
-  method with a refutable `Ensures` produced manifest locations with
-  `"path":"..\Views\Page.cshtml"` and the mapped line numbers.
-- **What is wrong:** Roslyn returns the path from a `#line` directive exactly
-  as written, and the compiler resolves a relative one against the directory
-  of the file that contains the directive when it prints diagnostics
-  (`SourceFileResolver.NormalizePath` with the tree's path as the base). The
-  collector copies the unresolved text into the manifest. The launcher then
-  prints it as an MSBuild-style `..\Views\Page.cshtml(42,9): error ...` line,
-  which MSBuild and IDEs resolve against the project directory instead.
-  `SarifProjection.ArtifactLocation` treats every non-rooted path as relative
-  to `%SRCROOT%` (the project directory), and `EscapePath` splits only on
-  `/`, so each backslash becomes `%5C` inside one segment:
-  `..%5CViews%5CPage.cshtml`. That is a single oddly named file, not a
-  relative path, on every platform.
-- **Failure scenario:** Razor, T4 and other generators emit `#line`
-  directives, often relative and with Windows separators. A refuted or
-  incomplete claim in such code is reported against a file that does not
-  exist (or the wrong file with the same relative name), so "go to error" in
-  the IDE and SARIF viewers in CI do nothing. The analyzer's own diagnostics
-  for the same code point to the right place, so the two disagree.
-- **Suggested fix:** When `FileLinePositionSpan.HasMappedPath` is true and
-  the path is relative, resolve it against the directory of
-  `location.SourceTree.FilePath` (what the compiler does) before storing it.
-  In `SarifProjection`, normalize `\` to `/` for relative paths before
-  escaping, and make paths that fall outside the project directory absolute
-  instead of `%SRCROOT%`-relative. Add a collector test with a relative
-  `#line` path in a subdirectory and a SARIF snapshot test with a
-  backslash path.
 
 ### Assigning a conditional, `??`, `?.`, `&&` or `||` expression to an existing local makes every effect claim in the method `Unknown`
 

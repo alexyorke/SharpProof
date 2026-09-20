@@ -291,6 +291,7 @@ internal static class SarifProjection
 
     private static string EscapePath(string path)
     {
+        path = path.Replace('\\', '/');
         return string.Join(
             "/",
             path.Split('/').Select(
