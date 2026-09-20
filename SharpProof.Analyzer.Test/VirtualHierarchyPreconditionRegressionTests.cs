@@ -63,6 +63,11 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 4);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"),
+            Is.EqualTo(3));
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0027"),
+            Is.EqualTo(4));
     }
 }

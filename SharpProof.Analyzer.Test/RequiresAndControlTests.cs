@@ -2628,6 +2628,88 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ReplayChecksDefinitelyExecutedNestedCalls()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer(int value) => value;
+
+                public static int Throwing() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() { }
+            }
+
+            public static class Fixture {
+                public static void BareBlock() {
+                    { Guard.Positive(0); }
+                }
+
+                public static void IfTrue() {
+                    if (true) { Guard.Positive(0); }
+                }
+
+                public static void DoLoop() {
+                    do { Guard.Positive(0); } while (false);
+                }
+
+                public static void Checked() {
+                    checked { Guard.Positive(0); }
+                }
+
+                public static void Labeled() {
+                    label: Guard.Positive(0);
+                }
+
+                public static void TryBlock() {
+                    try { Guard.Positive(0); }
+                    catch (Exception) { }
+                }
+
+                public static void FinallyBlock() {
+                    try { }
+                    finally { Guard.Positive(0); }
+                }
+
+                public static void Locked() {
+                    lock (new object()) { Guard.Positive(0); }
+                }
+
+                public static void Used() {
+                    using (new Resource()) { Guard.Positive(0); }
+                }
+
+                public static void NestedExpression() {
+                    _ = Guard.Outer(Guard.Positive(0));
+                }
+
+                public static void ThrowingPrefix() {
+                    _ = Guard.Throwing() + Guard.Positive(0);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Has.Length.EqualTo(10));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage(
+                CultureInfo.InvariantCulture)),
+            Has.All.Contain("Positive"));
+    }
+
+    [Test]
     public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

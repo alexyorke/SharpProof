@@ -176,15 +176,25 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     continue;
                 }
 
+                var syntacticReplayable = HasReplayablePrefix(
+                    operation,
+                    operationFacts);
+
                 var hasFlowState =
                     flowResult?.TryGetState(operation, out _) == true;
                 var hasReachableFlowState =
                     flowResult?.IsReachable(operation) == true &&
                     (hasFlowState || operation is IListPatternOperation);
+                var allowSyntacticReplay =
+                    syntacticReplayable &&
+                    !hasFlowState &&
+                    (flowResult == null ||
+                     flowResult.IsReachable(operation));
                 var isInsideExceptionHandler =
                     IsInsideExceptionHandler(operation);
                 if (flowAnalysis.IsComplete &&
                     !hasReachableFlowState &&
+                    !allowSyntacticReplay &&
                     (!isInsideExceptionHandler ||
                      !(semanticReachability ??=
                          OperationEffectScanner.CreateReachabilityProbe(
@@ -212,9 +222,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.CanReplay && HasReplayableCallEvaluation(
                             operation,
                             call,
-                            operationFacts,
-                            hasFlowState,
-                            flowAnalysis.IsComplete),
+                            operationFacts),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status,
                         cancellationToken);
@@ -223,6 +231,60 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         candidate,
                         skipDeduplication: operation is IListPatternOperation);
                 }
+            }
+        }
+
+        // Roslyn can omit operations in a finally region from the set of
+        // reachable CFG blocks even though the region is entered whenever
+        // its containing try statement is entered.  Revisit syntactically
+        // definite call sites that were not covered by those blocks.  The
+        // replayability proof below remains fail-closed for conditional,
+        // short-circuit, and exception-handler paths.
+        foreach (var operation in ExecutableDescendantsAndSelf(operationRoot!)
+                     .Where(operation => !reachableOperationSites.Contains((
+                         operation.Syntax.SyntaxTree,
+                         operation.Syntax.SpanStart,
+                         operation.Syntax.Span.Length))))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var calls = GetCalls(
+                operation,
+                operationFacts,
+                semanticModel,
+                delegateTargets,
+                flowResult,
+                _disposeInterfaceMethodCache,
+                cancellationToken);
+            if (calls.IsDefaultOrEmpty ||
+                requireCallerOwnership &&
+                !SymbolEqualityComparer.Default.Equals(
+                    semanticModel.GetEnclosingSymbol(
+                        operation.Syntax.SpanStart,
+                        cancellationToken),
+                    caller) ||
+                !HasReplayablePrefix(operation, operationFacts))
+            {
+                continue;
+            }
+
+            reachableOperationSites.Add((
+                operation.Syntax.SyntaxTree,
+                operation.Syntax.SpanStart,
+                operation.Syntax.Span.Length));
+            foreach (var call in calls)
+            {
+                AddOrUpgrade(
+                    callSites,
+                    CreateCandidate(
+                        operation,
+                        call,
+                        call.CanReplay && HasReplayableCallEvaluation(
+                            operation,
+                            call,
+                            operationFacts),
+                        flow: null,
+                        flowAnalysis.Status,
+                        cancellationToken));
             }
         }
 
@@ -288,10 +350,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     call.CanReplay && HasReplayableCallEvaluation(
                         operation,
                         call,
-                        operationFacts,
-                        hasFlowState: false,
-                        flowAnalysisIsComplete:
-                            flowAnalysis.IsComplete),
+                        operationFacts),
                         flow: null,
                         flowAnalysis.Status,
                         cancellationToken);
@@ -537,9 +596,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation callSite,
         DefiniteOperationFacts operationFacts)
     {
-        if (declaration is EqualsValueClauseSyntax)
+        if (declaration is EqualsValueClauseSyntax equalsValue)
         {
-            return true;
+            return equalsValue.Value is ExpressionSyntax initializerExpression &&
+                IsReplayableCallExpression(
+                    initializerExpression,
+                    callSite,
+                    operationFacts);
         }
 
         var body =
@@ -566,18 +629,29 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
         var statement = callSite.Syntax.AncestorsAndSelf()
             .OfType<StatementSyntax>()
-            .FirstOrDefault(candidate => ReferenceEquals(
-                candidate.Parent,
-                block));
-        return statement != null &&
-               IsDirectReplayableStatement(
-                   statement,
-                   callSite,
-                   operationFacts) &&
+            .FirstOrDefault();
+        if (statement == null ||
+            !IsReplayableStatementContext(
+                statement,
+                callSite,
+                operationFacts))
+        {
+            return false;
+        }
+
+        SyntaxNode directNode = statement;
+        while (directNode.Parent is { } parent &&
+               !ReferenceEquals(parent, block))
+        {
+            directNode = parent;
+        }
+
+        return directNode is StatementSyntax directStatement &&
+               ReferenceEquals(directStatement.Parent, block) &&
                block.Statements
                    .TakeWhile(candidate => !ReferenceEquals(
                        candidate,
-                       statement))
+                       directStatement))
                    .All(prior =>
                        prior is EmptyStatementSyntax or
                            LocalFunctionStatementSyntax ||
@@ -656,9 +730,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private bool HasReplayableCallEvaluation(
         IOperation operation,
         RequiresCallTarget call,
-        DefiniteOperationFacts operationFacts,
-        bool hasFlowState,
-        bool flowAnalysisIsComplete)
+        DefiniteOperationFacts operationFacts)
     {
         if (operation is IUsingOperation or IUsingDeclarationOperation)
         {
@@ -683,8 +755,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 call,
                 operationFacts);
         }
-        return (hasFlowState || !flowAnalysisIsComplete) &&
-            HasReplayablePrefix(operation, operationFacts);
+        return HasReplayablePrefix(operation, operationFacts);
     }
 
     private static bool CanCoalesceGetterComplete(
@@ -713,33 +784,336 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 Expression: AssignmentExpressionSyntax assignment
             } when assignment.IsKind(
                 SyntaxKind.SimpleAssignmentExpression) =>
-                IsOwnedCallSiteExpression(
+                IsReplayableCallExpression(
                     assignment.Right,
-                    callSite.Syntax) &&
+                    callSite,
+                    operationFacts) &&
                 operationFacts.CompletesNormally(
                     semanticModel.GetOperation(
                         assignment.Left,
                         cancellationToken)),
             ExpressionStatementSyntax expression =>
-                IsOwnedCallSiteExpression(
+                IsReplayableCallExpression(
                     expression.Expression,
-                    callSite.Syntax),
+                    callSite,
+                    operationFacts),
             LocalDeclarationStatementSyntax local =>
                 local.Declaration.Variables.Count == 1 &&
-                IsOwnedCallSiteExpression(
+                IsReplayableCallExpression(
                     local.Declaration.Variables[0]
                         .Initializer?.Value,
-                    callSite.Syntax),
+                    callSite,
+                    operationFacts),
             ReturnStatementSyntax returned =>
-                IsOwnedCallSiteExpression(
+                IsReplayableCallExpression(
                     returned.Expression,
-                    callSite.Syntax),
+                    callSite,
+                    operationFacts),
             ThrowStatementSyntax thrown =>
-                IsOwnedCallSiteExpression(
+                IsReplayableCallExpression(
                     thrown.Expression,
-                    callSite.Syntax),
+                    callSite,
+                    operationFacts),
+            IfStatementSyntax conditional =>
+                IsReplayableCallExpression(
+                    conditional.Condition,
+                    callSite,
+                    operationFacts),
+            WhileStatementSyntax loop =>
+                IsReplayableCallExpression(
+                    loop.Condition,
+                    callSite,
+                    operationFacts),
+            DoStatementSyntax loop =>
+                IsReplayableCallExpression(
+                    loop.Condition,
+                    callSite,
+                    operationFacts),
+            ForStatementSyntax loop =>
+                IsReplayableForExpression(loop, callSite, operationFacts),
+            ForEachStatementSyntax loop =>
+                IsReplayableCallExpression(
+                    loop.Expression,
+                    callSite,
+                    operationFacts),
+            UsingStatementSyntax usingStatement =>
+                IsReplayableUsingExpression(
+                    usingStatement,
+                    callSite,
+                    operationFacts),
+            LockStatementSyntax lockStatement =>
+                IsReplayableCallExpression(
+                    lockStatement.Expression,
+                    callSite,
+                    operationFacts),
+            FixedStatementSyntax fixedStatement =>
+                fixedStatement.Declaration.Variables.Any(variable =>
+                    IsReplayableCallExpression(
+                        variable.Initializer?.Value,
+                        callSite,
+                        operationFacts)),
+            SwitchStatementSyntax switchStatement =>
+                IsReplayableCallExpression(
+                    switchStatement.Expression,
+                    callSite,
+                    operationFacts),
             _ => false
         };
+    }
+
+    private bool IsReplayableStatementContext(
+        StatementSyntax statement,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        if (!IsDirectReplayableStatement(
+                statement,
+                callSite,
+                operationFacts))
+        {
+            return false;
+        }
+
+        foreach (var ancestor in statement.Ancestors())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (ancestor)
+            {
+                case CatchClauseSyntax:
+                    return false;
+                case IfStatementSyntax conditional
+                    when conditional.Statement.Span.Contains(callSite.Syntax.Span) ||
+                         conditional.Else?.Statement.Span.Contains(
+                             callSite.Syntax.Span) == true:
+                    if (!IsDefinitelySelectedBranch(
+                            conditional,
+                            callSite.Syntax))
+                    {
+                        return false;
+                    }
+                    break;
+                case WhileStatementSyntax loop
+                    when loop.Statement.Span.Contains(callSite.Syntax.Span):
+                    if (!IsConstantBoolean(loop.Condition, true))
+                    {
+                        return false;
+                    }
+                    break;
+                case ForStatementSyntax loop
+                    when loop.Statement.Span.Contains(callSite.Syntax.Span):
+                    if (loop.Condition != null &&
+                        !IsConstantBoolean(loop.Condition, true))
+                    {
+                        return false;
+                    }
+                    break;
+                case ForEachStatementSyntax loop
+                    when loop.Statement.Span.Contains(callSite.Syntax.Span):
+                    return false;
+                case UsingStatementSyntax usingStatement
+                    when usingStatement.Statement.Span.Contains(
+                        callSite.Syntax.Span):
+                    if (!CompletesSyntax(
+                            usingStatement.Expression,
+                            operationFacts))
+                    {
+                        return false;
+                    }
+                    break;
+                case LockStatementSyntax lockStatement
+                    when lockStatement.Statement.Span.Contains(
+                        callSite.Syntax.Span):
+                    if (!CompletesSyntax(
+                            lockStatement.Expression,
+                            operationFacts))
+                    {
+                        return false;
+                    }
+                    break;
+                case SwitchStatementSyntax switchStatement
+                    when switchStatement.Sections.Any(section =>
+                        section.Span.Contains(callSite.Syntax.Span)):
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsReplayableForExpression(
+        ForStatementSyntax statement,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        return statement.Initializers.Any(initializer =>
+                   IsReplayableCallExpression(
+                       initializer,
+                       callSite,
+                       operationFacts)) ||
+               statement.Declaration?.Variables.Any(variable =>
+                   IsReplayableCallExpression(
+                       variable.Initializer?.Value,
+                       callSite,
+                       operationFacts)) == true ||
+               IsReplayableCallExpression(
+                   statement.Condition,
+                   callSite,
+                   operationFacts) ||
+               statement.Incrementors.Any(incrementor =>
+                   IsReplayableCallExpression(
+                       incrementor,
+                       callSite,
+                       operationFacts));
+    }
+
+    private bool IsReplayableUsingExpression(
+        UsingStatementSyntax statement,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        return statement.Expression != null &&
+            IsReplayableCallExpression(
+                statement.Expression,
+                callSite,
+                operationFacts);
+    }
+
+    private bool CompletesSyntax(
+        SyntaxNode? syntax,
+        DefiniteOperationFacts operationFacts)
+    {
+        return syntax != null &&
+            operationFacts.CompletesNormally(
+                semanticModel.GetOperation(syntax, cancellationToken));
+    }
+
+    private bool IsDefinitelySelectedBranch(
+        IfStatementSyntax statement,
+        SyntaxNode callSiteSyntax)
+    {
+        var value = semanticModel.GetConstantValue(
+            statement.Condition,
+            cancellationToken);
+        if (value is not { HasValue: true, Value: bool condition })
+        {
+            return false;
+        }
+
+        var inThen = statement.Statement.Span.Contains(callSiteSyntax.Span);
+        return condition == inThen;
+    }
+
+    private bool IsConstantBoolean(
+        ExpressionSyntax condition,
+        bool expected)
+    {
+        return semanticModel.GetConstantValue(
+                condition,
+                cancellationToken) is
+        { HasValue: true, Value: bool value } &&
+            value == expected;
+    }
+
+    private bool IsReplayableCallExpression(
+        ExpressionSyntax? expression,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        var callSiteSyntax = callSite.Syntax;
+        if (expression == null ||
+            !expression.Span.Contains(callSiteSyntax.Span))
+        {
+            return false;
+        }
+
+        var current = callSiteSyntax;
+        while (!ReferenceEquals(current, expression))
+        {
+            if (current.Parent is not { } parent ||
+                !expression.Span.Contains(parent.Span))
+            {
+                return false;
+            }
+
+            switch (parent)
+            {
+                case BinaryExpressionSyntax binary
+                    when binary.IsKind(
+                             SyntaxKind.LogicalAndExpression) ||
+                         binary.IsKind(
+                             SyntaxKind.LogicalOrExpression) ||
+                         binary.IsKind(
+                             SyntaxKind.CoalesceExpression):
+                    if (binary.Right.Span.Contains(callSiteSyntax.Span))
+                    {
+                        return false;
+                    }
+                    break;
+                case ConditionalExpressionSyntax conditional:
+                    if (!conditional.Condition.Span.Contains(
+                            callSiteSyntax.Span))
+                    {
+                        var value = semanticModel.GetConstantValue(
+                            conditional.Condition,
+                            cancellationToken);
+                        if (value is not
+                            { HasValue: true, Value: bool condition } ||
+                            condition != conditional.WhenTrue.Span.Contains(
+                                callSiteSyntax.Span))
+                        {
+                            return false;
+                        }
+                    }
+                    break;
+                case ConditionalAccessExpressionSyntax:
+                    return false;
+                case SwitchExpressionArmSyntax or
+                    SwitchExpressionSyntax:
+                    return false;
+            }
+
+            current = parent;
+        }
+
+        return PrecedingExpressionOperationsComplete(
+            callSite,
+            expression,
+            operationFacts);
+    }
+
+    private static bool PrecedingExpressionOperationsComplete(
+        IOperation callSite,
+        ExpressionSyntax expression,
+        DefiniteOperationFacts operationFacts)
+    {
+        var current = callSite;
+        while (current.Parent is { } parent &&
+               expression.Span.Contains(parent.Syntax.Span))
+        {
+            var foundCurrent = false;
+            foreach (var child in parent.ChildOperations)
+            {
+                if (ReferenceEquals(child, current))
+                {
+                    foundCurrent = true;
+                    break;
+                }
+
+                if (!operationFacts.CompletesNormally(child))
+                {
+                    return false;
+                }
+            }
+
+            if (!foundCurrent)
+            {
+                return false;
+            }
+
+            current = parent;
+        }
+
+        return true;
     }
 
     private static bool IsOwnedCallSiteExpression(

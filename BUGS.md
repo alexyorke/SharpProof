@@ -32,57 +32,11 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 9 entries: 0 P0, 0 P1 and 9 P3. The final
+The list currently has 5 entries: 0 P0, 0 P1 and 5 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
 
-
-### SP0027 only checks calls in top-level statements, so a violation inside any block is silent
-
-- **File:** `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`
-  (`HasReplayableCallEvaluation` and the shape rules it applies), with the
-  shape list in `docs/diagnostic-examples.md` (SP0027).
-- **Confidence:** Confirmed with `SharpProofFeatures=contracts`. With
-  `PosV(int x)` requiring `x > 0`, `PosV(0);` as a statement directly in the
-  method body was reported, but none of these was:
-  `{ PosV(0); }`, `if (true) { PosV(0); }`, `do { PosV(0); } while (false);`,
-  `checked { PosV(0); }`, `label: PosV(0);`, `try { PosV(0); } catch (Exception) { }`,
-  `try { PosV(0); } finally { }`, `try { } finally { PosV(0); }`,
-  `lock (new object()) { PosV(0); }`, and a `using` block body. Every one of
-  those calls runs unconditionally. Nested expressions were also silent
-  (`Outer(Pos(0))`, `var x = Pos(0) + 1;`, `$"{Pos(0)}"`,
-  `if (Pos(0) > 0)`, `a[0] = Pos(0);`, `for (var i = Pos(0); ...)`,
-  `Pos(-5) * 2`). The two `using` forms also disagree:
-  `using var r = new Res(0);` was reported, but `using (new Res(0)) { }` and
-  `using (var r = new Res(0)) { }` were not.
-- **What is wrong:** The documentation describes SP0027 as reporting "an
-  exact ordinary invocation or object creation" whose precondition is false,
-  and lists the replayable shapes as "direct top-level expression
-  statements, returns, throws, single local initializers, simple
-  assignments ...". In practice "top-level" means a statement directly in
-  the method body: a call inside any nested statement, even a bare block,
-  is never replayed, and neither is a call nested inside a larger
-  expression. The discovery and flow analysis already know when a call is
-  definitely executed (they correctly stay silent for ternary arms,
-  short-circuit operands and `catch` bodies), so the restriction is a
-  shape limit, not a soundness requirement.
-- **Failure scenario:** Almost all real calls sit inside an `if`, loop,
-  `try` or `using` body, or inside an argument list. A user reading the
-  SP0027 description expects `try { Connect(port: 0); } finally { ... }` to
-  be reported the same way as a bare `Connect(port: 0);`, and gets
-  silence. The `using` inconsistency means rewriting
-  `using var r = new Res(0);` as a `using` statement silently removes the
-  warning.
-- **Suggested fix:** Replay calls in nested statements whenever the flow
-  analysis proves them definitely executed from method entry (a bare
-  block, `checked`/`unchecked`, a labeled statement, the first statements
-  of a `try` or `lock` body, `if (true)`), and replay nested call
-  expressions whose operands before the call are definitely non-throwing,
-  as is already done for top-level shapes. Handle the `using` statement's
-  resource expression like a `using` declaration. At minimum, state
-  explicitly in the SP0027 section that only statements directly in the
-  method body are checked.
 
 ### Effect attributes on abstract and interface members always fail and are never checked on implementations
 
