@@ -339,6 +339,9 @@ public sealed class CompilerSourceLocationAuthorityTests
         var token = tree.GetRoot().DescendantTokens()
             .Single(static candidate => candidate.ValueText == "Greet");
         var expected = tree.GetMappedLineSpan(token.Span);
+        var expectedPath = CompilerSourceLocationProjection.MappedPath(
+            tree,
+            expected);
         var snapshot = CompilerCompilationCapture.CaptureTree(
             tree,
             CancellationToken.None);
@@ -353,14 +356,14 @@ public sealed class CompilerSourceLocationAuthorityTests
             Is.True);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(mappedPath, Is.EqualTo(expected.Path));
+            Assert.That(mappedPath, Is.EqualTo(expectedPath));
             Assert.That(mappedLine, Is.EqualTo(expected.StartLinePosition.Line));
             Assert.That(mappedColumn, Is.EqualTo(expected.StartLinePosition.Character));
         }
 
         var artifact = CreateArtifact(source);
         var mappedDiagnostics = artifact.CompilerDiagnostics
-            .Where(static diagnostic => diagnostic.Location.Path == "template.dsl")
+            .Where(diagnostic => diagnostic.Location.Path == expectedPath)
             .ToArray();
         Assert.That(mappedDiagnostics, Is.Not.Empty);
         Assert.That(

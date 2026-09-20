@@ -2290,21 +2290,20 @@ public sealed class ClaimManifestBuilderTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(claims, Has.Length.EqualTo(4));
+            Assert.That(claims, Has.Length.EqualTo(3));
             Assert.That(
                 claims.Select(static claim => claim.EffectContractKind),
                 Is.EqualTo([
-                    WorkerEffectContractKind.AllowedExceptions,
                     WorkerEffectContractKind.AllowedExceptions,
                     WorkerEffectContractKind.EffectContract,
                     WorkerEffectContractKind.EffectContract
                 ]));
             Assert.That(
                 claims.Select(static claim => claim.Ordinal),
-                Is.EqualTo([0, 1, 2, 3]));
+                Is.EqualTo([0, 1, 2]));
             Assert.That(
                 claims.Select(static claim => claim.ClaimId).Distinct().ToArray(),
-                Has.Length.EqualTo(4));
+                Has.Length.EqualTo(3));
             Assert.That(
                 second.Manifest.Claims.Select(static claim =>
                     claim.ClaimId),

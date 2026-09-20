@@ -125,6 +125,11 @@ internal sealed class CompilerRelationalSummaryProvider
                 method);
     }
 
+    internal bool CanResolveSpecificationPack(IMethodSymbol method)
+    {
+        return _specificationPacks.CanResolve(method);
+    }
+
     internal bool TryGet(
         IMethodSymbol method,
         IrMemberId member,

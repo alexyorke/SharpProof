@@ -40,7 +40,15 @@ internal static class EffectClaimResultAssembler
                 evidence.Certainty);
         }
 
-        if (entryFeasibility.IsUnknown)
+        // A compiler effect summary remains useful when entry-feasibility
+        // lowering cannot represent a precondition. Preserve
+        // non-violation evidence in that case; replaying a compiler refutation
+        // still requires a proven reachable entry and stays unknown below.
+        var preserveCompilerEvidence =
+            entryFeasibility.IsUnknown &&
+            entryFeasibility.Reason == WorkerClaimReason.UnsupportedExpression &&
+            evidence.Outcome != WorkerClaimOutcome.Refuted;
+        if (entryFeasibility.IsUnknown && !preserveCompilerEvidence)
         {
             return CreateResult(
                 WorkerClaimOutcome.Unknown,

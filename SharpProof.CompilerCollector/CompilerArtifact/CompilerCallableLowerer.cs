@@ -115,6 +115,23 @@ internal sealed class CompilerCallableLowerer
                 clause.Kind == BoundContractKind.Assume ? userAssumptions[assumptionOrdinal++].Id : null))];
         ImmutableArray<CompilerCanonicalVariable> variables = [.. contracts.Variables.Select(
             variable => CreateVariable(variable, contracts))];
+        if (target.Claims.IsDefaultOrEmpty &&
+            contracts.Clauses.Any(static clause =>
+                clause.Kind != BoundContractKind.Ensures))
+        {
+            // A callable with only entry clauses has no body to replay, but we
+            // still classify an unsupported implementation so its typed
+            // incomplete result is not reported as complete. Effect-only
+            // callables without clauses intentionally skip this admission.
+            _ = PrepareBody(target, contracts, cancellationToken, out var bodyFailure);
+            if (bodyFailure != WorkerClaimReason.None)
+            {
+                return Fail(target, bodyFailure, clauses, variables);
+            }
+
+            return Success(target, clauses, variables, body: null);
+        }
+
         if (target.Claims.IsDefaultOrEmpty)
         {
             return Success(target, clauses, variables, body: null);
@@ -316,6 +333,14 @@ internal sealed class CompilerCallableLowerer
     {
         prepared = null;
         if (!admissibleByValue)
+        {
+            return false;
+        }
+
+        // An explicitly enabled relational pack owns overlapping calls.  Let
+        // the summary path preserve its relation instead of reducing the call
+        // to the scalar API specification first.
+        if (_summaries.CanResolveSpecificationPack(invocation.TargetMethod))
         {
             return false;
         }
