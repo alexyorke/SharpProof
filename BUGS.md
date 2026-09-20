@@ -32,7 +32,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 4 entries: 0 P0, 0 P1 and 4 P3. The final
+The list currently has 3 entries: 0 P0, 0 P1 and 3 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
@@ -109,38 +109,6 @@ section records the areas that were probed without finding a defect.
   or ignore source-only clauses of referenced projects so the IDE matches
   the build. Document the choice, and recommend closed parameter attributes
   for preconditions that must be checked across assemblies.
-
-### Repeated `[AllowedExceptions]` attributes are silently unioned, and each is reported as its own proven claim
-
-- **File:** `SharpProof.Attributes/AllowedExceptionsAttribute.cs`
-  (`AllowMultiple = true`), the combination of repeated attributes in
-  `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs`, and the
-  "Repeated effect attributes receive distinct manifest claims while
-  sharing the effective combined constraint" rule in `SEMANTICS.md`.
-- **Confidence:** Confirmed. A method carrying
-  `[AllowedExceptions(typeof(InvalidOperationException))]` and, separately,
-  `[AllowedExceptions(typeof(FormatException))]` that throws
-  `FormatException` got no analyzer diagnostic, and the worker published
-  two `Proven` claims for it, one located at each attribute. The same
-  method with only the first attribute was reported (SP0046) and was
-  `Unknown`.
-- **What is wrong:** The allowed sets of repeated attributes are combined
-  by union, which matches how a single attribute with both types behaves,
-  but nothing documents that repeating the attribute widens the allowance,
-  and the per-attribute claims in results and SARIF each say `Proven` at a
-  location whose own attribute is violated. A reader who treats each
-  annotation as an independent statement ("this member may throw only
-  `InvalidOperationException`"), for example after a merge added a second
-  attribute, gets a proof of something the code does not satisfy.
-- **Failure scenario:** Two developers each add an `[AllowedExceptions]`
-  to the same member for different reasons; the method now satisfies
-  neither individual intent, but both claims show as proven in the
-  verification report.
-- **Suggested fix:** Either document that repeated `[AllowedExceptions]`
-  attributes form one union constraint and report a single combined claim
-  (located at the member) instead of one claim per attribute, or treat
-  each attribute as its own constraint. Consider an informational
-  diagnostic suggesting a single attribute when a member has several.
 
 ### `Contract.Assume` is used for postconditions but ignored by effect claims, while `Contract.Requires` is used by both
 

@@ -361,46 +361,101 @@ internal sealed partial class ClaimManifestBuilder(
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation.Kind))
         {
-            foreach (var attribute in evaluation.Attributes
+            var attributes = evaluation.Attributes
                 .OrderBy(
                     static attribute =>
                         attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
                     StringComparer.Ordinal)
                 .ThenBy(static attribute =>
-                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue))
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
+                .ToImmutableArray();
+
+            // AllowedExceptions attributes are unioned by the analyzer, so
+            // publishing one claim per attribute would make every claim appear
+            // to prove a constraint that its own attribute may not satisfy.
+            // Keep one authoritative claim for the combined constraint and use
+            // all attribute identities so adding or removing an occurrence also
+            // changes the claim identity.
+            if (evaluation.Kind == EffectEvaluationContractKind.AllowedExceptions &&
+                attributes.Length > 1)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var fingerprint = "effect:" + evaluation.Kind + ":combined:" +
+                    string.Join(
+                        "|",
+                        attributes.Select(attribute =>
+                            SemanticClaimIdentity.CreateAttributeFingerprint(
+                                attribute, method)));
+                claims.Add(CreateEffectClaim(
+                    evaluation,
+                    method,
+                    callableId,
+                    ordinalOffset + claims.Count,
+                    isSupported,
+                    attributes[0],
+                    fingerprint,
+                    ranks,
+                    method.Locations.FirstOrDefault(static location => location.IsInSource)));
+                continue;
+            }
+
+            foreach (var attribute in attributes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var fingerprint = "effect:" + evaluation.Kind + ":" +
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, method);
-                var claimId = SemanticClaimIdentity.Create(
-                    AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
-                var entry = new WorkerClaimManifestEntry
-                {
-                    ClaimId = claimId,
-                    CallableId = callableId,
-                    Ordinal = ordinalOffset + claims.Count,
-                    Kind = WorkerClaimKind.Effect,
-                    Evidence = WorkerClaimEvidence.Attribute,
-                    EffectContractKind =
-                        CompilerEffectEvaluationWireMappings.ToWorker(
-                            evaluation.Kind),
-                    Location = ToSourceLocation(AttributeLocation(attribute, method))
-                };
-                var evidence = CreateEffectEvidence(
-                    claimId, evaluation, isSupported);
-                CompilerEffectClaimArtifactCodec.Seal(evidence);
-                var sourceTreePath = attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath;
-                claims.Add(new ManifestEffectClaim(
-                    entry,
-                    evidence,
-                    CompilerEffectAuthority.Create(
-                        entry,
-                        evidence,
-                        sourceTreePath)));
+                claims.Add(CreateEffectClaim(
+                    evaluation,
+                    method,
+                    callableId,
+                    ordinalOffset + claims.Count,
+                    isSupported,
+                    attribute,
+                    fingerprint,
+                    ranks));
             }
         }
 
         return claims.ToImmutable();
+    }
+
+    private ManifestEffectClaim CreateEffectClaim(
+        EffectClaimEvaluation evaluation,
+        IMethodSymbol method,
+        string callableId,
+        int ordinal,
+        bool isSupported,
+        AttributeData attribute,
+        string fingerprint,
+        Dictionary<string, int> ranks,
+        Location? locationOverride = null)
+    {
+        var claimId = SemanticClaimIdentity.Create(
+            AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
+        var location = locationOverride ?? AttributeLocation(attribute, method);
+        var entry = new WorkerClaimManifestEntry
+        {
+            ClaimId = claimId,
+            CallableId = callableId,
+            Ordinal = ordinal,
+            Kind = WorkerClaimKind.Effect,
+            Evidence = WorkerClaimEvidence.Attribute,
+            EffectContractKind =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Kind),
+            Location = ToSourceLocation(location)
+        };
+        var evidence = CreateEffectEvidence(claimId, evaluation, isSupported);
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        var sourceTreePath = location.SourceTree?.FilePath ??
+            attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath;
+        return new ManifestEffectClaim(
+            entry,
+            evidence,
+            CompilerEffectAuthority.Create(
+                entry,
+                evidence,
+                sourceTreePath));
     }
 
     private CompilerEffectClaimArtifact CreateEffectEvidence(

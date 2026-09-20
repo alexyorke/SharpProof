@@ -9,6 +9,52 @@ namespace SharpProof.Analyzer.Test;
 public sealed class EffectAnnotatedCallableIdentityRegressionTests
 {
     [Test]
+    public void RepeatedAllowedExceptionsAttributesProduceOneCombinedClaim()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture
+            {
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                [AllowedExceptions(typeof(FormatException))]
+                public static void ThrowFormat() => throw new FormatException();
+            }
+            """,
+            []);
+
+        var result = new ClaimManifestBuilder(
+            compilation,
+            WorkerFeatureSet.All).Build();
+        var target = result.Targets.Single(pair => pair.Key.Name == "ThrowFormat").Value;
+        var claim = target.EffectClaims.Single();
+        var expectedExceptions = new[] {
+            "System.FormatException",
+            "System.InvalidOperationException"
+        };
+        var actualExceptionNames = claim.Evidence.Constraint.AllowedExceptionTypes
+            .Select(value => value[(value.LastIndexOf("::", StringComparison.Ordinal) + 2)..])
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(target.EffectClaims, Has.Length.EqualTo(1));
+            Assert.That(
+                claim.Entry.EffectContractKind,
+                Is.EqualTo(WorkerEffectContractKind.AllowedExceptions));
+            Assert.That(
+                actualExceptionNames,
+                Is.EqualTo(expectedExceptions));
+            Assert.That(
+                result.Manifest.Claims.Count(static entry =>
+                    entry.EffectContractKind == WorkerEffectContractKind.AllowedExceptions),
+                Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void EffectAnnotatedNestedCallablesHaveDistinctManifestIds()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

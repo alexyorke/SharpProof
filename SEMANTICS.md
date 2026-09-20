@@ -59,8 +59,10 @@ silently counted as analyzed. Effect-only annotations on abstract, interface,
 and `extern` declarations have no executable body and report
 `BodylessEffectContractNotEnforced`; they do not apply to implementations, so
 each concrete implementation must be annotated directly. Repeated effect
-attributes receive distinct
-manifest claims while sharing the effective combined constraint and evidence.
+attributes normally receive distinct manifest claims. Repeated
+`[AllowedExceptions]` attributes are the exception: their allowed types are
+unioned and emitted as one combined claim at the callable location, with all
+occurrences contributing to its stable identity and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
 `DefiniteViolation` candidate for a simple unconditional direct operation.
