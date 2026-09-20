@@ -2822,6 +2822,16 @@ public sealed class SharpProofSoundnessAnalyzerTests
     {
         yield return new TestCaseData(
             """
+            using System.Runtime.CompilerServices;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Frontend;
+            static class C {
+                private static readonly ConditionalWeakTable<IAssemblySymbol, object> Cache = new();
+            }
+            """)
+            .SetName("AllowsAssemblyScopedWeakCaches");
+        yield return new TestCaseData(
+            """
             using System;
             namespace SharpProof.Verify;
             enum Status { Unknown, Proven }

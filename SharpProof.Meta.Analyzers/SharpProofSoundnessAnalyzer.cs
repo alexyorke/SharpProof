@@ -930,7 +930,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        return false;
+        return type.TypeArguments[0] is INamedTypeSymbol key &&
+            IsExactNamedType(
+                key,
+                "IAssemblySymbol",
+                "Microsoft",
+                "CodeAnalysis");
     }
 
     private static bool IsExactNamedType(

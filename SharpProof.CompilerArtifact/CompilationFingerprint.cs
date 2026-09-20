@@ -20,11 +20,11 @@ internal static class CompilationFingerprint
     {
         internal SummaryEvidenceIndex(
             Dictionary<(string Path, string Sha256), int> sourceTextLengths,
-            Dictionary<(string Name, string Mvid, string Sha256), int>
-                implementationModuleCounts)
+            Dictionary<(string Name, string Sha256), HashSet<string>>
+                implementationModuleMvids)
         {
             SourceTextLengths = sourceTextLengths;
-            ImplementationModuleCounts = implementationModuleCounts;
+            ImplementationModuleMvids = implementationModuleMvids;
         }
 
         internal Dictionary<(string Path, string Sha256), int>
@@ -33,8 +33,8 @@ internal static class CompilationFingerprint
             get;
         }
 
-        internal Dictionary<(string Name, string Mvid, string Sha256), int>
-            ImplementationModuleCounts
+        internal Dictionary<(string Name, string Sha256), HashSet<string>>
+            ImplementationModuleMvids
         {
             get;
         }
@@ -297,8 +297,8 @@ internal static class CompilationFingerprint
             }
         }
 
-        var implementationModuleCounts = new Dictionary<
-            (string Name, string Mvid, string Sha256), int>();
+        var implementationModuleMvids = new Dictionary<
+            (string Name, string Sha256), HashSet<string>>();
         foreach (var reference in snapshot.References ?? [])
         {
             foreach (var module in reference?.Modules ?? [])
@@ -308,17 +308,22 @@ internal static class CompilationFingerprint
                     continue;
                 }
 
-                var key = (module.Name, module.Mvid, module.Sha256);
-                implementationModuleCounts[key] =
-                    implementationModuleCounts.TryGetValue(key, out var count)
-                        ? count + 1
-                        : 1;
+                var key = (module.Name, module.Sha256);
+                if (!implementationModuleMvids.TryGetValue(
+                        key,
+                        out var mvids))
+                {
+                    mvids = new HashSet<string>(StringComparer.Ordinal);
+                    implementationModuleMvids.Add(key, mvids);
+                }
+
+                mvids.Add(module.Mvid);
             }
         }
 
         return new SummaryEvidenceIndex(
             sourceTextLengths,
-            implementationModuleCounts);
+            implementationModuleMvids);
     }
 
     private static bool ValidSourceEvidenceLocation(
@@ -348,20 +353,22 @@ internal static class CompilationFingerprint
     {
         if (evidenceIndex != null)
         {
-            return evidenceIndex.ImplementationModuleCounts.TryGetValue(
-                       (row.OwningModuleName,
-                        row.OwningModuleMvid,
-                        row.OwningModuleSha256),
-                       out var count) &&
-                count == 1;
+            return evidenceIndex.ImplementationModuleMvids.TryGetValue(
+                       (row.OwningModuleName, row.OwningModuleSha256),
+                       out var mvids) &&
+                mvids.Count == 1 &&
+                mvids.Contains(row.OwningModuleMvid);
         }
 
-        return (snapshot.References ?? []).SelectMany(
+        var matchingModules = (snapshot.References ?? []).SelectMany(
                 static reference => reference?.Modules ?? [])
-            .Count(module => module != null &&
+            .Where(module => module != null &&
                 module.Name == row.OwningModuleName &&
-                module.Mvid == row.OwningModuleMvid &&
-                module.Sha256 == row.OwningModuleSha256) == 1;
+                module.Sha256 == row.OwningModuleSha256)
+            .ToArray();
+        return matchingModules.Length > 0 &&
+            matchingModules.All(module =>
+                module.Mvid == row.OwningModuleMvid);
     }
 
     private static bool ValidIdentity(string? value)

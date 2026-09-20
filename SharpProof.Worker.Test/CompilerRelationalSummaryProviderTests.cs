@@ -266,6 +266,91 @@ public sealed class CompilerRelationalSummaryProviderTests
         }
     }
 
+    [Test]
+    public void DuplicateImplementationReferenceStillPublishesIlEvidence()
+    {
+        using var temporary = new TempDirectory(
+            "SharpProof.CompilerRelationalSummaryProvider-duplicate-");
+        var implementationPath = Path.Combine(
+            temporary.FullName,
+            "Lib.dll");
+        var duplicatePath = Path.Combine(
+            temporary.FullName,
+            "Lib-copy.dll");
+        var implementation = TestCompilation.Create(
+            "DuplicateImplementationIlLibrary",
+            """
+            public static class Lib
+            {
+                public static int Identity(int value) => value;
+            }
+            """,
+            includeSharpProofReference: false);
+        using (var stream = new FileStream(
+                   implementationPath,
+                   FileMode.CreateNew,
+                   FileAccess.Write,
+                   FileShare.None))
+        {
+            var emit = implementation.Emit(stream);
+            Assert.That(
+                emit.Success,
+                Is.True,
+                string.Join(
+                    Environment.NewLine,
+                    emit.Diagnostics.Select(static diagnostic =>
+                        diagnostic.ToString())));
+        }
+        File.Copy(implementationPath, duplicatePath);
+
+        var compilation = CreateCompilationWithReferences(
+            """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+
+            public static class Subject
+            {
+                public static int Verify(int value)
+                {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Lib.Identity(value);
+                }
+            }
+            """,
+            Path.Combine(temporary.FullName, "Subject.cs"),
+            MetadataReference.CreateFromFile(implementationPath),
+            MetadataReference.CreateFromFile(duplicatePath));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            temporary.FullName,
+            "net8.0",
+            WorkerFeatureSet.All,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+
+        Assert.That(
+            artifact.Compilation.SummaryEvidence,
+            Is.Not.Empty,
+            string.Join(", ", artifact.Compilation.SummaryEvidence.Select(static row =>
+                $"{row.Origin}:{row.CallIdentity}:{row.EvidenceSha256}")));
+        var evidence = artifact.Compilation.SummaryEvidence.Single(row =>
+            row.Origin == CompilerSummaryOrigin.ImplementationIl &&
+            row.CallIdentity == "M:Lib.Identity(System.Int32)");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evidence.OwningModuleMvid, Is.Not.Empty);
+            Assert.That(evidence.OwningModuleSha256, Is.EqualTo(evidence.EvidenceSha256));
+            Assert.That(
+                artifact.Compilation.References
+                    .SelectMany(static reference => reference.Modules)
+                    .Count(module => module.Sha256 == evidence.EvidenceSha256),
+                Is.EqualTo(2));
+        }
+    }
+
     private static (IMethodSymbol Method, IrMemberId Member) GetCall(
         CSharpCompilation compilation,
         IrFactory factory,

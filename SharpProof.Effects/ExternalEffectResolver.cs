@@ -161,7 +161,6 @@ internal sealed class ExternalEffectResolver
 
         var capabilities = EffectContractCapabilityKind.None;
         var complete = false;
-        var deterministic = false;
         ImmutableArray<TypedConstant> thrown = [];
         foreach (var argument in attribute.NamedArguments)
         {
@@ -185,12 +184,10 @@ internal sealed class ExternalEffectResolver
                     complete = completeValue;
                     break;
                 case EffectContractMetadata.IsDeterministicPropertyName:
-                    if (argument.Value.Value is not bool deterministicValue)
+                    if (argument.Value.Value is not bool)
                     {
                         return false;
                     }
-
-                    deterministic = deterministicValue;
                     break;
                 case EffectContractMetadata.PreconditionFreePropertyName:
                     if (argument.Value.Value is not bool preconditionFreeValue)
@@ -256,7 +253,7 @@ internal sealed class ExternalEffectResolver
             capabilityKinds |= EffectCapabilityKind.Synchronization;
         }
 
-        if ((effects & EffectContractKind.UsesNondeterminism) != 0 || !deterministic)
+        if ((effects & EffectContractKind.UsesNondeterminism) != 0)
         {
             capabilityKinds |= EffectCapabilityKind.Randomness;
         }

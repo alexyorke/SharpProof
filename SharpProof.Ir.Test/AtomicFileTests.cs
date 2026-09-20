@@ -72,6 +72,41 @@ public sealed class AtomicFileTests : IDisposable
     }
 
     [Test]
+    public async Task ConcurrentPublicationsToAnInitiallyMissingDestinationDoNotFail()
+    {
+        var path = Path.Combine(_root, "concurrent", "result.txt");
+        const int publicationCount = 32;
+        var staged = new string[publicationCount];
+        for (var index = 0; index < staged.Length; index++)
+        {
+            staged[index] = AtomicFile.PrepareStaged(path);
+            AtomicFile.WriteStagedBytes(
+                staged[index],
+                Encoding.UTF8.GetBytes($"content-{index}\n"));
+        }
+
+        using var start = new Barrier(publicationCount + 1);
+        var publications = staged.Select(temporary => Task.Run(() =>
+        {
+            start.SignalAndWait();
+            try
+            {
+                AtomicFile.PublishStaged(temporary, path);
+            }
+            finally
+            {
+                AtomicFile.TryDeleteStaged(temporary);
+            }
+        })).ToArray();
+
+        start.SignalAndWait();
+        await Task.WhenAll(publications);
+
+        Assert.That(File.ReadAllText(path), Does.Match("^content-[0-9]+\\n$"));
+        Assert.That(TemporaryFiles(path), Is.Empty);
+    }
+
+    [Test]
     public void CanceledWritePreservesDestinationAndCleansTemporaryFile()
     {
         var path = Path.Combine(_root, "result.txt");

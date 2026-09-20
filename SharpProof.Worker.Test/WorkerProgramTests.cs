@@ -37,6 +37,44 @@ public sealed class WorkerProgramTests
     }
 
     [Test]
+    [NonParallelizable]
+    public async Task StartBarrierTimeoutDoesNotBlockOnSynchronousConsoleReader()
+    {
+        var original = Console.In;
+        using var release = new ManualResetEventSlim();
+        using var input = new BlockingTextReader(release);
+        Console.SetIn(input);
+        try
+        {
+            var started = Stopwatch.GetTimestamp();
+            var accepted = await Program.WaitForStartAsync(
+                TimeSpan.FromMilliseconds(100));
+            var elapsed = Stopwatch.GetElapsedTime(started);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(accepted, Is.False);
+                Assert.That(elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
+            }
+        }
+        finally
+        {
+            release.Set();
+            Console.SetIn(original);
+        }
+    }
+
+    private sealed class BlockingTextReader(ManualResetEventSlim release)
+        : TextReader
+    {
+        public override string? ReadLine()
+        {
+            release.Wait();
+            return null;
+        }
+    }
+
+    [Test]
     public async Task DirectInvocationRequiresContainmentStartBarrier()
     {
         var directory = Path.Combine(

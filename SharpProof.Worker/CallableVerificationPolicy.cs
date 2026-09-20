@@ -93,12 +93,20 @@ internal static class CallableVerificationPolicy
         var effectClaims = target.EffectClaims.ToDictionary(
             static evidence => evidence.ClaimId,
             StringComparer.Ordinal);
+        var hasRequires = target.Entry.Assumptions.Any(static assumption =>
+            assumption.Kind == WorkerAssumptionKind.Precondition);
         var claims = target.Entry.ClaimIds.Select((claimId, index) =>
             effectClaims.TryGetValue(claimId, out var evidence)
                 ? EffectClaimResultAssembler.Assemble(
                     target,
                     evidence,
-                    CallableEntryFeasibility.Feasible,
+                    // A failed lowering does not establish that a required
+                    // entry is reachable. Keep compiler-proven summaries,
+                    // but do not publish a replayed violation from an
+                    // unverified entry.
+                    hasRequires && evidence.Outcome == WorkerClaimOutcome.Refuted
+                        ? CallableEntryFeasibility.Unknown(target.FailureReason)
+                        : CallableEntryFeasibility.Feasible,
                     cancellationToken)
                 : CallableClaimResultAssembler.Unknown(
                     target,

@@ -5252,7 +5252,7 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
-    public void UntrustedSourceContractRetainsItsDecodedSummaryForChecking()
+    public void UntrustedSourceContractRetainsItsDecodedSummaryWithoutImplicitRandomness()
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
@@ -5276,6 +5276,31 @@ public sealed class EffectAnalysisTests
             Is.EqualTo(EffectCompleteness.Complete));
         Assert.That(resolution.Summary.Reads.IsEmpty, Is.True);
         Assert.That(resolution.Summary.Writes.IsEmpty, Is.True);
+        Assert.That(
+            resolution.Summary.Capabilities.Contains(
+                EffectCapabilityKind.Randomness),
+            Is.False);
+    }
+
+    [Test]
+    public void ExplicitNondeterminismContractRetainsRandomnessCapability()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                [EffectContract(
+                    SharpProofEffect.UsesNondeterminism,
+                    Complete = true)]
+                public static void Boundary() {
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var resolution = session.ResolveExternalContract(
+            Method(compilation, "Boundary"));
+
         Assert.That(
             resolution.Summary.Capabilities.Contains(
                 EffectCapabilityKind.Randomness),

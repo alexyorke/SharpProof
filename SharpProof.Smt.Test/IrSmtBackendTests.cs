@@ -786,6 +786,55 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task DisposeWhileQueryIsQueuedReturnsUnavailable()
+    {
+        var factory = new IrFactory();
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend();
+        var queryGate = (SemaphoreSlim)typeof(IrSmtBackend).GetField(
+                "_queryGate",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(backend)!;
+        var disposeStarted = typeof(IrSmtBackend).GetField(
+                "_disposeStarted",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)!;
+
+        await queryGate.WaitAsync();
+        var check = backend.CheckAsync(query, CancellationToken.None);
+        var dispose = Task.Run(backend.Dispose);
+        try
+        {
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => (int)disposeStarted.GetValue(backend)! != 0,
+                    TimeSpan.FromSeconds(5)),
+                Is.True,
+                "Dispose must begin while the check is queued.");
+        }
+        finally
+        {
+            queryGate.Release();
+        }
+
+        var result = await check.WaitAsync(TimeSpan.FromSeconds(5));
+        await dispose.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+        Assert.That(
+            result.FailureReason,
+            Is.EqualTo(BackendFailureReason.Unavailable));
+    }
+
+    [Test]
     public async Task UnsupportedModelVariablesAreRejectedBeforeEncoding()
     {
         var factory = new IrFactory();

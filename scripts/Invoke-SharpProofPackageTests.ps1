@@ -661,9 +661,17 @@ try {
                             }
                         } | Measure-Object -Sum).Sum)
             }
+            # Keep the shard directory short enough for TRX and coverage
+            # output paths on Linux filesystems. The first fixture groups
+            # several small classes, so its filter is intentionally long.
+            $fixtureName = if ($classNames.Count -gt 1) {
+                'fixture-core'
+            }
+            else {
+                'fixture-' + $fixtureClass.ToLowerInvariant()
+            }
             $shards.Add([pscustomobject]@{
-                Name = 'fixture-' + ($fixtureClass.ToLowerInvariant() -replace
-                    '\|', '-and-')
+                Name = $fixtureName
                 Filter = $filter
                 EstimatedMilliseconds = $estimatedMilliseconds
                 # FinalCompilationProbeTests runs up to four NUnit children

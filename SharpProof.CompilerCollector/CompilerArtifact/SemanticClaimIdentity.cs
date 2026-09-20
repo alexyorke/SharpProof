@@ -85,7 +85,8 @@ internal static partial class SemanticClaimIdentity
 
         method = NormalizeCallable(method);
         var documentationId = DocumentationCommentId.CreateDeclarationId(method);
-        if (!string.IsNullOrEmpty(documentationId))
+        if (!RequiresStructuralCallableId(method) &&
+            !string.IsNullOrEmpty(documentationId))
         {
             return documentationId!;
         }
@@ -120,7 +121,8 @@ internal static partial class SemanticClaimIdentity
         symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
         var documentationId = DocumentationCommentId.CreateDeclarationId(symbol);
-        if (!string.IsNullOrEmpty(documentationId))
+        if (!RequiresStructuralContainerId(symbol) &&
+            !string.IsNullOrEmpty(documentationId))
         {
             return documentationId!;
         }
@@ -129,6 +131,7 @@ internal static partial class SemanticClaimIdentity
         writer.Add("SharpProofContainer/v1").Add(symbol.Kind.ToString())
             .Add(symbol.MetadataName)
             .Add(DocumentationCommentId.CreateReferenceId(symbol));
+        WriteSpecialContainingTypeIdentity(writer, symbol);
         return "sps1:" + writer.Finish();
     }
 
@@ -356,6 +359,7 @@ internal static partial class SemanticClaimIdentity
             return;
         }
         writer.Add(method.MethodKind.ToString()).Add(method.Arity).Add(method.IsStatic);
+        WriteSpecialContainingTypeIdentity(writer, method);
         WriteReferenceId(writer, method);
         writer.Add(method.TypeArguments.Length);
         foreach (var argument in method.TypeArguments)
@@ -386,7 +390,110 @@ internal static partial class SemanticClaimIdentity
             WriteTypeParameter(writer, parameter, context);
             return;
         }
+        if (type is IFunctionPointerTypeSymbol functionPointer)
+        {
+            WriteFunctionPointerType(writer, functionPointer, context);
+            return;
+        }
         writer.Add(DocumentationCommentId.CreateReferenceId(type));
+    }
+
+    private static void WriteFunctionPointerType(
+        CanonicalHashWriter writer,
+        IFunctionPointerTypeSymbol functionPointer,
+        ClaimIdentityContext context)
+    {
+        var signature = functionPointer.Signature;
+        writer.Add("function-pointer")
+            .Add(signature.CallingConvention.ToString())
+            .Add(signature.RefKind.ToString())
+            .Add(signature.ReturnsByRefReadonly)
+            .Add(signature.UnmanagedCallingConventionTypes.Length);
+        foreach (var convention in signature.UnmanagedCallingConventionTypes)
+        {
+            WriteType(writer, convention, context);
+        }
+
+        WriteType(writer, signature.ReturnType, context);
+        writer.Add(signature.Parameters.Length);
+        foreach (var parameter in signature.Parameters)
+        {
+            writer.Add(parameter.RefKind.ToString())
+                .Add(parameter.ScopedKind.ToString())
+                .Add(parameter.IsParams);
+            WriteType(writer, parameter.Type, context);
+        }
+    }
+
+    private static bool RequiresStructuralCallableId(IMethodSymbol method)
+    {
+        return RequiresStructuralContainerId(method) ||
+            HasFunctionPointerSignature(method);
+    }
+
+    private static bool RequiresStructuralContainerId(ISymbol symbol)
+    {
+        for (var type = symbol is INamedTypeSymbol named
+                ? named
+                : symbol.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            if (type.IsFileLocal || type.IsExtension)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasFunctionPointerSignature(IMethodSymbol method)
+    {
+        return ContainsFunctionPointer(method.ReturnType) ||
+            method.Parameters.Any(static parameter =>
+                ContainsFunctionPointer(parameter.Type));
+    }
+
+    private static bool ContainsFunctionPointer(ITypeSymbol type)
+    {
+        return type switch
+        {
+            IFunctionPointerTypeSymbol => true,
+            IArrayTypeSymbol array => ContainsFunctionPointer(array.ElementType),
+            IPointerTypeSymbol pointer => ContainsFunctionPointer(pointer.PointedAtType),
+            INamedTypeSymbol named => named.TypeArguments.Any(ContainsFunctionPointer),
+            _ => false
+        };
+    }
+
+    private static void WriteSpecialContainingTypeIdentity(
+        CanonicalHashWriter writer,
+        ISymbol symbol)
+    {
+        var types = new Stack<INamedTypeSymbol>();
+        for (var type = symbol is INamedTypeSymbol named
+                ? named
+                : symbol.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            if (type.IsFileLocal || type.IsExtension)
+            {
+                types.Push(type);
+            }
+        }
+
+        writer.Add("special-containing-types").Add(types.Count);
+        while (types.Count > 0)
+        {
+            var type = types.Pop();
+            writer.Add(type.MetadataName).Add(type.IsFileLocal).Add(type.IsExtension);
+            if (type.IsExtension && type.ExtensionParameter?.Type is { } receiver)
+            {
+                writer.Add(DocumentationCommentId.CreateReferenceId(receiver));
+            }
+        }
     }
 
     private static void WriteTypeParameter(

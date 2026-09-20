@@ -508,41 +508,87 @@ internal sealed partial class ClaimManifestBuilder(
         var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
         foreach (var tree in _compilation.SyntaxTrees)
         {
-            var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, tree);
-            foreach (var node in tree.GetRoot(cancellationToken).DescendantNodesAndSelf())
+            var root = tree.GetRoot(cancellationToken);
+            // Semantic-model creation binds every nested local function. Skip
+            // trees with no SharpProof syntax so an unrelated deeply nested
+            // tree cannot exhaust Roslyn's binder stack during discovery.
+            if (!MayContainSharpProofSyntax(root))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                switch (node)
+                continue;
+            }
+
+            var treeMethods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(
+                SymbolEqualityComparer.Default);
+
+            void DiscoverTree()
+            {
+                var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+                    _compilation,
+                    tree);
+                foreach (var node in root.DescendantNodesAndSelf())
                 {
-                    case TypeDeclarationSyntax type
-                        when PrimaryConstructorCallableInventory.TryGet(
-                            type,
-                            model,
-                            cancellationToken,
-                            out var primaryConstructor):
-                        Add(primaryConstructor);
-                        break;
-                    case BaseMethodDeclarationSyntax:
-                    case AccessorDeclarationSyntax:
-                    case LocalFunctionStatementSyntax:
-                        Add(model.GetDeclaredSymbol(node, cancellationToken) as IMethodSymbol);
-                        break;
-                    case AnonymousFunctionExpressionSyntax anonymous:
-                        Add((model.GetOperation(anonymous, cancellationToken) as IAnonymousFunctionOperation)?.Symbol);
-                        break;
-                    case GlobalStatementSyntax global:
-                        Add(model.GetEnclosingSymbol(global.SpanStart, cancellationToken) as IMethodSymbol);
-                        break;
-                    case BasePropertyDeclarationSyntax property:
-                        AddAccessors(model.GetDeclaredSymbol(property, cancellationToken));
-                        break;
-                    case EventFieldDeclarationSyntax eventField:
-                        foreach (var variable in eventField.Declaration.Variables)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            AddAccessors(model.GetDeclaredSymbol(variable, cancellationToken));
-                        }
-                        break;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    switch (node)
+                    {
+                        case TypeDeclarationSyntax type
+                            when PrimaryConstructorCallableInventory.TryGet(
+                                type,
+                                model,
+                                cancellationToken,
+                                out var primaryConstructor):
+                            Add(primaryConstructor);
+                            break;
+                        case BaseMethodDeclarationSyntax:
+                        case AccessorDeclarationSyntax:
+                        case LocalFunctionStatementSyntax:
+                            Add(model.GetDeclaredSymbol(node, cancellationToken) as IMethodSymbol);
+                            break;
+                        case AnonymousFunctionExpressionSyntax anonymous:
+                            Add((model.GetOperation(anonymous, cancellationToken) as IAnonymousFunctionOperation)?.Symbol);
+                            break;
+                        case GlobalStatementSyntax global:
+                            Add(model.GetEnclosingSymbol(global.SpanStart, cancellationToken) as IMethodSymbol);
+                            break;
+                        case BasePropertyDeclarationSyntax property:
+                            AddAccessors(model.GetDeclaredSymbol(property, cancellationToken));
+                            break;
+                        case EventFieldDeclarationSyntax eventField:
+                            foreach (var variable in eventField.Declaration.Variables)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                AddAccessors(model.GetDeclaredSymbol(variable, cancellationToken));
+                            }
+                            break;
+                    }
+                }
+            }
+
+            DiscoverTree();
+
+            methods.UnionWith(treeMethods);
+
+            void Add(IMethodSymbol? method)
+            {
+                if (method != null &&
+                    !ContractForSymbolMatcher.IsCompanionType(
+                        _contractSources.Companions,
+                        method.ContainingType))
+                {
+                    treeMethods.Add(ContractClauseInventoryBuilder.NormalizeCallable(method));
+                }
+            }
+            void AddAccessors(ISymbol? symbol)
+            {
+                if (symbol is IPropertySymbol property)
+                {
+                    Add(property.GetMethod);
+                    Add(property.SetMethod);
+                }
+                else if (symbol is IEventSymbol @event)
+                {
+                    Add(@event.AddMethod);
+                    Add(@event.RemoveMethod);
+                    Add(@event.RaiseMethod);
                 }
             }
         }
@@ -557,29 +603,48 @@ internal sealed partial class ClaimManifestBuilder(
 
         return methods.ToImmutableArray();
 
-        void Add(IMethodSymbol? method)
+        static bool MayContainSharpProofSyntax(SyntaxNode root)
         {
-            if (method != null &&
-                !ContractForSymbolMatcher.IsCompanionType(
-                    _contractSources.Companions,
-                    method.ContainingType))
+            foreach (var token in root.DescendantTokens())
             {
-                methods.Add(ContractClauseInventoryBuilder.NormalizeCallable(method));
+                if (token.ValueText is
+                    "SharpProof" or
+                    "Contract" or
+                    "Requires" or
+                    "Ensures" or
+                    "Assume" or
+                    "Old" or
+                    "Result" or
+                    "ContractFor" or
+                    "EnforcePure" or
+                    "ZeroAllocations" or
+                    "AllowedCapabilities" or
+                    "DoesNotThrow" or
+                    "AllowedExceptions" or
+                    "EffectContract" or
+                    "NotNull" or
+                    "Positive" or
+                    "InRange" or
+                    "SharpProofSuppress" or
+                    "SharpProofTrusted" or
+                    "ContractForAttribute" or
+                    "EnforcePureAttribute" or
+                    "ZeroAllocationsAttribute" or
+                    "AllowedCapabilitiesAttribute" or
+                    "DoesNotThrowAttribute" or
+                    "AllowedExceptionsAttribute" or
+                    "EffectContractAttribute" or
+                    "NotNullAttribute" or
+                    "PositiveAttribute" or
+                    "InRangeAttribute" or
+                    "SharpProofSuppressAttribute" or
+                    "SharpProofTrustedAttribute")
+                {
+                    return true;
+                }
             }
-        }
-        void AddAccessors(ISymbol? symbol)
-        {
-            if (symbol is IPropertySymbol property)
-            {
-                Add(property.GetMethod);
-                Add(property.SetMethod);
-            }
-            else if (symbol is IEventSymbol @event)
-            {
-                Add(@event.AddMethod);
-                Add(@event.RemoveMethod);
-                Add(@event.RaiseMethod);
-            }
+
+            return false;
         }
     }
 

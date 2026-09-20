@@ -201,7 +201,13 @@ against, rejects reference assemblies and facades as body authority, and
 decodes only a bounded scalar opcode set. A missing body, changed image,
 unsupported opcode, cross-module target, loop, recursion, unresolved call, or
 resource limit abstains. This facility is not a general IL interpreter and is
-not used for metadata effect inference.
+not used for metadata effect inference. A `Proven` claim whose proof core
+contains `il-summary:` is conditional on the deployed application resolving
+the exact captured implementation binary; the collector records that binary's
+provenance but cannot observe a later runtime or publish-time assembly choice.
+The SARIF claim message makes this runtime-binary assumption visible so a
+consumer can bind the deployment asset to the captured PE or treat the claim
+as requiring review.
 
 An audited specification-pack summary is admissible only when its pack ID was
 explicitly selected by `SharpProofSpecificationPacks`. Packs are embedded,

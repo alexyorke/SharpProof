@@ -381,6 +381,87 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task NondeterministicBoundaryDoesNotImplyRandomnessCapability()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("Reviewed native boundary.")]
+                [EffectContract(
+                    SharpProofEffect.ReadsAmbientState |
+                        SharpProofEffect.UsesNativeCode,
+                    Capabilities = SharpProofCapability.NativeInterop,
+                    Complete = true,
+                    IsDeterministic = false)]
+                public static extern int NativeValue();
+
+                [SharpProofTrusted("Reviewed clock boundary.")]
+                [EffectContract(
+                    SharpProofEffect.ReadsAmbientState,
+                    Capabilities = SharpProofCapability.Clock,
+                    Complete = true,
+                    IsDeterministic = false)]
+                public static extern int ClockValue();
+            }
+            """,
+            "NondeterministicExternalFixture");
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [AllowedCapabilities(SharpProofCapability.NativeInterop)]
+                public static int ReadNative() => ExternalFixture.NativeValue();
+
+                [AllowedCapabilities(SharpProofCapability.Clock)]
+                public static int ReadClock() => ExternalFixture.ClockValue();
+            }
+            """,
+            "effects",
+            ["SP0016"],
+            additionalReferences: [external]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task ExplicitNondeterminismStillRequiresDeclaredRandomnessCapability()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("Reviewed nondeterministic boundary.")]
+                [EffectContract(
+                    SharpProofEffect.UsesNondeterminism,
+                    Capabilities = SharpProofCapability.Randomness,
+                    Complete = true)]
+                public static extern int RandomValue();
+            }
+            """,
+            "ExplicitNondeterministicExternalFixture");
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [AllowedCapabilities(SharpProofCapability.Randomness)]
+                public static int ReadRandom() => ExternalFixture.RandomValue();
+            }
+            """,
+            "effects",
+            ["SP0016"],
+            additionalReferences: [external]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task LambdaOwnedEffectAttributesAreAnalyzed()
     {
         var factory = new RecordingSessionFactory();

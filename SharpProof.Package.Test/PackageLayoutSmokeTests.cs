@@ -1056,7 +1056,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain("SharpProof Refuted")
-                .And.Contain("failed with exit code 5"));
+                .And.Contain("SP0051"));
         Assert.That(
             File.Exists(workspace.ResultPath),
             Is.True,
@@ -1189,7 +1189,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain("SharpProof Refuted")
-                .And.Contain("failed with exit code 5"));
+                .And.Contain("SP0051"));
         Assert.That(
             File.Exists(workspace.CompilerManifestPath),
             Is.True,

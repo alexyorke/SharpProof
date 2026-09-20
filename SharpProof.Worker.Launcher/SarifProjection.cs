@@ -97,6 +97,11 @@ internal static class SarifProjection
         var reasonValue = result.Reason;
         var effectWitness = result.EffectWitness;
         var reason = reasonValue == WorkerClaimReason.None ? string.Empty : " (" + reasonValue + ")";
+        var implementationIlAssumption = result.ProofCore.Any(
+                static item => item.StartsWith(
+                    "il-summary:", StringComparison.Ordinal))
+            ? " [implementation-IL proof assumes the compile-time referenced binary is the runtime binary]"
+            : string.Empty;
         var witness = effectWitness == null
             ? string.Empty
             : " [concrete " + effectWitness.Kind + ": " + effectWitness.Detail +
@@ -110,7 +115,8 @@ internal static class SarifProjection
                 outcome == WorkerClaimOutcome.Refuted ? "error" :
                 LauncherPresentation.Level(request.VerifyPolicy, "note"),
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
-                result.ClaimId + " for " + claim.CallableId + reason + witness,
+                result.ClaimId + " for " + claim.CallableId +
+                implementationIlAssumption + reason + witness,
             effectWitness?.Location ?? claim.Location,
             result.ClaimId,
             new

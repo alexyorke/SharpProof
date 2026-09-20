@@ -3273,7 +3273,7 @@ public sealed class WorkerMsBuildIntegrationTests
             """);
         var refutedBuild = await refuted.BuildAsync(verify: true);
         Assert.That(refutedBuild.ExitCode, Is.Not.Zero);
-        Assert.That(refutedBuild.Output, Does.Contain("failed with exit code 5"));
+        Assert.That(refutedBuild.Output, Does.Contain("SP0051"));
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(refuted.ResultPath))!;
         var refutedRequest = WorkerProtocolJson.DeserializeRequest(
@@ -3293,7 +3293,7 @@ public sealed class WorkerMsBuildIntegrationTests
             repeatedRefutation.Output);
         Assert.That(
             repeatedRefutation.Output,
-            Does.Contain("failed with exit code 5"));
+            Does.Contain("SP0051"));
 
         using var timedOut = ConsumerProject.Create(IdentitySource);
         var timedOutBuild = await timedOut.BuildAsync(

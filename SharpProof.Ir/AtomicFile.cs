@@ -1,6 +1,7 @@
 namespace SharpProof.Ir;
 internal static class AtomicFile
 {
+    private const int MaxPublicationAttempts = 8;
     private static readonly UTF8Encoding Utf8 = new(false);
 
     private sealed class StagedFile(string temporary) : IDisposable
@@ -49,13 +50,30 @@ internal static class AtomicFile
 
     internal static void PublishStaged(string temporary, string destination)
     {
-        if (File.Exists(destination))
+        for (var attempt = 0; attempt < MaxPublicationAttempts; attempt++)
         {
-            File.Replace(temporary, destination, null);
-        }
-        else
-        {
-            File.Move(temporary, destination);
+            try
+            {
+                // The existence check is only a hint.  Either operation can
+                // race with another publisher, so retry the other operation
+                // after a transient IOException.
+                if (File.Exists(destination))
+                {
+                    File.Replace(temporary, destination, null);
+                }
+                else
+                {
+                    File.Move(temporary, destination);
+                }
+
+                return;
+            }
+            catch (IOException) when (attempt + 1 < MaxPublicationAttempts)
+            {
+                // A destination can appear between the check and Move, or
+                // disappear between the check and Replace.  Re-evaluate the
+                // destination on the next attempt.
+            }
         }
     }
 
@@ -77,7 +95,7 @@ internal static class AtomicFile
     internal static void WriteUtf8(string path, string content)
     {
         using var staged = new StagedFile(PrepareStaged(path));
-        File.WriteAllText(staged.Temporary.FullName, content, Utf8);
+        WriteStagedBytes(staged.Temporary.FullName, Utf8.GetBytes(content));
         PublishStaged(staged.Temporary.FullName, path);
     }
 
@@ -87,6 +105,10 @@ internal static class AtomicFile
         return WriteBytesAsync(path, Utf8.GetBytes(content), cancellationToken);
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1849",
+        Justification = "Flush(true) is required before publishing staged output.")]
     internal static async Task WriteBytesAsync(
         string path, byte[] content, CancellationToken cancellationToken = default)
     {
@@ -96,6 +118,7 @@ internal static class AtomicFile
         {
             await stream.WriteAsync(content, 0, content.Length, cancellationToken)
                 .ConfigureAwait(false);
+            stream.Flush(true);
         }
 
         PublishStaged(staged.Temporary.FullName, path);

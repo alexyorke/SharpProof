@@ -180,14 +180,27 @@ internal static class CompilerManifestArtifactProducer
                 if (!modulesByIdentity.TryGetValue(
                         (authority.OwningModuleName, authority.EvidenceSha256),
                         out var matchingModules) ||
-                    matchingModules.Length != 1)
+                    matchingModules.Length == 0)
                 {
                     throw new InvalidOperationException(
-                        "An IL summary authority is not bound to one captured module.");
+                        "An IL summary authority is not bound to a captured module.");
                 }
 
-                row.OwningModuleMvid = matchingModules[0].Mvid;
-                row.OwningModuleSha256 = matchingModules[0].Sha256;
+                var selectedModule = matchingModules
+                    .OrderBy(static module => module.Path, StringComparer.Ordinal)
+                    .First();
+                if (matchingModules.Any(module =>
+                        !string.Equals(
+                            module.Mvid,
+                            selectedModule.Mvid,
+                            StringComparison.Ordinal)))
+                {
+                    throw new InvalidOperationException(
+                        "An IL summary authority is bound to conflicting captured modules.");
+                }
+
+                row.OwningModuleMvid = selectedModule.Mvid;
+                row.OwningModuleSha256 = selectedModule.Sha256;
             }
             else if (authority.Origin == CompilerSummaryOrigin.SpecificationPack)
             {

@@ -517,7 +517,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task EffectClaimsRemainAccountableWhenRequiresBodyIsUnsupported()
+    public async Task EffectClaimsDoNotRefuteWhenRequiresBodyIsUnsupported()
     {
         using var project = TestProject.Create(
             """
@@ -585,17 +585,17 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerEffectSet.Allocates));
             Assert.That(
                 throwing.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 throwing.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
             Assert.That(
                 throwing.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
             Assert.That(
                 throwing.ProofCore,
-                Has.One.StartsWith("compiler-effect:"));
+                Is.Empty);
             Assert.That(
                 response.CallableResults.Single(result =>
                     result.CallableId.Contains(
@@ -607,7 +607,7 @@ public sealed class WorkerTests
                     result.CallableId.Contains(
                         ".ThrowExisting(",
                         StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Complete));
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }

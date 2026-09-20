@@ -156,6 +156,29 @@ public sealed class ReferencedTypeSymbolsTests
             Is.EqualTo(ExpectedTraversalOrder));
     }
 
+    [Test]
+    public void FilteredCachedTraversalSkipsAssembliesWithoutAttributeReference()
+    {
+        var compilation = CSharpCompilation.Create(
+            "FilteredTraversal",
+            [CSharpSyntaxTree.ParseText(
+                "namespace Consumer { internal sealed class Marker { } }")],
+            TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var contractFor = compilation.GetTypeByMetadataName(
+            "SharpProof.Attributes.ContractForAttribute");
+
+        Assert.That(contractFor, Is.Not.Null);
+        var types = ReferencedTypeSymbols.GetAllCached(
+                compilation,
+                contractFor!.ContainingAssembly)
+            .Select(static type => type.ToDisplayString())
+            .ToArray();
+
+        Assert.That(types, Does.Contain("Consumer.Marker"));
+        Assert.That(types, Does.Not.Contain("object"));
+    }
+
     private static CSharpCompilation CreateCompilation(
         string assemblyName,
         string source,

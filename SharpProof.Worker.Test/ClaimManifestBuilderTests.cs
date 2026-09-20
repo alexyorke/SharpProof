@@ -2513,7 +2513,10 @@ public sealed class ClaimManifestBuilderTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(ids, Is.Not.Null);
-            Assert.That(ids, Has.Count.EqualTo(depth + 1));
+            // The tree has no SharpProof selection syntax, so discovery skips
+            // semantic binding entirely. No manifest identities are needed for
+            // its unrelated local functions.
+            Assert.That(ids, Is.Empty);
         }
         await File.WriteAllTextAsync(
             Environment.GetEnvironmentVariable(markerVariable)!,

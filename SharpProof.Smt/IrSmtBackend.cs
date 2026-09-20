@@ -5,9 +5,13 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private const int MaximumEncodingDepth = 256;
     private readonly Context _context;
     private readonly object _gate = new();
+    private readonly object _lifecycleGate = new();
     private readonly SemaphoreSlim _queryGate = new(1, 1);
+    private readonly TaskCompletionSource<bool> _checksDrained = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly IrSmtBackendOptions _options;
     private long _consumedResourceCount;
+    private int _activeCheckCount;
     private int _disposeStarted;
     private bool _disposed;
 
@@ -50,28 +54,34 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         ArgumentNullGuard.NotNull(query, nameof(query));
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (Volatile.Read(ref _disposeStarted) != 0)
+        lock (_lifecycleGate)
         {
-            return Task.FromResult(BackendCheckResult.Unknown(
-                BackendFailureReason.Unavailable));
-        }
+            if (_disposeStarted != 0)
+            {
+                return Task.FromResult(BackendCheckResult.Unknown(
+                    BackendFailureReason.Unavailable));
+            }
 
-        return CheckSerializedAsync(query, cancellationToken);
+            _activeCheckCount++;
+            return CheckSerializedAsync(query, cancellationToken);
+        }
     }
 
     private async Task<BackendCheckResult> CheckSerializedAsync(
         VerificationQuery query,
         CancellationToken cancellationToken)
     {
-        await _queryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var acquired = false;
         try
         {
+            await _queryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            acquired = true;
             return await Task.Run(() =>
             {
                 lock (_gate)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (_disposed)
+                    if (_disposed || Volatile.Read(ref _disposeStarted) != 0)
                     {
                         return BackendCheckResult.Unknown(
                             BackendFailureReason.Unavailable);
@@ -114,7 +124,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
         finally
         {
-            _queryGate.Release();
+            if (acquired)
+            {
+                _queryGate.Release();
+            }
+
+            CheckFinished();
         }
     }
 
@@ -125,11 +140,23 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        lock (_lifecycleGate)
         {
-            return;
+            if (_disposeStarted != 0)
+            {
+                return;
+            }
+
+            _disposeStarted = 1;
+            if (_activeCheckCount == 0)
+            {
+                _checksDrained.TrySetResult(true);
+            }
         }
 
+        // Take exclusive ownership of the query gate before disposing the
+        // native context. Checks that were already admitted observe
+        // _disposeStarted and drain through the gate with Unavailable.
         _queryGate.Wait();
         try
         {
@@ -141,7 +168,29 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
         finally
         {
-            _queryGate.Dispose();
+            // Wake any checks that were queued before disposal began. They
+            // return Unavailable before touching the disposed context.
+            _queryGate.Release();
+            try
+            {
+                _checksDrained.Task.GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _queryGate.Dispose();
+            }
+        }
+    }
+
+    private void CheckFinished()
+    {
+        lock (_lifecycleGate)
+        {
+            _activeCheckCount--;
+            if (_disposeStarted != 0 && _activeCheckCount == 0)
+            {
+                _checksDrained.TrySetResult(true);
+            }
         }
     }
 

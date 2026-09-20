@@ -735,8 +735,12 @@ internal sealed class ManagedAbstractFlow
             ILocalReferenceOperation local => state.Get(local.Local),
             IFlowCaptureReferenceOperation capture => state.Get(capture.Id),
             IDefaultValueOperation value => DefaultForType(value.Type),
-            IInstanceReferenceOperation or IConditionalAccessInstanceOperation or IObjectCreationOperation or
+            IInstanceReferenceOperation or IConditionalAccessInstanceOperation or
                 ITypeOfOperation => NonNull,
+            IObjectCreationOperation creation =>
+                ManagedAbstractValue.IsEmptyNullableCreation(creation)
+                    ? Null
+                    : NonNull,
             IArrayCreationOperation array => EvaluateArray(array, state),
             IPropertyReferenceOperation property => EvaluateProperty(property, state),
             IInvocationOperation invocation => ReturnValue(invocation.TargetMethod, invocation.Type),
@@ -2400,6 +2404,11 @@ internal readonly record struct ManagedAbstractValue
             OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
         };
     }
+
+    internal static bool IsEmptyNullableCreation(IObjectCreationOperation creation)
+    {
+        return IsNullableType(creation.Type) && creation.Arguments.IsEmpty;
+    }
 }
 
 /// <summary>Fail-closed execution facts shared by analyzer and effect witnesses.</summary>
@@ -3360,15 +3369,19 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     internal static bool IsDefinitelyNonNull(IOperation operation)
     {
         operation = UnwrapSimpleConversions(operation);
-        return operation is IInstanceReferenceOperation or IConditionalAccessInstanceOperation or
-            IObjectCreationOperation or IArrayCreationOperation or ITypeOfOperation ||
+        return operation is IInstanceReferenceOperation or IConditionalAccessInstanceOperation ||
+            operation is IObjectCreationOperation creation &&
+                !ManagedAbstractValue.IsEmptyNullableCreation(creation) ||
+            operation is IArrayCreationOperation or ITypeOfOperation ||
             operation.ConstantValue is { HasValue: true, Value: not null };
     }
 
     internal static bool IsDefinitelyNull(IOperation operation)
     {
         operation = UnwrapSimpleConversions(operation);
-        return operation.ConstantValue is { HasValue: true, Value: null };
+        return operation is IObjectCreationOperation creation &&
+                ManagedAbstractValue.IsEmptyNullableCreation(creation) ||
+            operation.ConstantValue is { HasValue: true, Value: null };
     }
 
     private static IOperation UnwrapSimpleConversions(IOperation operation)

@@ -869,6 +869,12 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary ScanObjectCreation(IObjectCreationOperation creation)
     {
+        if (ManagedAbstractValue.IsEmptyNullableCreation(creation) &&
+            creation.Initializer == null)
+        {
+            return EffectSummary.Empty;
+        }
+
         if (creation.IsImplicit &&
             !IsInterpolatedStringHandlerCreation(creation))
         {

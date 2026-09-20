@@ -167,14 +167,13 @@ internal static class Program
         return !string.Equals(request, result, StringComparison.Ordinal);
     }
 
-    private static async Task<bool> WaitForStartAsync(TimeSpan timeout)
+    internal static async Task<bool> WaitForStartAsync(TimeSpan timeout)
     {
-        using var timeoutBoundary = new CancellationTokenSource(timeout);
-        var read = Console.In.ReadLineAsync(timeoutBoundary.Token).AsTask();
-        var timeoutSignal = Task.Delay(
-            Timeout.InfiniteTimeSpan,
-            timeoutBoundary.Token);
-        var completed = await Task.WhenAny(read, timeoutSignal)
+        // Console.In can be a synchronized TextReader whose ReadLineAsync
+        // implementation calls ReadLine synchronously. Run the read on a
+        // background thread so the timeout task is created immediately.
+        var read = Task.Run(static () => Console.In.ReadLine());
+        var completed = await Task.WhenAny(read, Task.Delay(timeout))
             .ConfigureAwait(false);
         if (!ReferenceEquals(completed, read) ||
             !read.IsCompletedSuccessfully)
