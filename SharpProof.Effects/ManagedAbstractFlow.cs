@@ -29,6 +29,12 @@ internal sealed class ManagedAbstractFlow
     [ThreadStatic]
     private static int s_walkDepth;
 
+    // Roslyn's CFG copies do not retain a semantic model. Keep the method being
+    // solved on the analysis thread so those copies can still be classified as
+    // receiver-backed primary-constructor parameters.
+    [ThreadStatic]
+    private static IMethodSymbol? s_currentMethod;
+
     private static readonly ConditionalWeakTable<Compilation, ManagedAbstractFlow> Sessions = new();
     private static readonly ConditionalWeakTable<
         Compilation,
@@ -130,36 +136,61 @@ internal sealed class ManagedAbstractFlow
             return ManagedFlowAnalysis.Cyclic();
         }
 
-        var result = new ManagedFlowResult(this);
+        var result = new ManagedFlowResult(this, method);
 
         // CheckBudget bounds the source CFG, but CreateDataflowGraph adds a
         // synthetic block per edge, so the iteration limit has to be taken from
         // the expanded graph rather than from MaxAnalyzedBlocks.
-        var dataflowGraph = CreateDataflowGraph(graph, result, cancellationToken);
+        var previousMethod = s_currentMethod;
+        s_currentMethod = method;
         try
         {
-            ForwardDataflowAnalysis.AnalyzeWithoutResult(dataflowGraph,
-                FlowDomain.Instance, entryState ?? CreateEntryState(method),
-                new ForwardDataflowAnalysisOptions(
-                    maxIterations: maxIterationsOverride
-                        ?? dataflowGraph.Blocks.Length * 4));
-        }
-        catch (DataflowConvergenceException)
-        {
-            // Every other resource limit here degrades to an incomplete summary.
-            // Reaching the iteration bound must not escape as AD0001.
-            return ManagedFlowAnalysis.BudgetExceeded(
-                EffectAnalysisIncompleteReason.BlockBudgetExceeded);
-        }
+            var dataflowGraph = CreateDataflowGraph(graph, result, cancellationToken);
+            try
+            {
+                ForwardDataflowAnalysis.AnalyzeWithoutResult(dataflowGraph,
+                    FlowDomain.Instance, entryState ?? CreateEntryState(method),
+                    new ForwardDataflowAnalysisOptions(
+                        maxIterations: maxIterationsOverride
+                            ?? dataflowGraph.Blocks.Length * 4));
+            }
+            catch (DataflowConvergenceException)
+            {
+                // Every other resource limit here degrades to an incomplete summary.
+                // Reaching the iteration bound must not escape as AD0001.
+                return ManagedFlowAnalysis.BudgetExceeded(
+                    EffectAnalysisIncompleteReason.BlockBudgetExceeded);
+            }
 
-        return ManagedFlowAnalysis.Complete(result);
+            return ManagedFlowAnalysis.Complete(result);
+        }
+        finally
+        {
+            s_currentMethod = previousMethod;
+        }
     }
 
-    internal ManagedAbstractValue Evaluate(IOperation operation, ManagedFlowState state)
+    internal ManagedAbstractValue Evaluate(
+        IOperation operation,
+        ManagedFlowState state,
+        IMethodSymbol? currentMethod = null)
     {
-        return EvaluateCore(
-            ArgumentNullGuard.NotNull(operation, nameof(operation)),
-            ArgumentNullGuard.NotNull(state, nameof(state)));
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
+        state = ArgumentNullGuard.NotNull(state, nameof(state));
+        var previousMethod = s_currentMethod;
+        if (currentMethod is not null)
+        {
+            s_currentMethod = currentMethod;
+        }
+
+        try
+        {
+            return EvaluateCore(operation, state);
+        }
+        finally
+        {
+            s_currentMethod = previousMethod;
+        }
     }
 
     private DataflowGraph<ManagedFlowState> CreateDataflowGraph(
@@ -616,7 +647,10 @@ internal sealed class ManagedAbstractFlow
 
         return operation switch
         {
-            IParameterReferenceOperation parameter => state.Get(parameter.Parameter),
+            IParameterReferenceOperation parameter =>
+                IsReceiverBackedParameter(parameter.Parameter, parameter)
+                    ? TopForType(parameter.Type)
+                    : state.Get(parameter.Parameter),
             ILocalReferenceOperation local => state.Get(local.Local),
             IFlowCaptureReferenceOperation capture => state.Get(capture.Id),
             IDefaultValueOperation value => DefaultForType(value.Type),
@@ -816,53 +850,71 @@ internal sealed class ManagedAbstractFlow
             : joined;
     }
 
-    internal bool ProvesNoOverflow(IOperation operation, ManagedFlowState state)
+    internal bool ProvesNoOverflow(
+        IOperation operation,
+        ManagedFlowState state,
+        IMethodSymbol? currentMethod = null)
     {
-        operation = Unwrap(operation);
-        IntervalValue interval;
-        ITypeSymbol? type;
-        switch (operation)
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
+        state = ArgumentNullGuard.NotNull(state, nameof(state));
+        var previousMethod = s_currentMethod;
+        if (currentMethod is not null)
         {
-            case IBinaryOperation binary when binary.OperatorKind is
-                BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or BinaryOperatorKind.Multiply:
-                if (!EvaluateCore(binary.LeftOperand, state).TryGetInteger(out var left) ||
-                    !EvaluateCore(binary.RightOperand, state).TryGetInteger(out var right) ||
-                    !TryArithmetic(binary.OperatorKind, left, right, out interval))
-                {
-                    return false;
-                }
-
-                type = binary.Type;
-                break;
-            case IUnaryOperation { OperatorKind: UnaryOperatorKind.Minus } unary:
-                if (!EvaluateCore(unary.Operand, state).TryGetInteger(out var operand) ||
-                    !TryNegate(operand, out interval))
-                {
-                    return false;
-                }
-
-                type = unary.Type;
-                break;
-            case IIncrementOrDecrementOperation increment:
-                if (!TryIncrement(increment, state, out interval))
-                {
-                    return false;
-                }
-
-                type = increment.Type;
-                break;
-            case IConversionOperation conversion:
-                if (!EvaluateCore(conversion.Operand, state).TryGetInteger(out interval))
-                {
-                    return false;
-                }
-
-                type = conversion.Type;
-                break;
-            default:
-                return false;
+            s_currentMethod = currentMethod;
         }
-        return FitsType(interval, type);
+
+        try
+        {
+            operation = Unwrap(operation);
+            IntervalValue interval;
+            ITypeSymbol? type;
+            switch (operation)
+            {
+                case IBinaryOperation binary when binary.OperatorKind is
+                    BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or BinaryOperatorKind.Multiply:
+                    if (!EvaluateCore(binary.LeftOperand, state).TryGetInteger(out var left) ||
+                        !EvaluateCore(binary.RightOperand, state).TryGetInteger(out var right) ||
+                        !TryArithmetic(binary.OperatorKind, left, right, out interval))
+                    {
+                        return false;
+                    }
+
+                    type = binary.Type;
+                    break;
+                case IUnaryOperation { OperatorKind: UnaryOperatorKind.Minus } unary:
+                    if (!EvaluateCore(unary.Operand, state).TryGetInteger(out var operand) ||
+                        !TryNegate(operand, out interval))
+                    {
+                        return false;
+                    }
+
+                    type = unary.Type;
+                    break;
+                case IIncrementOrDecrementOperation increment:
+                    if (!TryIncrement(increment, state, out interval))
+                    {
+                        return false;
+                    }
+
+                    type = increment.Type;
+                    break;
+                case IConversionOperation conversion:
+                    if (!EvaluateCore(conversion.Operand, state).TryGetInteger(out interval))
+                    {
+                        return false;
+                    }
+
+                    type = conversion.Type;
+                    break;
+                default:
+                    return false;
+            }
+            return FitsType(interval, type);
+        }
+        finally
+        {
+            s_currentMethod = previousMethod;
+        }
     }
 
     private ManagedAbstractValue ApplyAttributes(
@@ -1005,6 +1057,15 @@ internal sealed class ManagedAbstractFlow
     private static bool TryStorage(IOperation operation, out object storage)
     {
         operation = Unwrap(operation);
+        if (operation is IParameterReferenceOperation receiverBackedParameter &&
+            IsReceiverBackedParameter(
+                receiverBackedParameter.Parameter,
+                receiverBackedParameter))
+        {
+            storage = null!;
+            return false;
+        }
+
         storage = operation switch
         {
             IParameterReferenceOperation parameter => parameter.Parameter,
@@ -1013,6 +1074,15 @@ internal sealed class ManagedAbstractFlow
             _ => null!
         };
         return operation is IParameterReferenceOperation or ILocalReferenceOperation or IFlowCaptureReferenceOperation;
+    }
+
+    private static bool IsReceiverBackedParameter(
+        IParameterSymbol parameter,
+        IOperation operation)
+    {
+        return s_currentMethod is { } currentMethod
+            ? PrimaryConstructorParameterOwnership.IsReceiverBacked(parameter, currentMethod)
+            : PrimaryConstructorParameterOwnership.IsReceiverBacked(parameter, operation);
     }
 
     private static IOperation Unwrap(IOperation operation)
@@ -1384,7 +1454,7 @@ internal sealed class ManagedFlowAnalysis
     }
 }
 
-internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
+internal sealed class ManagedFlowResult(ManagedAbstractFlow flow, IMethodSymbol? method = null)
 {
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
     private readonly Dictionary<object, ManagedFlowState> _states = new(ManagedKeyComparer.Instance);
@@ -1493,7 +1563,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
             (TryGetState(value, out var state) ||
              TryGetState(origin, out state)))
         {
-            result = flow.Evaluate(value, state);
+            result = flow.Evaluate(value, state, method);
             return true;
         }
 
@@ -1509,7 +1579,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         if (!HasMutation(value) &&
             TryGetState(origin, out var state))
         {
-            result = flow.Evaluate(value, state);
+            result = flow.Evaluate(value, state, method);
             return true;
         }
         result = Unknown;
@@ -1570,7 +1640,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesNoOverflow(IOperation operation)
     {
         return !HasMutation(operation)
-            ? TryGetState(operation, out var state) && flow.ProvesNoOverflow(operation, state)
+            ? TryGetState(operation, out var state) && flow.ProvesNoOverflow(operation, state, method)
             : false;
     }
 

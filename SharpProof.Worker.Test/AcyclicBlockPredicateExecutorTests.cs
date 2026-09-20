@@ -37,6 +37,144 @@ public sealed class AcyclicBlockPredicateExecutorTests
     }
 
     [Test]
+    public void OverDeepJoinFailsInsteadOfDroppingReachableSuccessor()
+    {
+        const int maximumExpressionDepth = 5;
+        var factory = new IrFactory();
+        var firstCondition = factory.CreateVariable("first", factory.BooleanType);
+        var secondCondition = factory.CreateVariable("second", factory.BooleanType);
+        var thirdCondition = factory.CreateVariable("third", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var earlyReturn = builder.CreateBlock("early-return");
+        var outerBranch = builder.CreateBlock("outer-branch");
+        var innerBranch = builder.CreateBlock("inner-branch");
+        var join = builder.CreateBlock("join");
+
+        builder.Branch(
+            entry,
+            factory.CreateOperation(),
+            factory.Variable(firstCondition),
+            earlyReturn,
+            outerBranch);
+        builder.Return(earlyReturn, factory.CreateOperation(), factory.Integer(0));
+        builder.Branch(
+            outerBranch,
+            factory.CreateOperation(),
+            factory.Variable(secondCondition),
+            innerBranch,
+            join);
+        builder.Branch(
+            innerBranch,
+            factory.CreateOperation(),
+            factory.Variable(thirdCondition),
+            join,
+            join);
+        builder.Return(join, factory.CreateOperation(), factory.Integer(-1));
+
+        var program = builder.Build();
+        var environment = new[] { firstCondition, secondCondition, thirdCondition }
+            .ToImmutableDictionary(
+                static variable => variable,
+                variable => (IrTerm)factory.Variable(variable));
+        var execution = new AcyclicBlockPredicateExecutor(maximumExpressionDepth).Execute(
+            [],
+            factory,
+            program,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
+            environment,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.False);
+            Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(execution.Returns, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void OverDeepMergedPhiFailsInsteadOfDroppingReachableSuccessor()
+    {
+        const int maximumExpressionDepth = 6;
+        var factory = new IrFactory();
+        var firstCondition = factory.CreateVariable("first", factory.BooleanType);
+        var secondCondition = factory.CreateVariable("second", factory.BooleanType);
+        var thirdCondition = factory.CreateVariable("third", factory.BooleanType);
+        var fourthCondition = factory.CreateVariable("fourth", factory.BooleanType);
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var earlyReturn = builder.CreateBlock("early-return");
+        var dispatch = builder.CreateBlock("dispatch");
+        var left = builder.CreateBlock("left");
+        var right = builder.CreateBlock("right");
+        var firstPath = builder.CreateBlock("first-path");
+        var secondPath = builder.CreateBlock("second-path");
+        var thirdPath = builder.CreateBlock("third-path");
+        var fourthPath = builder.CreateBlock("fourth-path");
+        var join = builder.CreateBlock("join");
+
+        builder.Branch(
+            entry,
+            factory.CreateOperation(),
+            factory.Variable(firstCondition),
+            earlyReturn,
+            dispatch);
+        builder.Return(earlyReturn, factory.CreateOperation(), factory.Integer(0));
+        builder.Branch(
+            dispatch,
+            factory.CreateOperation(),
+            factory.Variable(secondCondition),
+            left,
+            right);
+        builder.Branch(
+            left,
+            factory.CreateOperation(),
+            factory.Variable(thirdCondition),
+            firstPath,
+            secondPath);
+        builder.Branch(
+            right,
+            factory.CreateOperation(),
+            factory.Variable(fourthCondition),
+            thirdPath,
+            fourthPath);
+        builder.Assign(firstPath, factory.CreateOperation(), value, factory.Integer(1));
+        builder.Goto(firstPath, factory.CreateOperation(), join);
+        builder.Assign(secondPath, factory.CreateOperation(), value, factory.Integer(2));
+        builder.Goto(secondPath, factory.CreateOperation(), join);
+        builder.Assign(thirdPath, factory.CreateOperation(), value, factory.Integer(3));
+        builder.Goto(thirdPath, factory.CreateOperation(), join);
+        builder.Assign(fourthPath, factory.CreateOperation(), value, factory.Integer(4));
+        builder.Goto(fourthPath, factory.CreateOperation(), join);
+        builder.Return(join, factory.CreateOperation(), factory.Variable(value));
+
+        var program = builder.Build();
+        var environment = new[]
+                { firstCondition, secondCondition, thirdCondition, fourthCondition }
+            .ToImmutableDictionary(
+                static variable => variable,
+                variable => (IrTerm)factory.Variable(variable));
+        var execution = new AcyclicBlockPredicateExecutor(maximumExpressionDepth).Execute(
+            [],
+            factory,
+            program,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
+            environment,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.False);
+            Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(execution.Returns, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task SequentialDiamondsRepresentMoreThanSixtyFourPathsWithoutEnumeration()
     {
         const int diamondCount = 7;

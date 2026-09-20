@@ -298,6 +298,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 inputs.Factory, values.Select(static value => value.Predicate).ToArray());
             if (!Supported(predicate))
             {
+                _reason = WorkerClaimReason.UnsupportedBody;
                 return null;
             }
 
@@ -340,6 +341,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 }
                 if (!Supported(merged))
                 {
+                    _reason = WorkerClaimReason.UnsupportedBody;
                     return null;
                 }
 

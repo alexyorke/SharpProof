@@ -164,30 +164,38 @@ internal static class StringConcatenationEffectResolver
         {
             return EffectSummary.Empty;
         }
-        if (formatted.Target == null)
+        if (formatted.Targets.IsDefaultOrEmpty)
         {
             return EffectSummaryOperations.Unsupported();
         }
 
-        var argumentRegions = Enumerable.Repeat(
-                EffectRegionSet.Empty,
-                formatted.Target.Parameters.Length)
-            .ToImmutableArray();
-        var actualArguments = Enumerable.Repeat<IOperation?>(
-                null,
-                formatted.Target.Parameters.Length)
-            .ToImmutableArray();
-        return calls.Resolve(
-            formatted.Target,
-            classifyRegion(formatted.Operand, false),
-            argumentRegions,
-            actualArguments,
-            IsDispatchUncertain(
-                formatted.Target,
-                formatted.ReceiverType,
-                formatted.IsInterpolation),
-            origin,
-            formatted.Operand);
+        var result = EffectSummary.Empty;
+        foreach (var target in formatted.Targets)
+        {
+            var argumentRegions = Enumerable.Repeat(
+                    EffectRegionSet.Empty,
+                    target.Parameters.Length)
+                .ToImmutableArray();
+            var actualArguments = Enumerable.Repeat<IOperation?>(
+                    null,
+                    target.Parameters.Length)
+                .ToImmutableArray();
+            result = EffectSummaryOperations.Join(
+                result,
+                calls.Resolve(
+                    target,
+                    classifyRegion(formatted.Operand, false),
+                    argumentRegions,
+                    actualArguments,
+                    IsDispatchUncertain(
+                        target,
+                        formatted.ReceiverType,
+                        formatted.IsInterpolation),
+                    origin,
+                    formatted.Operand));
+        }
+
+        return result;
     }
 
     internal static bool CanFormattedValueCompleteNormally(
@@ -214,15 +222,17 @@ internal static class StringConcatenationEffectResolver
         OperationCompletionEvaluator completionEvaluator)
     {
         return !formatted.IsRequired ||
-            formatted.Target == null ||
-            IsDispatchUncertain(
-                formatted.Target,
-                formatted.ReceiverType,
-                formatted.IsInterpolation) ||
-            completionEvaluator.CanCompleteInvocation(
-                formatted.Target,
-                formatted.Operand,
-                origin);
+            formatted.Targets.IsDefaultOrEmpty ||
+            formatted.Targets.Any(target =>
+                IsDispatchUncertain(
+                    target,
+                    formatted.ReceiverType,
+                    formatted.IsInterpolation)) ||
+            formatted.Targets.All(target =>
+                completionEvaluator.CanCompleteInvocation(
+                    target,
+                    formatted.Operand,
+                    origin));
     }
 
     internal static bool TryResolveFormattedValueMethod(
@@ -238,11 +248,14 @@ internal static class StringConcatenationEffectResolver
             origin,
             compilation,
             flow);
-        target = formatted.Target;
-        dispatchUncertain = target != null && IsDispatchUncertain(
-            target,
-            formatted.ReceiverType,
-            formatted.IsInterpolation);
+        target = formatted.Targets.IsDefaultOrEmpty
+            ? null
+            : formatted.Targets[0];
+        dispatchUncertain = formatted.Targets.Length > 1 ||
+            target != null && IsDispatchUncertain(
+                target,
+                formatted.ReceiverType,
+                formatted.IsInterpolation);
         return formatted.IsRequired;
     }
 
@@ -260,7 +273,7 @@ internal static class StringConcatenationEffectResolver
         {
             return new(
                 operand,
-                Target: null,
+                Targets: [],
                 ReceiverType: null,
                 IsRequired: false,
                 IsInterpolation: false);
@@ -268,16 +281,13 @@ internal static class StringConcatenationEffectResolver
 
         var receiverType = UnwrapNullable(operand.Type);
         var isInterpolation = origin is IInterpolationOperation;
-        var target = isInterpolation &&
-            TryResolveIFormattableToString(
-                receiverType,
-                compilation,
-                out var formattingMethod)
-                ? formattingMethod
-                : ResolveToString(receiverType, compilation);
+        var targets = ResolveFormattingMethods(
+            receiverType,
+            compilation,
+            isInterpolation);
         return new(
             operand,
-            target,
+            targets,
             receiverType,
             IsRequired: true,
             IsInterpolation: isInterpolation);
@@ -393,7 +403,7 @@ internal static class StringConcatenationEffectResolver
             .SingleOrDefault(method =>
                 IsIFormattableToString(method, formatProvider));
         if (interfaceMethod == null ||
-            !ImplementsIFormattable(receiverType, formattable))
+            !ImplementsInterface(receiverType, formattable))
         {
             return false;
         }
@@ -408,9 +418,109 @@ internal static class StringConcatenationEffectResolver
         return true;
     }
 
-    private static bool ImplementsIFormattable(
+    private static ImmutableArray<IMethodSymbol> ResolveFormattingMethods(
+        ITypeSymbol? receiverType,
+        Compilation compilation,
+        bool isInterpolation)
+    {
+        if (!isInterpolation)
+        {
+            var toStringTarget = ResolveToString(receiverType, compilation);
+            return toStringTarget == null ? [] : [toStringTarget];
+        }
+
+        if (TryResolveISpanFormattableTryFormat(
+                receiverType,
+                compilation,
+                out var spanFormattingMethod))
+        {
+            // The handler path calls TryFormat on modern target frameworks,
+            // while older string-formatting paths call IFormattable.ToString.
+            // Keep both exact targets in the effect model. If either
+            // interface member cannot be resolved, fail closed instead of
+            // certifying a formatter that may not be the runtime target.
+            if (spanFormattingMethod == null ||
+                !TryResolveIFormattableToString(
+                    receiverType,
+                    compilation,
+                    out var formattableMethod) ||
+                formattableMethod == null)
+            {
+                return [];
+            }
+
+            return SymbolEqualityComparer.Default.Equals(
+                    spanFormattingMethod,
+                    formattableMethod)
+                ? [spanFormattingMethod]
+                : [spanFormattingMethod, formattableMethod];
+        }
+
+        if (TryResolveIFormattableToString(
+                receiverType,
+                compilation,
+                out var formattingMethod))
+        {
+            return formattingMethod == null ? [] : [formattingMethod];
+        }
+
+        var fallbackTarget = ResolveToString(receiverType, compilation);
+        return fallbackTarget == null ? [] : [fallbackTarget];
+    }
+
+    private static bool TryResolveISpanFormattableTryFormat(
+        ITypeSymbol? receiverType,
+        Compilation compilation,
+        out IMethodSymbol? target)
+    {
+        target = null;
+        if (receiverType == null)
+        {
+            return false;
+        }
+
+        var spanFormattable = compilation.GetTypeByMetadataName(
+            "System.ISpanFormattable");
+        var span = compilation.GetTypeByMetadataName("System.Span`1");
+        var readOnlySpan = compilation.GetTypeByMetadataName(
+            "System.ReadOnlySpan`1");
+        var formatProvider = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.IFormatProvider);
+        if (spanFormattable == null ||
+            span == null ||
+            readOnlySpan == null ||
+            formatProvider == null)
+        {
+            return false;
+        }
+
+        var interfaceMethod = spanFormattable.GetMembers("TryFormat")
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault(method =>
+                IsISpanFormattableTryFormat(
+                    method,
+                    span,
+                    readOnlySpan,
+                    formatProvider));
+        if (interfaceMethod == null ||
+            !ImplementsInterface(receiverType, spanFormattable))
+        {
+            return false;
+        }
+
+        target = receiverType is INamedTypeSymbol
+        {
+            TypeKind: not TypeKind.Interface
+        } named
+            ? named.FindImplementationForInterfaceMember(
+                interfaceMethod) as IMethodSymbol
+            : interfaceMethod;
+        return true;
+    }
+
+    private static bool ImplementsInterface(
         ITypeSymbol receiverType,
-        INamedTypeSymbol formattable,
+        INamedTypeSymbol interfaceType,
         HashSet<ITypeSymbol>? visited = null)
     {
         visited ??= new HashSet<ITypeSymbol>(
@@ -424,19 +534,52 @@ internal static class StringConcatenationEffectResolver
         {
             return SymbolEqualityComparer.Default.Equals(
                     named.OriginalDefinition,
-                    formattable) ||
+                    interfaceType) ||
                 named.AllInterfaces.Any(@interface =>
                     SymbolEqualityComparer.Default.Equals(
                         @interface.OriginalDefinition,
-                        formattable));
+                        interfaceType));
         }
 
         return receiverType is ITypeParameterSymbol typeParameter &&
             typeParameter.ConstraintTypes.Any(constraint =>
-                ImplementsIFormattable(
+                ImplementsInterface(
                     constraint,
-                    formattable,
+                    interfaceType,
                     visited));
+    }
+
+    private static bool IsISpanFormattableTryFormat(
+        IMethodSymbol method,
+        INamedTypeSymbol span,
+        INamedTypeSymbol readOnlySpan,
+        INamedTypeSymbol formatProvider)
+    {
+        return method.MethodKind == MethodKind.Ordinary &&
+            !method.IsStatic &&
+            method.Arity == 0 &&
+            method.Parameters.Length == 4 &&
+            IsCharacterSpan(method.Parameters[0].Type, span) &&
+            method.Parameters[1].RefKind == RefKind.Out &&
+            method.Parameters[1].Type.SpecialType ==
+                SpecialType.System_Int32 &&
+            IsCharacterSpan(method.Parameters[2].Type, readOnlySpan) &&
+            SymbolEqualityComparer.Default.Equals(
+                method.Parameters[3].Type,
+                formatProvider) &&
+            method.ReturnType.SpecialType == SpecialType.System_Boolean;
+    }
+
+    private static bool IsCharacterSpan(
+        ITypeSymbol type,
+        INamedTypeSymbol span)
+    {
+        return type is INamedTypeSymbol named &&
+            SymbolEqualityComparer.Default.Equals(
+                named.OriginalDefinition,
+                span) &&
+            named.TypeArguments.Length == 1 &&
+            named.TypeArguments[0].SpecialType == SpecialType.System_Char;
     }
 
     private static bool IsIFormattableToString(
@@ -475,7 +618,7 @@ internal static class StringConcatenationEffectResolver
 
     private readonly record struct FormattedValueCall(
         IOperation Operand,
-        IMethodSymbol? Target,
+        ImmutableArray<IMethodSymbol> Targets,
         ITypeSymbol? ReceiverType,
         bool IsRequired,
         bool IsInterpolation);

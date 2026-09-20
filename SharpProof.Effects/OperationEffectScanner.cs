@@ -640,6 +640,14 @@ internal sealed partial class OperationEffectScanner
         var result = _abstractFlow?.ProvesNonZero(origin, right) == true
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.DivideByZeroException);
+        if (IsDecimalType(type))
+        {
+            return operatorKind == BinaryOperatorKind.Divide
+                ? EffectSummaryOperations.Join(
+                    result,
+                    Throw(FrameworkTypeMetadataNames.OverflowException))
+                : result;
+        }
         if (isSigned)
         {
             var overflowProvenAbsent = hasMinimum &&
@@ -829,7 +837,8 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary ScanObjectCreation(IObjectCreationOperation creation)
     {
-        if (creation.IsImplicit)
+        if (creation.IsImplicit &&
+            !IsInterpolatedStringHandlerCreation(creation))
         {
             return EffectSummary.Empty;
         }
@@ -846,6 +855,29 @@ internal sealed partial class OperationEffectScanner
                 suppressExternalConstruction,
                 out _)
             .Summary;
+    }
+
+    private static bool IsInterpolatedStringHandlerCreation(
+        IObjectCreationOperation creation)
+    {
+        // The CFG may detach the handler creation from its
+        // IInterpolatedStringHandlerCreationOperation parent, so identify it
+        // from the handler type's marker attribute.
+        return creation.Type is INamedTypeSymbol type &&
+            type.GetAttributes().Any(static attribute =>
+                attribute.AttributeClass is
+                {
+                    MetadataName: "InterpolatedStringHandlerAttribute",
+                    ContainingNamespace:
+                    {
+                        Name: "CompilerServices",
+                        ContainingNamespace:
+                        {
+                            Name: "Runtime",
+                            ContainingNamespace.Name: "System"
+                        }
+                    }
+                });
     }
 
     private EffectStep ScanObjectConstruction(
@@ -1688,7 +1720,14 @@ internal sealed partial class OperationEffectScanner
         hasMinimum = false;
         minimum = 0;
         return specialType is
-            SpecialType.System_UInt64 or SpecialType.System_IntPtr or SpecialType.System_UIntPtr;
+            SpecialType.System_UInt64 or SpecialType.System_IntPtr or
+            SpecialType.System_UIntPtr or SpecialType.System_Decimal;
+    }
+
+    private static bool IsDecimalType(ITypeSymbol? type)
+    {
+        return (CompilerIdentityBridge.GetNullableUnderlyingType(type) ?? type)
+            ?.SpecialType == SpecialType.System_Decimal;
     }
 
     private enum EffectAccess

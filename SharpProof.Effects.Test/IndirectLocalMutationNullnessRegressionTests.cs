@@ -89,6 +89,98 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
         }
     }
 
+    [Test]
+    public void LoopBackEdgeDoesNotPreserveStaleNullFact()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+            }
+
+            public static class Sample {
+                public static void Run() {
+                    string? value = null;
+                    for (var index = 0; index < 2; index++) {
+                        if (index == 1) {
+                            _ = value.Length;
+                            Global.State++;
+                        }
+                        value = "ready";
+                    }
+                }
+            }
+            """);
+
+        var result = EffectTestHost.AnalyzeSample(compilation, "Run");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
+    public void BackwardGotoDoesNotPreserveStaleNullFact()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+            }
+
+            public static class Sample {
+                public static void Run() {
+                    string? value = null;
+                    var index = 0;
+                Again:
+                    if (index == 1) {
+                        _ = value!.Length;
+                        Global.State++;
+                    }
+                    value = "ready";
+                    index++;
+                    if (index < 2) {
+                        goto Again;
+                    }
+                }
+            }
+            """);
+
+        var result = EffectTestHost.AnalyzeSample(compilation, "Run");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
+    public void DeconstructionAssignmentDoesNotPreserveStaleNullFact()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+            }
+
+            public static class Sample {
+                public static void Run() => Helper();
+
+                private static void Helper() {
+                    string? value = null;
+                    (value, var number) = ("ready", 1);
+                    _ = value.Length;
+                    Global.State++;
+                }
+            }
+            """);
+
+        var result = EffectTestHost.AnalyzeSample(compilation, "Run");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
     private static CSharpCompilation CreateReceiverEffectsCompilation()
     {
         return EffectTestHost.CreateCompilation(

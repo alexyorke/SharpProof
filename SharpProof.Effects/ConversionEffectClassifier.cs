@@ -144,11 +144,128 @@ internal sealed class ConversionEffectClassifier(
         IOperation operation,
         bool skipsLiftedOperator)
     {
-        return isChecked &&
+        var isSafeDecimalConversion = operation is IConversionOperation conversion &&
+            (IsDecimalType(conversion.Operand.Type) ||
+             IsDecimalType(conversion.Type)) &&
+            !DecimalConversionMayOverflow(conversion);
+        return ((isChecked && !isSafeDecimalConversion &&
+                 !IsKnownNonOverflowingDecimalOperation(operation)) ||
+                IsAlwaysCheckedDecimal(operation)) &&
                !skipsLiftedOperator &&
                abstractFlow?.ProvesNoOverflow(operation) != true
             ? Throw(FrameworkTypeMetadataNames.OverflowException)
             : EffectSummary.Empty;
+    }
+
+    private static bool IsKnownNonOverflowingDecimalOperation(
+        IOperation operation)
+    {
+        return operation switch
+        {
+            IBinaryOperation binary when binary.OperatorMethod == null &&
+                binary.OperatorKind == BinaryOperatorKind.Remainder =>
+                IsDecimalOperation(binary),
+            ICompoundAssignmentOperation assignment when
+                assignment.OperatorMethod == null &&
+                assignment.OperatorKind == BinaryOperatorKind.Remainder =>
+                IsDecimalOperation(assignment),
+            IUnaryOperation unary when unary.OperatorMethod == null &&
+                unary.OperatorKind == UnaryOperatorKind.Plus =>
+                IsDecimalOperation(unary),
+            _ => false
+        };
+    }
+
+    private static bool IsAlwaysCheckedDecimal(IOperation operation)
+    {
+        return operation switch
+        {
+            IConversionOperation conversion =>
+                DecimalConversionMayOverflow(conversion),
+            IBinaryOperation binary when binary.OperatorMethod == null &&
+                binary.OperatorKind is
+                    BinaryOperatorKind.Add or
+                    BinaryOperatorKind.Subtract or
+                    BinaryOperatorKind.Multiply or
+                    BinaryOperatorKind.Divide =>
+                IsDecimalOperation(binary),
+            ICompoundAssignmentOperation assignment when
+                assignment.OperatorMethod == null &&
+                assignment.OperatorKind is
+                    BinaryOperatorKind.Add or
+                    BinaryOperatorKind.Subtract or
+                    BinaryOperatorKind.Multiply or
+                    BinaryOperatorKind.Divide =>
+                IsDecimalOperation(assignment),
+            IUnaryOperation unary when unary.OperatorMethod == null &&
+                unary.OperatorKind == UnaryOperatorKind.Minus =>
+                IsDecimalOperation(unary),
+            IIncrementOrDecrementOperation increment when
+                increment.OperatorMethod == null =>
+                IsDecimalOperation(increment),
+            _ => false
+        };
+    }
+
+    private static bool DecimalConversionMayOverflow(
+        IConversionOperation operation)
+    {
+        if (operation.OperatorMethod != null)
+        {
+            return false;
+        }
+
+        var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+            .GetConversion(operation);
+        if (!conversion.IsNumeric && !conversion.IsEnumeration &&
+            !conversion.IsNullable)
+        {
+            return false;
+        }
+
+        var source = NullableUnderlyingOrSelf(operation.Operand.Type);
+        var target = NullableUnderlyingOrSelf(operation.Type);
+        if (source?.SpecialType == SpecialType.System_Decimal)
+        {
+            return target?.SpecialType is not (
+                SpecialType.System_Decimal or
+                SpecialType.System_Single or
+                SpecialType.System_Double);
+        }
+
+        return target?.SpecialType == SpecialType.System_Decimal &&
+            source?.SpecialType is
+                SpecialType.System_Single or
+                SpecialType.System_Double;
+    }
+
+    private static bool IsDecimalOperation(IOperation operation)
+    {
+        return IsDecimalType(operation.Type) ||
+            operation switch
+            {
+                IBinaryOperation binary =>
+                    IsDecimalType(binary.LeftOperand.Type) ||
+                    IsDecimalType(binary.RightOperand.Type),
+                ICompoundAssignmentOperation assignment =>
+                    IsDecimalType(assignment.Target.Type) ||
+                    IsDecimalType(assignment.Value.Type),
+                IUnaryOperation unary => IsDecimalType(unary.Operand.Type),
+                IIncrementOrDecrementOperation increment =>
+                    IsDecimalType(increment.Target.Type),
+                _ => false
+            };
+    }
+
+    private static bool IsDecimalType(ITypeSymbol? type)
+    {
+        return NullableUnderlyingOrSelf(type)?.SpecialType ==
+            SpecialType.System_Decimal;
+    }
+
+    private static ITypeSymbol? NullableUnderlyingOrSelf(ITypeSymbol? type)
+    {
+        return CompilerIdentityBridge.GetNullableUnderlyingType(type) ?? type;
     }
 
     internal bool SkipsLiftedOperator(IOperation operation)

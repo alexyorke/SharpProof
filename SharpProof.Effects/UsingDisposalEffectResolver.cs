@@ -107,12 +107,29 @@ internal sealed class UsingDisposalEffectResolver
                 Parameters.IsEmpty: true,
                 ReturnsVoid: true
             } &&
-            invocation.Syntax.AncestorsAndSelf().Any(static syntax =>
-                syntax is UsingStatementSyntax ||
-                syntax is LocalDeclarationStatementSyntax
+            IsUsingCleanupSyntax(invocation.Syntax);
+    }
+
+    private static bool IsUsingCleanupSyntax(SyntaxNode syntax)
+    {
+        foreach (var ancestor in syntax.AncestorsAndSelf())
+        {
+            switch (ancestor)
+            {
+                case ForEachStatementSyntax:
+                case ForEachVariableStatementSyntax:
+                    return false;
+                case UsingStatementSyntax:
+                    return true;
+                case LocalDeclarationStatementSyntax
                 {
                     UsingKeyword.RawKind: not 0
-                });
+                }:
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private EffectSummary ResolveResources(

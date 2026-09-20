@@ -48,11 +48,18 @@ internal static class SwitchExpressionFacts
         IListPatternOperation pattern,
         IPatternOperation item)
     {
-        return item is ISlicePatternOperation slice
-            ? slice.Pattern == null
-                ? null
-                : GetCallableListPatternMember(slice.SliceSymbol)
-            : GetCallableListPatternMember(pattern.IndexerSymbol);
+        if (item is not ISlicePatternOperation slice)
+        {
+            return GetCallableListPatternMember(pattern.IndexerSymbol);
+        }
+
+        if (slice.Pattern == null)
+        {
+            return null;
+        }
+
+        return GetCallableListPatternMember(slice.SliceSymbol) ??
+            GetCompilerGeneratedArraySliceMember(pattern);
     }
 
     internal static (int RequiredLength, bool HasSlice) GetListPatternShape(
@@ -81,8 +88,26 @@ internal static class SwitchExpressionFacts
             return false;
         }
 
-        return pattern.InputType is IArrayTypeSymbol ||
+        return pattern.InputType is IArrayTypeSymbol &&
+            !SymbolEqualityComparer.Default.Equals(
+                method.OriginalDefinition,
+                GetCompilerGeneratedArraySliceMember(pattern)?.OriginalDefinition) ||
             IsCompilerIntrinsicRefLikeMember(compilation, method);
+    }
+
+    private static IMethodSymbol? GetCompilerGeneratedArraySliceMember(
+        IListPatternOperation pattern)
+    {
+        // Roslyn does not expose the compiler's RuntimeHelpers.GetSubArray
+        // call for array slices. Reuse Array.Clone as a metadata-only marker
+        // so the existing implicit-call path records an unknown boundary for
+        // the hidden allocation. A discard slice has no nested pattern and
+        // never reaches this helper.
+        return pattern.InputType?.BaseType is INamedTypeSymbol arrayType
+            ? arrayType.GetMembers("Clone")
+                .OfType<IMethodSymbol>()
+                .SingleOrDefault(static method => method.Parameters.IsEmpty)
+            : null;
     }
 
     internal static bool IsCompilerIntrinsicRefLikeMember(

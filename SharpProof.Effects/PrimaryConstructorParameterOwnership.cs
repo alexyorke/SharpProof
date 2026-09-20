@@ -6,6 +6,15 @@ internal static class PrimaryConstructorParameterOwnership
 {
     internal static bool IsReceiverBacked(
         IParameterSymbol parameter,
+        IOperation operation)
+    {
+        return operation.SemanticModel?.GetEnclosingSymbol(
+            operation.Syntax.SpanStart) is IMethodSymbol currentMethod &&
+            IsReceiverBacked(parameter, currentMethod);
+    }
+
+    internal static bool IsReceiverBacked(
+        IParameterSymbol parameter,
         IMethodSymbol currentMethod)
     {
         if (currentMethod.IsStatic ||

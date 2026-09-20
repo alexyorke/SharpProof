@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Effects;
 
 internal sealed class OperationNullnessEvaluator
@@ -30,9 +32,12 @@ internal sealed class OperationNullnessEvaluator
 
     internal bool IsProvenNull(IOperation? value, IOperation origin)
     {
+        var hasDeconstructionAssignment = value != null &&
+            HasDeconstructionAssignmentBefore(value, origin);
         return value != null &&
             (value.ConstantValue is { HasValue: true, Value: null } ||
-             _abstractFlow?.ProvesNull(origin, value) == true ||
+             (!hasDeconstructionAssignment &&
+              _abstractFlow?.ProvesNull(origin, value) == true) ||
              IsSourceDefinitelyNull(value, origin));
     }
 
@@ -45,10 +50,14 @@ internal sealed class OperationNullnessEvaluator
         }
 
         var isNull = value.ConstantValue is { HasValue: true, Value: null };
+        var hasDeconstructionAssignment =
+            HasDeconstructionAssignmentBefore(value, origin);
         if (_abstractFlow?.TryEvaluate(origin, value, out var result) == true)
         {
-            isNonNull |= result.IsDefinitelyNonNull;
-            isNull |= result.IsDefinitelyNull;
+            isNonNull |= !hasDeconstructionAssignment &&
+                result.IsDefinitelyNonNull;
+            isNull |= !hasDeconstructionAssignment &&
+                result.IsDefinitelyNull;
         }
 
         if (!isNull)
@@ -120,8 +129,12 @@ internal sealed class OperationNullnessEvaluator
         if (value != null &&
             _abstractFlow?.TryEvaluate(origin, value, out var result) == true)
         {
-            var isNull = result.IsDefinitelyNull;
-            var isNonNull = result.IsDefinitelyNonNull;
+            var hasDeconstructionAssignment =
+                HasDeconstructionAssignmentBefore(value, origin);
+            var isNull = result.IsDefinitelyNull &&
+                !hasDeconstructionAssignment;
+            var isNonNull = result.IsDefinitelyNonNull &&
+                !hasDeconstructionAssignment;
             if (preferNull ? isNull : isNonNull)
             {
                 state = preferNull ? NullState.Null : NullState.NonNull;
@@ -186,6 +199,16 @@ internal sealed class OperationNullnessEvaluator
             return false;
         }
 
+        // The source-order fallback has no way to account for an assignment
+        // that reaches the origin through a loop or a backward goto. Let the
+        // caller's conservative nullness path handle these control-flow
+        // shapes instead of treating the declaration's initializer as still
+        // current.
+        if (CanReachOriginThroughBackEdge(origin))
+        {
+            return false;
+        }
+
         var aliases = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)
         {
             local.Local
@@ -224,6 +247,14 @@ internal sealed class OperationNullnessEvaluator
                 return false;
             }
 
+            if (operation is IDeconstructionAssignmentOperation deconstruction &&
+                deconstruction.Target.DescendantsAndSelf()
+                    .OfType<ILocalReferenceOperation>()
+                    .Any(reference => IsAlias(reference.Local)))
+            {
+                return false;
+            }
+
             if (operation is IArgumentOperation
                 {
                     Parameter.RefKind: not RefKind.None
@@ -247,10 +278,94 @@ internal sealed class OperationNullnessEvaluator
         return true;
     }
 
+    private bool HasDeconstructionAssignmentBefore(
+        IOperation value,
+        IOperation origin)
+    {
+        if (value is not ILocalReferenceOperation local ||
+            local.Local.DeclaringSyntaxReferences.Length != 1)
+        {
+            return false;
+        }
+
+        var declaration = local.Local.DeclaringSyntaxReferences[0]
+            .GetSyntax();
+        if (declaration.SyntaxTree != origin.Syntax.SyntaxTree ||
+            declaration.SpanStart >= origin.Syntax.SpanStart)
+        {
+            return false;
+        }
+
+        var aliases = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)
+        {
+            local.Local
+        };
+        foreach (var operation in _root.DescendantsAndSelf()
+                     .Where(candidate =>
+                         candidate.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&
+                         candidate.Syntax.SpanStart >= declaration.Span.End &&
+                         candidate.Syntax.SpanStart < origin.Syntax.SpanStart)
+                     .OrderBy(static candidate => candidate.Syntax.SpanStart)
+                     .ThenByDescending(static candidate => candidate.Syntax.Span.Length))
+        {
+            if (operation is IVariableDeclaratorOperation
+                {
+                    Symbol.RefKind: RefKind.Ref,
+                    Initializer.Value: { } aliasInitializer
+                } aliasDeclarator &&
+                DefiniteOperationFacts.UnwrapHarmlessValue(aliasInitializer)
+                    is ILocalReferenceOperation aliasedLocal &&
+                aliases.Contains(aliasedLocal.Local))
+            {
+                aliases.Add(aliasDeclarator.Symbol);
+                continue;
+            }
+
+            if (operation is IDeconstructionAssignmentOperation deconstruction &&
+                deconstruction.Target.DescendantsAndSelf()
+                    .OfType<ILocalReferenceOperation>()
+                    .Any(reference => aliases.Contains(reference.Local)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool CanReachOriginThroughBackEdge(IOperation origin)
+    {
+        if (_root.Syntax.SyntaxTree != origin.Syntax.SyntaxTree)
+        {
+            return false;
+        }
+
+        var originSpan = origin.Syntax.Span;
+        if (_root.DescendantsAndSelf()
+                .OfType<ILoopOperation>()
+                .Any(loop =>
+                    loop.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&
+                    loop.Syntax.Span.Contains(originSpan)))
+        {
+            return true;
+        }
+
+        return _root.DescendantsAndSelf()
+            .OfType<IBranchOperation>()
+            .Where(branch => branch.Syntax is GotoStatementSyntax)
+            .Any(branch =>
+                branch.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&
+                branch.Syntax.SpanStart > originSpan.Start &&
+                branch.Target.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == origin.Syntax.SyntaxTree &&
+                    reference.GetSyntax().SpanStart < originSpan.Start));
+    }
+
     internal bool IsProvenNonNull(IOperation? value, IOperation access)
     {
         return IsStaticallyNonNull(value) ||
             value is not null &&
+            !HasDeconstructionAssignmentBefore(value, access) &&
             _abstractFlow?.ProvesNonNull(access, value) == true;
     }
 }

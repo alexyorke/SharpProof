@@ -903,12 +903,14 @@ internal sealed class EffectMethodNodeBuilder
 
         void AddReachableFinallyEntries(ControlFlowBranch branch)
         {
-            foreach (var region in branch.LeavingRegions)
+            foreach (var region in branch.FinallyRegions)
             {
-                if (finallyEntries.TryGetValue(region, out var entry))
+                pending.Add(region.FirstBlockOrdinal);
+                if (finallyEntries.TryGetValue(region, out var entry) &&
+                    entry.Operation is { } operation &&
+                    !scanner.CanCompleteNormally(operation))
                 {
-                    pending.Add(entry.EntryOrdinal);
-                    return;
+                    break;
                 }
             }
         }
@@ -942,7 +944,11 @@ internal sealed class EffectMethodNodeBuilder
                 if (finallyEntries.TryGetValue(region, out var entry))
                 {
                     pending.Add(entry.EntryOrdinal);
-                    return;
+                    if (entry.Operation is { } operation &&
+                        !scanner.CanCompleteNormally(operation))
+                    {
+                        break;
+                    }
                 }
             }
         }

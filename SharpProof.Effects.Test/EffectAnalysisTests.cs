@@ -548,6 +548,63 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void NestedFinallyEffectsAreIncludedWhenTheInnerRegionCompletesOrExits()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                private static int state;
+
+                public static void ReturnThroughNestedFinally() {
+                    try {
+                        try { return; }
+                        finally { Helper(); }
+                    }
+                    finally { state++; }
+                }
+
+                public static void ThrowThroughNestedFinally() {
+                    try {
+                        try { throw new InvalidOperationException(); }
+                        finally { Helper(); }
+                    }
+                    finally { state++; }
+                }
+
+                public static void FallThroughNestedFinally() {
+                    try {
+                        try { Helper(); }
+                        finally { Helper(); }
+                    }
+                    finally { state++; }
+                }
+
+                private static void Helper() { }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[]
+            {
+                "ReturnThroughNestedFinally",
+                "ThrowThroughNestedFinally",
+                "FallThroughNestedFinally"
+            })
+            {
+                Assert.That(
+                    session.Analyze(Method(compilation, methodName))
+                        .Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+            }
+        }
+    }
+
+    [Test]
     public void PureArithmeticHasNoMayEffects()
     {
         var result = Analyze(

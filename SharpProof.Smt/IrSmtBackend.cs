@@ -378,6 +378,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private readonly Z3ExpressionOwner _owner;
         private readonly Dictionary<IrId, EncodedValue> _encoded = [];
         private readonly Dictionary<IrVarId, Expr> _variables = [];
+        private readonly Dictionary<string, ArithExpr> _stringConstants =
+            new(StringComparer.Ordinal);
         private readonly IrFactory _factory;
         private readonly CancellationToken _cancellationToken;
         private ArithExpr? _longMin;
@@ -513,14 +515,16 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private EncodedValue EncodeString(IrStringTerm text)
         {
             var value = _factory.GetString(text.Value);
-            // Z3's native string constructor consumes a NUL-terminated
-            // buffer, so embedded NULs would otherwise be silently truncated.
-            if (value.IndexOf('\0') >= 0)
+            if (!_stringConstants.TryGetValue(value, out var encoded))
             {
-                throw new UnsupportedIrEncodingException();
+                // The backend only supports string equality and conditionals.
+                // Interning each ordinal value as a distinct integer keeps the
+                // value out of Z3's native string parser and P/Invoke boundary.
+                encoded = _owner.Own(_context.MkInt(_stringConstants.Count));
+                _stringConstants.Add(value, encoded);
             }
 
-            return Defined(_owner.Own(_context.MkString(value)));
+            return Defined(encoded);
         }
 
         private EncodedValue EncodeUnary(IrUnaryTerm unary)

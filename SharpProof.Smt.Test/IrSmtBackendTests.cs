@@ -336,6 +336,43 @@ public sealed class IrSmtBackendTests
             ProofDiagnosticKind.Precondition);
     }
 
+    [TestCase(@"\u{41}", "A")]
+    [TestCase("\U00000100", "A")]
+    [TestCase("\U0001F600", "??")]
+    [TestCase("\U00004E2D", "?")]
+    [TestCase("left\0right", "leftright")]
+    public async Task DistinctStringLiteralBranchesRemainDistinct(
+        string first,
+        string second)
+    {
+        var factory = new IrFactory();
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        var selected = factory.Conditional(
+            factory.Variable(flag),
+            factory.String(first),
+            factory.String(second));
+        var goal = factory.Binary(
+            IrBinaryOperator.Equal,
+            selected,
+            factory.String(second));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(
+            ((RefutedOutcome)outcome).Model.Assignments[flag].Boolean,
+            Is.True);
+    }
+
     [Test]
     public async Task NullableStringConcatCannotProduceAFalseProof()
     {
