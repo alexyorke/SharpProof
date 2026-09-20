@@ -295,7 +295,9 @@ internal sealed class ContractApiIdentityResolver
         }
         catch (Exception exception) when (
             exception is ArgumentException or
+                BadImageFormatException or
                 IOException or
+                InvalidOperationException or
                 NotSupportedException or
                 UnauthorizedAccessException or
                 SecurityException or

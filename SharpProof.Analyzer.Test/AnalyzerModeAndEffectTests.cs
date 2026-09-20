@@ -3260,7 +3260,7 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
-    public async Task ThrowsOnlyDoesNotCoverAllocationButStillCoversThrowingExistingException()
+    public async Task ThrowsOnlyDoesNotCoverRuntimeExceptionAllocation()
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -3292,14 +3292,14 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "EffectContractDoesNotCoverBodySummary");
             Assert.That(
                 factory.Outcomes["AllocateOnly"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
             Assert.That(
                 factory.Outcomes["ThrowExisting"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         }
     }
 

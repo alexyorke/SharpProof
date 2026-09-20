@@ -85,19 +85,47 @@ public static class ForwardDataflowAnalysis
         T initialState,
         ForwardDataflowAnalysisOptions? options = null)
     {
-        return AnalyzeCore(graph, domain, initialState,
-            options ?? new ForwardDataflowAnalysisOptions(),
-            produceResult: true)!;
+        try
+        {
+            return AnalyzeCore(graph, domain, initialState,
+                options ?? new ForwardDataflowAnalysisOptions(),
+                produceResult: true)!;
+        }
+        catch (DataflowMonotonicityException exception)
+        {
+            // Preserve the public contract's established exception type while
+            // keeping an internal discriminator for analyzer degradation.
+            throw new InvalidOperationException(exception.Message, exception);
+        }
     }
 
-    internal static void AnalyzeWithoutResult<T>(
+    /// <summary>
+    /// Runs the solver for callers that only need transfer side effects.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when the transfer function reached a fixed
+    /// point; <see langword="false"/> when a transfer violated the
+    /// monotonicity contract.
+    /// </returns>
+    internal static bool AnalyzeWithoutResult<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
         T initialState,
         ForwardDataflowAnalysisOptions options)
     {
-        _ = AnalyzeCore(graph, domain, initialState, options,
-            produceResult: false);
+        try
+        {
+            _ = AnalyzeCore(graph, domain, initialState, options,
+                produceResult: false);
+            return true;
+        }
+        catch (DataflowMonotonicityException)
+        {
+            // Analyzer callers must degrade to an incomplete result when a
+            // transfer function violates its order contract. Public callers
+            // still receive the contract failure from Analyze.
+            return false;
+        }
     }
 
     private static DataflowAnalysisResult<T>? AnalyzeCore<T>(
@@ -140,7 +168,7 @@ public static class ForwardDataflowAnalysis
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
                 if (!domain.LessThanOrEqual(outputs[blockId], transferred))
                 {
-                    throw new InvalidOperationException(
+                    throw new DataflowMonotonicityException(
                         $"Block {blockId} transfer must be monotone as its input grows.");
                 }
 
@@ -210,6 +238,26 @@ public static class ForwardDataflowAnalysis
         return produceResult
             ? new DataflowAnalysisResult<T>([.. inputs], [.. outputs], iterations)
             : null;
+    }
+
+    private sealed class DataflowMonotonicityException : InvalidOperationException
+    {
+        public DataflowMonotonicityException()
+            : this("The dataflow transfer function violated monotonicity.")
+        {
+        }
+
+        public DataflowMonotonicityException(string message)
+            : base(message)
+        {
+        }
+
+        public DataflowMonotonicityException(
+            string message,
+            Exception innerException)
+            : base(message, innerException)
+        {
+        }
     }
 
     private static SortedSet<int> FindReachableBlocks<T>(

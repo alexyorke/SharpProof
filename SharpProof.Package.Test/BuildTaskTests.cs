@@ -830,6 +830,7 @@ public sealed class BuildTaskTests
         }
     }
 
+    [TestCase(5, true)]
     [TestCase(6, true)]
     [TestCase(42, false)]
     [TestCase(124, false)]

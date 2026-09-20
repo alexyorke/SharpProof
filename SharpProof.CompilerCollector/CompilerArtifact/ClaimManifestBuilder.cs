@@ -603,11 +603,13 @@ internal sealed partial class ClaimManifestBuilder(
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
                          MethodKind.AnonymousFunction or MethodKind.LocalFunction)
-                     // Callables without contract clauses do not participate in
-                     // the manifest identity. Excluding them keeps an unrelated
-                     // sibling from renumbering the callables that do.
-                     .Where(static seed => seed.Declaration?.ToString()
-                         .IndexOf("Contract.", StringComparison.Ordinal) >= 0)
+                     // Callables without contract or effect claims do not
+                     // participate in the manifest identity. Excluding them
+                     // keeps an unrelated sibling from renumbering the
+                     // callables that do. Use the semantic selection inventory
+                     // so effect-only callables participate without treating
+                     // comments or string literals as contract clauses.
+                     .Where(HasManifestIdentity)
                      .GroupBy(static seed => seed.Method.ContainingSymbol!,
                          SymbolEqualityComparer.Default))
         {
@@ -629,6 +631,16 @@ internal sealed partial class ClaimManifestBuilder(
         }
 
         return ids.ToImmutableDictionary(SymbolEqualityComparer.Default);
+
+        bool HasManifestIdentity(CallableSeed seed)
+        {
+            var resolution = _contractSources.Resolve(seed.Method);
+            var selection = _attributes.Select(
+                seed.Method,
+                resolution.HasSelectedContractIntent);
+            return (selection & (ContractSelectionFeatures.Contracts |
+                ContractSelectionFeatures.Effects)) != 0;
+        }
 
         void Resolve(IMethodSymbol method)
         {

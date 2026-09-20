@@ -102,7 +102,8 @@ internal static class VerifierDiagnosticTransport
         if (diagnostic.Severity is not ("warning" or "error") ||
             diagnostic.Code is not (
                 VerifierDiagnosticCodes.IncompleteSelectedCallable or
-                VerifierDiagnosticCodes.AssumptionsDeclared) ||
+                VerifierDiagnosticCodes.AssumptionsDeclared or
+                VerifierDiagnosticCodes.RefutedContract) ||
             diagnostic.File == null || diagnostic.Message == null ||
             diagnostic.Line < 0 || diagnostic.Column < 0)
         {

@@ -519,7 +519,8 @@ internal sealed partial class OperationEffectScanner
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
 
-        if (access == EffectAccess.Write &&
+        if ((access == EffectAccess.Write ||
+             IsWritableReferenceUse(element)) &&
             element.ArrayReference.Type is IArrayTypeSymbol arrayType &&
             !arrayType.ElementType.IsValueType &&
             !ArrayStoreIsDefinitelyCompatible(element, arrayType, assignedValue))
@@ -531,6 +532,65 @@ internal sealed partial class OperationEffectScanner
             evaluation.Summary,
             accessSummary,
             exceptions);
+    }
+
+    private bool IsWritableReferenceUse(
+        IArrayElementReferenceOperation element)
+    {
+        IOperation operation = element;
+        while (operation.Parent is { } parent)
+        {
+            switch (parent)
+            {
+                case IArgumentOperation argument
+                    when ReferenceEquals(
+                        DefiniteOperationFacts.UnwrapHarmlessValue(argument.Value),
+                        element):
+                    return argument.Parameter?.RefKind is
+                        RefKind.Ref or RefKind.Out;
+
+                case IVariableInitializerOperation initializer
+                    when ReferenceEquals(
+                        DefiniteOperationFacts.UnwrapHarmlessValue(initializer.Value),
+                        element):
+                    return initializer.Parent is IVariableDeclaratorOperation
+                    {
+                        Symbol.RefKind: RefKind.Ref
+                    };
+
+                case ISimpleAssignmentOperation assignment
+                    when assignment.IsRef &&
+                        ReferenceEquals(
+                            DefiniteOperationFacts.UnwrapHarmlessValue(assignment.Value),
+                            element):
+                    return assignment.Target switch
+                    {
+                        ILocalReferenceOperation local =>
+                            local.Local.RefKind == RefKind.Ref,
+                        IParameterReferenceOperation parameter =>
+                            parameter.Parameter.RefKind == RefKind.Ref,
+                        _ => true
+                    };
+
+                case IReturnOperation returned
+                    when returned.ReturnedValue is { } value &&
+                        ReferenceEquals(
+                            DefiniteOperationFacts.UnwrapHarmlessValue(value),
+                            element):
+                    return _method.ReturnsByRef &&
+                        !_method.ReturnsByRefReadonly;
+            }
+
+            operation = parent;
+        }
+
+        // A ref-return expression can be detached from its Return operation
+        // in the lowered method-body operation tree. The source ref marker is
+        // still available and distinguishes it from an ordinary array read.
+        return _method.ReturnsByRef &&
+            !_method.ReturnsByRefReadonly &&
+            element.Syntax.AncestorsAndSelf().Any(
+                static syntax => syntax is RefExpressionSyntax);
     }
 
     private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)
@@ -550,13 +610,11 @@ internal sealed partial class OperationEffectScanner
         {
             return true;
         }
-        if (assignedValue == null)
-        {
-            return false;
-        }
-        if (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
-            _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
-            value.IsDefinitelyNull)
+
+        if (assignedValue is not null &&
+            (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
+             _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
+             value.IsDefinitelyNull))
         {
             return true;
         }
@@ -569,7 +627,23 @@ internal sealed partial class OperationEffectScanner
             !_freshArrayTypes.TryGetValue(
                 (element.Syntax.SyntaxTree, fresh.Ordinal),
                 out var runtimeType) ||
-            assignedValue.Type == null)
+            runtimeType.ElementType is not { } runtimeElementType)
+        {
+            return false;
+        }
+
+        if (assignedValue == null)
+        {
+            // ldelema checks an array's runtime element type for writable
+            // references.  An exact fresh array type is therefore sufficient
+            // to prove that taking the reference cannot throw, while a
+            // covariant runtime element type is not.
+            return SymbolEqualityComparer.Default.Equals(
+                runtimeElementType,
+                arrayType.ElementType);
+        }
+
+        if (assignedValue.Type == null)
         {
             return false;
         }

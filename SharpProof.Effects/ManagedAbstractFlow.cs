@@ -148,11 +148,19 @@ internal sealed class ManagedAbstractFlow
             var dataflowGraph = CreateDataflowGraph(graph, result, cancellationToken);
             try
             {
-                ForwardDataflowAnalysis.AnalyzeWithoutResult(dataflowGraph,
+                var converged = ForwardDataflowAnalysis.AnalyzeWithoutResult(dataflowGraph,
                     FlowDomain.Instance, entryState ?? CreateEntryState(method),
                     new ForwardDataflowAnalysisOptions(
                         maxIterations: maxIterationsOverride
                             ?? dataflowGraph.Blocks.Length * 4));
+                if (!converged)
+                {
+                    // A domain-order defect must not escape the analyzer
+                    // callback. Preserve the fail-closed incomplete-summary
+                    // path used for other managed-flow limits.
+                    return ManagedFlowAnalysis.BudgetExceeded(
+                        EffectAnalysisIncompleteReason.BlockBudgetExceeded);
+                }
             }
             catch (DataflowConvergenceException)
             {
@@ -1901,7 +1909,15 @@ internal readonly record struct ManagedAbstractValue
 
     internal static ManagedAbstractValue Integer(IntervalValue value, bool excludesZero = false)
     {
-        return value.IsBottom ? Bottom : new(value, default, default, excludesZero, false, false);
+        return value.IsBottom
+            ? Bottom
+            : new(
+                value,
+                default,
+                default,
+                excludesZero || !value.Contains(0),
+                false,
+                false);
     }
 
     internal static ManagedAbstractValue Reference(
@@ -2170,7 +2186,9 @@ internal readonly record struct ManagedAbstractValue
             var scalar = IntervalDomain.Instance.Join(left.Scalar, right.Scalar);
             return left.IsBoolean
                 ? scalar.IsSingleton ? Boolean(scalar.SingletonValue != 0) : BooleanUnknown
-                : Integer(scalar, left.ExcludesZero && right.ExcludesZero);
+                : Integer(
+                    scalar,
+                    left.IsDefinitelyNonZero && right.IsDefinitelyNonZero);
         }
         if (left.Nullness == NullnessValue.Bottom || right.Nullness == NullnessValue.Bottom)
         {

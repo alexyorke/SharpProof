@@ -512,7 +512,7 @@ foreach ($productDocument in @(
 }
 
 $readme = Get-RequiredText 'README.md'
-$launcherDiagnosticCodes = @('SP0047', 'SP0048')
+$launcherDiagnosticCodes = @('SP0047', 'SP0048', 'SP0051')
 $requiredReadmeText = @(
     $packageVersion,
     'SharpProofProfile',

@@ -307,8 +307,8 @@ public sealed partial class ApiSpecTable
                     false, 0, IrTypeKind.Reference, [], null,
                     assemblySetFramework),
                 new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
-                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState | SpecEffect.ReadsAmbientState | SpecEffect.Synchronization, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),

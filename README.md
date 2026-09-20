@@ -141,8 +141,9 @@ The schema-owned typed result table includes `VacuousEntry` and the full
 The analyzer is conservative. An unsupported explicitly selected method emits
 SP0047; a concrete precondition violation emits SP0027; verifier assumptions
 and trusted evidence are reported through SP0048; and a compiler-artifact
-collection failure is SP0049. See the complete diagnostic table and examples
-in [docs/diagnostic-examples.md](docs/diagnostic-examples.md).
+collection failure is SP0049. A replayed claim counterexample is reported as
+SP0051. See the complete diagnostic table and examples in
+[docs/diagnostic-examples.md](docs/diagnostic-examples.md).
 
 The portable analyzer does not load Z3. The worker handles bounded Boolean and
 integer obligations, exact compiler-produced whole-body CFG/IR, selected API

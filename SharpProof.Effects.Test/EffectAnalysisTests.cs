@@ -4416,6 +4416,7 @@ public sealed class EffectAnalysisTests
             result.Projection.Effects,
             Is.EqualTo(
                 SharpProofEffect.WritesArgumentState |
+                SharpProofEffect.Allocates |
                 SharpProofEffect.Throws));
         Assert.That(result.Projection.IsComplete, Is.True);
     }
@@ -8588,7 +8589,7 @@ public sealed class EffectAnalysisTests
                 Is.False);
             Assert.That(
                 allocation.Summary.Allocation,
-                Is.EqualTo(EffectAllocationKind.None));
+                Is.EqualTo(EffectAllocationKind.Managed));
         }
     }
 
@@ -8629,7 +8630,7 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
-    public void FailingAnonymousInitializerDoesNotAllocate()
+    public void FailingAnonymousInitializerChargesRuntimeExceptionAllocation()
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
@@ -8645,7 +8646,7 @@ public sealed class EffectAnalysisTests
 
         Assert.That(
             result.Summary.Allocation,
-            Is.EqualTo(EffectAllocationKind.None));
+            Is.EqualTo(EffectAllocationKind.Managed));
     }
 
     [Test]
@@ -8689,7 +8690,7 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 session.Analyze(method)
                     .Summary.Allocation,
-                Is.EqualTo(EffectAllocationKind.None),
+                Is.EqualTo(EffectAllocationKind.Managed),
                 methodName);
         }
         Assert.That(

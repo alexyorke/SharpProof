@@ -787,21 +787,19 @@ internal sealed class ExceptionHandlerReachability(
                 {
                     var conversionKind = Microsoft.CodeAnalysis.CSharp
                         .CSharpExtensions.GetConversion(builtInConversion);
-                    if (conversionKind.IsUnboxing ||
-                        conversionKind is { IsReference: true, IsExplicit: true } &&
-                        !builtInConversion.IsTryCast)
-                    {
-                        Add(
-                            FromThrowSet(
-                                conversionEffects.Classify(
-                                    builtInConversion,
-                                    conversionKind).Throws),
-                            builtInConversion);
-                    }
-                }
-                if (CanThrowUnknownAfterPrerequisites(builtInConversion))
-                {
-                    Add(UnknownPotential, builtInConversion);
+                    // Keep handler reachability in lockstep with the effect
+                    // scanner. The classifier covers nullable unwraps,
+                    // checked numeric conversions, reference casts,
+                    // unboxing, and unsupported conversion boundaries. The
+                    // older hand-maintained subset missed nullable unwraps
+                    // and the separate Roslyn may-throw predicate widened
+                    // them to every catch type.
+                    Add(
+                        FromThrowSet(
+                            conversionEffects.Classify(
+                                builtInConversion,
+                                conversionKind).Throws),
+                        builtInConversion);
                 }
                 PushChildren(builtInConversion);
                 continue;

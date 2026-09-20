@@ -335,6 +335,16 @@ internal static class StringConcatenationEffectResolver
         ITypeSymbol? receiverType,
         Compilation compilation)
     {
+        var objectToString = compilation.GetSpecialType(
+                SpecialType.System_Object)
+            .GetMembers("ToString")
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault(IsParameterlessToString);
+        if (objectToString == null)
+        {
+            return null;
+        }
+
         if (receiverType is INamedTypeSymbol named)
         {
             for (var current = named;
@@ -343,30 +353,36 @@ internal static class StringConcatenationEffectResolver
             {
                 var target = current.GetMembers("ToString")
                     .OfType<IMethodSymbol>()
-                    .SingleOrDefault(IsParameterlessToString);
+                    .FirstOrDefault(method =>
+                        IsParameterlessToString(method) &&
+                        OverridesObjectToString(method, objectToString));
                 if (target != null)
                 {
                     return target;
                 }
             }
+        }
 
-            if (named.TypeKind != TypeKind.Interface)
+        return objectToString;
+    }
+
+    private static bool OverridesObjectToString(
+        IMethodSymbol method,
+        IMethodSymbol objectToString)
+    {
+        for (var current = method;
+             current != null;
+             current = current.OverriddenMethod)
+        {
+            if (SymbolEqualityComparer.Default.Equals(
+                    current,
+                    objectToString))
             {
-                return null;
+                return true;
             }
         }
 
-        if (receiverType is not IArrayTypeSymbol and
-            not ITypeParameterSymbol and
-            not INamedTypeSymbol { TypeKind: TypeKind.Interface })
-        {
-            return null;
-        }
-
-        return compilation.GetSpecialType(SpecialType.System_Object)
-            .GetMembers("ToString")
-            .OfType<IMethodSymbol>()
-            .SingleOrDefault(IsParameterlessToString);
+        return false;
     }
 
     private static bool IsParameterlessToString(IMethodSymbol method)

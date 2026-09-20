@@ -113,6 +113,42 @@
       "postconditions": []
     },
     {
+      "id": "ObservedInvalidOperationExceptionConstruction",
+      "facets": {
+        "effects": {
+          "values": [
+            "WritesReceiverState",
+            "ReadsAmbientState",
+            "Synchronization"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "MayAllocate",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
       "id": "ContractSemantics",
       "facets": {
         "effects": {
@@ -418,7 +454,7 @@
         "resultType": null,
         "approvedAssemblySet": "framework"
       },
-      "profile": "ObservedExceptionConstruction"
+      "profile": "ObservedInvalidOperationExceptionConstruction"
     },
     {
       "target": {

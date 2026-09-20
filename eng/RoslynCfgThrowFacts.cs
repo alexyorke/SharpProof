@@ -193,8 +193,7 @@ internal static class RoslynCfgThrowFacts
 
         var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
             .GetConversion(operation);
-        return conversion.IsNumeric || conversion.IsEnumeration ||
-            conversion.IsNullable;
+        return conversion.IsNullable && conversion.IsExplicit;
     }
 
     private static bool IsDecimalOperation(IOperation operation)

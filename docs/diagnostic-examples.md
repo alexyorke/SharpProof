@@ -37,7 +37,8 @@ dotnet_diagnostic.SP0027.severity = warning
 `SP0024` is an error and `SP0025` is a warning. The `SPCF` rules are errors once
 the generator is loaded. Unsupported unannotated methods are quiet; an
 unsupported explicitly selected method produces SP0047. SP0049 is a fatal
-compiler-collection infrastructure error during container verification.
+compiler-collection infrastructure error during container verification. A
+replayed claim counterexample produces the verifier-launcher diagnostic SP0051.
 
 ## Main analyzer summary
 
@@ -56,6 +57,7 @@ compiler-collection infrastructure error during container verification.
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
 | `SP0049` | Container verification compiler manifest | Error, on | On artifact failure |
 | `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
+| `SP0051` | Replayed claim counterexample | Error, on | On refutation |
 
 `SharpProofFeatures=all` enables both feature pipelines. The former
 `SharpProofMode` and `all-experimental` compatibility inputs are removed.
@@ -263,6 +265,14 @@ A readable payload whose hash does not match the pin is rejected and every
 attempted use reports SP0047 `ContractApiIdentityRejected`; the rejected symbol
 supplies no proof fact. SP0050 is reserved for a payload that cannot be read.
 
+<a id="sp0051"></a>
+## SP0051 - claim counterexample replayed
+
+The worker independently replayed a concrete counterexample for a selected
+claim. The verifier launcher reports SP0051 with the claim's source location
+and replay details, and the build fails. This is a semantic refutation, not an
+incomplete-analysis or infrastructure diagnostic.
+
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics
 
@@ -373,7 +383,7 @@ its executable method bodies.
 - SP0027 is stronger: it is emitted only after concrete predicate replay
   evaluates to false.
 - SP0047 is explicit incomplete analysis, SP0048 is explicit user/trusted
-  evidence, and SP0049 is a compilation-collection infrastructure failure;
-  none is a proof outcome.
+  evidence, SP0049 is a compilation-collection infrastructure failure, and
+  SP0051 is an independently replayed counterexample; none is a proof outcome.
 - Worker `Unknown` reasons are protocol records, not Roslyn diagnostics. See
   [Typed abstention reasons](unknown-reasons.md).

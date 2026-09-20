@@ -94,9 +94,7 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         AnalyzerConfigurationOption option)
     {
-        var values = new List<string>();
-        var found = false;
-        var value = string.Empty;
+        var candidates = new List<(string Key, string Value)>();
         foreach (var key in new[] {
                      option.Key,
                      "build_property." + option.Key,
@@ -107,22 +105,43 @@ internal sealed class AnalyzerConfiguration
             {
                 continue;
             }
-            if (!found)
-            {
-                value = candidate;
-                found = true;
-            }
-            if (!string.IsNullOrWhiteSpace(candidate))
-            {
-                values.Add(candidate.Trim());
-            }
+            candidates.Add((key, candidate));
         }
 
+        var hasExplicitAnalyzerValue = candidates.Any(
+            candidate => string.Equals(
+                candidate.Key,
+                option.Key,
+                StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(candidate.Value));
+        var explicitAnalyzerValue = hasExplicitAnalyzerValue
+            ? candidates.First(
+                candidate => string.Equals(
+                    candidate.Key,
+                    option.Key,
+                    StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(candidate.Value)).Value
+            : string.Empty;
+        var values = candidates
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.Value))
+            .Where(candidate => !hasExplicitAnalyzerValue ||
+                !IsPackageDefaultProperty(
+                    options,
+                    option,
+                    candidate.Key,
+                    candidate.Value))
+            .Select(static candidate => candidate.Value.Trim())
+            .ToArray();
+        var effective = hasExplicitAnalyzerValue
+            ? explicitAnalyzerValue
+            : candidates.Count == 0
+                ? string.Empty
+                : candidates[0].Value;
         var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         return (
-            found,
-            value,
+            candidates.Count != 0,
+            effective,
             distinct.Length > 1,
             string.Join(" / ", distinct));
     }
@@ -192,7 +211,9 @@ internal sealed class AnalyzerConfiguration
 
             if (globalOptions != null &&
                 TryGet(globalOptions, option, out var global) &&
-                Is(global, value))
+                (Is(global, value) ||
+                    (HasNonBlankValue(options, option.Key) &&
+                        IsPackageDefault(globalOptions, option, global))))
             {
                 continue;
             }
@@ -231,6 +252,82 @@ internal sealed class AnalyzerConfiguration
 
         value = string.Empty;
         return false;
+    }
+
+    private static bool IsPackageDefault(
+        AnalyzerConfigOptions options,
+        AnalyzerConfigurationOption option,
+        string value)
+    {
+        var packagePropertyKey =
+            "build_property." + option.BuildPropertyName;
+        if (!options.TryGetValue(packagePropertyKey, out var packageValue) ||
+            !Is(packageValue, value) ||
+            !HasPackageDefaults(options) ||
+            !IsPackageDefaultValue(option, packageValue))
+        {
+            return false;
+        }
+
+        foreach (var key in new[] {
+                     option.Key,
+                     "build_property." + option.Key
+                 })
+        {
+            if (options.TryGetValue(key, out var candidate) &&
+                !string.IsNullOrWhiteSpace(candidate))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool HasNonBlankValue(
+        AnalyzerConfigOptions options,
+        string key)
+    {
+        return options.TryGetValue(key, out var value) &&
+            !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool IsPackageDefaultProperty(
+        AnalyzerConfigOptions options,
+        AnalyzerConfigurationOption option,
+        string key,
+        string value)
+    {
+        return string.Equals(
+                key,
+                "build_property." + option.BuildPropertyName,
+                StringComparison.OrdinalIgnoreCase) &&
+            HasPackageDefaults(options) &&
+            IsPackageDefaultValue(option, value);
+    }
+
+    private static bool HasPackageDefaults(AnalyzerConfigOptions options)
+    {
+        return options.TryGetValue(
+                "build_property." +
+                AnalyzerConfigurationOptionRegistry.Profile.BuildPropertyName,
+                out var profile) &&
+            Is(profile, "advisory") &&
+            options.TryGetValue(
+                "build_property." +
+                AnalyzerConfigurationOptionRegistry.Features.BuildPropertyName,
+                out var features) &&
+            Is(features, "all");
+    }
+
+    private static bool IsPackageDefaultValue(
+        AnalyzerConfigurationOption option,
+        string value)
+    {
+        return option == AnalyzerConfigurationOptionRegistry.Profile
+            ? Is(value, "advisory")
+            : option == AnalyzerConfigurationOptionRegistry.Features &&
+                Is(value, "all");
     }
 
     private static bool TryGet(

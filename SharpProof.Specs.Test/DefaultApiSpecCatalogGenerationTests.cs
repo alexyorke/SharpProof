@@ -14,7 +14,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         ["id", "version", "methods"];
 
     private const string ExpectedContentSha256 =
-        "8e177ed0d36d9c78603c634aa1abe6fcc5e765e08d9607f8702277d38c0d1386";
+        "0170c0c4607cac91d7a67f4f1374425957635f9dcc028948ef9731b7cde0529a";
 
     [Test]
     public void GeneratedCatalogPreservesEveryReviewedWitness()

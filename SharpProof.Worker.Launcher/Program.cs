@@ -13,6 +13,12 @@ namespace SharpProof.Worker.Launcher;
 
 internal static class Program
 {
+    // Refuted contracts are semantic verifier failures. Keep their transport
+    // identity separate from incomplete analysis and assumption diagnostics so
+    // the build task can preserve the source location and claim-specific code.
+    private const string RefutedContractDiagnosticCode =
+        VerifierDiagnosticCodes.RefutedContract;
+
     internal static async Task<int> Main(string[] args)
     {
         return await RunMain(
@@ -459,6 +465,10 @@ internal static class Program
             var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
             Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
                 LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason);
+            if (result.Outcome == WorkerClaimOutcome.Refuted)
+            {
+                ReportRefutedClaim(claim, result);
+            }
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
             if (result.Outcome == WorkerClaimOutcome.Unknown)
             {
@@ -517,6 +527,41 @@ internal static class Program
 
         return refuted ? 5 : incompleteError || assumptionError ? 6 : 0;
     }
+
+    private static void ReportRefutedClaim(
+        WorkerClaimManifestEntry claim, WorkerClaimResult result)
+    {
+        var message = "Refuted " + LauncherPresentation.ClaimKind(claim) +
+            " claim " + result.ClaimId + " for " + claim.CallableId + "." +
+            (result.Model is { Length: > 0 }
+                ? " Counterexample: " + string.Join(
+                    ", ", result.Model.Select(static value =>
+                        value.Variable + " = " + value.Value)) + "."
+                : string.Empty);
+
+        // Keep this diagnostic on stderr so RunVerifier consumes it through
+        // the structured diagnostic channel. The shared transport validator
+        // owns the accepted code set; this line remains schema-compatible when
+        // the launcher is paired with an older host during package bootstrap.
+        Console.Error.WriteLine(
+            VerifierDiagnosticTransport.Prefix + JsonSerializer.Serialize(new
+            {
+                schema = 1,
+                severity = "error",
+                code = RefutedContractDiagnosticCode,
+                file = claim.Location.Path ?? string.Empty,
+                line = claim.Location.Line,
+                column = claim.Location.Column,
+                message
+            }));
+        var prefix = string.IsNullOrWhiteSpace(claim.Location.Path)
+            ? "SharpProof"
+            : claim.Location.Path + FormattableString.Invariant(
+                $"({claim.Location.Line},{claim.Location.Column})");
+        Console.Out.WriteLine(prefix + ": error " +
+            RefutedContractDiagnosticCode + ": " + message);
+    }
+
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
     {

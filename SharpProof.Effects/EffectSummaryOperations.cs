@@ -49,7 +49,12 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary Throw(EffectThrowSet exceptions)
     {
-        return Create(throws: exceptions, completeness: exceptions.IncludesUnknown
+        return Create(
+            allocation: exceptions.IsEmpty
+                ? EffectAllocationKind.None
+                : EffectAllocationKind.Managed,
+            throws: exceptions,
+            completeness: exceptions.IncludesUnknown
             ? EffectCompleteness.Incomplete : EffectCompleteness.Complete);
     }
 

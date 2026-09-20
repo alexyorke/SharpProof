@@ -262,12 +262,21 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorWitness()
     {
-        return CreateBclConstructorWitness(
+        var row = CreateBclConstructorWitness(
             "an already allocated InvalidOperationException receiver, excluding newobj",
             ObserveInvalidOperationExceptionConstructorEffect,
             SpecEffect.None,
             PrepareInvalidOperationExceptionConstructorReceiver,
             InvokePreparedInvalidOperationExceptionConstructor);
+        return row with
+        {
+            Facets = [
+                ConservativeMayAllocate(
+                    "an already allocated InvalidOperationException receiver, excluding newobj"),
+                .. row.Facets.Where(static witness =>
+                    witness.Facet != FacetKind.Allocation)
+            ]
+        };
     }
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorStringWitness()
@@ -553,6 +562,17 @@ public sealed partial class ApiSpecRuntimeOracleTests
             mutation);
     }
 
+    private static FacetWitness<SpecAllocationBehavior> ConservativeMayAllocate(
+        string edgeInputs)
+    {
+        return new(
+            FacetKind.Allocation,
+            edgeInputs,
+            static template => template.Facets.Allocation.Behavior,
+            static claim => claim == SpecAllocationBehavior.MayAllocate,
+            SpecAllocationBehavior.None);
+    }
+
     private static FacetWitness<ThrowClaim> Throws(
         string edgeInputs,
         ImmutableArray<RuntimeEdge> edges,
@@ -698,10 +718,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecEffect ObserveInvalidOperationExceptionConstructorEffect()
     {
-        return ObserveConstructorWrites(
+        var writes = ObserveConstructorWrites(
             PrepareInvalidOperationExceptionConstructorReceiver,
             static () => s_invalidOperationExceptionConstructorReceiver,
             InvokePreparedInvalidOperationExceptionConstructor);
+        return writes == SpecEffect.WritesReceiverState
+            ? SpecEffect.WritesReceiverState |
+              SpecEffect.ReadsAmbientState |
+              SpecEffect.Synchronization
+            : writes;
     }
 
     private static SpecEffect ObserveInvalidOperationExceptionStringConstructorEffect()
@@ -839,7 +864,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         var observedAllocation = false;
         foreach (var edge in edges)
         {
-            for (var iteration = 0; iteration < 128; iteration++)
+            for (var iteration = 0; iteration < edge.WarmupIterations; iteration++)
             {
                 edge.Prepare();
                 edge.Invoke();
@@ -1653,7 +1678,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         }
     }
 
-    private sealed record RuntimeEdge(Action Prepare, Action Invoke)
+    private sealed record RuntimeEdge(
+        Action Prepare,
+        Action Invoke,
+        int WarmupIterations = 128)
     {
         public static RuntimeEdge For(Action invoke)
         {

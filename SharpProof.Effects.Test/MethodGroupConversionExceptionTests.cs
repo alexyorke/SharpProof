@@ -86,8 +86,8 @@ public sealed class MethodGroupConversionExceptionTests
                 "virtual dispatch still throws NullReferenceException");
             Assert.That(
                 virtualCall.Allocation,
-                Is.EqualTo(EffectAllocationKind.None),
-                "virtual dispatch fails before delegate allocation");
+                Is.EqualTo(EffectAllocationKind.Managed),
+                "virtual dispatch allocates its runtime exception before delegate allocation");
             Assert.That(virtualCall.Throws.IsEmpty, Is.True);
         }
 

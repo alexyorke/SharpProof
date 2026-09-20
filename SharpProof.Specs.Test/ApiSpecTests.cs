@@ -728,25 +728,37 @@ public sealed class ApiSpecTests
             .Where(static constructor =>
                 constructor.Parameters.Length == 0 ||
                 constructor.Parameters is [
-                    {
-                        Type.SpecialType: SpecialType.System_String
-                    }])
+                {
+                    Type.SpecialType: SpecialType.System_String
+                }])
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
                 constructor.Parameters is [
-                {
-                    Type: INamedTypeSymbol
                     {
-                        MetadataName: "IEnumerable`1"
-                    }
-                }]);
+                        Type: INamedTypeSymbol
+                        {
+                            MetadataName: "IEnumerable`1"
+                        }
+                    }]);
+        var standard = supported
+            .Where(static constructor =>
+                constructor.ContainingType.MetadataName == "Exception")
+            .Concat(supported.Where(static constructor =>
+                constructor.ContainingType.MetadataName ==
+                "InvalidOperationException" &&
+                constructor.Parameters.Length == 1))
+            .ToArray();
+        var invalidOperationParameterless =
+            invalidOperation.InstanceConstructors.Single(
+                static constructor => constructor.Parameters.IsEmpty);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(supported, Has.Length.EqualTo(4));
             Assert.That(
-                supported.All(constructor =>
+                standard
+                .All(constructor =>
                     resolved.TryGet(constructor, out var spec) &&
                     spec.Template.Facets.Throws.Behavior ==
                     SpecThrowBehavior.DoesNotThrow &&
@@ -754,6 +766,13 @@ public sealed class ApiSpecTests
                     SpecTerminationBehavior.Terminates &&
                     spec.Template.Facets.Effects.Effects ==
                     SpecEffect.WritesReceiverState),
+                Is.True);
+            Assert.That(
+                resolved.TryGet(invalidOperationParameterless, out var spec) &&
+                spec.Template.Facets.Effects.Effects ==
+                (SpecEffect.WritesReceiverState |
+                    SpecEffect.ReadsAmbientState |
+                    SpecEffect.Synchronization),
                 Is.True);
             Assert.That(
                 resolved.Lookup(aggregateEnumerable).Status,

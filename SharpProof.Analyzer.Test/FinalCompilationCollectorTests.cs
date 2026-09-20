@@ -1063,7 +1063,7 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
-    public async Task TreeLocalConfigurationPreventsArtifactEmission()
+    public async Task TreeLocalConfigurationOverridesPackageDefaults()
     {
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("tree-configuration");
@@ -1078,8 +1078,8 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
-            Assert.That(File.Exists(path), Is.False);
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(File.Exists(path), Is.True);
         }
     }
 
