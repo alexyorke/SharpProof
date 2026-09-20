@@ -270,10 +270,8 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 string.Equals(constructor.MetadataName, target.MemberName, StringComparison.Ordinal) &&
                 constructor.Arity == target.GenericArity &&
                 constructor.Parameters.Length == target.ParameterTypes.Length,
-            SpecTargetMemberKind.Method => symbol is IMethodSymbol
-            {
-                MethodKind: MethodKind.Ordinary
-            } method &&
+            SpecTargetMemberKind.Method => symbol is IMethodSymbol method &&
+                (method.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet) &&
                 method.IsStatic == target.IsStatic &&
                 string.Equals(method.Name, target.MemberName, StringComparison.Ordinal) &&
                 method.Arity == target.GenericArity &&

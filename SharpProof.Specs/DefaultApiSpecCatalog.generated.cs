@@ -368,6 +368,102 @@ public sealed partial class ApiSpecTable
                 ]),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
+                    "bcl.math.max.int32-int32",
+                    "M:System.Math.Max(System.Int32,System.Int32)",
+                    "System.Math",
+                    SpecTargetMemberKind.Method, "Max",
+                    true, 0, null, [IrTypeKind.Integer, IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.math.min.int32-int32",
+                    "M:System.Math.Min(System.Int32,System.Int32)",
+                    "System.Math",
+                    SpecTargetMemberKind.Method, "Min",
+                    true, 0, null, [IrTypeKind.Integer, IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.get-value-or-default",
+                    "M:System.Nullable`1.GetValueOrDefault",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.Method, "GetValueOrDefault",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.get-value-or-default.value",
+                    "M:System.Nullable`1.GetValueOrDefault(`0)",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.Method, "GetValueOrDefault",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.Integer], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.has-value",
+                    "P:System.Nullable`1.HasValue",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.PropertyGet, "HasValue",
+                    false, 0, IrTypeKind.Reference, [], IrTypeKind.Boolean,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.value",
+                    "P:System.Nullable`1.Value",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.PropertyGet, "Value",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
                     "bcl.object.ctor",
                     "M:System.Object.#ctor",
                     "System.Object",
@@ -395,6 +491,38 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceDocumented),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.string.is-null-or-empty",
+                    "M:System.String.IsNullOrEmpty(System.String)",
+                    "System.String",
+                    SpecTargetMemberKind.Method, "IsNullOrEmpty",
+                    true, 0, null, [IrTypeKind.String], IrTypeKind.Boolean,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.string.item.int32",
+                    "M:System.String.get_Chars(System.Int32)",
+                    "System.String",
+                    SpecTargetMemberKind.Method, "get_Chars",
+                    false, 0, IrTypeKind.String, [IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.IndexOutOfRangeException"], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
                     null),
                 []),

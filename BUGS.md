@@ -32,46 +32,11 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 2 entries: 0 P0, 0 P1 and 2 P3. The final
+The list currently has 1 entry: 0 P0, 0 P1 and 1 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
 
-
-### Nullable value types and other everyday pure BCL members have no effect specifications, so ordinary code is unprovable
-
-- **File:** `SharpProof.Specs/DefaultApiSpecCatalog.json` (no entries for
-  `System.Nullable<T>` members) with the rule in `SEMANTICS.md` that a
-  closed constructed generic API call is accepted only when a
-  specification resolves for it.
-- **Confidence:** Confirmed. Helpers `v.HasValue`, `v.GetValueOrDefault()`,
-  `v ?? 0` and `v.HasValue ? v.Value : 0` over an `int?` parameter each made
-  an `[EnforcePure]` caller report SP0002. So did `Math.Max(a, b)`,
-  `Math.Min(a, b)`, `Math.Clamp(a, 0, 10)`, `string.IsNullOrEmpty(s)` and
-  the string indexer `s[0]` directly in `[EnforcePure]` methods, while
-  `Math.Abs(int)` and `string.Length`, which have catalog entries, were
-  accepted. `Math.Max(int, int)` does have a relational specification in
-  the `dotnet.scalar` pack, so with that pack enabled a postcondition can
-  use its result while an effect claim on the same call still fails.
-- **What is wrong:** `Nullable<T>.HasValue`, `GetValueOrDefault()` and
-  `Value` are pure field reads (`Value` throws `InvalidOperationException`
-  when empty, which the analysis already models for explicit unwraps), and
-  the compiler lowers `??`, lifted operators and `is` checks on nullable
-  value types into exactly these calls. Without specifications they are
-  unmodeled external calls, so every method that touches a nullable value
-  type is unknown for purity, allocation and exceptions.
-- **Failure scenario:** Optional numeric parameters and fields (`int?`,
-  `DateTime?`) are common in exactly the kind of small helper that effect
-  contracts target; users see SP0002/SP0045/SP0046 on code that is plainly
-  pure.
-- **Suggested fix:** Add specifications for `Nullable<T>.HasValue`,
-  `GetValueOrDefault()`, `GetValueOrDefault(T)` and `Value` (reads of the
-  receiver, no allocation, `Value` throwing `InvalidOperationException`),
-  instantiable for any `T`, and for the common pure numeric and string
-  members (`Math.Min`, `Math.Max`, `Math.Clamp` with its
-  `ArgumentException`, `string.IsNullOrEmpty`, the string indexer with its
-  `IndexOutOfRangeException`). Add a test that `v ?? 0` over `int?` is
-  provably pure.
 
 ### SP0027 checks another project's `Contract.Requires` only when that project is a source reference, so the IDE and the build disagree
 
@@ -115,6 +80,13 @@ section records the areas that were probed without finding a defect.
 These were exercised with the same scratch harnesses and produced no defect.
 They are listed so the work is not repeated, and because each one is evidence
 about where the implementation is solid.
+
+- **Common pure BCL specifications.** The default API catalog now covers
+  nullable value reads (`HasValue`, `GetValueOrDefault`, and `Value`),
+  `Math.Min`/`Math.Max`, `string.IsNullOrEmpty`, and the string indexer on
+  every supported reference-pack family. Analyzer and runtime witnesses cover
+  the normal and throwing paths; unsupported framework members remain
+  unresolved and fail closed.
 
 - **Contract.Assume effect evidence.** Direct `Contract.Assume` clauses now
   refine managed effect flow and remain in effects-only compiler artifacts as

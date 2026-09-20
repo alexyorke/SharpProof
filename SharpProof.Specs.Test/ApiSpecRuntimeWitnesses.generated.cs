@@ -20,8 +20,16 @@ public sealed partial class ApiSpecRuntimeOracleTests
         witnesses.Add("bcl.invalid-operation-exception.ctor.string", CreateBclInvalidOperationExceptionCtorStringWitness());
         witnesses.Add("bcl.list.add", CreateBclListAddWitness());
         witnesses.Add("bcl.math.abs.int32", CreateBclMathAbsInt32Witness());
+        witnesses.Add("bcl.math.max.int32-int32", CreateBclMathMaxInt32Int32Witness());
+        witnesses.Add("bcl.math.min.int32-int32", CreateBclMathMinInt32Int32Witness());
+        witnesses.Add("bcl.nullable.get-value-or-default", CreateBclNullableGetValueOrDefaultWitness());
+        witnesses.Add("bcl.nullable.get-value-or-default.value", CreateBclNullableGetValueOrDefaultValueWitness());
+        witnesses.Add("bcl.nullable.has-value", CreateBclNullableHasValueWitness());
+        witnesses.Add("bcl.nullable.value", CreateBclNullableValueWitness());
         witnesses.Add("bcl.object.ctor", CreateBclObjectCtorWitness());
         witnesses.Add("bcl.string.concat.string-string", CreateBclStringConcatStringStringWitness());
+        witnesses.Add("bcl.string.is-null-or-empty", CreateBclStringIsNullOrEmptyWitness());
+        witnesses.Add("bcl.string.item.int32", CreateBclStringItemInt32Witness());
         witnesses.Add("bcl.string.length", CreateBclStringLengthWitness());
         witnesses.Add("contract.assume", CreateContractAssumeWitness());
         witnesses.Add("contract.ensures", CreateContractEnsuresWitness());

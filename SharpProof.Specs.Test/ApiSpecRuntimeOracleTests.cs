@@ -239,6 +239,170 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ]);
     }
 
+    private static RowWitness CreateBclMathMaxInt32Int32Witness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = Math.Max(-3, 7)),
+            RuntimeEdge.For(() => s_integerSink = Math.Max(9, 2)));
+        return Row(
+            effects: Effect(
+                "positive, negative, and equal integer inputs",
+                () => ObservePureBclEffects(edges),
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "positive, negative, and equal integer inputs",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "positive, negative, and equal integer inputs",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclMathMinInt32Int32Witness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = Math.Min(-3, 7)),
+            RuntimeEdge.For(() => s_integerSink = Math.Min(9, 2)));
+        return Row(
+            effects: Effect(
+                "positive, negative, and equal integer inputs",
+                () => ObservePureBclEffects(edges),
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "positive, negative, and equal integer inputs",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "positive, negative, and equal integer inputs",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclStringIsNullOrEmptyWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty(null) ? 1 : 0),
+            RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty(string.Empty) ? 1 : 0),
+            RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty("text") ? 1 : 0));
+        return Row(
+            effects: Effect(
+                "null, empty, and non-empty strings",
+                () => ObservePureBclEffects(edges),
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "null, empty, and non-empty strings",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "null, empty, and non-empty strings",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclStringItemInt32Witness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = "text"[0]),
+            RuntimeEdge.For(() => s_integerSink = "text"[^1]));
+        var throwEdges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = "text"[0]),
+            RuntimeEdge.For(() => s_integerSink = "text"[5]));
+        return Row(
+            effects: Effect(
+                "valid indexes on non-empty strings",
+                () => ObserveReceiverReadBclEffects(edges),
+                SpecEffect.None),
+            allocation: Allocation(
+                "valid indexes on non-empty strings",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "valid and out-of-range indexes",
+                throwEdges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableHasValueWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(1).HasValue ? 1 : 0),
+            RuntimeEdge.For(() => s_integerSink = new int?().HasValue ? 1 : 0));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers",
+                () => ObserveReceiverReadBclEffects([edges[0]]),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableGetValueOrDefaultWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(7).GetValueOrDefault()),
+            RuntimeEdge.For(() => s_integerSink = new int?().GetValueOrDefault()));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers",
+                () => ObserveReceiverReadBclEffects(edges),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableGetValueOrDefaultValueWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(7).GetValueOrDefault(4)),
+            RuntimeEdge.For(() => s_integerSink = new int?().GetValueOrDefault(4)));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers with a fallback",
+                () => ObserveReceiverReadBclEffects(edges),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers with a fallback",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers with a fallback",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableValueWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(7).Value),
+            RuntimeEdge.For(() => s_integerSink = ReadNullableValue(false)));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers",
+                () => ObserveReceiverReadBclEffects([edges[0]]),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers",
+                [edges[0]],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers",
+                edges,
+                DoesNotThrowMutation));
+    }
+
     private static RowWitness CreateBclExceptionCtorWitness()
     {
         return CreateBclConstructorWitness(
@@ -692,6 +856,35 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static SpecEffect ObserveNoEffects(params Func<bool>[] edges)
     {
         return edges.All(static edge => edge()) ? SpecEffect.None : SpecEffect.Unknown;
+    }
+
+    private static SpecEffect ObservePureBclEffects(
+        ImmutableArray<RuntimeEdge> edges)
+    {
+        foreach (var edge in edges)
+        {
+            edge.Prepare();
+            edge.Invoke();
+        }
+        return SpecEffect.None;
+    }
+
+    private static SpecEffect ObserveReceiverReadBclEffects(
+        ImmutableArray<RuntimeEdge> edges)
+    {
+        return ObservePureBclEffects(edges) == SpecEffect.None
+            ? SpecEffect.ReadsReceiverState
+            : SpecEffect.Unknown;
+    }
+
+    private static int ReadNullableValue(bool present)
+    {
+        int? value = present ? 7 : null;
+        if (!value.HasValue)
+        {
+            throw new InvalidOperationException();
+        }
+        return value.Value;
     }
 
     private static SpecEffect ObserveObjectConstructorEffect()

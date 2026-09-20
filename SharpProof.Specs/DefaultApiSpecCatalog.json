@@ -209,6 +209,160 @@
         }
       },
       "postconditions": []
+    },
+    {
+      "id": "ObservedPureBcl",
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "id": "ObservedPureReceiverRead",
+      "facets": {
+        "effects": {
+          "values": [
+            "ReadsReceiverState"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "id": "DocumentedNullableValue",
+      "facets": {
+        "effects": {
+          "values": [
+            "ReadsReceiverState"
+          ],
+          "evidence": "documented"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "id": "DocumentedNullableValueThrow",
+      "facets": {
+        "effects": {
+          "values": [
+            "ReadsReceiverState"
+          ],
+          "evidence": "documented"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "MayThrow",
+          "exceptionMetadataNames": [
+            "System.InvalidOperationException"
+          ],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "id": "DocumentedStringIndexer",
+      "facets": {
+        "effects": {
+          "values": [
+            "ReadsReceiverState"
+          ],
+          "evidence": "documented"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "MayThrow",
+          "exceptionMetadataNames": [
+            "System.IndexOutOfRangeException"
+          ],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
     }
   ],
   "declarations": [
@@ -631,6 +785,146 @@
           "evidence": "documented"
         }
       ]
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.math.max.int32-int32",
+        "documentationCommentId": "M:System.Math.Max(System.Int32,System.Int32)",
+        "containingTypeMetadataName": "System.Math",
+        "memberKind": "Method",
+        "memberName": "Max",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "Integer",
+          "Integer"
+        ],
+        "resultType": "Integer",
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "ObservedPureBcl"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.math.min.int32-int32",
+        "documentationCommentId": "M:System.Math.Min(System.Int32,System.Int32)",
+        "containingTypeMetadataName": "System.Math",
+        "memberKind": "Method",
+        "memberName": "Min",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "Integer",
+          "Integer"
+        ],
+        "resultType": "Integer",
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "ObservedPureBcl"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.string.is-null-or-empty",
+        "documentationCommentId": "M:System.String.IsNullOrEmpty(System.String)",
+        "containingTypeMetadataName": "System.String",
+        "memberKind": "Method",
+        "memberName": "IsNullOrEmpty",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "String"
+        ],
+        "resultType": "Boolean",
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "ObservedPureBcl"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.string.item.int32",
+        "documentationCommentId": "M:System.String.get_Chars(System.Int32)",
+        "containingTypeMetadataName": "System.String",
+        "memberKind": "Method",
+        "memberName": "get_Chars",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "String",
+        "parameterTypes": [
+          "Integer"
+        ],
+        "resultType": "Integer",
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "DocumentedStringIndexer"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.nullable.has-value",
+        "documentationCommentId": "P:System.Nullable`1.HasValue",
+        "containingTypeMetadataName": "System.Nullable`1",
+        "memberKind": "PropertyGet",
+        "memberName": "HasValue",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [],
+        "resultType": "Boolean",
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "ObservedPureReceiverRead"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.nullable.get-value-or-default",
+        "documentationCommentId": "M:System.Nullable`1.GetValueOrDefault",
+        "containingTypeMetadataName": "System.Nullable`1",
+        "memberKind": "Method",
+        "memberName": "GetValueOrDefault",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "DocumentedNullableValue"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.nullable.get-value-or-default.value",
+        "documentationCommentId": "M:System.Nullable`1.GetValueOrDefault(`0)",
+        "containingTypeMetadataName": "System.Nullable`1",
+        "memberKind": "Method",
+        "memberName": "GetValueOrDefault",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [
+          "Integer"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "DocumentedNullableValue"
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.nullable.value",
+        "documentationCommentId": "P:System.Nullable`1.Value",
+        "containingTypeMetadataName": "System.Nullable`1",
+        "memberKind": "PropertyGet",
+        "memberName": "Value",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "profile": "DocumentedNullableValueThrow"
     },
     {
       "target": {

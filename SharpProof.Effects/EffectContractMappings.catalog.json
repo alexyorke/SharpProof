@@ -192,9 +192,11 @@
     {"marker":"/PACKS/NETSTANDARD.LIBRARY.REF/","family":"NetStandardReferencePack"},
     {"marker":"/PACKAGES/NETSTANDARD.LIBRARY/","family":"NetStandardReferencePack"},
     {"marker":"/REFERENCEPACKS/NETSTANDARD/","family":"NetStandardReferencePack"},
+    {"marker":"/REFERENCEPACKS/NETSTANDARD2.0/","family":"NetStandardReferencePack"},
     {"marker":"/REFERENCE ASSEMBLIES/MICROSOFT/FRAMEWORK/.NETFRAMEWORK/","family":"NetFrameworkReferenceAssemblies"},
     {"marker":"/PACKAGES/MICROSOFT.NETFRAMEWORK.REFERENCEASSEMBLIES/","family":"NetFrameworkReferenceAssemblies"},
     {"marker":"/REFERENCEPACKS/NET47/","family":"NetFrameworkReferenceAssemblies"},
+    {"marker":"/REFERENCEPACKS/NET472/","family":"NetFrameworkReferenceAssemblies"},
     {"marker":"/SHARED/MICROSOFT.NETCORE.APP/","family":"MicrosoftNetCoreRuntime"}
   ],
   "evidenceRules": [

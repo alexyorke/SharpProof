@@ -120,7 +120,7 @@ compiler-elided call, including its argument evaluation.
 
 ## Resolved API specification inventory
 
-The default table has eleven BCL rows. Every row resolves by documentation
+The default table has nineteen BCL rows. Every row resolves by documentation
 comment ID and original symbol identity across the supported reference
 surfaces. Effects, allocation, throws, nullness, and cardinality are separate
 facets; an exact fact in one facet does not make an unknown facet exact.
@@ -137,9 +137,17 @@ facets; an exact fact in one facet does not make an unknown facet exact.
 | `bcl.string.concat.string-string` - `System.String.Concat(string, string)` | None | May allocate | Does not throw | Non-null string |
 | `bcl.list.add` - `List<T>.Add(T)` | Writes receiver state | May allocate | Unknown | None |
 | `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` | Result is non-negative on normal return |
+| `bcl.math.max.int32-int32` - `Math.Max(int, int)` | None | None | Does not throw | - |
+| `bcl.math.min.int32-int32` - `Math.Min(int, int)` | None | None | Does not throw | - |
+| `bcl.nullable.has-value` - `Nullable<T>.HasValue` | Reads receiver state | None | Does not throw | - |
+| `bcl.nullable.get-value-or-default` - `Nullable<T>.GetValueOrDefault()` | Reads receiver state | None | Does not throw | - |
+| `bcl.nullable.get-value-or-default.value` - `Nullable<T>.GetValueOrDefault(T)` | Reads receiver state | None | Does not throw | - |
+| `bcl.nullable.value` - `Nullable<T>.Value` | Reads receiver state | None | May throw `InvalidOperationException` | - |
+| `bcl.string.is-null-or-empty` - `String.IsNullOrEmpty(string)` | None | None | Does not throw | - |
+| `bcl.string.item.int32` - `String.this[int]` | Reads receiver state | None | May throw `IndexOutOfRangeException` | - |
 | `bcl.enumerable.empty` - `Enumerable.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
 
-These eleven rows are the complete supported built-in BCL surface. Anything
+These nineteen rows are the complete supported built-in BCL surface. Anything
 outside this table, or any row that does not resolve exactly for the current
 target framework, fails closed. Object creation always analyzes a source
 constructor or resolves an exact catalog row; exception constructors are not
