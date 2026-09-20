@@ -115,10 +115,7 @@ internal sealed class CompilerCallableLowerer
                 clause.Kind == BoundContractKind.Assume ? userAssumptions[assumptionOrdinal++].Id : null))];
         ImmutableArray<CompilerCanonicalVariable> variables = [.. contracts.Variables.Select(
             variable => CreateVariable(variable, contracts))];
-        var requiresBodyAdmission =
-            !target.Claims.IsDefaultOrEmpty ||
-            !contracts.Clauses.IsDefaultOrEmpty;
-        if (!requiresBodyAdmission)
+        if (target.Claims.IsDefaultOrEmpty)
         {
             return Success(target, clauses, variables, body: null);
         }

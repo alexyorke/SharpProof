@@ -32,7 +32,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 3 entries: 0 P0, 0 P1 and 3 P3. The final
+The list currently has 2 entries: 0 P0, 0 P1 and 2 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
@@ -110,45 +110,15 @@ section records the areas that were probed without finding a defect.
   the build. Document the choice, and recommend closed parameter attributes
   for preconditions that must be checked across assemblies.
 
-### `Contract.Assume` is used for postconditions but ignored by effect claims, while `Contract.Requires` is used by both
-
-- **File:** `SharpProof.Effects/ManagedAbstractFlow.cs` (`Transfer`, the
-  `IInvocationOperation` case:
-  `IsRequires(invocation) ? Assume(state, invocation.Arguments[0].Value, true) : HavocCall(...)`,
-  so a `Contract.Assume` call is treated like any other call), with the
-  user-facing description in `docs/coverage-and-limits.md` ("Explicit user
-  evidence").
-- **Confidence:** Confirmed with `SharpProofFeatures=effects`.
-  `[DoesNotThrow] int F(int x) { Contract.Requires(x != 0); return 10 / x; }`
-  was accepted, but the same method with `Contract.Assume(x != 0)` reported
-  SP0046 (`DivideByZeroException`), and so did
-  `Contract.Assume(a != null && i >= 0 && i < a.Length); return a[i];`.
-  For postconditions the worker does use `Assume` (it appears in proof cores
-  as a user assumption).
-- **What is wrong:** The documentation presents `Contract.Assume` as
-  explicit user evidence without saying that it only feeds postcondition
-  proofs. A user who adds an assumption to state an invariant the analyzer
-  cannot infer (the usual reason to write one) finds that it has no effect
-  on `[DoesNotThrow]`, `[AllowedExceptions]` or `[ZeroAllocations]`, even
-  though the equivalent `Requires` does. Not trusting assumptions for
-  effect claims is a defensible choice, since effect proofs have no place
-  to record the assumption, but the asymmetry is surprising and
-  undocumented.
-- **Failure scenario:** A developer writes `Contract.Assume(divisor != 0)`
-  before a division in a `[DoesNotThrow]` method, keeps getting SP0046, and
-  either converts it into a `Requires` (which changes the method's contract
-  and triggers SP0027 at callers) or suppresses the diagnostic.
-- **Suggested fix:** Either apply `Assume` conditions to the managed flow
-  for effect claims and record them as SP0048-visible assumptions on those
-  claims, or document in `docs/coverage-and-limits.md` and `SEMANTICS.md`
-  that assumptions are postcondition-only evidence and never discharge
-  effect obligations.
-
 ## Areas checked without findings
 
 These were exercised with the same scratch harnesses and produced no defect.
 They are listed so the work is not repeated, and because each one is evidence
 about where the implementation is solid.
+
+- **Contract.Assume effect evidence.** Direct `Contract.Assume` clauses now
+  refine managed effect flow and remain in effects-only compiler artifacts as
+  `UserAssume` evidence, so SP0048 still reports the declared assumption.
 
 - **Worker postcondition soundness (differential).** A C# fuzzer generated
   contract-bearing methods over `long`/`bool` with branches, reassignment,

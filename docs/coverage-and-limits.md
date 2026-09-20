@@ -80,7 +80,7 @@ support.
 |---|---|
 | `Contract.Requires(condition)` | A precondition. The analyzer uses exact replay or managed CFG facts at definite call sites. The worker can use a bound precondition as a justified entry assumption. |
 | `Contract.Ensures(condition)` | A normal-return postcondition and worker proof goal. The analyzer does not prove postconditions. |
-| `Contract.Assume(condition)` | Explicit user evidence. It remains visible as a user-assumed proof justification. |
+| `Contract.Assume(condition)` | Explicit user evidence. It refines selected effect flow and remains visible as a user-assumed proof justification. |
 | `Contract.Result<T>()` | Valid only inside `Ensures`; substitutes the callable's normal return value. A direct runtime call throws. |
 | `Contract.Old(value)` | Valid only inside `Ensures`; substitutes the entry-state value. Nested or otherwise invalid uses fail closed. A direct runtime call throws. |
 

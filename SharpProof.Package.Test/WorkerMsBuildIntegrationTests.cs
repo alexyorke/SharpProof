@@ -2670,6 +2670,50 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task EffectsFeatureRetainsContractAssumptionsForEffectClaims()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [DoesNotThrow]
+                public static int Divide(int divisor) {
+                    Contract.Assume(divisor != 0);
+                    return 10 / divisor;
+                }
+            }
+            """);
+
+        var build = await BuildOkAsync(project.BuildAsync(
+            verify: true,
+            ("SharpProofFeatures", "effects"),
+            ("SharpProofAssumptionPolicy", "allow")));
+        Assert.That(build.Output, Does.Contain("info SP0048"));
+
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        var artifact = await CompilerManifestArtifact.ReadAsync(
+            request.CompilerManifest.Path);
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var claim = response.ClaimResults.Single();
+        var callable = response.CallableResults.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
+            Assert.That(callable.Assumptions,
+                Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
+                    assumption.Kind == WorkerAssumptionKind.UserAssume));
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(claim.Assumptions,
+                Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
+                    assumption.Kind == WorkerAssumptionKind.UserAssume));
+        }
+    }
+
+    [Test]
     public async Task AssumptionSeverityIncludesDeclaredEvidence()
     {
         RequireContainerWorker();

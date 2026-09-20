@@ -209,7 +209,7 @@ internal sealed class ManagedAbstractFlow
         var elidedInvocations = graph.OriginalOperation.DescendantsAndSelf()
             .OfType<IInvocationOperation>()
             .Where(invocation =>
-                !IsRequires(invocation) &&
+                !IsAssumption(invocation) &&
                 _completionFacts.IsConditionallyElided(invocation))
             .ToImmutableArray();
         foreach (var block in graph.Blocks)
@@ -322,7 +322,7 @@ internal sealed class ManagedAbstractFlow
         ManagedFlowState state, IOperation operation, ManagedFlowResult result, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!(operation is IInvocationOperation requires && IsRequires(requires)) &&
+        if (!(operation is IInvocationOperation assumption && IsAssumption(assumption)) &&
             _completionFacts.IsConditionallyElided(operation))
         {
             result.Record(operation, state);
@@ -428,7 +428,7 @@ internal sealed class ManagedAbstractFlow
             case IInvocationOperation invocation:
                 state = TransferMany(state, invocation.ChildOperations, result, cancellationToken);
                 result.Record(operation, state);
-                return IsRequires(invocation) ? Assume(state, invocation.Arguments[0].Value, true)
+                return IsAssumption(invocation) ? Assume(state, invocation.Arguments[0].Value, true)
                     : HavocCall(state, invocation.TargetMethod, invocation.Arguments);
             case IObjectCreationOperation creation:
                 state = TransferMany(state, creation.Arguments, result, cancellationToken);
@@ -1043,13 +1043,13 @@ internal sealed class ManagedAbstractFlow
             attribute.AttributeClass?.OriginalDefinition, expected.OriginalDefinition);
     }
 
-    private bool IsRequires(IInvocationOperation invocation)
+    private bool IsAssumption(IInvocationOperation invocation)
     {
         return invocation.TargetMethod is
         {
             IsStatic: true,
             ReturnsVoid: true,
-            Name: ContractApiCatalog.RequiresMethodName,
+            Name: ContractApiCatalog.RequiresMethodName or ContractApiCatalog.AssumeMethodName,
             Parameters.Length: 1
         } method &&
         method.Parameters[0].Type.SpecialType == SpecialType.System_Boolean &&

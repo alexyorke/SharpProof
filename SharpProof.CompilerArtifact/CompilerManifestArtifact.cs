@@ -688,7 +688,9 @@ internal static class CompilerManifestArtifactJson
                 (selectedContracts && !allowContracts) ||
                 (effects.Length != 0 && (!selectedEffects || !allowEffects)) ||
                 (postconditions.Length != 0 && (!selectedContracts || !allowContracts)) ||
-                (hasContractAssumptions && (!selectedContracts || !allowContracts)))
+                (hasContractAssumptions &&
+                 !((selectedContracts && allowContracts) ||
+                   (selectedEffects && allowEffects))))
             {
                 return false;
             }

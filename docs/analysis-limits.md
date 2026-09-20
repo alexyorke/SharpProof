@@ -154,7 +154,8 @@ malformed closure fails before worker execution.
 
 `SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
 effect-only annotations from the manifest; `effects` excludes postcondition
-claims and contract assumptions; `all` includes both.
+claims but retains the `Requires`/`Assume` clauses needed to justify selected
+effect summaries; `all` includes both.
 
 ## Fixed portable analyzer bounds
 

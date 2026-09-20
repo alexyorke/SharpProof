@@ -64,12 +64,6 @@ internal sealed partial class ClaimManifestBuilder(
         var source = resolution.Source;
         var inventory = resolution.Inventory;
         var usesCompanion = resolution.UsesCompanion;
-        var clausePartitions = ContractsEnabled
-            ? PartitionClauses(inventory.Clauses)
-            : default;
-        var postconditions = CreatePostconditions(
-            target, source, clausePartitions.Postconditions,
-            usesCompanion, callableId);
         var trustedAttributes = TrustedAttributes(target).ToImmutableArray();
         var selection = _attributes.Select(
             target,
@@ -77,13 +71,23 @@ internal sealed partial class ClaimManifestBuilder(
         var selected = SelectFeatures(
             selection,
             !trustedAttributes.IsDefaultOrEmpty);
+        var effectAssumptionsEnabled =
+            EffectsEnabled &&
+            (selection & ContractSelectionFeatures.Effects) != 0;
+        var clausePartitions = ContractsEnabled || effectAssumptionsEnabled
+            ? PartitionClauses(inventory.Clauses)
+            : default;
+        var postconditions = CreatePostconditions(
+            target, source, clausePartitions.Postconditions,
+            usesCompanion, callableId);
         var assumptions = CreateAssumptions(
             target,
             source,
             clausePartitions.Assumptions,
             usesCompanion,
             callableId,
-            trustedAttributes);
+            trustedAttributes,
+            ContractsEnabled || effectAssumptionsEnabled);
         if (postconditions.IsDefaultOrEmpty && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
         {
             return null;
@@ -124,8 +128,7 @@ internal sealed partial class ClaimManifestBuilder(
                 target, callableId, postconditions.Length, supported)
             : [];
         var features = new HashSet<WorkerSelectedFeature>(selected);
-        if (!postconditions.IsDefaultOrEmpty ||
-            assumptions.Any(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume))
+        if (!postconditions.IsDefaultOrEmpty)
         {
             features.Add(WorkerSelectedFeature.Contracts);
         }
@@ -277,10 +280,11 @@ internal sealed partial class ClaimManifestBuilder(
         ImmutableArray<ContractClauseOccurrence> clauses,
         bool usesCompanion,
         string callableId,
-        ImmutableArray<(ISymbol Scope, AttributeData Attribute)> trustedAttributes)
+        ImmutableArray<(ISymbol Scope, AttributeData Attribute)> trustedAttributes,
+        bool includeContractAssumptions)
     {
         var candidates = ImmutableArray.CreateBuilder<AssumptionCandidate>();
-        if (ContractsEnabled)
+        if (includeContractAssumptions)
         {
             foreach (var clause in clauses)
             {
