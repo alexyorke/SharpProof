@@ -241,9 +241,9 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
-    public async Task CompilationReferenceRequiresClauseActivatesCallAnalysis()
+    public async Task RequiresClauseProjectReferencesMatchCompiledReferences()
     {
-        await AssertCompilationReferenceActivatesCallAnalysisAsync(
+        var external = AnalyzerTestHost.CreateCompilation(
             """
             using SharpProof.Attributes;
 
@@ -255,13 +255,47 @@ public sealed class AdvisoryActivationTests
                 }
             }
             """,
-            """
+            []);
+        MetadataReference[] references =
+        [
+            external.ToMetadataReference(),
+            MetadataReference.CreateFromImage(
+                AnalyzerTestHost.EmitImage(external))
+        ];
+        const string callerSource = """
             internal static class Caller {
                 internal static void Call() {
                     External.Contracts.Guard.RequirePositive(-1);
                 }
             }
-            """);
+            """;
+        const string ActivatedCallerSource = """
+            using SharpProof.Attributes;
+
+            internal static class Caller {
+                internal static void Call() {
+                    Contract.Requires(true);
+                    External.Contracts.Guard.RequirePositive(-1);
+                }
+            }
+            """;
+
+        foreach (var source in new[] { callerSource, ActivatedCallerSource })
+        {
+            foreach (var reference in references)
+            {
+                var caller = AnalyzerTestHost.CreateCompilation(
+                    source,
+                    ["SP0027"],
+                    [reference]);
+                var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+                    caller,
+                    mode: null,
+                    analyzer: new SharpProofAnalyzer());
+
+                Assert.That(diagnostics, Is.Empty);
+            }
+        }
     }
 
     [Test]

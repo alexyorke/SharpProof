@@ -351,15 +351,11 @@ internal sealed partial class SharpProofAnalyzerEngine
                 continue;
             }
 
-            if (reference is CompilationReference source)
+            if (reference is CompilationReference)
             {
-                if (CompilationContainsRequiresClause(
-                        source.Compilation,
-                        cancellationToken))
-                {
-                    return true;
-                }
-
+                // Contract.Requires is Conditional and is omitted from a
+                // compiled reference. Treat source-only clauses the same as
+                // the emitted assembly so IDE and build diagnostics agree.
                 var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
                 if (symbol == null)
                 {
@@ -388,54 +384,6 @@ internal sealed partial class SharpProofAnalyzerEngine
             }
 
             return true;
-        }
-
-        return false;
-    }
-
-    private static bool CompilationContainsRequiresClause(
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        if (compilation.Language != LanguageNames.CSharp)
-        {
-            return true;
-        }
-
-        var contract = SharpProof.Frontend.ContractApiIdentityResolver
-            .ForCompilation(compilation)
-            .Contract;
-        if (contract == null)
-        {
-            return false;
-        }
-
-        foreach (var tree in PotentiallyActivatedTrees(
-                     compilation,
-                     cancellationToken))
-        {
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, tree);
-            foreach (var invocation in tree.GetRoot(cancellationToken)
-                         .DescendantNodes()
-                         .OfType<InvocationExpressionSyntax>())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!IsContractApiCandidate(invocation.Expression) ||
-                    model.GetSymbolInfo(invocation, cancellationToken)
-                        .Symbol is not IMethodSymbol
-                        {
-                            Name: ContractApiMetadata.RequiresMethodName
-                        } method ||
-                    !SymbolEqualityComparer.Default.Equals(
-                        method.ContainingType.OriginalDefinition,
-                        contract.OriginalDefinition))
-                {
-                    continue;
-                }
-
-                return true;
-            }
         }
 
         return false;

@@ -32,48 +32,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 1 entry: 0 P0, 0 P1 and 1 P3. The final
+The list currently has 0 entries: 0 P0, 0 P1 and 0 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
-
-
-### SP0027 checks another project's `Contract.Requires` only when that project is a source reference, so the IDE and the build disagree
-
-- **File:** `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs`
-  (`MayContainExternalClosedPreconditions` looks at `Contract.Requires`
-  clauses through `CompilationReference` and only at closed parameter
-  attributes through `PortableExecutableReference`) and the call-site
-  contract lookup used by `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`.
-- **Confidence:** Confirmed. A library method
-  `public static long Pos(long x) { Contract.Requires(x > 0); return x; }`
-  and a `[Positive]` sibling were called with `0` from a second
-  compilation. With the library passed as a compilation reference (what
-  Visual Studio and other IDE hosts use for project-to-project references),
-  both calls reported SP0027. With the library passed as its compiled DLL
-  (what `dotnet build` and CI use for the same project reference), only the
-  `[Positive]` call was reported.
-- **What is wrong:** `Contract.Requires` is `[Conditional]`, so it is not
-  present in the referenced assembly's IL, and the analyzer has no other
-  metadata record of it. When the referenced project is available as
-  source, the analyzer reads the clause from its syntax. The same code
-  therefore gets a precondition warning in the editor that the command-line
-  build never produces (or, for a team that builds with
-  `TreatWarningsAsErrors`, an IDE error that CI does not reproduce).
-  `SEMANTICS.md` says the call-site screen "checks source and metadata
-  targets, including closed parameter annotations", which does not say that
-  `Requires` clauses are invisible across a compiled project boundary.
-- **Failure scenario:** A shared library annotates its API with
-  `Contract.Requires`. Developers see SP0027 in the IDE when they call it
-  wrongly from an application project, but the CI build of the same commit
-  is clean, so the warning is ignored, or a build that is green in CI shows
-  errors locally.
-- **Suggested fix:** Pick one behavior. Either persist `Requires` clauses
-  in metadata (for example an assembly-level contract table written by the
-  analyzer or compiler collector) so compiled references are checked too,
-  or ignore source-only clauses of referenced projects so the IDE matches
-  the build. Document the choice, and recommend closed parameter attributes
-  for preconditions that must be checked across assemblies.
 
 ## Areas checked without findings
 
@@ -87,6 +49,13 @@ about where the implementation is solid.
   every supported reference-pack family. Analyzer and runtime witnesses cover
   the normal and throwing paths; unsupported framework members remain
   unresolved and fail closed.
+
+- **Cross-project source and binary contracts.** Source-only
+  `Contract.Requires` clauses are ignored for external compilation
+  references, matching emitted DLLs where conditional calls are absent.
+  Closed parameter attributes remain checked across both reference forms, and
+  regression coverage compares the two paths with and without local contract
+  activation.
 
 - **Contract.Assume effect evidence.** Direct `Contract.Assume` clauses now
   refine managed effect flow and remain in effects-only compiler artifacts as

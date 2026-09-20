@@ -356,10 +356,13 @@ discovery policy and its tests.
 
 When ordinary calls activate advisory analysis without any local
 contract/attribute candidate, SharpProof runs only the conservative call-site
-precondition screen. It still checks source and metadata targets, including
-closed parameter annotations, but does not initialize contract inventories,
-companion resolution, API specifications, or effect analysis unless a target
-or selected callable demands them.
+precondition screen. It checks closed parameter annotations on source and
+metadata targets, but ignores source-only `Contract.Requires` and companion
+clauses from external compilation references because conditional contract calls
+are absent from emitted assemblies. Local source clauses and closed attributes
+remain available to call-site analysis. The screen does not initialize contract
+inventories, companion resolution, API specifications, or effect analysis
+unless a target or selected callable demands them.
 
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
 by default. A concretely replayed false precondition is SP0027 at Warning.

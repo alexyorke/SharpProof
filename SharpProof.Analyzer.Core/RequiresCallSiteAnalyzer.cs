@@ -311,18 +311,26 @@ internal static partial class RequiresCallSiteAnalyzer
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
+            var externalSourceTarget = IsExternalSourceTarget(contractTarget);
             var binding = session.BindRequires(contractTarget);
             if (binding is not { IsSuccess: true, Contracts: not null })
             {
-                return AnalyzerSemanticOutcome.Unknown;
+                return externalSourceTarget
+                    ? AnalyzerSemanticOutcome.NotApplicable
+                    : AnalyzerSemanticOutcome.Unknown;
             }
 
             var requires = binding.Contracts.Clauses
-                .Where(static clause => clause.Kind == BoundContractKind.Requires)
+                .Where(clause =>
+                    clause.Kind == BoundContractKind.Requires &&
+                    (!externalSourceTarget ||
+                     clause.Evidence == BoundContractEvidence.ClosedAttribute))
                 .ToImmutableArray();
             if (requires.IsDefaultOrEmpty)
             {
-                return session.HasPotentialCallPreconditions(contractTarget)
+                return externalSourceTarget
+                    ? AnalyzerSemanticOutcome.NotApplicable
+                    : session.HasPotentialCallPreconditions(contractTarget)
                     ? AnalyzerSemanticOutcome.Unknown
                     : AnalyzerSemanticOutcome.NotApplicable;
             }
@@ -349,6 +357,14 @@ internal static partial class RequiresCallSiteAnalyzer
                 binding.Contracts,
                 requires,
                 inputVariables);
+        }
+
+        private bool IsExternalSourceTarget(IMethodSymbol target)
+        {
+            return !target.DeclaringSyntaxReferences.IsEmpty &&
+                !SymbolEqualityComparer.Default.Equals(
+                    target.ContainingAssembly,
+                    semanticModel.Compilation.Assembly);
         }
 
         private AnalyzerSemanticOutcome AnalyzeAbstractCallSite(
