@@ -2565,6 +2565,69 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task DispatchImplementationsCannotHideLocalPreconditions()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface IScaler {
+                long Scale(long value);
+            }
+
+            public class BaseScaler {
+                public virtual long Scale(long value) => value;
+            }
+
+            public sealed class StrictScaler : BaseScaler, IScaler {
+                public override long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public sealed class InterfaceScaler : IScaler {
+                public long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public sealed class AnnotatedInterfaceScaler : IScaler {
+                public long Scale([Positive] long value) => value;
+            }
+
+            public class ContractedBase {
+                public virtual long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public sealed class MatchingOverride : ContractedBase {
+                public override long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024", "SP0047"]);
+
+        var invalid = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SP0024")
+            .ToArray();
+        Assert.That(invalid, Has.Length.EqualTo(3));
+        Assert.That(
+            invalid.Select(static diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("override or interface implementation"));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0047"));
+    }
+
+    [Test]
     public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

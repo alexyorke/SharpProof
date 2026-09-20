@@ -38,42 +38,6 @@ section records the areas that were probed without finding a defect.
 ## P3 - Low
 
 
-### Preconditions added on overrides and interface implementations are assumed but cannot be checked at virtual call sites
-
-- **File:** `SharpProof.Contracts/ContractClauseInventoryBuilder.cs` and
-  `SharpProof.Contracts/ContractBinder.cs` (clauses are accepted on any
-  ordinary method, including overrides and interface implementations), with
-  the call-site check in
-  `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs` (which only sees the
-  statically bound target).
-- **Confidence:** Confirmed. `StrictScaler.Scale`, an `override` of
-  `BaseScaler.Scale` that also implements `IScaler.Scale`, declared
-  `Contract.Requires(x > 0)` and `Contract.Ensures(Contract.Result<long>() > 0)`.
-  The worker published the postcondition as `Proven` with proof core
-  `requires:0`. The analyzer reported SP0027 for `new StrictScaler().Scale(-5)`
-  but nothing for `baseScaler.Scale(-5)` or `scaler.Scale(-5)` through the
-  interface, and nothing about the strengthened precondition itself. A
-  `[Positive]` parameter on an interface implementation behaved the same way.
-  The limitation is not described in `SEMANTICS.md` or
-  `docs/coverage-and-limits.md`.
-- **What is wrong:** A precondition is an obligation on callers. Callers
-  that bind to the base method or the interface member cannot see a
-  precondition declared only on one override, so it is never checked for
-  them, yet the override's own proofs assume it. This is the precondition
-  strengthening that the .NET Code Contracts tools rejected; SharpProof
-  accepts it silently.
-- **Failure scenario:** A team adds `Contract.Requires(x > 0)` to one
-  implementation to get its postcondition proven. Every caller uses the
-  interface, passes `-5`, and receives a negative result from a method whose
-  "result is positive" claim is shown as proven in the verification report
-  and in SARIF.
-- **Suggested fix:** Report SP0024 for `Requires` clauses and closed
-  parameter preconditions on overrides, explicit or implicit interface
-  implementations, unless an identical precondition is declared on the
-  overridden or implemented member (or on its `[ContractFor]` companion).
-  Alternatively, mark such proofs with a distinct vacuity or assumption kind
-  so that they are not presented as unconditional. Document the rule.
-
 ### SP0027 only checks calls in top-level statements, so a violation inside any block is silent
 
 - **File:** `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`

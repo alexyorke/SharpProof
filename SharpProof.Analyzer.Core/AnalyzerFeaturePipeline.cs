@@ -273,6 +273,11 @@ internal static partial class AnalyzerFeaturePipeline
                 session,
                 context.ReportDiagnostic,
                 context.CancellationToken);
+        OverridePreconditionDiagnostics.Validate(
+            method,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
         if (TryRecordRejectedContractAbstention(
                 method,
                 rejectedContractApi,

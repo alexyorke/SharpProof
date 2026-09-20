@@ -177,6 +177,12 @@ compiler-bound ghost specification.
 
 Callee postconditions may be assumed only after verification or explicit trust.
 
+Preconditions declared only on an override or an interface implementation are
+not visible through base or interface dispatch. The analyzer reports SP0024 for
+such a local precondition unless an equivalent valid `Requires` contract is
+already declared on an overridden or implemented member. Callers must use the
+base or interface contract that is visible at the dispatch site.
+
 ## Relational callee summaries
 
 Worker postcondition verification may compose a direct callee only when the
