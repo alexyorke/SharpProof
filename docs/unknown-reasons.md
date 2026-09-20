@@ -277,8 +277,10 @@ from its conservative scan of every compiler-reachable block.
 Proven postconditions additionally carry `WorkerVacuityKind`: `None`,
 `ContradictoryPreconditions`, or `NoModeledNormalReturn`. The last two make
 partial-correctness vacuity visible rather than silently presenting the result
-as an ordinary proof. The field is preserved by canonical JSON and SARIF
-projection. Proven claims do not enter the semantic cache.
+as an ordinary proof. `NoModeledNormalReturn` also covers an unsatisfiable
+`Contract.Assume` combined with the method's other modeled assumptions. The
+field is preserved by canonical JSON and SARIF projection. Proven claims do
+not enter the semantic cache.
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
 proof `UnsupportedEncoding` maps to worker `UnsupportedExpression`.

@@ -445,7 +445,7 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
-    public async Task UserAssumeCannotCreatePreconditionVacuity()
+    public async Task UserAssumeCanCreateNormalCompletionVacuity()
     {
         var factory = new IrFactory();
         var target = CreateTarget(
@@ -467,7 +467,47 @@ public sealed class WorkerTcbEdgeCaseTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+        }
+    }
+
+    [Test]
+    public async Task UserAssumeContradictingPreconditionIsNormalCompletionVacuity()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var variable = factory.Variable(value);
+        var target = CreateTarget(
+            factory,
+            [
+                Requires(factory.Binary(
+                    IrBinaryOperator.GreaterThan,
+                    variable,
+                    factory.Integer(0))),
+                new CompilerPreparedClause(
+                    CompilerContractKind.Assume,
+                    factory.Binary(
+                        IrBinaryOperator.LessThan,
+                        variable,
+                        factory.Integer(0)),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    null,
+                    "assume"),
+                Ensures(factory.Boolean(false))
+            ],
+            [Parameter(value)],
+            CompilerPreparedBody.Trivial());
+
+        var result = await VerifyWithSmtAsync(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
         }
     }
 

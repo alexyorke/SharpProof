@@ -226,8 +226,9 @@ ghost specification evidence.
   semantic disagreement during an otherwise valid replay becomes the fatal
   `Unknown(CounterexampleReplayFailed)`.
 - Proven postconditions expose `ContradictoryPreconditions` or
-  `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. Proven claims are
-  not disk-cache entries.
+  `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. The latter also
+  covers an unsatisfiable `Contract.Assume` combined with the modeled entry
+  and body assumptions. Proven claims are not disk-cache entries.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.

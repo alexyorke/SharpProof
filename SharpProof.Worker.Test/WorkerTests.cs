@@ -2302,7 +2302,7 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 assumeOnly.Vacuity,
-                Is.EqualTo(WorkerVacuityKind.None));
+                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
                 Is.True);

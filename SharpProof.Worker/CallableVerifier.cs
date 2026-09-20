@@ -141,11 +141,15 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 ? ImmutableArray.Create("body:normal-completion")
                 : [];
         var noModeledNormalReturn = normalCompletionIsFalse;
-        if (normalCompletion is not IrBooleanTerm)
+        var hasUserAssumptions = assumptions.Any(
+            static assumption =>
+                assumption.Justification is UserAssumedJustification);
+        if (normalCompletion is not IrBooleanTerm || hasUserAssumptions)
         {
-            var bodyEvidence = assumptions.Where(
-                static assumption =>
-                    assumption.Justification is not UserAssumedJustification);
+            // A user assumption can remove every modeled normal return just
+            // like an impossible path.  Include it in this consistency probe
+            // so a vacuous proof remains visible to the result assembler.
+            var bodyEvidence = assumptions;
             var completionOutcome = await ProbeSatisfiabilityAsync(
                     factory,
                     bodyEvidence,

@@ -32,7 +32,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 14 entries: 0 P0, 0 P1 and 14 P3. The final
+The list currently has 13 entries: 0 P0, 0 P1 and 13 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
@@ -80,63 +80,6 @@ section records the areas that were probed without finding a defect.
   `docs/analysis-limits.md`, and emit a structured, coded diagnostic that
   names the project time budget and the setting that raises it
   (`SharpProofVerifyProjectWallTimeMilliseconds`).
-
-### Proofs made vacuous by `Contract.Assume` report `vacuity=None`
-
-- **File:** `SharpProof.Worker/CallableVerifier.cs` (vacuity selection after
-  `_kernel.VerifyAsync`), `SharpProof.Worker/CallableClaimResultAssembler.cs`
-  (`Contradictory`, `FromOutcome`)
-- **Confidence:** Confirmed. The unmodified collector and worker (bundled Z3)
-  were run on the methods below. The contradictory-precondition and
-  always-overflowing controls were marked correctly:
-  `Contract.Requires(p > 0 && p < 0)` gave `Proven` with
-  `vacuity=ContradictoryPreconditions`, and `return checked(long.MaxValue + p)`
-  under `Requires(p > 0)` gave `vacuity=NoModeledNormalReturn`. The
-  assumption-based cases did not:
-
-  ```csharp
-  public static long AssumeFalse(long p)
-  {
-      Contract.Ensures(Contract.Result<long>() == 42);
-      Contract.Assume(false);
-      return p;
-  }
-
-  public static long AssumeContradictsRequires(long p)
-  {
-      Contract.Requires(p > 0);
-      Contract.Ensures(Contract.Result<long>() == 42);
-      Contract.Assume(p < 0);
-      return p;
-  }
-  ```
-
-  Both were `Proven` with `vacuity=None` (cores `[assume:0]` and
-  `[assume:1, requires:0]`).
-- **What is wrong:** Vacuity evidence is computed only for contradictory
-  preconditions and for a normal-completion predicate that is unsatisfiable
-  under non-user assumptions. A user assumption that is unsatisfiable, alone
-  or together with the preconditions, removes every modeled normal return,
-  but the claim result is indistinguishable from an ordinary proof apart from
-  the assumption ID in its core. The documentation says the vacuity field
-  exists to make partial-correctness vacuity visible "rather than silently
-  presenting the result as an ordinary proof", and consumers that key on
-  `Vacuity` (SARIF readers, dashboards, the launcher summary) see a normal
-  `Proven`.
-- **Failure scenario:** A developer adds `Contract.Assume(count >= 0)` to quiet
-  a solver timeout, but `count` is a negative constant on the only path, or a
-  refactoring flips a `Requires`. Every postcondition of the method becomes
-  `Proven` with `vacuity=None`. Under the default strict assumption policy
-  SP0048 still fails the build, but under `SharpProofAssumptionPolicy=allow`
-  or `warn` the only sign is an informational or warning SP0048 that looks the
-  same as for a harmless assumption.
-- **Suggested fix:** After a `Proven` outcome whose core contains a user
-  assumption, check satisfiability of the entry and body assumptions including
-  user assumptions but excluding the goal. If they are unsatisfiable, report a
-  distinct vacuity kind (for example `ContradictoryAssumptions`), or reuse
-  `NoModeledNormalReturn` and document that user assumptions count. Add worker
-  tests for `Assume(false)` and for an assumption that contradicts a
-  precondition.
 
 
 ### SP0048 is reported once at the first callable instead of where assumptions are declared
