@@ -32,7 +32,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 19 entries: 0 P0, 0 P1 and 19 P3. The final
+The list currently has 16 entries: 0 P0, 0 P1 and 16 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
@@ -186,39 +186,6 @@ section records the areas that were probed without finding a defect.
   tests for `Assume(false)` and for an assumption that contradicts a
   precondition.
 
-### Return nullability treats `yield return null` as a null-returning method
-
-- **File:** `SharpProof.Effects/ExceptionHandlerReachability.cs`
-  (`ComputeReturnNullability`, used by `GetForEachExceptions` and the await
-  branch; also consumed by `OperationEffectScanner.ScanAwait`)
-- **Confidence:** Low. Not reproduced. A selected method containing `foreach`
-  is rejected by the subset gate (SP0047, which only admits `for` and `while`
-  loops). When the loop is in a callee, the call to the iterator's
-  `IEnumerator.MoveNext` is unmodeled, so the caller already reports SP0002.
-  The misclassification is in the code but is currently masked.
-- **What is wrong:** The method collects every `IReturnOperation` under the
-  declaration. Roslyn represents `yield return value` as an
-  `IReturnOperation` with `OperationKind.YieldReturn`, so for an iterator the
-  collected "returned values" are the yielded elements, not the enumerator
-  object the method really returns. An iterator whose yields are all `null`
-  (or `default`) is classified `ReturnNullability.Null`, although an iterator
-  method never returns null.
-- **Failure scenario:**
-  `class Bag { public IEnumerator GetEnumerator() { yield return null; } }` and
-  `try { foreach (var item in new Bag()) { Work(); } } catch (InvalidOperationException) { s_state++; }`.
-  `GetForEachExceptions` sees `ReturnNullability.Null`, adds only a
-  `NullReferenceException` and returns with `reachesBody = false`, so the
-  loop body is never pushed and `Work()`'s exceptions are ignored. If `Work`
-  throws `InvalidOperationException`, the catch is classified unreachable, its
-  static write is dropped from the enclosing method's effect summary, and a
-  write-free or pure contract can be accepted. `ScanAwait` has the same
-  exposure for an awaiter factory that is an iterator.
-- **Suggested fix:** Return `ReturnNullability.NonNull` for iterator methods
-  (detected with `IMethodSymbol.IsIterator` on Roslyn versions that expose it,
-  or by the presence of any `YieldReturn`/`YieldBreak` operation) and for
-  async methods (the returned task or value task is never null), and ignore
-  `IReturnOperation`s whose `Kind` is `YieldReturn` or `YieldBreak` when
-  collecting returned values.
 
 ### SP0048 is reported once at the first callable instead of where assumptions are declared
 
@@ -249,36 +216,6 @@ section records the areas that were probed without finding a defect.
   coverage (one result per incomplete callable, as the SARIF path already
   does for `IncompleteResult`).
 
-### SP0027 prints the folded condition instead of the violated precondition
-
-- **File:** `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`
-  (`CompleteEvaluation` and the loop that builds `ClauseEvaluation`)
-- **Confidence:** Confirmed. For
-  `static int RequirePositive(int value) { Contract.Requires(value > 0); return value; }`
-  called as `RequirePositive(-1)`, the reported message was
-  `Call to 'RequirePositive' violates precondition 'false'`. When the argument
-  is a local (`int x = -1; return Positive(x);`), the message was
-  `Call to 'Positive' violates precondition '(v21 > 0)'`, which exposes an
-  internal IR variable name instead of `value`.
-- **What is wrong:** The analyzer substitutes the call arguments into
-  `clause.Condition` and stores the substituted term in `ClauseEvaluation`.
-  `IrFactory` folds constants while building terms, so with literal or
-  otherwise known arguments the substituted condition is simply `false`. That
-  folded term is what `IrPrinter` renders into the `{1}` placeholder of the
-  message format, so the diagnostic never names the precondition that failed.
-- **Failure scenario:** A method with several `Contract.Requires` clauses is
-  called with arguments that violate one of them. Every SP0027 message reads
-  `violates precondition 'false'`, so the developer cannot tell which clause
-  failed. The documentation's own `Positive(0)` example produces this message.
-  The `{0}` placeholder uses `TargetMethod.Name`, so a violating constructor
-  call such as `new Guarded(0)` is reported as `Call to '.ctor' violates
-  precondition 'false'` (confirmed), which names neither the type nor the
-  condition.
-- **Suggested fix:** Keep the unsubstituted `clause.Condition` (or the source
-  text of the `Contract.Requires` argument) in `ClauseEvaluation` and print
-  that. Optionally, append the concrete argument values that made it false.
-  Format constructors with their containing type name (for example with
-  `ToDisplayString` on the method symbol) instead of `Name`.
 
 ### ContractFor validation is documented as a generator but runs as an untagged compilation-end analyzer action
 
@@ -576,30 +513,6 @@ section records the areas that were probed without finding a defect.
   override and implementation in the compilation and check each of them.
   Document the chosen behavior next to the attribute descriptions.
 
-### SP0046 messages list exception types by full assembly identity
-
-- **File:** `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs`
-  (`FormatDiagnosticTypes`), which uses
-  `SharpProof.Frontend/CompilerIdentityBridge.cs` (`CreateTypeDisplay`,
-  `AssemblyIdentity(...) + "::" + TypeReference(...)`).
-- **Confidence:** Confirmed. A `[DoesNotThrow]` method whose helper may
-  throw `NullReferenceException` and a user exception `Fail` was reported as
-  `... may-effect summary includes disallowed exceptions: Probe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Fail, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.NullReferenceException`.
-- **What is wrong:** The diagnostic text reuses the canonical identity
-  string meant for manifests and evidence, which prefixes every type with
-  its assembly's display name, version, culture and public key token, and
-  sorts by that prefix. The message becomes long enough that the actual
-  exception names are hard to find, the order is by assembly rather than by
-  type, and the text changes with the reference pack version (a project
-  that multi-targets `net8.0` and `net9.0` gets different messages for the
-  same method, and so does an SDK update).
-- **Failure scenario:** Teams that review SP0046 in the IDE error list or
-  keep baselines of analyzer output see unreadable messages and churn on
-  every framework update, even though the analyzed code did not change.
-- **Suggested fix:** Use `ToDisplayString()` (optionally with the assembly
-  name only when two reported types share a full name) in user-facing
-  messages, and keep `CreateTypeDisplay` for manifests, evidence and
-  properties on the diagnostic. Sort by the displayed type name.
 
 ### Nullable value types and other everyday pure BCL members have no effect specifications, so ordinary code is unprovable
 

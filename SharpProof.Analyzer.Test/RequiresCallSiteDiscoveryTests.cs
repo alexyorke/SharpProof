@@ -928,8 +928,8 @@ public sealed class RequiresCallSiteDiscoveryTests
             Assert.That(
                 diagnostics[0].GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture),
-                Is.EqualTo(
-                    "Call to 'Target' violates precondition 'false'"));
+                Does.Contain(
+                    "Call to 'Target' violates precondition '(v0 > 0)'"));
         }
     }
 

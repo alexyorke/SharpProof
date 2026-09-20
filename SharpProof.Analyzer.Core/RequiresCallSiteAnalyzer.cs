@@ -587,7 +587,12 @@ internal static partial class RequiresCallSiteAnalyzer
                     return null;
                 }
 
-                evaluations.Add(new ClauseEvaluation(value.Value.Boolean, condition));
+                // Keep the declaration-side predicate for the diagnostic.
+                // The substituted term may fold to `false`, which hides the
+                // precondition that the caller violated.
+                evaluations.Add(new ClauseEvaluation(
+                    value.Value.Boolean,
+                    clause.Condition));
             }
             return CompleteEvaluation(callSite, evaluations);
         }

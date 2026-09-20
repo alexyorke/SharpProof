@@ -467,9 +467,49 @@ internal static class EffectContractDiagnostics
         IEnumerable<INamedTypeSymbol> types)
     {
         return string.Join(", ", types.Select(static type =>
-                CompilerIdentityBridge.CreateTypeDisplay(type))
+                FormatDiagnosticType(type))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
+    }
+
+    private static string FormatDiagnosticType(ITypeSymbol type)
+    {
+        return type switch
+        {
+            INamedTypeSymbol named => FormatDiagnosticNamedType(named),
+            IArrayTypeSymbol array => FormatDiagnosticType(array.ElementType) +
+                "[" + new string(',', array.Rank - 1) + "]",
+            IPointerTypeSymbol pointer => FormatDiagnosticType(pointer.PointedAtType) + "*",
+            ITypeParameterSymbol parameter => parameter.Name,
+            _ => type.Name
+        };
+    }
+
+    private static string FormatDiagnosticNamedType(INamedTypeSymbol type)
+    {
+        var containingTypes = new Stack<string>();
+        for (var current = type; current != null; current = current.ContainingType)
+        {
+            var name = current.Name;
+            if (!current.TypeArguments.IsDefaultOrEmpty)
+            {
+                name += "<" + string.Join(", ", current.TypeArguments.Select(
+                    FormatDiagnosticType)) + ">";
+            }
+            containingTypes.Push(name);
+        }
+
+        var namespaces = new Stack<string>();
+        for (var current = type.ContainingNamespace;
+             current is { IsGlobalNamespace: false };
+             current = current.ContainingNamespace)
+        {
+            namespaces.Push(current.Name);
+        }
+
+        return string.Join(
+            ".",
+            namespaces.Concat(containingTypes));
     }
 
     private static Location GetLocation(AttributeData attribute, Location fallback)

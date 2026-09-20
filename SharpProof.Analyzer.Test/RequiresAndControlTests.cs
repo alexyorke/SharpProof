@@ -1580,7 +1580,7 @@ public sealed class RequiresAndControlTests
             []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
-        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "false");
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "> 0");
     }
 
     [Test]

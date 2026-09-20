@@ -3451,6 +3451,8 @@ public sealed class AnalyzerModeAndEffectTests
         {
             Assert.That(message, Does.Contain("First.SameException"));
             Assert.That(message, Does.Contain("Second.SameException"));
+            Assert.That(message, Does.Not.Contain("Version="));
+            Assert.That(message, Does.Not.Contain("PublicKeyToken="));
         }
     }
 

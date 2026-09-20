@@ -2968,9 +2968,22 @@ internal sealed class ExceptionHandlerReachability(
         {
             return ReturnNullability.MaybeNull;
         }
+        if (method.IsAsync)
+        {
+            // Async methods return the compiler-created task/awaiter object;
+            // the modeled result is never the method's direct return value.
+            return ReturnNullability.NonNull;
+        }
         try
         {
             var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
+            if (declaration.DescendantNodesAndSelf().Any(
+                    static node => node is YieldStatementSyntax))
+            {
+                // Iterator methods return an enumerator object even when all
+                // yielded elements are null.
+                return ReturnNullability.NonNull;
+            }
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, declaration.SyntaxTree);
             var directBody = GetBodyOperation(declaration, model);
