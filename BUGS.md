@@ -38,39 +38,6 @@ section records the areas that were probed without finding a defect.
 ## P3 - Low
 
 
-### A valid `ContractFor` companion for an interface member reports SP0047 on the bodiless target
-
-- **File:** `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs` (selected
-  callables without an operation root are reported as
-  `MissingOperationRoot`) together with the companion selection in
-  `SharpProof.Contracts/EffectiveContractSourceResolver.cs`.
-- **Confidence:** Confirmed. The shipped `samples/ContractFor` source,
-  compiled with nullable enabled and `SharpProofFeatures=all`, reported
-  `SP0047 ... could not completely analyze selected method 'Find': MissingOperationRoot`
-  on `IService.Find`. A minimal valid companion for `IGate.Open` did the
-  same, while a companion for a class method with a body did not, and the
-  companion's `Requires` were still enforced at call sites (SP0027 for
-  `new Calc2().Next(500)` against `Requires(x < 100)`).
-- **What is wrong:** A companion makes its target a contract-bearing
-  ("selected") callable. For an interface or abstract member there is no
-  body to analyze, which is expected, but the pipeline reports it the same
-  way as an explicitly annotated method it failed to analyze.
-  `docs/diagnostic-examples.md` does say SP0047 "includes selected
-  abstract, interface, and `extern` declarations that have no operation
-  body", so the report is documented, but for a companion the user did not
-  annotate the declaration at all and has no way to resolve the
-  diagnostic other than suppressing it.
-- **Failure scenario:** Every interface companion, which is the main use of
-  `ContractFor` and what the sample demonstrates, adds an SP0047 that users
-  cannot resolve. Teams that raise SP0047 to a warning to catch real
-  analysis gaps (the diagnostics sample does exactly this kind of
-  configuration) get a permanent false alarm per companion member and learn
-  to ignore the rule.
-- **Suggested fix:** Do not report SP0047 for abstract, interface, extern or
-  partial-definition targets whose only contract source is a companion (or
-  report a separate, clearly informational ID). Add the `samples/ContractFor`
-  expectation "no SP0047" to the sample test.
-
 ### Preconditions added on overrides and interface implementations are assumed but cannot be checked at virtual call sites
 
 - **File:** `SharpProof.Contracts/ContractClauseInventoryBuilder.cs` and

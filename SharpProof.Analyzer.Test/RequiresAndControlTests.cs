@@ -2526,6 +2526,45 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ValidCompanionForInterfaceMemberDoesNotReportBodilessTarget()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface IService {
+                int Find(int value);
+            }
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts {
+                public static int Find(IService receiver, int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public static class Fixture {
+                public static int Call(IService service) {
+                    return service.Find(0);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027", "SP0047"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0047"));
+        Assert.That(
+            diagnostics,
+            Has.Some.Matches<Diagnostic>(static diagnostic =>
+                diagnostic.Id == "SP0027" &&
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)
+                    .Contains("Find", StringComparison.Ordinal)));
+    }
+
+    [Test]
     public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

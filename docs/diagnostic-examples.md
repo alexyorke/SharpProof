@@ -205,8 +205,10 @@ until it has concrete exception-effect replay.
 The analyzer emits SP0047 when a contract or SharpProof annotation explicitly
 selects a method but the method is outside the supported analyzer subset.
 This includes selected abstract, interface, and `extern` declarations that have
-no operation body. Unannotated or explicitly suppressed unsupported methods
-remain silent.
+no operation body. A valid `ContractFor` companion supplies the contract for a
+bodyless target and does not produce SP0047 on that target; direct annotations
+on a bodyless declaration still report the incomplete analysis. Unannotated or
+explicitly suppressed unsupported methods remain silent.
 
 SP0047 also reports `ContractApiIdentityRejected` when a clause or annotation
 binds to a source/project lookalike, a mismatched `SharpProof.Attributes`

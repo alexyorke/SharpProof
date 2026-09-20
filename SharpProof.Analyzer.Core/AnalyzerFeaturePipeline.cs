@@ -162,6 +162,17 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        var contractSource = session.ResolveContractSource(method);
+        if ((method.IsAbstract || method.IsExtern) &&
+            contractSource.UsesCompanion &&
+            contractSource.Failure == ContractBindingFailure.None &&
+            !contractSource.HasValidDirectClause)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.NotApplicable);
+            return;
+        }
         if (!selection.Contracts &&
             selection.Effects &&
             session.ResolveEffectContract(method) is
