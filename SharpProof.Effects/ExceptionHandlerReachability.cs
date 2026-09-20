@@ -908,6 +908,30 @@ internal sealed class ExceptionHandlerReachability(
                 {
                     continue;
                 }
+                if (SwitchExpressionFacts.IsITuplePattern(recursivePattern))
+                {
+                    Add(
+                        ResolveDispatch(
+                            SwitchExpressionFacts.GetITupleLengthMember(
+                                recursivePattern),
+                            traversal),
+                        recursivePattern);
+                    if (SwitchExpressionFacts.GetITupleIndexerMember(
+                            recursivePattern) is { } indexer)
+                    {
+                        foreach (var _ in recursivePattern
+                                     .DeconstructionSubpatterns)
+                        {
+                            Add(
+                                ResolveDispatch(indexer, traversal),
+                                recursivePattern);
+                        }
+                    }
+                    PushSequentialCore(
+                        recursivePattern.ChildOperations,
+                        remaining);
+                    continue;
+                }
                 if (recursivePattern.DeconstructSymbol is
                     IMethodSymbol deconstruct)
                 {
@@ -2983,8 +3007,15 @@ internal sealed class ExceptionHandlerReachability(
                 var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
                 var model = SharpProof.Frontend.Host.CompilationModelProvider
                     .GetSemanticModel(compilation, declaration.SyntaxTree);
-                var operation = model.GetOperation(declaration) ??
-                    GetBodyOperation(declaration, model);
+                var operation = model.GetOperation(declaration);
+                if (operation is ILocalFunctionOperation)
+                {
+                    operation = GetBodyOperation(declaration, model);
+                }
+                else
+                {
+                    operation ??= GetBodyOperation(declaration, model);
+                }
                 result = operation == null
                     ? UnknownPotential
                     : GetPotentialExceptions(
@@ -3001,6 +3032,9 @@ internal sealed class ExceptionHandlerReachability(
                             method,
                             traversal));
                 }
+                result = Union(
+                    result,
+                    GetImplicitThrowExceptions(operation));
             }
             if (cacheResult)
             {
@@ -3023,6 +3057,71 @@ internal sealed class ExceptionHandlerReachability(
         {
             traversal.ActiveMethods.Remove(method);
         }
+    }
+
+    private PotentialExceptions GetImplicitThrowExceptions(
+        IOperation? operation)
+    {
+        if (operation is not (
+                IMethodBodyOperation or
+                IConstructorBodyOperation or
+                IBlockOperation { Parent: null }))
+        {
+            return EmptyPotential;
+        }
+
+        ControlFlowGraph? graph;
+        try
+        {
+            graph = operation switch
+            {
+                IMethodBodyOperation or IConstructorBodyOperation =>
+                    RoslynCfgFactory.TryCreateMethodOrConstructorGraph(
+                        operation,
+                        CancellationToken.None),
+                IBlockOperation { Parent: null } block =>
+                    ControlFlowGraph.Create(block, CancellationToken.None),
+                _ => null
+            };
+        }
+        catch (ArgumentException)
+        {
+            return EmptyPotential;
+        }
+
+        if (graph == null)
+        {
+            return EmptyPotential;
+        }
+
+        var result = EmptyPotential;
+        foreach (var block in RoslynCfgThrowFacts.ReachableBlocks(graph))
+        {
+            if (block.FallThroughSuccessor?.Semantics !=
+                    ControlFlowBranchSemantics.Throw ||
+                block.BranchValue is not { IsImplicit: true } branchValue)
+            {
+                continue;
+            }
+
+            // Roslyn lowers a non-exhaustive switch expression to an implicit
+            // throw branch. Other implicit CFG throw branches are already
+            // covered by the operation walk; treating them as unknown here
+            // would make unrelated catches spuriously reachable.
+            if (!branchValue.Syntax.AncestorsAndSelf().Any(
+                    static syntax => syntax is SwitchExpressionSyntax))
+            {
+                continue;
+            }
+
+            var potential = _switchExpressionExceptionType is { } exception
+                ? Potential(exception)
+                : UnknownPotential;
+            potential = KeepEscaping(potential, branchValue);
+            result = Union(result, potential);
+        }
+
+        return result;
     }
 
     private PotentialExceptions GetImplicitConstructorExceptions(

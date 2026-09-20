@@ -55,6 +55,7 @@ internal sealed partial class OperationEffectScanner
 
         var phasesComplete = _completionEvaluator
             .CanCompleteDeconstructionPhases(deconstruction);
+        var deconstructionCall = ScanDeconstructionCall(deconstruction);
         // Identity tuple deconstruction has no intervening call or conversion.
         // Other phases retain the existing conservative boundary.
         var phases = IsDirectTupleDeconstruction(
@@ -63,13 +64,98 @@ internal sealed partial class OperationEffectScanner
             ? EffectSummary.Empty
             : phasesComplete
                 ? EffectSummaryOperations.Unsupported()
-                : EffectSummaryOperations.MayDiverge();
+                : deconstructionCall.Termination ==
+                    EffectTermination.Terminates &&
+                    !deconstructionCall.Throws.IsEmpty
+                        ? EffectSummary.Empty
+                        : EffectSummaryOperations.MayDiverge();
+        phases = EffectSummaryDomain.Instance.Join(
+            phases,
+            deconstructionCall);
         result = result.Then(new EffectStep(phases, phasesComplete));
         return !result.CompletesNormally
             ? result.Summary
             : result.Then(ScanDeconstructionTargetWrites(
                 deconstruction.Target,
                 deconstruction.Value)).Summary;
+    }
+
+    private EffectSummary ScanDeconstructionCall(
+        IDeconstructionAssignmentOperation deconstruction)
+    {
+        if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax)
+        {
+            return EffectSummary.Empty;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_session.Compilation, syntax.SyntaxTree);
+        var info = model.GetDeconstructionInfo(syntax);
+        if (info.Method is not { } method)
+        {
+            return EffectSummary.Empty;
+        }
+
+        var hasReceiver = method.ReducedFrom != null || !method.IsStatic;
+        var receiver = hasReceiver
+            ? _conversionOwnership.ClassifyRegion(
+                deconstruction.Value,
+                aliasSource: true)
+            : EffectRegionSet.Empty;
+        var targets = FlattenDeconstructionTargets(deconstruction.Target)
+            .Take(method.Parameters.Length)
+            .ToImmutableArray();
+        var argumentRegions = targets
+            .Select(ClassifyDeconstructionTargetRegion)
+            .Concat(Enumerable.Repeat(
+                EffectRegionSet.Unknown,
+                Math.Max(0, method.Parameters.Length - targets.Length)))
+            .ToImmutableArray();
+        var actualArguments = targets
+            .Cast<IOperation?>()
+            .Concat(Enumerable.Repeat<IOperation?>(
+                null,
+                Math.Max(0, method.Parameters.Length - targets.Length)))
+            .ToImmutableArray();
+        return _callResolver.Resolve(
+            method,
+            receiver,
+            receiver,
+            argumentRegions,
+            actualArguments,
+            method.IsVirtual || method.IsAbstract,
+            deconstruction,
+            hasReceiver ? deconstruction.Value : null);
+    }
+
+    private EffectRegionSet ClassifyDeconstructionTargetRegion(
+        IOperation target)
+    {
+        return target switch
+        {
+            ILocalReferenceOperation local
+                when local.Local.RefKind == RefKind.None =>
+                EffectRegionSet.Empty,
+            IDiscardOperation => EffectRegionSet.Empty,
+            _ => _conversionOwnership.ClassifyRegion(
+                target,
+                aliasSource: true)
+        };
+    }
+
+    private static IEnumerable<IOperation> FlattenDeconstructionTargets(
+        IOperation target)
+    {
+        if (target is IDeclarationExpressionOperation declaration)
+        {
+            return FlattenDeconstructionTargets(declaration.Expression);
+        }
+        if (target is ITupleOperation tuple)
+        {
+            return tuple.Elements.SelectMany(FlattenDeconstructionTargets);
+        }
+
+        return [target];
     }
 
     private EffectStep ScanDeconstructionTargetEvaluations(

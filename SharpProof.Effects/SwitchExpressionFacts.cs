@@ -34,6 +34,57 @@ internal static class SwitchExpressionFacts
         };
     }
 
+    internal static bool IsITuplePattern(IRecursivePatternOperation pattern)
+    {
+        // Roslyn represents the object/ITuple fallback as the ITuple type in
+        // DeconstructSymbol; value tuple patterns leave it null.
+        return pattern.DeconstructSymbol is INamedTypeSymbol type &&
+            IsITupleType(type);
+    }
+
+    internal static IMethodSymbol? GetITupleLengthMember(
+        IRecursivePatternOperation pattern)
+    {
+        return GetITupleProperty(pattern, "Length")?.GetMethod;
+    }
+
+    internal static IMethodSymbol? GetITupleIndexerMember(
+        IRecursivePatternOperation pattern)
+    {
+        return IsITuplePattern(pattern)
+            ? ((INamedTypeSymbol)pattern.DeconstructSymbol!)
+                .GetMembers()
+                .OfType<IPropertySymbol>()
+                .SingleOrDefault(static property => property.IsIndexer)
+                ?.GetMethod
+            : null;
+    }
+
+    private static IPropertySymbol? GetITupleProperty(
+        IRecursivePatternOperation pattern,
+        string name)
+    {
+        return IsITuplePattern(pattern)
+            ? ((INamedTypeSymbol)pattern.DeconstructSymbol!)
+                .GetMembers(name)
+                .OfType<IPropertySymbol>()
+                .SingleOrDefault()
+            : null;
+    }
+
+    private static bool IsITupleType(INamedTypeSymbol type)
+    {
+        var compilerServices = type.ContainingNamespace;
+        var runtime = compilerServices.ContainingNamespace;
+        var system = runtime.ContainingNamespace;
+        return type.Arity == 0 &&
+            type.Name == "ITuple" &&
+            compilerServices.Name == "CompilerServices" &&
+            runtime.Name == "Runtime" &&
+            system.Name == "System" &&
+            system.ContainingNamespace.IsGlobalNamespace;
+    }
+
     internal static IMethodSymbol? GetCallableListPatternMember(ISymbol? symbol)
     {
         return symbol switch
@@ -413,6 +464,13 @@ internal static class SwitchExpressionFacts
         if (inputType?.IsValueType != true && !inputDefinitelyNonNull ||
             !SymbolEqualityComparer.Default.Equals(matchedType, inputType))
         {
+            return false;
+        }
+        if (pattern is IRecursivePatternOperation recursive &&
+            IsITuplePattern(recursive))
+        {
+            // ITuple positional patterns inspect a runtime Length value. The
+            // input type does not promise enough elements for the pattern.
             return false;
         }
         return pattern is not IRecursivePatternOperation recursivePattern ||

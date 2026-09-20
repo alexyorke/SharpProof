@@ -196,8 +196,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 meter.GetRemainingBudget());
             solver.Parameters = parameters;
             cancellationToken.ThrowIfCancellationRequested();
+            // Z3 reports this statistic as a context-lifetime total.
+            var resourceCountBeforeCheck = ReadResourceCount(solver);
             var status = solver.Check();
-            meter.ConsumeNative(ReadResourceCount(solver));
+            var resourceCountAfterCheck = ReadResourceCount(solver);
+            meter.ConsumeNative(checked(
+                resourceCountAfterCheck - resourceCountBeforeCheck));
             cancellationToken.ThrowIfCancellationRequested();
             return status switch
             {

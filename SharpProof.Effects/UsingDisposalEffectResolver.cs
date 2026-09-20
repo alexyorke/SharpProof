@@ -51,6 +51,10 @@ internal sealed class UsingDisposalEffectResolver
         ImmutableArray<IOperation> operations = default)
     {
         var summary = EffectSummary.Empty;
+        // Managed flow does not record handler paths (or code reached after a
+        // normally completing handler). Let the scanner's semantic fallback
+        // distinguish those paths from genuinely unreachable operations.
+        OperationEffectScanner? semanticReachability = null;
         IEnumerable<IOperation> candidates = operations.IsDefault
             ? root.DescendantsAndSelf()
             : operations;
@@ -59,8 +63,18 @@ internal sealed class UsingDisposalEffectResolver
                          operation is IUsingOperation or
                              IUsingDeclarationOperation))
         {
-            if (ConversionOwnershipClassifier.IsInsideNestedCallable(operation, root) ||
-                _flow != null && !_flow.IsReachable(operation))
+            if (ConversionOwnershipClassifier.IsInsideNestedCallable(operation, root))
+            {
+                continue;
+            }
+            if (_flow != null && !_flow.IsReachable(operation) &&
+                !(semanticReachability ??= OperationEffectScanner
+                    .CreateReachabilityProbe(
+                        _compilation,
+                        _caller,
+                        root,
+                        _flow))
+                    .IsReachable(operation))
             {
                 continue;
             }

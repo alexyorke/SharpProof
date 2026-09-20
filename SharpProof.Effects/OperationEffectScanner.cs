@@ -181,64 +181,6 @@ internal sealed partial class OperationEffectScanner
         }
     }
 
-    internal EffectSummary ScanLexicalControlEffects(IOperation root)
-    {
-        var result = EffectSummary.Empty;
-        IEnumerable<IOperation> operations = ReferenceEquals(root, _root)
-            ? _operations
-            : root.DescendantsAndSelf();
-        foreach (var operation in operations
-                     .Where(operation =>
-                         operation is ILockOperation or IThrowOperation &&
-                         !ConversionOwnershipClassifier.IsInsideNestedCallable(operation, root)))
-        {
-            if (!IsReachable(operation))
-            {
-                continue;
-            }
-
-            var canReachThrow = operation is IThrowOperation throwOperation &&
-                CanReachThrow(throwOperation);
-
-            if (IsDirectSyntax(operation))
-            {
-                if (operation is ILockOperation directLock)
-                {
-                    RecordDirectLock(directLock);
-                }
-                else if (operation is IThrowOperation thrown &&
-                         canReachThrow)
-                {
-                    RecordDirect(operation);
-                }
-            }
-            var lexical = operation switch
-            {
-                ILockOperation @lock
-                    when _completionEvaluator.CanCompleteNormally(
-                        @lock.LockedValue) => EffectSummaryOperations.Join(
-                            PotentialNullLock(@lock.LockedValue, @lock),
-                            EffectSummaryOperations.Capability(
-                                EffectCapabilityKind.Synchronization)),
-                IThrowOperation thrown when IsSourceThrow(thrown) &&
-                    canReachThrow => EffectExceptionFlow.KeepEscaping(
-                    IsUnmodeledExternalExceptionConstruction(thrown.Exception)
-                        ? ScanUnmodeledExternalExceptionThrow(thrown)
-                        : IsExternalExceptionConstructionWithoutSpec(
-                            thrown.Exception)
-                            ? EffectSummaryOperations.ExceptionConstructionThrow(
-                                EffectSummary.Empty,
-                                ResolveThrownException(thrown))
-                        : EffectSummaryOperations.Throw(
-                            ResolveThrownException(thrown)),
-                    thrown, _session.Compilation),
-                _ => EffectSummary.Empty
-            };
-            result = EffectSummaryDomain.Instance.Join(result, lexical);
-        }
-        return result;
-    }
-
     internal EffectSummary ScanUsingDisposalEffects(IOperation root)
     {
         var operations = ReferenceEquals(root, _root)
@@ -306,6 +248,14 @@ internal sealed partial class OperationEffectScanner
         EffectAccess access,
         EffectStep? evaluatedLocation = null)
     {
+        if (operation is IPatternOperation pattern &&
+            TryGetPatternAllocation(pattern, out var patternAllocation))
+        {
+            return EffectSummaryOperations.Join(
+                ScanCoreOperationTail(operation),
+                EffectSummaryOperations.Allocate(patternAllocation));
+        }
+
         return operation switch
         {
             IAnonymousFunctionOperation or ILocalFunctionOperation or ILiteralOperation or
@@ -1249,43 +1199,6 @@ internal sealed partial class OperationEffectScanner
             method.IsVirtual && !method.IsSealed ||
             _completionEvaluator.CanMethodCompleteNormally(method);
         return new EffectStep(call, completesNormally);
-    }
-
-    private EffectSummary ScanDefaultPattern(IOperation pattern)
-    {
-        if (_nullnessEvaluator.IsProvenNull(
-                SwitchExpressionFacts.GetGoverningValue(
-                    (IPatternOperation)pattern),
-                pattern))
-        {
-            return EffectSummary.Empty;
-        }
-
-        return pattern is IRecursivePatternOperation recursivePattern
-            ? ScanRecursivePattern(recursivePattern)
-            : ScanChildren(pattern);
-    }
-
-    private EffectSummary ScanRecursivePattern(
-        IRecursivePatternOperation pattern)
-    {
-        if (pattern.DeconstructSymbol is not IMethodSymbol deconstruct)
-        {
-            return ScanChildren(pattern);
-        }
-
-        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
-        var receiver = _conversionOwnership.ClassifyRegion(
-            instance,
-            aliasSource: true);
-        var result = ScanImplicitPatternCall(
-            deconstruct,
-            receiver,
-            pattern,
-            instance);
-        return result.CompletesNormally
-            ? result.Then(ScanSequence(pattern.ChildOperations)).Summary
-            : result.Summary;
     }
 
     private EffectSummary ScanChildren(IOperation operation)

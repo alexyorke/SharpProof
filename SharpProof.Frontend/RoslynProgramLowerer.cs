@@ -1,3 +1,6 @@
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Frontend;
 
 public sealed class RoslynProgramLowerer(
@@ -401,6 +404,7 @@ public sealed class RoslynProgramLowerer(
             IrBlockId block, OperationId operation, IInvocationOperation invocation,
             bool wantsResult)
         {
+            var targetMethod = GetDispatchMethod(invocation);
             var receiver = LowerOptionalValue(block, operation, invocation.Instance);
             var loweredArguments = LowerInvocationArguments(
                 block,
@@ -409,7 +413,7 @@ public sealed class RoslynProgramLowerer(
             var arguments = loweredArguments.Arguments;
             var mutated = loweredArguments.Mutated;
             var resultType = _expressions.GetTypeId(invocation.Type);
-            var member = _expressions.GetMember(invocation.TargetMethod, ref receiver, "call:", resultType, arguments);
+            var member = _expressions.GetMember(targetMethod, ref receiver, "call:", resultType, arguments);
             var isDirect = loweredArguments.IsDirect;
             if (!isDirect)
             {
@@ -417,7 +421,7 @@ public sealed class RoslynProgramLowerer(
             }
 
             IrVarId? target = null;
-            if (wantsResult && !invocation.TargetMethod.ReturnsVoid &&
+            if (wantsResult && !targetMethod.ReturnsVoid &&
                 CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type))
             {
                 target = CreateTemporary("call", resultType);
@@ -427,10 +431,10 @@ public sealed class RoslynProgramLowerer(
             _calls.Add(call, invocation);
 
             if (mutated.Length != 0 || !isDirect ||
-                !IsStaticallyBound(invocation.TargetMethod) ||
-                !_isKnownPure(invocation.TargetMethod))
+                !IsStaticallyBound(targetMethod) ||
+                !_isKnownPure(targetMethod))
             {
-                if (IsClosureInvocation(invocation.TargetMethod))
+                if (IsClosureInvocation(targetMethod))
                 {
                     mutated = [.. mutated
                         .Concat(CreateKnownStateVariables())];
@@ -451,6 +455,19 @@ public sealed class RoslynProgramLowerer(
                 return _factory.Variable(missing);
             }
             return null;
+        }
+
+        private IMethodSymbol GetDispatchMethod(
+            IInvocationOperation invocation)
+        {
+            if (invocation.Syntax is InvocationExpressionSyntax syntax &&
+                (invocation.SemanticModel ?? _graph.OriginalOperation.SemanticModel) is { } semanticModel &&
+                semanticModel.GetInterceptorMethod(syntax) is { } interceptor)
+            {
+                return interceptor;
+            }
+
+            return invocation.TargetMethod;
         }
 
         private (IrTerm[] Arguments, bool IsDirect, IrVarId[] Mutated)

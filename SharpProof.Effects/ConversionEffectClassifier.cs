@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp;
+
 namespace SharpProof.Effects;
 
 /// <summary>
@@ -73,7 +75,7 @@ internal sealed class ConversionEffectClassifier(
             return ClassifyNullableConversion(
                 operation,
                 CheckedOverflow(
-                    operation.IsChecked,
+                    IsCheckedConversion(operation, conversion),
                     operation,
                     skipsLiftedOperator));
         }
@@ -81,7 +83,7 @@ internal sealed class ConversionEffectClassifier(
         if (conversion is { IsNumeric: true } or { IsEnumeration: true })
         {
             return CheckedOverflow(
-                operation.IsChecked,
+                IsCheckedConversion(operation, conversion),
                 operation,
                 skipsLiftedOperator);
         }
@@ -127,6 +129,47 @@ internal sealed class ConversionEffectClassifier(
         // conversions, stackalloc/span/inline-array conversions, pointer and
         // native-integer conversions are not modeled by this effect domain.
         return EffectSummaryOperations.Unsupported();
+    }
+
+    private bool IsCheckedConversion(
+        IConversionOperation operation,
+        Microsoft.CodeAnalysis.CSharp.Conversion conversion)
+    {
+        // Roslyn omits IsChecked for some built-in enum and nullable
+        // conversions. Recover their enclosing checked context here.
+        bool? explicitContext = null;
+        for (var syntax = operation.Syntax;
+             syntax != null;
+             syntax = syntax.Parent)
+        {
+            if (syntax.IsKind(SyntaxKind.UncheckedExpression) ||
+                syntax.IsKind(SyntaxKind.UncheckedStatement))
+            {
+                explicitContext = false;
+                break;
+            }
+
+            if (syntax.IsKind(SyntaxKind.CheckedExpression) ||
+                syntax.IsKind(SyntaxKind.CheckedStatement))
+            {
+                explicitContext = true;
+                break;
+            }
+        }
+
+        if (explicitContext == false)
+        {
+            return false;
+        }
+
+        if (operation.IsChecked)
+        {
+            return true;
+        }
+
+        return conversion.IsExplicit &&
+            (conversion.IsEnumeration || conversion.IsNullable) &&
+            (explicitContext ?? session.Compilation.Options.CheckOverflow);
     }
 
     internal EffectSummary CheckedOverflow(
