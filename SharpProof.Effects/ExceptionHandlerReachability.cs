@@ -1815,21 +1815,131 @@ internal sealed class ExceptionHandlerReachability(
         {
             sequenceEntry = outerLabel;
         }
-        if (sequenceEntry.Parent is IBlockOperation block)
+
+        bool CanFallThroughLoop(ILoopOperation loop)
         {
-            var index = block.Operations.IndexOf(sequenceEntry);
-            return index < 0
-                ? null
-                : IncludeLabeledStatement(block.Operations.Skip(index));
+            if (!IsKnownInfiniteLoop(loop) || loop.Body == null)
+            {
+                return true;
+            }
+
+            return HasReachableLoopExit(loop, loop.Body);
         }
-        if (sequenceEntry.Parent is ISwitchCaseOperation @case)
+
+        bool IsKnownInfiniteLoop(ILoopOperation loop)
         {
-            var index = @case.Body.IndexOf(sequenceEntry);
-            return index < 0
-                ? null
-                : IncludeLabeledStatement(@case.Body.Skip(index));
+            SyntaxNode? conditionSyntax = loop.Syntax switch
+            {
+                WhileStatementSyntax whileStatement =>
+                    whileStatement.Condition,
+                ForStatementSyntax forStatement =>
+                    forStatement.Condition,
+                DoStatementSyntax doStatement =>
+                    doStatement.Condition,
+                _ => null
+            };
+            if (loop.Syntax is ForStatementSyntax &&
+                conditionSyntax == null)
+            {
+                return true;
+            }
+
+            return conditionSyntax != null &&
+                model.GetOperation(conditionSyntax)?.ConstantValue is
+                { HasValue: true, Value: true };
         }
-        return [sequenceEntry];
+
+        bool HasReachableLoopExit(
+            ILoopOperation loop,
+            IOperation operation)
+        {
+            if (operation is IAnonymousFunctionOperation or
+                ILocalFunctionOperation)
+            {
+                return false;
+            }
+
+            if (operation is IBranchOperation branch &&
+                (SymbolEqualityComparer.Default.Equals(
+                     branch.Target,
+                     loop.ExitLabel) ||
+                 IsOutwardGoto(branch, loop)))
+            {
+                return true;
+            }
+
+            return operation.ChildOperations.Any(
+                child => HasReachableLoopExit(loop, child));
+        }
+
+        static bool IsOutwardGoto(
+            IBranchOperation branch,
+            ILoopOperation loop)
+        {
+            return branch.BranchKind == BranchKind.GoTo &&
+                branch.Target.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == loop.Syntax.SyntaxTree &&
+                    !loop.Syntax.Span.Contains(reference.Span));
+        }
+
+        // A goto can enter a nested block whose normal fall-through is
+        // otherwise hidden by a non-completing sibling.  Walk out through
+        // the containing operation tree and retain the statements after each
+        // sequence that the target completes.  The old implementation stopped
+        // at the label's immediate block, so an exception in the enclosing
+        // block was omitted from the protected region's potential throws.
+        var continuation = new List<IOperation>();
+        var current = sequenceEntry;
+        var firstSequence = true;
+        while (current.Parent is { } parent)
+        {
+            // Do not carry a goto continuation beyond a loop that cannot
+            // complete normally.  A label inside `while (true)` may be
+            // reachable, but execution cannot fall through to the operation
+            // after that loop.
+            if (current is ILoopOperation loop &&
+                !CanFallThroughLoop(loop))
+            {
+                break;
+            }
+
+            if (parent is IBlockOperation block)
+            {
+                var index = block.Operations.IndexOf(current);
+                if (index >= 0)
+                {
+                    continuation.AddRange(
+                        block.Operations.Skip(
+                            firstSequence ? index : index + 1));
+                    firstSequence = false;
+                    current = block;
+                    continue;
+                }
+            }
+            else if (parent is ISwitchCaseOperation @case)
+            {
+                var index = @case.Body.IndexOf(current);
+                if (index >= 0)
+                {
+                    continuation.AddRange(
+                        @case.Body.Skip(
+                            firstSequence ? index : index + 1));
+                    firstSequence = false;
+                    current = @case;
+                    continue;
+                }
+            }
+
+            // The operation may be inside a loop, conditional, or try body;
+            // climb through that wrapper until its containing sequence is
+            // found. Once the enclosing method body is reached there is no
+            // further continuation to add.
+            current = parent;
+        }
+
+        return continuation.Count == 0
+            ? [sequenceEntry]
+            : IncludeLabeledStatement(continuation);
     }
 
     private ClauseCompletionFacts GetCaseClauseCompletionFacts(
@@ -2602,6 +2712,18 @@ internal sealed class ExceptionHandlerReachability(
         }
         var model = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(compilation, syntax.SyntaxTree);
+        if (DirectForeachFacts.IsArrayOrString(model, syntax))
+        {
+            var collectionValue = DirectForeachFacts.GetCollectionValue(
+                forEach.Collection);
+            var directResult = GetPotentialNullReceiver(
+                forEach,
+                collectionValue,
+                out reachesBody,
+                instanceAlreadyComplete: true);
+            return directResult;
+        }
+
         var info = model.GetForEachStatementInfo(syntax);
         var result = EmptyPotential;
         if (info.GetEnumeratorMethod is { } getEnumerator)

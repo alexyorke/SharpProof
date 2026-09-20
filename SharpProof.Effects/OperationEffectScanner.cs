@@ -133,6 +133,7 @@ internal sealed partial class OperationEffectScanner
             }
         }
         _operations = operationsBuilder.ToImmutable();
+        _directForeachInfos = CreateDirectForeachInfos(_root);
         _useAbstractReachability = useAbstractReachability;
         _conversionOwnership.BuildLocalRegions(
             IsReachable,
@@ -156,7 +157,6 @@ internal sealed partial class OperationEffectScanner
 
     internal ImmutableArray<EffectDirectWitness> DirectWitnesses =>
         _directWitnesses.ToImmutable();
-
 
     internal EffectSummary Scan(IOperation operation)
     {
@@ -248,6 +248,11 @@ internal sealed partial class OperationEffectScanner
         EffectAccess access,
         EffectStep? evaluatedLocation = null)
     {
+        if (TryScanDirectForeachProtocol(operation, out var directForeach))
+        {
+            return directForeach;
+        }
+
         if (operation is IPatternOperation pattern &&
             TryGetPatternAllocation(pattern, out var patternAllocation))
         {
@@ -1573,9 +1578,14 @@ internal sealed partial class OperationEffectScanner
 
     internal bool IsReachable(IOperation operation)
     {
+        if (_session.IsConditionallyElided(operation))
+        {
+            return false;
+        }
+
         if (ManagedAbstractFlow.IsCompileTimeUnreachable(
-                _session.Compilation,
-                operation))
+            _session.Compilation,
+            operation))
         {
             return false;
         }

@@ -682,6 +682,43 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void UserDefinedNotDoesNotRefineMutatedLocalReceiverInCallee()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Flag {
+                public bool IsSet;
+
+                public static bool operator !(Flag value) => !value.IsSet;
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                public static void Caller() => Callee();
+
+                private static void Callee() {
+                    var flag = new Flag();
+                    if (!flag) {
+                        flag.IsSet = true;
+                        if (!flag) {
+                        }
+                        else {
+                            s_state++;
+                        }
+                    }
+                }
+            }
+            """);
+
+        var result = EffectTestHost.AnalyzeSample(compilation, "Caller");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void SharedEdgeRefinementPreservesBooleanFactsAcrossOperationIdentity()
     {
         var compilation = EffectTestHost.CreateCompilation(

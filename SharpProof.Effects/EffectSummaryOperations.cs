@@ -140,6 +140,20 @@ internal static class EffectSummaryOperations
         return Create(termination: EffectTermination.MayDiverge);
     }
 
+    internal static EffectSummary IncompleteDivergence(EffectSummary summary)
+    {
+        return new EffectSummary(
+            EffectRegionSet.Empty,
+            EffectRegionSet.Empty,
+            EffectAllocationKind.None,
+            EffectCapabilitySet.Empty,
+            EffectThrowSet.Empty,
+            EffectTermination.MayDiverge,
+            EffectCompleteness.Incomplete,
+            summary.Uncertainty,
+            summary.AnalysisIncompleteReason);
+    }
+
     internal static EffectSummary Remap(
         EffectSummary summary,
         EffectRegionSet receiver,

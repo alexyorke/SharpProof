@@ -604,6 +604,15 @@ internal sealed partial class OperationEffectScanner
 
         var skipsLiftedOperator =
             _conversionEffects.SkipsLiftedOperator(increment);
+        if (!skipsLiftedOperator &&
+            SharpProof.Roslyn.RoslynCfgThrowFacts
+                .IsUnsupportedImplicitIncrement(increment))
+        {
+            return result.Then(new EffectStep(
+                EffectSummaryOperations.Unsupported(),
+                CompletesNormally: false)).Summary;
+        }
+
         result = result.Then(new EffectStep(
             skipsLiftedOperator
                 ? EffectSummary.Empty

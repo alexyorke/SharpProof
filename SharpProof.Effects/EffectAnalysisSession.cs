@@ -209,7 +209,8 @@ public sealed class EffectAnalysisSession
         List<EffectCallSite> sourceCalls, IOperation origin,
         IOperation? instance,
         ImmutableArray<IOperation?> actualArguments,
-        ManagedFlowResult? flow)
+        ManagedFlowResult? flow,
+        bool isDivergingDispose = false)
     {
         if (target.ReducedFrom != null)
         {
@@ -252,7 +253,8 @@ public sealed class EffectAnalysisSession
                 receiver,
                 writeReceiver,
                 arguments,
-                origin));
+                origin,
+                isDivergingDispose));
             return EffectSummaryOperations.Join(
                 preconditionEvidence,
                 EffectSummaryOperations.DirectCall());
@@ -556,10 +558,11 @@ public sealed class EffectAnalysisSession
                     var target = HasSameContainingType(method, call.Target)
                         ? ComputeBody(call.Target)
                         : Compute(call.Target);
-                    initializationSummary = JoinCall(
+                    initializationSummary = JoinSummaryCall(
                         initializationSummary,
                         call,
                         target,
+                        nodes,
                         wrapTypeInitializationFailures: true);
                 }
                 summary = EffectSummaryDomain.Instance.Join(
@@ -600,7 +603,7 @@ public sealed class EffectAnalysisSession
                     HasSameContainingType(method, call.Target)
                         ? ComputeBody(call.Target)
                         : Compute(call.Target);
-                summary = JoinCall(summary, call, target);
+                summary = JoinSummaryCall(summary, call, target, nodes: nodes);
             }
 
             computeDepth--;
@@ -616,30 +619,6 @@ public sealed class EffectAnalysisSession
 
         _bodySummaries = bodySummaries.ToImmutable();
         return summaries.ToImmutable();
-
-        EffectSummary JoinCall(
-            EffectSummary summary,
-            EffectCallSite call,
-            EffectSummary target,
-            bool wrapTypeInitializationFailures = false)
-        {
-            var remapped = EffectSummaryOperations.Remap(
-                target,
-                call.Receiver,
-                call.WriteReceiver,
-                call.Arguments);
-            if (wrapTypeInitializationFailures)
-            {
-                remapped = WrapTypeInitializationFailures(
-                    remapped);
-            }
-            return EffectSummaryDomain.Instance.Join(
-                summary,
-                EffectExceptionFlow.KeepEscaping(
-                    remapped,
-                    call.Origin,
-                    _compilation));
-        }
 
         static IOrderedEnumerable<EffectCallSite> OrderCalls(
             IEnumerable<EffectCallSite> calls)
@@ -659,6 +638,50 @@ public sealed class EffectAnalysisSession
                 left.ContainingType.OriginalDefinition,
                 right.ContainingType.OriginalDefinition);
         }
+    }
+
+    private EffectSummary JoinSummaryCall(
+        EffectSummary summary,
+        EffectCallSite call,
+        EffectSummary target,
+        IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
+        bool wrapTypeInitializationFailures = false)
+    {
+        target = PrepareDivergingDisposeTarget(call, target, nodes);
+        var remapped = EffectSummaryOperations.Remap(
+            target,
+            call.Receiver,
+            call.WriteReceiver,
+            call.Arguments);
+        if (wrapTypeInitializationFailures)
+        {
+            remapped = WrapTypeInitializationFailures(remapped);
+        }
+        return EffectSummaryDomain.Instance.Join(
+            summary,
+            EffectExceptionFlow.KeepEscaping(
+                remapped,
+                call.Origin,
+                _compilation));
+    }
+
+    private static EffectSummary PrepareDivergingDisposeTarget(
+        EffectCallSite call,
+        EffectSummary target,
+        IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes)
+    {
+        if (call.IsDivergingDispose &&
+            target.Completeness == EffectCompleteness.Incomplete &&
+            nodes.TryGetValue(call.Target, out var targetNode))
+        {
+            // A recursive Dispose that cannot unwind must not turn its
+            // unknown recursive boundary into writes on outer resources.
+            // Keep the target's direct effects; a concrete diverging Dispose
+            // remains complete and is left untouched above.
+            return targetNode.LocalSummary;
+        }
+
+        return target;
     }
 
     private Dictionary<IMethodSymbol, EffectMethodNode> BuildNodes(

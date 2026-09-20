@@ -1176,15 +1176,17 @@ internal sealed class OperationCompletionEvaluator
     internal bool CanCompleteIncrementValue(
         IIncrementOrDecrementOperation increment)
     {
+        var skipsLiftedOperator = ConversionEffectClassifier
+            .SkipsLiftedOperator(increment, _abstractFlow);
         return CanCompleteNormally(increment.Target) &&
-            (ConversionEffectClassifier.SkipsLiftedOperator(
-                 increment,
-                 _abstractFlow) ||
-             increment.OperatorMethod == null ||
-             CanCompleteInvocation(
-                 increment.OperatorMethod,
-                 instance: null,
-                 increment));
+            (skipsLiftedOperator ||
+             !SharpProof.Roslyn.RoslynCfgThrowFacts
+                 .IsUnsupportedImplicitIncrement(increment) &&
+             (increment.OperatorMethod == null ||
+              CanCompleteInvocation(
+                  increment.OperatorMethod,
+                  instance: null,
+                  increment)));
     }
 
     internal bool CanCompleteConstruction(IObjectCreationOperation creation)

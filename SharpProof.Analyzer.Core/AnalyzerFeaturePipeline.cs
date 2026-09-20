@@ -123,6 +123,27 @@ internal static partial class AnalyzerFeaturePipeline
             {
                 return;
             }
+
+            if (AutoPropertyFacts.IsAccessor(
+                    method,
+                    context.CancellationToken))
+            {
+                var declaration = method.DeclaringSyntaxReferences
+                    .FirstOrDefault()?
+                    .GetSyntax(context.CancellationToken);
+                if (declaration != null)
+                {
+                    var outcome = EffectContractDiagnostics.Analyze(
+                        method,
+                        declaration,
+                        session,
+                        context.ReportDiagnostic,
+                        context.CancellationToken);
+                    session.RecordSemanticOutcome(method, outcome);
+                }
+                return;
+            }
+
             session.RegisterSelectedSemicolonAccessor(method);
         }
         if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)

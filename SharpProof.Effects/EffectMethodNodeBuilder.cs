@@ -37,6 +37,14 @@ internal sealed class EffectMethodNodeBuilder
         var root = GetOperationRoot(method, cancellationToken);
         if (root == null)
         {
+            if (TryBuildAutoPropertyAccessor(
+                    method,
+                    cancellationToken,
+                    out var autoPropertyNode))
+            {
+                return autoPropertyNode;
+            }
+
             return new EffectMethodNode(EffectSummaryOperations.UnknownBoundary(
                 EffectUncertainty.UnsupportedOperation), [], []);
         }
@@ -144,6 +152,39 @@ internal sealed class EffectMethodNodeBuilder
                 ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
                 : EffectSummary.Empty);
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
+    }
+
+    private bool TryBuildAutoPropertyAccessor(
+        IMethodSymbol method,
+        CancellationToken cancellationToken,
+        out EffectMethodNode node)
+    {
+        node = default;
+        if (!AutoPropertyFacts.IsAccessor(method, cancellationToken) ||
+            method.AssociatedSymbol is not IPropertySymbol property ||
+            !AutoPropertyFacts.TryGetBackingField(property, out var field))
+        {
+            return false;
+        }
+
+        var region = field.IsStatic
+            ? EffectRegionSet.Create(EffectRegionId.Static())
+            : EffectRegionSet.Create(EffectRegionId.Receiver);
+        var summary = method.MethodKind == MethodKind.PropertyGet
+            ? EffectSummaryOperations.Read(region)
+            : EffectSummaryOperations.Write(region);
+        if (field.IsStatic && !field.IsConst)
+        {
+            summary = EffectSummaryOperations.Join(
+                summary,
+                _session.ResolveStaticFieldTypeInitialization(method, field));
+        }
+        summary = EffectSummaryOperations.Join(
+            summary,
+            _session.ResolveEntryPreconditions(method));
+
+        node = new EffectMethodNode(summary, [], []);
+        return true;
     }
 
     private ConstructorInitializationPlan? CreateConstructorInitializationPlan(

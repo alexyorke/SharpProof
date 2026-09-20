@@ -23,7 +23,8 @@ internal sealed class EffectCallSiteResolver(
         IOperation origin,
         IOperation? instance,
         IEnumerable<IArgumentOperation>? callArguments = null,
-        bool? hasParamArray = null)
+        bool? hasParamArray = null,
+        bool isDivergingDispose = false)
     {
         return Resolve(
             target,
@@ -35,7 +36,8 @@ internal sealed class EffectCallSiteResolver(
             origin,
             instance,
             callArguments,
-            hasParamArray);
+            hasParamArray,
+            isDivergingDispose);
     }
 
     internal EffectSummary Resolve(
@@ -48,7 +50,8 @@ internal sealed class EffectCallSiteResolver(
         IOperation origin,
         IOperation? instance,
         IEnumerable<IArgumentOperation>? callArguments = null,
-        bool? hasParamArray = null)
+        bool? hasParamArray = null,
+        bool isDivergingDispose = false)
     {
         var summary = _session.ResolveCall(
             _caller,
@@ -61,7 +64,8 @@ internal sealed class EffectCallSiteResolver(
             origin,
             instance,
             actualArguments,
-            _flow);
+            _flow,
+            isDivergingDispose);
         return hasParamArray == false ||
             hasParamArray == null && callArguments == null
             ? summary

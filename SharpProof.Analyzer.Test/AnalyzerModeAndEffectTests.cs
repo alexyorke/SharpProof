@@ -2145,7 +2145,7 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
-    public async Task ConcreteSelectedAutoAccessorsAbstainExactlyOnce()
+    public async Task ConcreteSelectedAutoAccessorsUseBackingStorageSummary()
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -2169,21 +2169,21 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0002", 2);
             Assert.That(
                 diagnostics.Select(diagnostic => diagnostic.GetMessage(
                     CultureInfo.InvariantCulture)),
-                Has.All.Contain("MissingOperationRoot"));
+                Has.All.Contain("marked [EnforcePure]"));
             Assert.That(factory.OutcomeCounts["get_Read"], Is.EqualTo(1));
             Assert.That(factory.OutcomeCounts["set_Write"], Is.EqualTo(1));
             Assert.That(factory.OutcomeCounts["set_Initialize"], Is.EqualTo(1));
             Assert.That(factory.OutcomeCounts["get_Explicit"], Is.EqualTo(1));
             Assert.That(factory.Outcomes["get_Read"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
             Assert.That(factory.Outcomes["set_Write"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(factory.Outcomes["set_Initialize"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(factory.Outcomes["get_Explicit"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
         }
@@ -2284,10 +2284,10 @@ public sealed class AnalyzerModeAndEffectTests
         {
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+                AnalyzerTestHost.AssertIds(diagnostics);
                 Assert.That(factory.OutcomeCounts["get_Value"], Is.EqualTo(1));
                 Assert.That(factory.Outcomes["get_Value"],
-                    Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+                    Is.EqualTo(AnalyzerSemanticOutcome.Proven));
             }
         }
     }

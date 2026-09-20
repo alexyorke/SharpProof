@@ -154,7 +154,8 @@ internal readonly record struct EffectCallSite(
     EffectRegionSet Receiver,
     EffectRegionSet WriteReceiver,
     ImmutableArray<EffectRegionSet> Arguments,
-    IOperation Origin
+    IOperation Origin,
+    bool IsDivergingDispose = false
 );
 
 internal readonly record struct EffectCallPreconditionContext(

@@ -94,7 +94,7 @@ internal sealed class ManagedAbstractFlow
         foreach (var parameter in method.Parameters)
         {
             var value = TopForType(parameter.Type);
-            if (parameter.RefKind != RefKind.Out)
+            if (parameter.RefKind == RefKind.None)
             {
                 value = ApplyAttributes(value, parameter.GetAttributes());
             }
@@ -206,6 +206,12 @@ internal sealed class ManagedAbstractFlow
     {
         var blocks = ImmutableArray.CreateBuilder<DataflowBlock<ManagedFlowState>>();
         var edges = ImmutableArray.CreateBuilder<DataflowEdge>();
+        var elidedInvocations = graph.OriginalOperation.DescendantsAndSelf()
+            .OfType<IInvocationOperation>()
+            .Where(invocation =>
+                !IsRequires(invocation) &&
+                _completionFacts.IsConditionallyElided(invocation))
+            .ToImmutableArray();
         foreach (var block in graph.Blocks)
         {
             var captured = block;
@@ -225,7 +231,57 @@ internal sealed class ManagedAbstractFlow
             }
         }
 
+        // Roslyn lowers conditional arguments into CFG blocks outside the
+        // invocation operation. If the invocation is elided, those blocks are
+        // not executed, so their branch refinements must not be the only input
+        // to the continuation. Add a direct state-preserving edge from every
+        // lowered block in the elided call back to the call block. The regular
+        // edge remains for the emitted case; joining this edge restores the
+        // pre-call facts when the call is omitted.
+        foreach (var invocation in elidedInvocations)
+        {
+            var callBlock = graph.Blocks.FirstOrDefault(block =>
+                BlockOperations(block).Any(operation =>
+                    operation is IInvocationOperation candidate &&
+                    SameSyntax(candidate.Syntax, invocation.Syntax)));
+            if (callBlock == null)
+            {
+                continue;
+            }
+
+            foreach (var block in graph.Blocks)
+            {
+                if (block.Ordinal != callBlock.Ordinal &&
+                    BlockOperations(block).Any(operation =>
+                        IsWithin(operation.Syntax, invocation.Syntax)))
+                {
+                    edges.Add(new(block.Ordinal, callBlock.Ordinal));
+                }
+            }
+        }
+
         return new(blocks, edges);
+
+        static IEnumerable<IOperation> BlockOperations(BasicBlock block)
+        {
+            return block.Operations
+                .SelectMany(static operation => operation.DescendantsAndSelf())
+                .Append(block.BranchValue)
+                .Where(static operation => operation != null)
+                .Select(static operation => operation!);
+        }
+
+        static bool SameSyntax(SyntaxNode left, SyntaxNode right)
+        {
+            return left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
+        }
+
+        static bool IsWithin(SyntaxNode candidate, SyntaxNode container)
+        {
+            return SameSyntax(candidate, container) ||
+                candidate.SyntaxTree == container.SyntaxTree &&
+                container.Span.Contains(candidate.Span);
+        }
     }
 
     private ManagedFlowState TransferBlock(
@@ -332,6 +388,10 @@ internal sealed class ManagedAbstractFlow
                         result.ResolveCoalesceAssignmentTarget(assignment.Target),
                         assignedValue);
                 }
+                if (IsNonLocalTarget(assignment.Target))
+                {
+                    state = state.ForgetByReferenceParameters();
+                }
                 break;
             case ICompoundAssignmentOperation compound:
                 state = MarkUntrackedAlias(
@@ -343,6 +403,10 @@ internal sealed class ManagedAbstractFlow
                 if (!compoundAliasesUntrackedStorage)
                 {
                     state = SetStorage(state, compound.Target, TopForType(compound.Type));
+                }
+                if (IsNonLocalTarget(compound.Target))
+                {
+                    state = state.ForgetByReferenceParameters();
                 }
                 break;
             case IIncrementOrDecrementOperation increment:
@@ -356,6 +420,10 @@ internal sealed class ManagedAbstractFlow
                 {
                     state = SetStorage(state, increment.Target, Increment(increment, state));
                 }
+                if (IsNonLocalTarget(increment.Target))
+                {
+                    state = state.ForgetByReferenceParameters();
+                }
                 break;
             case IInvocationOperation invocation:
                 state = TransferMany(state, invocation.ChildOperations, result, cancellationToken);
@@ -366,8 +434,13 @@ internal sealed class ManagedAbstractFlow
                 state = TransferMany(state, creation.Arguments, result, cancellationToken);
                 result.Record(operation, state);
                 state = HavocArguments(state, creation.Arguments);
+                state = state.ForgetByReferenceParameters();
                 return creation.Initializer == null ? state
                     : Transfer(state, creation.Initializer, result, cancellationToken);
+            case IPropertyReferenceOperation:
+                state = TransferMany(state, operation.ChildOperations, result, cancellationToken);
+                result.Record(operation, state);
+                return state.ForgetByReferenceParameters();
             case IDynamicInvocationOperation or IFunctionPointerInvocationOperation:
                 state = TransferMany(state, operation.ChildOperations, result, cancellationToken);
                 result.Record(operation, state);
@@ -443,7 +516,7 @@ internal sealed class ManagedAbstractFlow
 
         return condition switch
         {
-            IUnaryOperation { OperatorKind: UnaryOperatorKind.Not } unary =>
+            IUnaryOperation unary when IsBuiltinBooleanNot(unary) =>
                 Assume(state, unary.Operand, !expected),
             IBinaryOperation
             {
@@ -805,15 +878,24 @@ internal sealed class ManagedAbstractFlow
     private ManagedAbstractValue EvaluateUnary(IUnaryOperation unary, ManagedFlowState state)
     {
         var operand = EvaluateCore(unary.Operand, state);
-        if (unary.OperatorKind == UnaryOperatorKind.Not)
+        if (IsBuiltinBooleanNot(unary))
         {
             return NegateBoolean(operand);
         }
 
         return unary.OperatorKind == UnaryOperatorKind.Minus && operand.TryGetInteger(out var interval) &&
                TryNegate(interval, out var negated)
-            ? KeepWithinType(negated, unary.Type)
-            : TopForType(unary.Type);
+               ? KeepWithinType(negated, unary.Type)
+               : TopForType(unary.Type);
+    }
+
+    private static bool IsBuiltinBooleanNot(IUnaryOperation unary)
+    {
+        return unary.OperatorKind == UnaryOperatorKind.Not &&
+            unary.OperatorMethod == null &&
+            !unary.IsLifted &&
+            unary.Type?.SpecialType == SpecialType.System_Boolean &&
+            unary.Operand.Type?.SpecialType == SpecialType.System_Boolean;
     }
 
     private ManagedAbstractValue EvaluateConditional(IConditionalOperation operation, ManagedFlowState state)
@@ -975,12 +1057,13 @@ internal sealed class ManagedAbstractFlow
     private static ManagedFlowState HavocCall(
         ManagedFlowState state, IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments)
     {
-        return method.MethodKind == MethodKind.LocalFunction ||
+        state = method.MethodKind == MethodKind.LocalFunction ||
             method.ContainingType.TypeKind == TypeKind.Delegate ||
             arguments.Any(static argument =>
                 CanCarryDelegate(argument.Value))
             ? state.Forget()
             : HavocArguments(state, arguments);
+        return state.ForgetByReferenceParameters();
     }
 
     private static bool CanCarryDelegate(IOperation value)
@@ -1044,6 +1127,15 @@ internal sealed class ManagedAbstractFlow
     {
         return DefiniteOperationFacts.UnwrapHarmlessValue(operation) is ILocalReferenceOperation local &&
             IsUntrackedManagedReference(local.Local.RefKind);
+    }
+
+    private static bool IsNonLocalTarget(IOperation operation)
+    {
+        operation = Unwrap(operation);
+        return operation is not (ILocalReferenceOperation or
+            IParameterReferenceOperation or
+            IFlowCaptureReferenceOperation or
+            IDiscardOperation);
     }
 
     private static ManagedFlowState MarkUntrackedAlias(
@@ -1746,6 +1838,28 @@ internal sealed class ManagedFlowState
         return IsBottom || _hasUntrackedAlias ? this : Empty;
     }
 
+    internal ManagedFlowState ForgetByReferenceParameters()
+    {
+        if (_values == null || _hasUntrackedAlias)
+        {
+            return this;
+        }
+
+        var values = _values;
+        foreach (var storage in _values.Keys)
+        {
+            if (storage is IParameterSymbol parameter &&
+                parameter.RefKind != RefKind.None)
+            {
+                values = values.SetItem(
+                    parameter,
+                    ManagedAbstractValue.TopForType(parameter.Type));
+            }
+        }
+
+        return ReferenceEquals(values, _values) ? this : new(values);
+    }
+
     internal static ManagedFlowState Join(ManagedFlowState left, ManagedFlowState right)
     {
         if (left._values == null)
@@ -2306,6 +2420,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     [ThreadStatic]
     private static Dictionary<DefiniteOperationFacts, HashSet<IMethodSymbol>>?
         s_activeMethods;
+    [ThreadStatic]
+    private static Dictionary<DefiniteOperationFacts, HashSet<IMethodSymbol>>?
+        s_cycleAffectedMethods;
+    private readonly ConcurrentDictionary<IMethodSymbol, bool>
+        _methodCompletionCache = new(SymbolEqualityComparer.Default);
     private readonly INamedTypeSymbol? _contractApi =
         ContractApiIdentityResolver.ForCompilation(compilation).Contract;
 
@@ -2322,6 +2441,48 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         return methods.Add(method);
+    }
+
+    private bool IsMethodActive(IMethodSymbol method)
+    {
+        return s_activeMethods != null &&
+            s_activeMethods.TryGetValue(this, out var methods) &&
+            methods.Contains(method);
+    }
+
+    private void MarkActiveCycle()
+    {
+        if (s_activeMethods == null ||
+            !s_activeMethods.TryGetValue(this, out var active))
+        {
+            return;
+        }
+
+        var cycleAffected = s_cycleAffectedMethods ??= [];
+        if (!cycleAffected.TryGetValue(this, out var methods))
+        {
+            methods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            cycleAffected.Add(this, methods);
+        }
+
+        methods.UnionWith(active);
+    }
+
+    private bool ExitMethodAndReportCycle(IMethodSymbol method)
+    {
+        var cycleAffected = false;
+        if (s_cycleAffectedMethods != null &&
+            s_cycleAffectedMethods.TryGetValue(this, out var methods))
+        {
+            cycleAffected = methods.Remove(method);
+            if (methods.Count == 0)
+            {
+                s_cycleAffectedMethods.Remove(this);
+            }
+        }
+
+        ExitMethod(method);
+        return cycleAffected;
     }
 
     private void ExitMethod(IMethodSymbol method)
@@ -2442,16 +2603,32 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var normalized = method.OriginalDefinition;
+        if (_methodCompletionCache.TryGetValue(normalized, out var cached))
+        {
+            return cached;
+        }
+
+        if (IsMethodActive(normalized))
+        {
+            // A recursive re-entry is uncertainty, not evidence that every
+            // invocation is nonreturning. Do not publish the conservative
+            // answer or any result that depends on it.
+            MarkActiveCycle();
+            return true;
+        }
+
         var isImplicitConstructor = EffectMethodNodeBuilder
             .IsSourceImplicitParameterlessConstructor(normalized);
         if (!isImplicitConstructor &&
             normalized.DeclaringSyntaxReferences.Length != 1)
         {
+            _methodCompletionCache.TryAdd(normalized, true);
             return true;
         }
         if (!isImplicitConstructor &&
             HasUnconditionalSelfInvocation(normalized))
         {
+            _methodCompletionCache.TryAdd(normalized, false);
             return false;
         }
         if (!TryEnterMethod(normalized))
@@ -2461,44 +2638,62 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             return true;
         }
 
+        bool result;
+        bool cycleAffected;
         try
         {
             if (isImplicitConstructor)
             {
-                return ImplicitConstructorMayCompleteNormally(normalized);
+                result = ImplicitConstructorMayCompleteNormally(normalized);
             }
-
-            var declaration = normalized.DeclaringSyntaxReferences[0]
-                .GetSyntax(cancellationToken);
-            if (DefersBodyCompletion(normalized, declaration))
+            else
             {
-                return true;
+                var declaration = normalized.DeclaringSyntaxReferences[0]
+                    .GetSyntax(cancellationToken);
+                if (DefersBodyCompletion(normalized, declaration))
+                {
+                    result = true;
+                }
+                else
+                {
+                    var model = SharpProof.Frontend.Host.CompilationModelProvider
+                        .GetSemanticModel(compilation, declaration.SyntaxTree);
+                    var operation = model.GetOperation(
+                            declaration,
+                            cancellationToken) ??
+                        (ExecutableBodySyntax.Get(declaration) is { } methodBody
+                            ? model.GetOperation(methodBody, cancellationToken)
+                            : null);
+                    result = operation == null
+                        ? true
+                        : normalized.MethodKind == MethodKind.Constructor &&
+                          operation is IConstructorBodyOperation constructorBody
+                            ? ConstructorMayCompleteNormally(
+                                normalized,
+                                constructorBody)
+                            : MayCompleteNormally(operation);
+                }
             }
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, declaration.SyntaxTree);
-            var operation = model.GetOperation(declaration, cancellationToken) ??
-                (ExecutableBodySyntax.Get(declaration) is { } methodBody
-                    ? model.GetOperation(methodBody, cancellationToken)
-                    : null);
-            if (operation == null)
-            {
-                return true;
-            }
-            return normalized.MethodKind == MethodKind.Constructor &&
-                operation is IConstructorBodyOperation constructorBody
-                ? ConstructorMayCompleteNormally(
-                    normalized,
-                    constructorBody)
-                : MayCompleteNormally(operation);
         }
         catch (ArgumentException)
         {
-            return true;
+            result = true;
         }
         finally
         {
-            ExitMethod(normalized);
+            cycleAffected = ExitMethodAndReportCycle(normalized);
         }
+
+        // Only publish results after the active-method guard has been left.
+        // Results that depended on a cycle guard are deliberately excluded;
+        // this avoids turning a recursive re-entry's conservative fallback
+        // into a definitive cache entry for the whole strongly connected
+        // component.
+        if (!cycleAffected)
+        {
+            _methodCompletionCache.TryAdd(normalized, result);
+        }
+        return result;
     }
 
     private bool HasUnconditionalSelfInvocation(IMethodSymbol method)

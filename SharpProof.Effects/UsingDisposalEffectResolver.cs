@@ -265,24 +265,35 @@ internal sealed class UsingDisposalEffectResolver
         var canThrow = !facts.IsDispatchUncertain &&
             _canMethodThrow(dispose);
         var canUnwind = facts.IsDispatchUncertain || canComplete || canThrow;
-        if (!canUnwind)
-        {
-            return (EffectSummary.Empty, false);
-        }
 
+        // A definitely diverging Dispose still runs its own effects before it
+        // stops. Keep the call summary, while CanUnwind prevents an earlier
+        // resource from being treated as reachable after this one.
         var receiver = dispose.ContainingType?.IsValueType == true &&
             !dispose.ContainingType.IsRefLikeType
                 ? EffectRegionSet.Empty
                 : _classifyRegion(facts.Resource, true);
-        return (
-            _calls.Resolve(
+        var summary = _calls.Resolve(
                 dispose,
                 receiver,
                 ImmutableArray<EffectRegionSet>.Empty,
                 ImmutableArray<IOperation?>.Empty,
                 facts.IsDispatchUncertain,
                 facts.Origin,
-                facts.Resource),
+                facts.Resource,
+                isDivergingDispose: !canUnwind);
+        if (!canUnwind && summary.Completeness == EffectCompleteness.Incomplete)
+        {
+            // A recursive/unsupported disposal can produce an unknown call
+            // boundary even though its own control flow is definitely
+            // non-unwinding. Keep the fail-closed incompleteness marker and
+            // divergence, but do not remap unknown receiver/parameter regions
+            // into unrelated outer resources.
+            summary = EffectSummaryOperations.IncompleteDivergence(summary);
+        }
+
+        return (
+            summary,
             canUnwind);
     }
 
