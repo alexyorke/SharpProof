@@ -1605,13 +1605,13 @@ public sealed class LauncherArgumentTests
         "fail", "error")]
     [TestCase(
         WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.Advisory,
-        "review", "note")]
+        "review", "none")]
     [TestCase(
         WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.WarnOnUnknown,
-        "review", "warning")]
+        "fail", "warning")]
     [TestCase(
         WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.RequireProven,
-        "review", "error")]
+        "fail", "error")]
     public void SarifClaimPresentationFollowsOutcomeAndPolicy(
         WorkerClaimOutcome outcome, WorkerVerifyPolicy policy,
         string expectedKind, string expectedLevel)

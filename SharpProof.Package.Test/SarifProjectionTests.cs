@@ -171,4 +171,83 @@ public sealed class SarifProjectionTests
             Does.Contain(
                 "implementation-IL proof assumes the compile-time referenced binary is the runtime binary"));
     }
+
+    [TestCase(WorkerVerifyPolicy.Advisory, "review", "none")]
+    [TestCase(WorkerVerifyPolicy.WarnOnUnknown, "fail", "warning")]
+    [TestCase(WorkerVerifyPolicy.RequireProven, "fail", "error")]
+    public void UnknownAndIncompleteResultsUseValidSarifKindAndLevel(
+        WorkerVerifyPolicy policy, string expectedKind, string expectedLevel)
+    {
+        var location = new WorkerSourceLocation
+        {
+            Path = "source.cs",
+            Start = 0,
+            Length = 1,
+            Line = 4,
+            Column = 9
+        };
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [new WorkerCallableManifestEntry
+            {
+                CallableId = "Consumer.Subject.Identity()",
+                Location = location,
+                ClaimIds = ["claim-1"]
+            }],
+            Claims = [new WorkerClaimManifestEntry
+            {
+                ClaimId = "claim-1",
+                CallableId = "Consumer.Subject.Identity()",
+                Ordinal = 0,
+                Kind = WorkerClaimKind.Postcondition,
+                Evidence = WorkerClaimEvidence.DirectClause,
+                Location = location
+            }]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            ClaimResults = [new WorkerClaimResult
+            {
+                ClaimId = "claim-1",
+                Outcome = WorkerClaimOutcome.Unknown,
+                Reason = WorkerClaimReason.UnsupportedBody
+            }],
+            CallableResults = [new WorkerCallableResult
+            {
+                CallableId = "Consumer.Subject.Identity()",
+                Coverage = WorkerCallableCoverage.Incomplete,
+                Reason = WorkerCallableCoverageReason.UnsupportedCallable
+            }],
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "1.0.0-test"
+                }
+            }
+        };
+
+        using var document = JsonDocument.Parse(
+            SarifProjection.Serialize(
+                new WorkerVerifyRequest { VerifyPolicy = policy },
+                response,
+                "/workspace/consumer"));
+        var results = document.RootElement
+            .GetProperty("runs")[0]
+            .GetProperty("results");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results.GetArrayLength(), Is.EqualTo(2));
+            foreach (var result in results.EnumerateArray())
+            {
+                Assert.That(result.GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
+                Assert.That(result.GetProperty("level").GetString(), Is.EqualTo(expectedLevel));
+            }
+        }
+    }
 }

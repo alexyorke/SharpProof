@@ -98,8 +98,8 @@ internal static class SarifProjection
         var effectWitness = result.EffectWitness;
         var reason = reasonValue == WorkerClaimReason.None ? string.Empty : " (" + reasonValue + ")";
         var implementationIlAssumption = result.ProofCore.Any(
-                static item => item.StartsWith(
-                    "il-summary:", StringComparison.Ordinal))
+            static item => item.StartsWith(
+                "il-summary:", StringComparison.Ordinal))
             ? " [implementation-IL proof assumes the compile-time referenced binary is the runtime binary]"
             : string.Empty;
         var witness = effectWitness == null
@@ -107,13 +107,17 @@ internal static class SarifProjection
             : " [concrete " + effectWitness.Kind + ": " + effectWitness.Detail +
                 " at " + effectWitness.Location.Path + ":" + effectWitness.Location.Line +
                 ":" + effectWitness.Location.Column + "]";
+        var presentation = outcome switch
+        {
+            WorkerClaimOutcome.Proven => (Kind: "pass", Level: "none"),
+            WorkerClaimOutcome.Refuted => (Kind: "fail", Level: "error"),
+            WorkerClaimOutcome.Unknown => UnknownPresentation(request.VerifyPolicy),
+            _ => throw new ArgumentOutOfRangeException(nameof(result))
+        };
         return Result(
             "SharpProof." + outcome,
-            outcome == WorkerClaimOutcome.Proven ? "pass" :
-                outcome == WorkerClaimOutcome.Refuted ? "fail" : "review",
-            outcome == WorkerClaimOutcome.Proven ? "none" :
-                outcome == WorkerClaimOutcome.Refuted ? "error" :
-                LauncherPresentation.Level(request.VerifyPolicy, "note"),
+            presentation.Kind,
+            presentation.Level,
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId +
                 implementationIlAssumption + reason + witness,
@@ -132,9 +136,11 @@ internal static class SarifProjection
     {
         var callableId = result.CallableId;
         var reason = result.Reason;
+        var presentation = UnknownPresentation(request.VerifyPolicy);
         return Result(
-            VerifierDiagnosticCodes.IncompleteSelectedCallable, "review",
-            LauncherPresentation.Level(request.VerifyPolicy, "note"),
+            VerifierDiagnosticCodes.IncompleteSelectedCallable,
+            presentation.Kind,
+            presentation.Level,
             "Selected analysis is incomplete for " + callableId +
                 " (" + reason + ").",
             callable.Location, callableId,
@@ -143,6 +149,19 @@ internal static class SarifProjection
                 callable,
                 result
             });
+    }
+
+    private static (string Kind, string Level) UnknownPresentation(
+        WorkerVerifyPolicy policy)
+    {
+        return policy switch
+        {
+            WorkerVerifyPolicy.Advisory => ("review", "none"),
+            WorkerVerifyPolicy.WarnOnUnknown => ("fail", "warning"),
+            WorkerVerifyPolicy.RequireProven => ("fail", "error"),
+            _ => throw new InvalidOperationException(
+                "The verifier policy was not validated.")
+        };
     }
 
     private static object Result(

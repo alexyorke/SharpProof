@@ -32,7 +32,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 15 entries: 0 P0, 0 P1 and 15 P3. The final
+The list currently has 14 entries: 0 P0, 0 P1 and 14 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
@@ -40,27 +40,6 @@ section records the areas that were probed without finding a defect.
 
 
 
-### SARIF results pair non-`fail` kinds with warning or error levels
-
-- **File:** `SharpProof.Worker.Launcher/SarifProjection.cs` (`ClaimResult`,
-  `IncompleteResult`)
-- **Confidence:** Medium
-- **What is wrong:** Unknown claims and incomplete callables are emitted with
-  `kind: "review"` and `level` from `LauncherPresentation.Level`, which is
-  `note`, `warning` (warn-on-unknown) or `error` (require-proven). SARIF 2.1.0
-  (`result.kind`/`result.level`, sections 3.27.9 and 3.27.10) requires `level`
-  to be absent or `"none"` whenever `kind` is anything other than `"fail"`. The
-  published SARIF therefore violates the schema's normative rules exactly in
-  the policies where the result matters.
-- **Failure scenario:** A project uses `SharpProofVerifyPolicy=require-proven`
-  and uploads the published SARIF to a code-scanning service or validates it
-  with the SARIF multitool. Unknown claims are either rejected as invalid
-  results or shown inconsistently: some consumers ignore `kind` and show
-  errors, while others honor `kind: "review"` and drop the level.
-- **Suggested fix:** Use `kind: "fail"` with the policy-derived level when the
-  policy makes unknowns warnings or errors, and keep `kind: "review"` only with
-  `level: "none"` (or omit `level`) for the advisory policy. Add a schema-level
-  test that checks the `kind`/`level` invariant for each policy.
 
 ### A project timeout fails the build even under the `advisory` verify policy
 

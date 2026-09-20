@@ -777,10 +777,10 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "Audited production inventory including the bounded analyzer, effect, summary, manifest, worker, verifier transport, flow-analysis, identity, runtime, publication, discovery, advisory activation, diagnostic, and reachability repairs in this release; ceilings:227070/13207/6444.",
-    "maximumExpressionNodes": 227070,
-    "maximumDecisionPoints": 13207,
-    "maximumMembers": 6444
+    "ceilingRationale": "Audited production inventory including the bounded analyzer, effect, summary, manifest, worker, verifier transport, flow-analysis, identity, runtime, publication, discovery, advisory activation, diagnostic, reachability, and SARIF policy repairs in this release; ceilings:227103/13211/6445.",
+    "maximumExpressionNodes": 227103,
+    "maximumDecisionPoints": 13211,
+    "maximumMembers": 6445
   },
   "productionCoordinatorComplexity": {
     "measurement": "Roslyn expression nodes and decision points in coordination layers; whitespace, comments, line wrapping, and optional braces are excluded.",
