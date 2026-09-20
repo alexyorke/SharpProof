@@ -2217,10 +2217,52 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0047"]);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 4);
+        var messages = diagnostics.Select(diagnostic =>
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                messages.Count(static message =>
+                    message.Contains(
+                        "BodylessEffectContractNotEnforced",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(3));
+            Assert.That(
+                messages.Count(static message =>
+                    message.Contains(
+                        "MissingOperationRoot",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public async Task BodylessEffectAnnotationsAreReportedAsUnenforced()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface IFixture {
+                [EnforcePure]
+                void Run();
+            }
+
+            public sealed class ImpureFixture : IFixture {
+                private static int state;
+
+                public void Run() {
+                    state++;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002", "SP0045", "SP0046", "SP0047"]);
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
         Assert.That(
-            diagnostics.Select(diagnostic =>
-                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
-            Has.All.Contain("MissingOperationRoot"));
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("BodylessEffectContractNotEnforced"));
     }
 
     [Test]

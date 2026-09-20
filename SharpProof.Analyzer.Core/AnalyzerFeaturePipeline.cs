@@ -188,7 +188,21 @@ internal static partial class AnalyzerFeaturePipeline
                 method,
                 outcome == AnalyzerSemanticOutcome.NotApplicable
                     ? AnalyzerSemanticOutcome.Proven
-                    : outcome);
+                : outcome);
+            return;
+        }
+        if (!selection.Contracts && selection.Effects)
+        {
+            ReportSelectedAnalysisIncomplete(
+                context.ReportDiagnostic,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                    method,
+                    context.CancellationToken),
+                method.Name,
+                "BodylessEffectContractNotEnforced");
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.NotApplicable);
             return;
         }
         ReportSelectedAnalysisIncomplete(
@@ -287,6 +301,15 @@ internal static partial class AnalyzerFeaturePipeline
         }
         if (TryRecordSuppressed(method, selection, session))
         {
+            return;
+        }
+        if ((method.IsAbstract || method.IsExtern) &&
+            !selection.Contracts &&
+            selection.Effects)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.NotApplicable);
             return;
         }
 

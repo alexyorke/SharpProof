@@ -192,11 +192,21 @@ public sealed class AdvisoryActivationTests
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
             AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
+            var messages = diagnostics.Select(static diagnostic =>
+                diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture)).ToArray();
             Assert.That(
-                diagnostics.Select(static diagnostic =>
-                    diagnostic.GetMessage(
-                        System.Globalization.CultureInfo.InvariantCulture)),
-                Has.All.Contain("MissingOperationRoot"));
+                messages.Count(static message =>
+                    message.Contains(
+                        "BodylessEffectContractNotEnforced",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(2));
+            Assert.That(
+                messages.Count(static message =>
+                    message.Contains(
+                        "MissingOperationRoot",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(1));
         }
     }
 

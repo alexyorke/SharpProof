@@ -55,7 +55,11 @@ assumptions, and postcondition claims while excluding effect-only annotations.
 `Effects` includes effect-selected callables while excluding postcondition
 claims and contract assumptions. `All` is their union. Strict accountability
 applies to everything selected by that feature set; disabled features are not
-silently counted as analyzed. Repeated effect attributes receive distinct
+silently counted as analyzed. Effect-only annotations on abstract, interface,
+and `extern` declarations have no executable body and report
+`BodylessEffectContractNotEnforced`; they do not apply to implementations, so
+each concrete implementation must be annotated directly. Repeated effect
+attributes receive distinct
 manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured

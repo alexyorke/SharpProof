@@ -32,55 +32,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 5 entries: 0 P0, 0 P1 and 5 P3. The final
+The list currently has 4 entries: 0 P0, 0 P1 and 4 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
-
-
-### Effect attributes on abstract and interface members always fail and are never checked on implementations
-
-- **File:** `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs` (selected
-  callables without an operation root become `MissingOperationRoot`), the
-  effect contract evaluation that then reports SP0002/SP0045/SP0046, and
-  the attribute declarations in `SharpProof.Attributes`
-  (`[AttributeUsage(..., Inherited = false)]` on `EnforcePureAttribute` and
-  its siblings).
-- **Confidence:** Confirmed. With `SharpProofFeatures=effects`,
-  `[EnforcePure] public abstract int Area();` reported both
-  `SP0047 ... 'Area': MissingOperationRoot` and
-  `SP0002: Method 'Area' is marked [EnforcePure], but its effects do not prove observable purity`,
-  and `[EnforcePure] int Get();` on an interface did the same. The sealed
-  override `Square7.Area()`, which increments a static counter, and the
-  implementation `Impl7.Get()`, which does the same, were not reported,
-  and neither was an override of a `[DoesNotThrow] virtual` method that
-  always throws. A `partial` method with the attribute on the defining
-  declaration was checked against its implementation, which is correct.
-- **What is wrong:** An effect attribute on a member with no body can only
-  mean "every implementation must satisfy this". SharpProof does not
-  implement that meaning (the attributes are not inherited and overrides
-  are not checked), but it does not reject the placement either. Instead it
-  treats the abstract member as a selected callable, fails to analyze it,
-  and reports a violation of the contract itself, which reads as if the
-  (nonexistent) body were impure. The SP0047 half is documented
-  (`docs/diagnostic-examples.md` lists "selected abstract, interface, and
-  `extern` declarations"); the SP0002/SP0046 half and the fact that
-  implementations are never checked are not. The user gets two diagnostics they
-  cannot fix on the declaration, and no diagnostic on the implementation
-  that actually breaks the stated contract.
-- **Failure scenario:** A library author annotates an interface
-  (`[EnforcePure] int Get();`) to document and enforce purity for all
-  implementations. Every build shows SP0002 and SP0047 on the interface,
-  so the author suppresses them, and implementations that write global
-  state are never reported. Callers cannot rely on the annotation either,
-  since contracts are never used to discharge virtual dispatch.
-- **Suggested fix:** Either report a dedicated diagnostic for effect
-  attributes on abstract, interface and extern members ("not enforced;
-  annotate implementations instead") and skip the SP0002/SP0045/SP0046 and
-  SP0047 reports for them, or implement the obligation: treat an effect
-  attribute on an abstract or interface member as applying to every
-  override and implementation in the compilation and check each of them.
-  Document the chosen behavior next to the attribute descriptions.
 
 
 ### Nullable value types and other everyday pure BCL members have no effect specifications, so ordinary code is unprovable
