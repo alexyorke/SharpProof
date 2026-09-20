@@ -5,10 +5,22 @@ namespace SharpProof.Worker.Launcher;
 internal static partial class LauncherPresentation
 {
     internal static string AssumptionsDeclaredMessage(
-        WorkerAssumptionSummary assumptions)
+        string callableId, IReadOnlyList<WorkerAssumptionEvidence> assumptions)
     {
+        var user = assumptions
+            .Where(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.UserAssume)
+            .Select(static assumption => assumption.Id)
+            .ToArray();
+        var trusted = assumptions
+            .Where(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+            .Select(static assumption => assumption.Id)
+            .ToArray();
+        var userIds = string.Join(", ", user);
+        var trustedIds = string.Join(", ", trusted);
         return FormattableString.Invariant(
-            $"User assumption/trusted evidence declared: total={assumptions.User + assumptions.Trusted}, user={assumptions.User}, trusted={assumptions.Trusted}.");
+            $"User assumption/trusted evidence declared for {callableId}: total={user.Length + trusted.Length}, user={user.Length}, trusted={trusted.Length}; user-ids=[{userIds}], trusted-ids=[{trustedIds}].");
     }
 
     // Preserve the launcher's distinct containment-failure exit code when a

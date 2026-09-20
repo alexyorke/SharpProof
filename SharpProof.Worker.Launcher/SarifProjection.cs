@@ -33,16 +33,12 @@ internal static class SarifProjection
         results.AddRange(callableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
             .Select(result => IncompleteResult(request, result, callables[result.CallableId])));
+        results.AddRange(callableResults
+            .Where(static result => result.Assumptions.Any(IsPolicyAssumption))
+            .Select(result => AssumptionResult(
+                request, result, callables[result.CallableId])));
         var notifications = errors.Select(
             static error => Notification(error.Code, error.Message)).ToList();
-        var assumptions = summary.Assumptions;
-        if (assumptions.User + assumptions.Trusted != 0)
-        {
-            notifications.Add(Notification(
-                VerifierDiagnosticCodes.AssumptionsDeclared,
-                LauncherPresentation.AssumptionsDeclaredMessage(assumptions),
-                LauncherPresentation.Level(request.AssumptionPolicy, "note")));
-        }
 
         if (runStatus != WorkerRunStatus.Complete &&
             notifications.Count == 0)
@@ -149,6 +145,36 @@ internal static class SarifProjection
                 callable,
                 result
             });
+    }
+
+    private static object AssumptionResult(
+        WorkerVerifyRequest request, WorkerCallableResult result,
+        WorkerCallableManifestEntry callable)
+    {
+        var assumptions = result.Assumptions
+            .Where(IsPolicyAssumption)
+            .ToArray();
+        var level = LauncherPresentation.Level(
+            request.AssumptionPolicy, "note");
+        return Result(
+            VerifierDiagnosticCodes.AssumptionsDeclared,
+            level == "note" ? "review" : "fail",
+            level,
+            LauncherPresentation.AssumptionsDeclaredMessage(
+                result.CallableId, assumptions),
+            callable.Location, result.CallableId,
+            new
+            {
+                callable,
+                assumptions
+            });
+    }
+
+    private static bool IsPolicyAssumption(
+        WorkerAssumptionEvidence assumption)
+    {
+        return assumption.Kind is WorkerAssumptionKind.UserAssume or
+            WorkerAssumptionKind.TrustedBoundary;
     }
 
     private static (string Kind, string Level) UnknownPresentation(

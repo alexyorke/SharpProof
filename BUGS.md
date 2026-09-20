@@ -32,44 +32,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 12 entries: 0 P0, 0 P1 and 12 P3. The final
+The list currently has 11 entries: 0 P0, 0 P1 and 11 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
-
-
-
-
-
-
-### SP0048 is reported once at the first callable instead of where assumptions are declared
-
-- **File:** `SharpProof.Worker.Launcher/Program.cs` (`ReportAssumptions`,
-  and the incomplete-coverage report above it),
-  `SharpProof.Worker.Launcher/SarifProjection.cs` (assumption notification)
-- **Confidence:** High (from the code).
-- **What is wrong:** `ReportAssumptions` emits a single SP0048 at
-  `response.Manifest.Callables[0].Location`, whose message has only counts
-  ("total=N, user=U, trusted=T"). The SARIF projection adds the same text as a
-  run-level notification with no location. Each `WorkerCallableResult`
-  already carries its `Assumptions` and a `CallableId` that maps to a
-  manifest location, so the launcher has what it needs to point at each
-  method that declares `Contract.Assume` or `[SharpProofTrusted]`. The
-  incomplete-coverage SP0047 has the same shape: it is reported once at the
-  first incomplete callable, with a count.
-- **Failure scenario:** With the strict profile (`SharpProofAssumptionPolicy`
-  defaults to `error`), a project with 200 verified methods, one of which has
-  a `Contract.Assume`, fails the build with an SP0048 error on whichever
-  callable sorts first by ID, possibly in an unrelated file. The message does
-  not name the method that holds the assumption, and SARIF viewers show no
-  location, so the developer has to search the codebase or read the raw JSON
-  result.
-- **Suggested fix:** Emit one SP0048 per callable whose result lists user or
-  trusted assumptions, at that callable's location, naming the assumption
-  kinds and IDs. Put the same results in SARIF `results` with locations
-  instead of a run-level notification. Do the same for SP0047 incomplete
-  coverage (one result per incomplete callable, as the SARIF path already
-  does for `IncompleteResult`).
 
 
 ### ContractFor validation is documented as a generator but runs as an untagged compilation-end analyzer action

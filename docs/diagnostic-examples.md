@@ -213,20 +213,22 @@ binds to a source/project lookalike, a mismatched `SharpProof.Attributes`
 assembly, or a malformed non-elided contract API. The rejected symbol supplies
 no proof fact.
 
-The verifier launcher also emits SP0047 when one or more selected callables
-have incomplete coverage or an `Unknown` claim. Its severity comes from
-`SharpProofVerifyPolicy`: `advisory` is information,
-`warn-on-unknown` is a warning, and `require-proven` is an error that fails the
-build. SP0047 never means the method was proven.
+The verifier launcher emits one location-specific SP0047 for each selected
+callable with incomplete coverage or an `Unknown` claim. Its message names the
+callable and coverage reason. Severity comes from `SharpProofVerifyPolicy`:
+`advisory` is information, `warn-on-unknown` is a warning, and `require-proven`
+is an error that fails the build. SP0047 never means the method was proven.
 
 <a id="sp0048"></a>
 ## SP0048 - user assumption or trusted evidence
 
 SP0048 is a verifier-launcher diagnostic, not a Roslyn analyzer descriptor. It
-reports declared `Contract.Assume` or `[SharpProofTrusted]` evidence recorded
-by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
-`warn` reports a warning, and `error` fails the build. Advisory defaults to
-`allow`; strict defaults to `error`.
+reports each selected callable's declared `Contract.Assume` or
+`[SharpProofTrusted]` evidence at that callable's source location. The message
+names the callable and the recorded assumption IDs. In SARIF, each callable's
+assumptions are results with the same location. `SharpProofAssumptionPolicy=allow`
+reports information, `warn` reports a warning, and `error` fails the build.
+Advisory defaults to `allow`; strict defaults to `error`.
 
 <a id="sp0049"></a>
 ## SP0049 - final compiler manifest emission failed

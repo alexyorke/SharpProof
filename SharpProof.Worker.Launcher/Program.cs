@@ -473,7 +473,6 @@ internal static class Program
             response.FailureReason == WorkerRunFailureReason.None;
 
         var refuted = false;
-        var unknownClaims = 0;
         for (var index = 0; index < response.ClaimResults.Length; index++)
         {
             var result = response.ClaimResults[index];
@@ -486,40 +485,30 @@ internal static class Program
                 ReportRefutedClaim(claim, result);
             }
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
-            if (result.Outcome == WorkerClaimOutcome.Unknown)
-            {
-                unknownClaims++;
-            }
         }
-        var incompleteCount = 0;
-        var firstIncompleteIndex = -1;
-        for (var index = 0; index < response.CallableResults.Length; index++)
+        var incompleteCount = response.CallableResults.Count(
+            static result => result.Coverage == WorkerCallableCoverage.Incomplete);
+        var callablesById = response.Manifest.Callables.ToDictionary(
+            static callable => callable.CallableId, StringComparer.Ordinal);
+        foreach (var result in response.CallableResults)
         {
-            var result = response.CallableResults[index];
             if (result.Coverage != WorkerCallableCoverage.Incomplete)
             {
                 continue;
             }
 
-            if (incompleteCount == 0)
-            {
-                firstIncompleteIndex = index;
-            }
-            incompleteCount++;
-        }
-        if (incompleteCount != 0)
-        {
+            var callable = callablesById[result.CallableId];
             ReportDiagnostic(
-                response.Manifest.Callables[firstIncompleteIndex].Location,
+                callable.Location,
                 LauncherPresentation.Level(request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
                 projectTimedOut
                     ? FormattableString.Invariant(
-                        $"Project analysis timed out: callables={incompleteCount}, unknown-claims={unknownClaims}.")
+                        $"Project analysis timed out for {result.CallableId} ({result.Reason}).")
                     : FormattableString.Invariant(
-                        $"Selected analysis is incomplete: callables={incompleteCount}, unknown-claims={unknownClaims}."));
+                        $"Selected analysis is incomplete for {result.CallableId} ({result.Reason})."));
         }
-        else if (projectTimedOut)
+        if (incompleteCount == 0 && projectTimedOut)
         {
             ReportDiagnostic(
                 new WorkerSourceLocation(),
@@ -592,17 +581,30 @@ internal static class Program
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
     {
-        var assumptions = response.Summary.Assumptions;
-        if (assumptions.User + assumptions.Trusted == 0)
+        var callablesById = response.Manifest.Callables.ToDictionary(
+            static callable => callable.CallableId, StringComparer.Ordinal);
+        var reported = false;
+        foreach (var result in response.CallableResults)
         {
-            return false;
-        }
+            var assumptions = result.Assumptions
+                .Where(static assumption =>
+                    assumption.Kind is WorkerAssumptionKind.UserAssume or
+                        WorkerAssumptionKind.TrustedBoundary)
+                .ToArray();
+            if (assumptions.Length == 0)
+            {
+                continue;
+            }
 
-        ReportDiagnostic(response.Manifest.Callables[0].Location,
-            LauncherPresentation.Level(policy, "info"),
-            VerifierDiagnosticCodes.AssumptionsDeclared,
-            LauncherPresentation.AssumptionsDeclaredMessage(assumptions));
-        return policy == WorkerAssumptionPolicy.Error;
+            ReportDiagnostic(
+                callablesById[result.CallableId].Location,
+                LauncherPresentation.Level(policy, "info"),
+                VerifierDiagnosticCodes.AssumptionsDeclared,
+                LauncherPresentation.AssumptionsDeclaredMessage(
+                    result.CallableId, assumptions));
+            reported = true;
+        }
+        return reported && policy == WorkerAssumptionPolicy.Error;
     }
 
     private static void ReportDiagnostic(

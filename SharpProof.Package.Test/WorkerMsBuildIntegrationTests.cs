@@ -1875,6 +1875,7 @@ public sealed class WorkerMsBuildIntegrationTests
             verify: true,
             ("SharpProofWorkerPath", worker),
             ("_SharpProofTestWorkerPath", worker),
+            ("SharpProofVerifyPolicy", "require-proven"),
             ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
             ("SharpProofVerifyProjectWallTimeMilliseconds", "100"),
             ("SharpProofVerifyTerminationGraceMilliseconds", "1000"));

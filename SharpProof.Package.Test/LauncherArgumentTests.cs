@@ -1373,6 +1373,9 @@ public sealed class LauncherArgumentTests
                         "(UnsupportedExpression)"));
                 Assert.That(errorCapture.ToString(), Does.Contain("SP0047"));
                 Assert.That(errorCapture.ToString(), Does.Contain("SP0048"));
+                Assert.That(
+                    errorCapture.ToString(),
+                    Does.Contain("User assumption/trusted evidence declared for C.M"));
             }
         }
         finally
@@ -1473,7 +1476,7 @@ public sealed class LauncherArgumentTests
                 Does.EndWith("sarif-2.1.0.json"));
             JsonAssert.Equal(root, "version", "2.1.0");
             JsonAssert.Equal(run, "invocations[0].executionSuccessful", true);
-            Assert.That(results.GetArrayLength(), Is.EqualTo(2));
+            Assert.That(results.GetArrayLength(), Is.EqualTo(3));
             JsonAssert.Equal(results[0], "ruleId", "SharpProof.Refuted");
             JsonAssert.Equal(results[0], "kind", "fail");
             JsonAssert.Equal(results[0], "level", "error");
@@ -1485,10 +1488,24 @@ public sealed class LauncherArgumentTests
             JsonAssert.Equal(physicalLocation, "region.startColumn", 5);
             JsonAssert.Equal(results[1], "ruleId", "SP0047");
             JsonAssert.Equal(results[1], "level", "error");
-            var assumption = run.GetProperty("invocations")[0]
-                .GetProperty("toolExecutionNotifications")[0];
-            JsonAssert.Equal(assumption, "descriptor.id", "SP0048");
-            JsonAssert.Equal(assumption, "level", "error");
+            JsonAssert.Equal(results[2], "ruleId", "SP0048");
+            JsonAssert.Equal(results[2], "kind", "fail");
+            JsonAssert.Equal(results[2], "level", "error");
+            JsonAssert.Equal(
+                results[2],
+                "partialFingerprints.sharpProofSemanticId/v1",
+                "C.M");
+            var assumptionLocation = results[2].GetProperty("locations")[0]
+                .GetProperty("physicalLocation");
+            JsonAssert.Equal(
+                assumptionLocation,
+                "artifactLocation.uri",
+                "file:///C:/source/Subject.cs");
+            Assert.That(
+                run.GetProperty("invocations")[0]
+                    .GetProperty("toolExecutionNotifications")
+                    .GetArrayLength(),
+                Is.EqualTo(0));
         }
     }
 
@@ -1808,7 +1825,10 @@ public sealed class LauncherArgumentTests
             JsonAssert.Equal(invocation, "executionSuccessful", false);
             JsonAssert.Equal(invocation, "properties.runStatus", "Failed");
             JsonAssert.Equal(invocation, "toolExecutionNotifications[0].descriptor.id", "infrastructure.test");
-            JsonAssert.Equal(invocation, "toolExecutionNotifications[1].descriptor.id", "SP0048");
+            Assert.That(
+                invocation.GetProperty("toolExecutionNotifications")
+                    .GetArrayLength(),
+                Is.EqualTo(1));
         }
     }
 
