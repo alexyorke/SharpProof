@@ -17,6 +17,14 @@ internal sealed class OperationCompletionEvaluator
     private readonly Func<IOperation?, IOperation, bool> _isProvenNonNull;
     private readonly Func<IInvocationOperation, bool> _isImplicitLockEnterWithNullValue;
     private readonly Dictionary<IOperation, bool> _completionCache = new();
+    private int _completionDepth;
+
+    // Roslyn operation trees can be arbitrarily deep (a left-associated binary
+    // chain is one common example).  StackOverflowException cannot be caught by
+    // the analyzer host, so stop before recursive completion queries consume the
+    // host stack.  This matches the depth ceiling used by the operation scanner
+    // and managed-flow evaluator.
+    private const int MaximumCompletionDepth = 256;
 
     internal OperationCompletionEvaluator(
         EffectAnalysisSession session,
@@ -55,9 +63,24 @@ internal sealed class OperationCompletionEvaluator
             return cached;
         }
 
-        var result = CanCompleteNormallyCore(operation);
-        _completionCache.Add(operation, result);
-        return result;
+        if (_completionDepth >= MaximumCompletionDepth)
+        {
+            // Do not cache this conservative answer.  The same operation can
+            // still be reached later from a shallower path in the tree.
+            return false;
+        }
+
+        _completionDepth++;
+        try
+        {
+            var result = CanCompleteNormallyCore(operation);
+            _completionCache.Add(operation, result);
+            return result;
+        }
+        finally
+        {
+            _completionDepth--;
+        }
     }
 
     private bool CanCompleteNormallyCore(IOperation operation)

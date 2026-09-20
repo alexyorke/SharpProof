@@ -223,9 +223,12 @@ internal sealed partial class OperationEffectScanner
                 IThrowOperation thrown when IsSourceThrow(thrown) &&
                     canReachThrow => EffectExceptionFlow.KeepEscaping(
                     IsUnmodeledExternalExceptionConstruction(thrown.Exception)
-                        ? EffectSummaryOperations.ExceptionConstructionThrow(
-                            EffectSummary.Empty,
-                            ResolveThrownException(thrown))
+                        ? ScanUnmodeledExternalExceptionThrow(thrown)
+                        : IsExternalExceptionConstructionWithoutSpec(
+                            thrown.Exception)
+                            ? EffectSummaryOperations.ExceptionConstructionThrow(
+                                EffectSummary.Empty,
+                                ResolveThrownException(thrown))
                         : EffectSummaryOperations.Throw(
                             ResolveThrownException(thrown)),
                     thrown, _session.Compilation),
@@ -846,9 +849,10 @@ internal sealed partial class OperationEffectScanner
             ? EffectSummary.Empty
             : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         var suppressExternalConstruction =
-            IsUnmodeledExternalExceptionConstruction(creation) &&
+            IsExternalExceptionConstruction(creation) &&
             creation.Syntax.AncestorsAndSelf().Any(static syntax =>
-                syntax is ThrowExpressionSyntax or ThrowStatementSyntax);
+                syntax is ThrowExpressionSyntax or ThrowStatementSyntax) &&
+            !IsUnmodeledExternalExceptionConstruction(creation);
         return ScanObjectConstruction(
                 creation,
                 allocation,
@@ -974,6 +978,11 @@ internal sealed partial class OperationEffectScanner
             IsExternalExceptionConstruction(creation) &&
             !HasNonThrowingConstructorSpec(creation))
         {
+            if (IsUnmodeledExternalExceptionConstruction(thrown.Exception))
+            {
+                return ScanUnmodeledExternalExceptionThrow(thrown);
+            }
+
             var result = ScanObjectConstruction(
                 creation,
                 EffectSummary.Empty,
@@ -998,29 +1007,6 @@ internal sealed partial class OperationEffectScanner
                     ResolveThrownException(thrown)),
                 false)).Summary
             : expression.Summary;
-    }
-
-    private bool IsUnmodeledExternalExceptionConstruction(IOperation? operation)
-    {
-        if (operation == null)
-        {
-            return false;
-        }
-        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
-        return operation is IObjectCreationOperation creation &&
-            IsExternalExceptionConstruction(creation) &&
-            !HasNonThrowingConstructorSpec(creation);
-    }
-
-    private bool IsExternalExceptionConstruction(
-        IObjectCreationOperation creation)
-    {
-        return
-            creation.Type is INamedTypeSymbol type &&
-            _exceptionType is { } exceptionType &&
-            EffectTypeFacts.IsDerivedFrom(type, exceptionType) &&
-            creation.Constructor is
-            { DeclaringSyntaxReferences.Length: 0 };
     }
 
     private EffectSummary ScanArrayCreation(IArrayCreationOperation array)

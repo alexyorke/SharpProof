@@ -42,19 +42,40 @@ internal static class CompilerManifestArtifactProducer
         }
         else
         {
-            var lowerer = new CompilerCallableLowerer(
-                compilation,
-                new IrFactory(),
-                specificationPackAuthority,
-                snapshot.SyntaxTrees);
+            var summaryAuthorities =
+                ImmutableArray.CreateBuilder<CompilerSummaryEvidenceAuthority>();
             callables = [.. targets.Select(item => {
+                // Each encoded callable is a self-contained IR graph. Keep its
+                // lowering factory self-contained too: contract binding and
+                // body lowering may request the same symbol with different
+                // display-name purposes (opaque versus call), and IrFactory
+                // intentionally hash-conses those requests by structural
+                // identity rather than display name.
+                var lowerer = new CompilerCallableLowerer(
+                    compilation,
+                    new IrFactory(),
+                    specificationPackAuthority,
+                    snapshot.SyntaxTrees);
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
+                summaryAuthorities.AddRange(lowerer.SummaryEvidenceAuthorities);
                 return artifact.AttachEffectEvidence(item, snapshot);
             })];
+            var canonicalAuthorities = summaryAuthorities
+                .GroupBy(static authority => (
+                    authority.Origin,
+                    authority.CallIdentity,
+                    authority.EvidenceIdentity,
+                    authority.EvidenceSha256))
+                .Select(static group => group.First())
+                .OrderBy(static authority => (int)authority.Origin)
+                .ThenBy(static authority => authority.CallIdentity, StringComparer.Ordinal)
+                .ThenBy(static authority => authority.EvidenceIdentity, StringComparer.Ordinal)
+                .ThenBy(static authority => authority.EvidenceSha256, StringComparer.Ordinal)
+                .ToImmutableArray();
             snapshot.SummaryEvidence = BuildSummaryEvidence(
                 snapshot,
-                lowerer.SummaryEvidenceAuthorities);
+                canonicalAuthorities);
         }
         var artifact = new CompilerManifestArtifact
         {

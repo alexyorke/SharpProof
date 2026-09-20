@@ -30,6 +30,7 @@ public static class FrameworkTypeMetadataNames
     public const string IDisposable = "System.IDisposable";
     public const string IFormattable = "System.IFormattable";
     public const string IFormatProvider = "System.IFormatProvider";
+    public const string ISpanFormattable = "System.ISpanFormattable";
     public const string Span = "System.Span`1";
     public const string ReadOnlySpan = "System.ReadOnlySpan`1";
     public const string ICriticalNotifyCompletion =

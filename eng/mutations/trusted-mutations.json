@@ -810,8 +810,8 @@
   {
     "name": "launcher-manifest-byte-limit",
     "file": "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
-    "original": "MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;",
-    "mutated": "MaximumBytes = 32 * 1024 * 1024;",
+    "original": "MaximumBytes = 32 * 1024 * 1024;",
+    "mutated": "MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~CompilerManifestByteLimitIsEnforcedBeforeAllocation"
   },

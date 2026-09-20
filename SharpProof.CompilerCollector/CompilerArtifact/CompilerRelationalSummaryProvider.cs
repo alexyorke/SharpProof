@@ -24,6 +24,21 @@ internal sealed class CompilerRelationalSummaryProvider
         IrRelationalSummary? Summary,
         CompilerSummaryEvidenceAuthority? Authority);
 
+    // The IL lowerer can resolve a dependency through a metadata-only
+    // compilation.  Roslyn symbols from that compilation are not equal to the
+    // corresponding symbols from the user's compilation, even though they
+    // describe the same method.  Keep the cache and recursion guard keyed by
+    // identity that survives that compilation boundary.
+    private readonly record struct SummaryCacheKey(
+        string AssemblyIdentity,
+        string ModuleName,
+        int MetadataToken,
+        string DocumentationCommentId);
+
+    private readonly record struct SummaryCacheLookupKey(
+        SummaryCacheKey Method,
+        IrMemberId Member);
+
     private readonly CSharpCompilation _compilation;
     private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
     private readonly Dictionary<SyntaxTree, int>? _capturedTreeOrdinals;
@@ -32,10 +47,9 @@ internal sealed class CompilerRelationalSummaryProvider
     private readonly IrFactory _factory;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerSpecificationPackProvider _specificationPacks;
-    private readonly Dictionary<IMethodSymbol, SummaryCacheEntry> _cache =
-        new(SymbolEqualityComparer.Default);
-    private readonly HashSet<IMethodSymbol> _active =
-        new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<SummaryCacheLookupKey, SummaryCacheEntry> _cache =
+        new();
+    private readonly HashSet<SummaryCacheKey> _active = [];
     private bool _dependencyResourceLimitReached;
 
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention
@@ -48,6 +62,16 @@ internal sealed class CompilerRelationalSummaryProvider
         [.. _cache.Values
             .Where(static entry => entry.Authority is not null)
             .Select(static entry => entry.Authority!)
+            // A metadata-only symbol can reach the same method as a source
+            // compilation symbol.  Identical authorities represent one
+            // evidence row; retain conflicting rows so manifest validation
+            // fails closed for an actual provenance conflict.
+            .GroupBy(static authority => (
+                authority.Origin,
+                authority.CallIdentity,
+                authority.EvidenceIdentity,
+                authority.EvidenceSha256))
+            .SelectMany(static group => group.Distinct())
             .OrderBy(static authority => (int)authority.Origin)
             .ThenBy(static authority => authority.CallIdentity, StringComparer.Ordinal)
             .ThenBy(static authority => authority.EvidenceIdentity, StringComparer.Ordinal)
@@ -110,13 +134,15 @@ internal sealed class CompilerRelationalSummaryProvider
         cancellationToken.ThrowIfCancellationRequested();
         method = SemanticClaimIdentity.NormalizeCandidate(method)
             .ConstructedFrom;
-        if (_cache.TryGetValue(method, out var cached))
+        var methodKey = CreateCacheKey(method);
+        var cacheKey = new SummaryCacheLookupKey(methodKey, member);
+        if (_cache.TryGetValue(cacheKey, out var cached))
         {
             summary = cached.Summary;
             return summary is not null && summary.Signature.Member == member;
         }
 
-        if (_active.Contains(method))
+        if (_active.Contains(methodKey))
         {
             summary = null;
             return false;
@@ -137,7 +163,7 @@ internal sealed class CompilerRelationalSummaryProvider
             return false;
         }
 
-        _active.Add(method);
+        _active.Add(methodKey);
 
         try
         {
@@ -168,7 +194,7 @@ internal sealed class CompilerRelationalSummaryProvider
                         ? CompilerImplementationIlAbstentionReason
                             .SummaryResourceLimit
                         : implementationIlAbstention;
-                _cache.Add(method, default);
+                _cache.Add(cacheKey, default);
                 return false;
             }
 
@@ -178,21 +204,31 @@ internal sealed class CompilerRelationalSummaryProvider
                 cancellationToken);
             if (authority == null)
             {
-                _cache.Add(method, default);
+                _cache.Add(cacheKey, default);
                 summary = null;
                 return false;
             }
 
             _cache.Add(
-                method,
+                cacheKey,
                 new SummaryCacheEntry(summary, authority));
             _dependencyResourceLimitReached = false;
             return true;
         }
         finally
         {
-            _active.Remove(method);
+            _active.Remove(methodKey);
         }
+    }
+
+    private static SummaryCacheKey CreateCacheKey(IMethodSymbol method)
+    {
+        var assembly = method.ContainingAssembly;
+        return new SummaryCacheKey(
+            assembly?.Identity.ToString() ?? string.Empty,
+            method.ContainingModule?.Name ?? string.Empty,
+            method.MetadataToken,
+            method.GetDocumentationCommentId() ?? string.Empty);
     }
 
     private bool TryBuildSource(

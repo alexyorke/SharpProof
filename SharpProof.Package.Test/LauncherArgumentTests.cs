@@ -861,7 +861,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void CompilerManifestByteLimitIsEnforcedBeforeAllocation()
     {
-        const int expectedLimit = 16 * 1024 * 1024;
+        const int expectedLimit = 32 * 1024 * 1024;
         using var temporary = new TempDirectory(
             "sharpproof-compiler-manifest-limit-",
             TestContext.CurrentContext.WorkDirectory);

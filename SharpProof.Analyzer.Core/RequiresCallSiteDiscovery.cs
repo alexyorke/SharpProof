@@ -596,16 +596,61 @@ internal sealed partial class RequiresCallSiteDiscovery(
             MethodKind.EventRemove;
     }
 
-    private static bool HasReplayableAccessorEvaluation(
+    private bool HasReplayableAccessorEvaluation(
+        IOperation operation,
         RequiresCallTarget call,
         DefiniteOperationFacts operationFacts)
     {
+        var isInitializerMemberCall = IsInitializerMemberCall(
+            operation,
+            call.Instance);
         return (call.Instance == null ||
-                operationFacts.CompletesNormally(call.Instance)) &&
+                operationFacts.CompletesNormally(call.Instance) ||
+                isInitializerMemberCall) &&
             call.Arguments.All(argument =>
-                operationFacts.CompletesNormally(argument.Value)) &&
+                operationFacts.CompletesNormally(argument.Value) ||
+                isInitializerMemberCall &&
+                CompletesInitializerCapture(
+                    argument.Value,
+                    operationFacts)) &&
             call.ExplicitArguments.Values.All(
-                operationFacts.CompletesNormally);
+                value => operationFacts.CompletesNormally(value) ||
+                    isInitializerMemberCall &&
+                    CompletesInitializerCapture(value, operationFacts));
+    }
+
+    private bool CompletesInitializerCapture(
+        IOperation operation,
+        DefiniteOperationFacts operationFacts)
+    {
+        return operation is IFlowCaptureReferenceOperation &&
+            semanticModel.GetOperation(operation.Syntax, cancellationToken)
+                is { } source &&
+            operationFacts.CompletesNormally(source);
+    }
+
+    private static bool IsInitializerMemberCall(
+        IOperation operation,
+        IOperation? instance)
+    {
+        if (instance is not IFlowCaptureReferenceOperation)
+        {
+            return false;
+        }
+
+        var isPropertyAssignment = operation is IPropertyReferenceOperation
+        {
+            Parent: ISimpleAssignmentOperation assignment
+        } property && ReferenceEquals(assignment.Target, property);
+        var isCollectionAdd = operation is IInvocationOperation
+        {
+            IsImplicit: true
+        };
+        return (isPropertyAssignment || isCollectionAdd) &&
+            (OperationAncestors.Of(operation).Any(static ancestor =>
+                 ancestor is IObjectOrCollectionInitializerOperation) ||
+             operation.Syntax.AncestorsAndSelf().Any(static syntax =>
+                 syntax is InitializerExpressionSyntax));
     }
 
     private bool HasReplayableCallEvaluation(
@@ -633,7 +678,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     invocation.TargetMethod) ||
             operation.IsImplicit)
         {
-            return HasReplayableAccessorEvaluation(call, operationFacts);
+            return HasReplayableAccessorEvaluation(
+                operation,
+                call,
+                operationFacts);
         }
         return (hasFlowState || !flowAnalysisIsComplete) &&
             HasReplayablePrefix(operation, operationFacts);

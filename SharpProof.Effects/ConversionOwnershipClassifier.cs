@@ -226,7 +226,11 @@ internal sealed class ConversionOwnershipClassifier
         {
             if (!_localRegions.ContainsKey(declarator.Symbol))
             {
-                _localRegions.Add(declarator.Symbol, EffectRegionSet.Empty);
+                _localRegions.Add(
+                    declarator.Symbol,
+                    IsRuntimeAssignedDeclarator(declarator)
+                        ? EffectRegionSet.Unknown
+                        : EffectRegionSet.Empty);
             }
             if (declarator.Symbol.RefKind != RefKind.None &&
                 !_refLocalStorageRegions.ContainsKey(declarator.Symbol))
@@ -559,6 +563,20 @@ internal sealed class ConversionOwnershipClassifier
                 source = null!;
                 return false;
         }
+    }
+
+    private static bool IsRuntimeAssignedDeclarator(
+        IVariableDeclaratorOperation declarator)
+    {
+        if (declarator.Parent is ICatchClauseOperation ||
+            declarator.Parent is IForEachLoopOperation)
+        {
+            return true;
+        }
+
+        return declarator.Parent is IVariableDeclarationOperation declaration &&
+            (declaration.Parent is ICatchClauseOperation ||
+             declaration.Parent is IForEachLoopOperation);
     }
 
     private static bool IsSimpleSetterTarget(

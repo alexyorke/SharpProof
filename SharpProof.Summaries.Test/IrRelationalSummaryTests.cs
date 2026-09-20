@@ -616,6 +616,161 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void LiteralSummaryArgumentDropsFreshVariablesFromFoldedBranch()
+    {
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "LiteralSummaryArguments");
+        var identity = factory.CreateIdentity();
+        var integer = factory.IntegerType;
+        var firstHelper = factory.GetOrCreateMember(
+            identity,
+            declaringType,
+            "First",
+            integer,
+            isStatic: true,
+            integer);
+        var secondHelper = factory.GetOrCreateMember(
+            identity,
+            declaringType,
+            "Second",
+            integer,
+            isStatic: true,
+            integer);
+        var choose = factory.GetOrCreateMember(
+            identity,
+            declaringType,
+            "Choose",
+            integer,
+            isStatic: true,
+            integer,
+            integer);
+
+        var firstParameter = factory.CreateVariable("first:parameter", integer);
+        var firstResult = factory.CreateVariable("first:result", integer);
+        var firstBodyValue = factory.CreateVariable("first:body-value", integer);
+        var firstSummary = BuildIdentitySummary(
+            factory,
+            firstHelper,
+            firstParameter,
+            firstResult,
+            firstBodyValue,
+            "first:entry",
+            "first:return",
+            Provenance('c'));
+
+        var secondParameter = factory.CreateVariable("second:parameter", integer);
+        var secondResult = factory.CreateVariable("second:result", integer);
+        var secondBodyValue = factory.CreateVariable("second:body-value", integer);
+        var secondSummary = BuildIdentitySummary(
+            factory,
+            secondHelper,
+            secondParameter,
+            secondResult,
+            secondBodyValue,
+            "second:entry",
+            "second:return",
+            Provenance('d'));
+
+        var chooseParameter = factory.CreateVariable("choose:parameter", integer);
+        var chooseFlag = factory.CreateVariable("choose:flag", integer);
+        var chooseResult = factory.CreateVariable("choose:result", integer);
+        var chooseBodyValue = factory.CreateVariable("choose:body-value", integer);
+        var chooseBodyFlag = factory.CreateVariable("choose:body-flag", integer);
+        var firstCallResult = factory.CreateVariable("choose:first-result", integer);
+        var secondCallResult = factory.CreateVariable("choose:second-result", integer);
+        var chooseBuilder = new IrProgramBuilder(factory);
+        var chooseEntry = chooseBuilder.CreateBlock("choose:entry");
+        var firstBranch = chooseBuilder.CreateBlock("choose:first");
+        var secondBranch = chooseBuilder.CreateBlock("choose:second");
+        chooseBuilder.Branch(
+            chooseEntry,
+            factory.CreateOperation("choose:test"),
+            factory.Binary(
+                IrBinaryOperator.GreaterThan,
+                factory.Variable(chooseBodyFlag),
+                factory.Integer(0)),
+            firstBranch,
+            secondBranch);
+        var firstCall = chooseBuilder.Call(
+            firstBranch,
+            factory.CreateOperation("choose:first-call"),
+            firstCallResult,
+            firstHelper,
+            receiver: null,
+            factory.Variable(chooseBodyValue));
+        chooseBuilder.Return(
+            firstBranch,
+            factory.CreateOperation("choose:first-return"),
+            factory.Variable(firstCallResult));
+        var secondCall = chooseBuilder.Call(
+            secondBranch,
+            factory.CreateOperation("choose:second-call"),
+            secondCallResult,
+            secondHelper,
+            receiver: null,
+            factory.Variable(chooseBodyValue));
+        chooseBuilder.Return(
+            secondBranch,
+            factory.CreateOperation("choose:second-return"),
+            factory.Variable(secondCallResult));
+
+        var chooseBuilt = IrRelationalSummaryBuilder.Build(
+            chooseBuilder.Build(),
+            new IrSummarySignature(
+                choose,
+                receiver: null,
+                [chooseParameter, chooseFlag],
+                chooseResult,
+                Provenance('e')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [chooseBodyValue] = factory.Variable(chooseParameter),
+                [chooseBodyFlag] = factory.Variable(chooseFlag)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [firstCall.Id] = firstSummary,
+                [secondCall.Id] = secondSummary
+            });
+
+        Assert.That(chooseBuilt.IsSuccess, Is.True, chooseBuilt.Reason.ToString());
+        var chooseSummary = chooseBuilt.Summary!;
+        Assert.That(chooseSummary.ExistentialVariables, Has.Length.EqualTo(2));
+
+        var literal = IrRelationalSummaryInstantiator.Instantiate(
+            chooseSummary,
+            receiver: null,
+            [factory.Variable(chooseParameter), factory.Integer(1)],
+            instanceOrdinal: 1);
+        var symbolicFlag = factory.CreateVariable("actual:flag", integer);
+        var symbolic = IrRelationalSummaryInstantiator.Instantiate(
+            chooseSummary,
+            receiver: null,
+            [factory.Variable(chooseParameter), factory.Variable(symbolicFlag)],
+            instanceOrdinal: 2);
+
+        var literalReferenced = new HashSet<IrVarId>(
+            IrTermAnalysis.CollectVariables(literal.NormalCompletion));
+        literalReferenced.UnionWith(
+            IrTermAnalysis.CollectVariables(literal.NormalRelation));
+        var symbolicReferenced = new HashSet<IrVarId>(
+            IrTermAnalysis.CollectVariables(symbolic.NormalCompletion));
+        symbolicReferenced.UnionWith(
+            IrTermAnalysis.CollectVariables(symbolic.NormalRelation));
+
+        Assert.That(literal.FreshVariables, Has.Length.EqualTo(2));
+        Assert.That(
+            literal.FreshVariables.All(literalReferenced.Contains),
+            Is.True);
+        Assert.That(symbolic.FreshVariables, Has.Length.EqualTo(3));
+        Assert.That(
+            symbolic.FreshVariables.All(symbolicReferenced.Contains),
+            Is.True);
+    }
+
+    [Test]
     public void CallCompositionUsesAReusableRelationAndFreshVariables()
     {
         var callee = new SummaryFixture("Double");
@@ -1142,6 +1297,36 @@ public sealed class IrRelationalSummaryTests
             {
                 [bodyParameter] = fixture.Factory.Variable(parameter)
             });
+    }
+
+    private static IrRelationalSummary BuildIdentitySummary(
+        IrFactory factory,
+        IrMemberId member,
+        IrVarId parameter,
+        IrVarId result,
+        IrVarId bodyParameter,
+        string entryName,
+        string returnOperationName,
+        IrSummaryProvenance provenance)
+    {
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock(entryName);
+        builder.Return(
+            entry,
+            factory.CreateOperation(returnOperationName),
+            factory.Variable(bodyParameter));
+        return IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            new IrSummarySignature(
+                member,
+                receiver: null,
+                [parameter],
+                result,
+                provenance),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = factory.Variable(parameter)
+            }).Summary!;
     }
 
     private static IrSummaryProvenance Provenance(char digit)

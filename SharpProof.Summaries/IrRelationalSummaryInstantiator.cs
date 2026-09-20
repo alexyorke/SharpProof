@@ -76,11 +76,26 @@ public static class IrRelationalSummaryInstantiator
             factory,
             [summary.NormalCompletion, summary.NormalRelation],
             replacements);
+
+        var referencedVariables = new HashSet<IrVarId>(
+            IrTermAnalysis.CollectVariables(predicates[0]));
+        referencedVariables.UnionWith(
+            IrTermAnalysis.CollectVariables(predicates[1]));
+        var retainedFresh = ImmutableArray.CreateBuilder<IrVarId>(
+            fresh.Count);
+        foreach (var variable in fresh)
+        {
+            if (referencedVariables.Contains(variable))
+            {
+                retainedFresh.Add(variable);
+            }
+        }
+
         return new IrSummaryInstantiation(
             result,
             predicates[0],
             predicates[1],
-            fresh.MoveToImmutable());
+            retainedFresh.ToImmutable());
     }
 
     private static IrVarId CreateFresh(

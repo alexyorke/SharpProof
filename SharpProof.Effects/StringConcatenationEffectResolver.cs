@@ -480,10 +480,11 @@ internal static class StringConcatenationEffectResolver
         }
 
         var spanFormattable = compilation.GetTypeByMetadataName(
-            "System.ISpanFormattable");
-        var span = compilation.GetTypeByMetadataName("System.Span`1");
+            FrameworkTypeMetadataNames.ISpanFormattable);
+        var span = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.Span);
         var readOnlySpan = compilation.GetTypeByMetadataName(
-            "System.ReadOnlySpan`1");
+            FrameworkTypeMetadataNames.ReadOnlySpan);
         var formatProvider = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.IFormatProvider);
         if (spanFormattable == null ||

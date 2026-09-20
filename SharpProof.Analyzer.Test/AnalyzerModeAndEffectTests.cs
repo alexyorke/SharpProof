@@ -3217,6 +3217,11 @@ public sealed class AnalyzerModeAndEffectTests
                 public static void UnmodeledThrow() =>
                     throw new AggregateException(
                         (IEnumerable<Exception>)null!);
+
+                [AllowedExceptions(typeof(AggregateException))]
+                public static void UnmodeledThrowWithMatchingContract() =>
+                    throw new AggregateException(
+                        (IEnumerable<Exception>)null!);
             }
             """,
             mode: null,
@@ -3226,7 +3231,12 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0046", "SP0046", "SP0046");
+            AnalyzerTestHost.AssertIds(
+                diagnostics,
+                "SP0046",
+                "SP0046",
+                "SP0046",
+                "SP0046");
             Assert.That(
                 factory.Outcomes["SafeConstruction"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
@@ -3238,6 +3248,9 @@ public sealed class AnalyzerModeAndEffectTests
                 Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
             Assert.That(
                 factory.Outcomes["UnmodeledThrow"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["UnmodeledThrowWithMatchingContract"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(
                 diagnostics.Select(diagnostic =>

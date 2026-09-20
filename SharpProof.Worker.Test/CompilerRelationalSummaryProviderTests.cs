@@ -1,13 +1,16 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Specs;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
@@ -162,6 +165,107 @@ public sealed class CompilerRelationalSummaryProviderTests
         }
     }
 
+    [Test]
+    public void NestedImplementationIlDependencyDoesNotDuplicateEvidence()
+    {
+        using var temporary = new TempDirectory(
+            "SharpProof.CompilerRelationalSummaryProvider-");
+        var implementationPath = Path.Combine(
+            temporary.FullName,
+            "Lib.dll");
+        var implementation = TestCompilation.Create(
+            "NestedImplementationIlLibrary",
+            """
+            public static class Lib
+            {
+                public static int Inner(int value) => value;
+                public static int Outer(int value) => Inner(value);
+            }
+            """,
+            includeSharpProofReference: false);
+        using (var stream = new FileStream(
+                   implementationPath,
+                   FileMode.CreateNew,
+                   FileAccess.Write,
+                   FileShare.None))
+        {
+            var emit = implementation.Emit(stream);
+            Assert.That(
+                emit.Success,
+                Is.True,
+                string.Join(
+                    Environment.NewLine,
+                    emit.Diagnostics.Select(static diagnostic =>
+                        diagnostic.ToString())));
+        }
+
+        var compilation = CreateCompilationWithReferences(
+            """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+
+            public static class Subject
+            {
+                public static int VerifyOuter(int value)
+                {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Lib.Outer(value);
+                }
+
+                public static int VerifyInner(int value)
+                {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Lib.Inner(value);
+                }
+            }
+            """,
+            Path.Combine(temporary.FullName, "Subject.cs"),
+            MetadataReference.CreateFromFile(implementationPath));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        var lowerer = new CompilerCallableLowerer(
+            compilation,
+            new IrFactory());
+        var preparations = discovery.Targets.Values
+            .OrderBy(static candidate => candidate.Method.MetadataName,
+                StringComparer.Ordinal)
+            .Select(candidate => lowerer.Prepare(candidate))
+            .ToArray();
+
+        Assert.That(
+            preparations.Select(static preparation => preparation.IsSuccess),
+            Is.All.True,
+            string.Join(
+                ", ",
+                preparations.Select(static preparation =>
+                    preparation.FailureReason.ToString())) + " / " +
+                lowerer.LastImplementationIlAbstention);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowerer.SummaryEvidenceAuthorities, Has.Length.EqualTo(2));
+            Assert.That(
+                lowerer.SummaryEvidenceAuthorities.Count(authority =>
+                    authority.CallIdentity == "M:Lib.Inner(System.Int32)"),
+                Is.EqualTo(1));
+        }
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            temporary.FullName,
+            "net8.0",
+            WorkerFeatureSet.All,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Compilation.SummaryEvidence, Has.Length.EqualTo(2));
+            Assert.That(
+                artifact.Compilation.SummaryEvidence.Count(row =>
+                    row.Origin == CompilerSummaryOrigin.ImplementationIl &&
+                    row.CallIdentity == "M:Lib.Inner(System.Int32)"),
+                Is.EqualTo(1));
+        }
+    }
+
     private static (IMethodSymbol Method, IrMemberId Member) GetCall(
         CSharpCompilation compilation,
         IrFactory factory,
@@ -192,5 +296,29 @@ public sealed class CompilerRelationalSummaryProviderTests
         return TestCompilation.Create(
             "CompilerRelationalSummaryProviderTests",
             ("Subject.cs", source));
+    }
+
+    private static CSharpCompilation CreateCompilationWithReferences(
+        string source,
+        string sourcePath,
+        params MetadataReference[] additionalReferences)
+    {
+        var compilation = CSharpCompilation.Create(
+            "CompilerRelationalSummaryProviderTests",
+            [CSharpSyntaxTree.ParseText(
+                SourceText.From(
+                    source,
+                    Encoding.UTF8,
+                    SourceHashAlgorithm.Sha256),
+                new CSharpParseOptions(
+                    LanguageVersion.CSharp12,
+                    preprocessorSymbols: [Contract.ConditionalSymbol]),
+                sourcePath)],
+            TestMetadataReferences.WithSharpProof.AddRange(additionalReferences),
+            TestCompilation.CreateOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
+        return compilation;
     }
 }

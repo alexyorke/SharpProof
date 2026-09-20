@@ -251,6 +251,154 @@ public sealed class ExceptionHandlerReachabilityTests
     }
 
     [Test]
+    public void ConstructorMemberInitializersReachMatchingCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class FieldInitialized {
+                private readonly int _value = Fail();
+
+                public FieldInitialized() { }
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class ImplicitInitialized {
+                private readonly int _value = Fail();
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class PropertyInitialized {
+                public int Value { get; } = Fail();
+
+                public PropertyInitialized() { }
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class ChainedInitializer {
+                private readonly int _value = Fail();
+
+                public ChainedInitializer() { }
+
+                public ChainedInitializer(int value) : this() { }
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+            }
+
+            public struct StructInitialized {
+                private int _value = Fail();
+
+                public StructInitialized() { }
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+            }
+
+            public static class Sample {
+                public static void Field() {
+                    try {
+                        _ = new FieldInitialized();
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+
+                public static void Implicit() {
+                    try {
+                        _ = new ImplicitInitialized();
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+
+                public static void Property() {
+                    try {
+                        _ = new PropertyInitialized();
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+
+                public static void Chained() {
+                    try {
+                        _ = new ChainedInitializer(1);
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+
+                public static void Struct() {
+                    try {
+                        _ = new StructInitialized();
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                IsCatchReachable(compilation, session, "Field"),
+                Is.True);
+            Assert.That(
+                IsCatchReachable(compilation, session, "Implicit"),
+                Is.True);
+            Assert.That(
+                IsCatchReachable(compilation, session, "Property"),
+                Is.True);
+            Assert.That(
+                IsCatchReachable(compilation, session, "Chained"),
+                Is.True);
+            Assert.That(
+                IsCatchReachable(compilation, session, "Struct"),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void ImplicitRecordCopyConstructorKeepsCatchReachable()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public record BaseRecord {
+                protected BaseRecord(BaseRecord other) {
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public record DerivedRecord : BaseRecord;
+
+            public static class Sample {
+                public static void Copy(DerivedRecord value) {
+                    try {
+                        _ = value with { };
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        Assert.That(
+            IsCatchReachable(compilation, session, "Copy"),
+            Is.True);
+    }
+
+    [Test]
     public void CallableExceptionWalkHonorsDepthCutoff()
     {
         const int lastForwardingMethod = 34;

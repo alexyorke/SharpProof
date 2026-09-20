@@ -624,12 +624,15 @@ internal sealed class ExceptionHandlerReachability(
                         var constructorExceptions =
                             constructor == null
                                 ? UnknownPotential
-                                : unsourcedExceptionConstructor
+                                    : unsourcedExceptionConstructor
                                     ? metadataExceptionType && hasApiSpec
                                         ? FromThrowSet(
                                             _externalEffects.Resolve(
                                                 constructor).Throws)
-                                        : EmptyPotential
+                                        : IsTrustedFrameworkExceptionConstructor(
+                                            constructor)
+                                            ? EmptyPotential
+                                            : UnknownPotential
                                     : GetCallableExceptions(
                                         constructor,
                                         traversal.Next);
@@ -2924,6 +2927,12 @@ internal sealed class ExceptionHandlerReachability(
         {
             return EmptyPotential;
         }
+        if (method.MethodKind == MethodKind.Constructor &&
+            method.DeclaringSyntaxReferences.Length == 0 &&
+            IsTrustedFrameworkExceptionConstructor(method))
+        {
+            return EmptyPotential;
+        }
         if (traversal.Depth > 32)
         {
             return UnknownPotential;
@@ -2958,10 +2967,12 @@ internal sealed class ExceptionHandlerReachability(
             {
                 result = EffectMethodNodeBuilder
                     .IsSourceImplicitParameterlessConstructor(method)
-                    ? GetImplicitConstructorExceptions(
-                        method,
-                        traversal)
-                    : EmptyPotential;
+                        ? GetImplicitConstructorExceptions(
+                            method,
+                            traversal)
+                        : IsRecordCopyConstructor(method)
+                            ? UnknownPotential
+                            : EmptyPotential;
             }
             else if (method.DeclaringSyntaxReferences.Length != 1)
             {
@@ -2980,6 +2991,16 @@ internal sealed class ExceptionHandlerReachability(
                         operation,
                         traversal,
                         keepEscaping: true);
+                if (method.MethodKind == MethodKind.Constructor &&
+                    (operation is not IConstructorBodyOperation constructorBody ||
+                     !DelegatesToThisConstructor(method, constructorBody)))
+                {
+                    result = Union(
+                        result,
+                        GetInstanceMemberInitializerExceptions(
+                            method,
+                            traversal));
+                }
             }
             if (cacheResult)
             {
@@ -3008,18 +3029,69 @@ internal sealed class ExceptionHandlerReachability(
         IMethodSymbol constructor,
         TraversalContext traversal)
     {
+        var initializers = GetInstanceMemberInitializerExceptions(
+            constructor,
+            traversal);
         if (constructor.ContainingType.IsValueType)
         {
-            return EmptyPotential;
+            return initializers;
         }
 
         var baseConstructor = EffectMethodNodeBuilder
             .GetUniqueParameterlessBaseConstructor(constructor);
-        return baseConstructor == null
-            ? UnknownPotential
-            : GetCallableExceptions(
-                baseConstructor,
-                traversal.Next);
+        return Union(
+            initializers,
+            baseConstructor == null
+                ? UnknownPotential
+                : GetCallableExceptions(
+                    baseConstructor,
+                    traversal.Next));
+    }
+
+    private PotentialExceptions GetInstanceMemberInitializerExceptions(
+        IMethodSymbol constructor,
+        TraversalContext traversal)
+    {
+        var result = EmptyPotential;
+        foreach (var operation in EffectMethodNodeBuilder
+                     .GetMemberInitializerOperations(
+                         compilation,
+                         constructor.ContainingType,
+                         staticInitializers: false,
+                         CancellationToken.None))
+        {
+            result = Union(
+                result,
+                operation == null
+                    ? UnknownPotential
+                    : GetPotentialExceptions(
+                        operation,
+                        traversal,
+                        keepEscaping: true));
+        }
+
+        return result;
+    }
+
+    private static bool IsRecordCopyConstructor(IMethodSymbol method)
+    {
+        return method.ContainingType.IsRecord &&
+            method.Parameters.Length == 1 &&
+            SymbolEqualityComparer.Default.Equals(
+                method.Parameters[0].Type.OriginalDefinition,
+                method.ContainingType.OriginalDefinition);
+    }
+
+    private static bool DelegatesToThisConstructor(
+        IMethodSymbol constructor,
+        IConstructorBodyOperation body)
+    {
+        var initializer = EffectMethodNodeBuilder
+            .GetConstructorInitializerInvocation(body);
+        return initializer != null &&
+            SymbolEqualityComparer.Default.Equals(
+                initializer.TargetMethod.ContainingType.OriginalDefinition,
+                constructor.ContainingType.OriginalDefinition);
     }
 
     internal bool CanMethodThrow(IMethodSymbol method)
@@ -3089,6 +3161,16 @@ internal sealed class ExceptionHandlerReachability(
         return type is INamedTypeSymbol named &&
             _exceptionType is { } exception &&
             EffectTypeFacts.IsDerivedFrom(named, exception);
+    }
+
+    private bool IsTrustedFrameworkExceptionConstructor(
+        IMethodSymbol constructor)
+    {
+        return constructor.Parameters.Length == 0 &&
+            _exceptionType is { } exceptionType &&
+            SymbolEqualityComparer.Default.Equals(
+                constructor.ContainingAssembly,
+                exceptionType.ContainingAssembly);
     }
 
     private static PotentialExceptions Union(

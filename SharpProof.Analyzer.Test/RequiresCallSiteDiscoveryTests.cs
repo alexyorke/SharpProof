@@ -976,6 +976,78 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task InitializerMembersAndWithExpressionsCheckRequires()
+    {
+        var source = """
+            using System;
+            using System.Collections;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            public sealed class Config
+            {
+                private int _value;
+                private int _setter;
+                public int Value
+                {
+                    get => _value;
+                    init { Contract.Requires(value > 0); _value = value; }
+                }
+                public int Setter
+                {
+                    get => _setter;
+                    set { Contract.Requires(value > 0); _setter = value; }
+                }
+                public int this[int index]
+                {
+                    get => 0;
+                    set { Contract.Requires(index >= 0); }
+                }
+            }
+
+            public sealed record RecordConfig
+            {
+                private readonly int _value;
+                public int Value
+                {
+                    get => _value;
+                    init { Contract.Requires(value > 0); _value = value; }
+                }
+            }
+
+            public sealed class Positives : IEnumerable<int>
+            {
+                public void Add(int value) { Contract.Requires(value > 0); }
+                public IEnumerator<int> GetEnumerator() =>
+                    ((IEnumerable<int>)Array.Empty<int>()).GetEnumerator();
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+
+            public static class Subject
+            {
+                public static Config ObjectInitializer() =>
+                    new Config { Value = 0 };
+                public static Config SetterInitializer() =>
+                    new Config { Setter = 0 };
+                public static Config IndexInitializer() =>
+                    new Config { [-1] = 0 };
+                public static RecordConfig WithInitializer(RecordConfig value) =>
+                    value with { Value = 0 };
+                public static Positives CollectionInitializer() =>
+                    new Positives { 0 };
+            }
+            """;
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            source,
+            ["SP0027"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 5);
+    }
+
+    [Test]
     public async Task DelegateTargetRemainsKnownUntilItsFirstReassignment()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

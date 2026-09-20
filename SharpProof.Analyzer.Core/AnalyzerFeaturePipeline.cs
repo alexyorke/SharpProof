@@ -341,15 +341,34 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        if (context.SemanticModel.GetOperation(
-                context.Node,
-                context.CancellationToken) is not
-            IAnonymousFunctionOperation anonymousFunction)
+        var operation = context.SemanticModel.GetOperation(
+            context.Node,
+            context.CancellationToken);
+        if (operation is not (IAnonymousFunctionOperation or
+            ILocalFunctionOperation))
         {
             return;
         }
 
-        var method = anonymousFunction.Symbol;
+        var method = operation switch
+        {
+            IAnonymousFunctionOperation anonymousFunction =>
+                anonymousFunction.Symbol,
+            ILocalFunctionOperation localFunction => localFunction.Symbol,
+            _ => throw new InvalidOperationException(
+                "Unexpected nested callable operation.")
+        };
+        var body = operation switch
+        {
+            IAnonymousFunctionOperation anonymousFunction =>
+                anonymousFunction.Body,
+            ILocalFunctionOperation localFunction => localFunction.Body,
+            _ => null
+        };
+        if (body == null)
+        {
+            return;
+        }
         if (AnalyzerGeneratedCodePolicy.IsGenerated(
                 method,
                 context.Node.SyntaxTree,
@@ -403,7 +422,7 @@ internal static partial class AnalyzerFeaturePipeline
             method,
             context.Node,
             context.SemanticModel,
-            [anonymousFunction.Body],
+            [body],
             session.HasResolvedApiSpec,
             context.CancellationToken);
         if (!subset.IsSupported)

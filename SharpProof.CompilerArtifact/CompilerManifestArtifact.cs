@@ -460,14 +460,19 @@ internal static class CompilerManifestArtifactJson
                 WorkerProtocolJson.SharedOptions) +
             "\n";
         cancellationToken.ThrowIfCancellationRequested();
+        EnsureWithinByteLimit(json);
+
+        return json;
+    }
+
+    private static void EnsureWithinByteLimit(string json)
+    {
         if (Encoding.UTF8.GetByteCount(json) >
             CompilerManifestArtifactFile.MaximumBytes)
         {
             throw new JsonException(
                 "The compiler manifest exceeds the worker input byte limit.");
         }
-
-        return json;
     }
 
     internal static CompilerManifestArtifact Deserialize(
@@ -476,6 +481,7 @@ internal static class CompilerManifestArtifactJson
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
         cancellationToken.ThrowIfCancellationRequested();
+        EnsureWithinByteLimit(json);
         using var document = JsonDocument.Parse(
             json,
             new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
@@ -1195,7 +1201,9 @@ internal static class CompilerManifestArtifactJson
 
 internal static class CompilerManifestArtifactFile
 {
-    internal const int MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;
+    // Compiler manifests contain lowered evidence for every annotated method,
+    // so they need a larger bounded envelope than ordinary worker JSON files.
+    internal const int MaximumBytes = 32 * 1024 * 1024;
 
     internal static byte[] ReadAllBytes(
         string path,

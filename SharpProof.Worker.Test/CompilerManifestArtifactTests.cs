@@ -656,6 +656,42 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void HelperUsedByAnEarlierContractKeepsLaterCallableDecodable()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class SharedMember {
+                private static long Helper(long value) => value;
+
+                public static long A(long value) {
+                    Contract.Requires(Helper(value) > 0);
+                    Contract.Ensures(Contract.Result<long>() > 0);
+                    return value;
+                }
+
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return Helper(value);
+                }
+
+                public static long C(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return Helper(value);
+                }
+            }
+            """);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.That(
+            artifact.Callables.Single(item => item.CallableId.Contains(".B(", StringComparison.Ordinal)).Graph,
+            Is.Not.Null);
+    }
+
+    [Test]
     public void NullableSchemaShapesFailWithJsonException()
     {
         var previousSchema = CreateArtifact();
@@ -1005,6 +1041,41 @@ public sealed class CompilerManifestArtifactTests
                 .Replace('\\', '/'),
             Sha256 = new string('a', 64)
         });
+    }
+
+    [Test]
+    public void CompilerManifestAllowsPayloadsAboveWorkerJsonEnvelope()
+    {
+        var artifact = CreateArtifact();
+        artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
+        BindDiagnostics(artifact);
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+        var initial = CompilerManifestArtifactJson.Serialize(artifact);
+        var padding =
+            WorkerProtocolJson.MaximumJsonBytes + 1 -
+            Encoding.UTF8.GetByteCount(initial);
+        Assert.That(padding, Is.GreaterThan(0));
+
+        artifact.CompilerDiagnostics[0].Message += new string('x', padding);
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+
+        var json = CompilerManifestArtifactJson.Serialize(artifact);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                CompilerManifestArtifactFile.MaximumBytes,
+                Is.GreaterThan(WorkerProtocolJson.MaximumJsonBytes));
+            Assert.That(
+                Encoding.UTF8.GetByteCount(json),
+                Is.GreaterThan(WorkerProtocolJson.MaximumJsonBytes));
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(json)));
+        }
     }
 
     [Test]
