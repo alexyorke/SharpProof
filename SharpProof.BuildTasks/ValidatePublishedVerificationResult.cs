@@ -26,6 +26,13 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
     {
         try
         {
+            static bool IsPublishableResponse(WorkerVerifyResponse response)
+            {
+                return response.RunStatus == WorkerRunStatus.Complete ||
+                    response.RunStatus == WorkerRunStatus.TimedOut &&
+                    response.FailureReason == WorkerRunFailureReason.None;
+            }
+
             var projectRoot = Path.GetFullPath(
                 string.IsNullOrWhiteSpace(ProjectDirectory)
                     ? Environment.CurrentDirectory
@@ -66,7 +73,7 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                     WorkerProtocolJson.ReadUtf8File(invocationPath));
                 if (invocationResponse == null ||
                     !WorkerProtocolJson.Validate(invocationResponse).IsValid ||
-                    invocationResponse.RunStatus != WorkerRunStatus.Complete)
+                    !IsPublishableResponse(invocationResponse))
                 {
                     throw new InvalidDataException(
                         "the private invocation result does not satisfy the worker protocol");
@@ -90,7 +97,7 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                         response,
                         expectedInputHash!,
                         expectedManifest)).IsValid ||
-                response.RunStatus != WorkerRunStatus.Complete)
+                !IsPublishableResponse(response))
             {
                 throw new InvalidDataException(
                     "the published result does not satisfy the worker protocol");

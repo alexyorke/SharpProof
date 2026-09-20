@@ -229,9 +229,10 @@ ghost specification evidence.
   `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. The latter also
   covers an unsatisfiable `Contract.Assume` combined with the modeled entry
   and body assumptions. Proven claims are not disk-cache entries.
-- Caller cancellation is run status `Canceled`, project timeout is
-  `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
-  None is a successful claim outcome.
+- Caller cancellation is run status `Canceled`; project timeout is `TimedOut`
+  and follows the selected incomplete-analysis policy; infrastructure,
+  protocol, backend, and replay failure is `Failed`. None is a successful
+  claim outcome.
 - Cache schema version 13 stores only complete, postcondition-only, all-refuted
   payloads. Cache reads are checked against the entire current manifest, then
   every supported scalar model is reconstructed and whole-body replayed.

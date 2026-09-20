@@ -3298,19 +3298,10 @@ public sealed class WorkerMsBuildIntegrationTests
         using var timedOut = ConsumerProject.Create(IdentitySource);
         var timedOutBuild = await timedOut.BuildAsync(
             verify: true,
+            ("SharpProofVerifyPolicy", "advisory"),
             ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
             ("SharpProofVerifyProjectWallTimeMilliseconds", "1"),
             ("SharpProofVerifyTerminationGraceMilliseconds", "1"));
-        Assert.That(timedOutBuild.ExitCode, Is.Not.Zero);
-        Assert.That(
-            timedOutBuild.Output.Contains(
-                "worker run TimedOut",
-                StringComparison.Ordinal) ||
-            timedOutBuild.Output.Contains(
-                "worker run Failed (ContainmentFailure)",
-                StringComparison.Ordinal),
-            Is.True,
-            timedOutBuild.Output);
         var timedOutResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(timedOut.ResultPath))!;
         var publishedTimeout =
@@ -3328,7 +3319,30 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 WorkerProtocolJson.Validate(timedOutResponse).IsValid,
                 Is.True);
+            if (publishedTimeout)
+            {
+                Assert.That(timedOutBuild.ExitCode, Is.Zero, timedOutBuild.Output);
+                Assert.That(
+                    timedOutBuild.Output,
+                    Does.Contain(VerifierDiagnosticCodes.IncompleteSelectedCallable));
+            }
+            else
+            {
+                Assert.That(timedOutBuild.ExitCode, Is.Not.Zero, timedOutBuild.Output);
+            }
         }
+
+        using var strictTimeout = ConsumerProject.Create(IdentitySource);
+        var strictTimeoutBuild = await strictTimeout.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyPolicy", "require-proven"),
+            ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
+            ("SharpProofVerifyProjectWallTimeMilliseconds", "1"),
+            ("SharpProofVerifyTerminationGraceMilliseconds", "1"));
+        Assert.That(strictTimeoutBuild.ExitCode, Is.Not.Zero);
+        Assert.That(
+            strictTimeoutBuild.Output,
+            Does.Contain(VerifierDiagnosticCodes.IncompleteSelectedCallable));
     }
 
     private const string IdentitySource =

@@ -243,9 +243,11 @@ No timeout, resource exhaustion, unsupported encoding, malformed result,
 backend failure, or exceeded expression depth is promoted to `Proven` or
 `Refuted`. A method-level semantic boundary becomes a typed claim `Unknown`.
 Project timeout and caller cancellation use separate `TimedOut` and `Canceled`
-run statuses. Malformed output, backend/replay failure, containment failure,
-and infrastructure failure make the run `Failed` and fail the build under
-every policy.
+run statuses. A project timeout is reported as incomplete SP0047 evidence and
+follows `SharpProofVerifyPolicy`: advisory and warn-on-unknown continue the
+build, while require-proven reports an error. Malformed output, backend/replay
+failure, containment failure, and infrastructure failure make the run `Failed`
+and fail the build under every policy.
 
 Only exact-manifest, complete, postcondition-only project responses whose
 claims are all replay-validated `Refuted` can enter the semantic cache. Every

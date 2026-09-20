@@ -221,6 +221,20 @@ internal static class Program
             return resultExitCode;
         }
 
+        if (validResponse &&
+            validatedResponse is
+            {
+                RunStatus: WorkerRunStatus.TimedOut,
+                FailureReason: WorkerRunFailureReason.None
+            } &&
+            resultExitCode == 0)
+        {
+            // The worker process uses 124 for its transport timeout, while
+            // the validated response is an incomplete analysis whose build
+            // outcome is governed by SharpProofVerifyPolicy.
+            return 0;
+        }
+
         Console.Error.WriteLine("SharpProof worker failed closed with exit code " +
             exitCode.ToString(CultureInfo.InvariantCulture) + ".");
         return exitCode;
@@ -455,6 +469,8 @@ internal static class Program
         WorkerProtocolJson.Canonicalize(response);
         validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
+        var projectTimedOut = response.RunStatus == WorkerRunStatus.TimedOut &&
+            response.FailureReason == WorkerRunFailureReason.None;
 
         var refuted = false;
         var unknownClaims = 0;
@@ -497,8 +513,19 @@ internal static class Program
                 response.Manifest.Callables[firstIncompleteIndex].Location,
                 LauncherPresentation.Level(request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                FormattableString.Invariant(
-                    $"Selected analysis is incomplete: callables={incompleteCount}, unknown-claims={unknownClaims}."));
+                projectTimedOut
+                    ? FormattableString.Invariant(
+                        $"Project analysis timed out: callables={incompleteCount}, unknown-claims={unknownClaims}.")
+                    : FormattableString.Invariant(
+                        $"Selected analysis is incomplete: callables={incompleteCount}, unknown-claims={unknownClaims}."));
+        }
+        else if (projectTimedOut)
+        {
+            ReportDiagnostic(
+                new WorkerSourceLocation(),
+                LauncherPresentation.Level(request.VerifyPolicy, "info"),
+                VerifierDiagnosticCodes.IncompleteSelectedCallable,
+                "Project analysis timed out before selected callable coverage was published.");
         }
 
         var incompleteError = incompleteCount != 0 &&
@@ -512,7 +539,7 @@ internal static class Program
                 response.Summary
             },
             WorkerProtocolJson.SharedOptions));
-        if (response.RunStatus != WorkerRunStatus.Complete)
+        if (response.RunStatus != WorkerRunStatus.Complete && !projectTimedOut)
         {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
@@ -520,7 +547,7 @@ internal static class Program
                 response.RunStatus,
                 response.FailureReason);
         }
-        if (response.Errors.Length != 0)
+        if (response.Errors.Length != 0 && !projectTimedOut)
         {
             return 3;
         }

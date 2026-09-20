@@ -32,7 +32,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 13 entries: 0 P0, 0 P1 and 13 P3. The final
+The list currently has 12 entries: 0 P0, 0 P1 and 12 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
@@ -40,46 +40,6 @@ section records the areas that were probed without finding a defect.
 
 
 
-
-### A project timeout fails the build even under the `advisory` verify policy
-
-- **File:** `SharpProof.Worker.Launcher/Program.cs` (the
-  `if (response.RunStatus != WorkerRunStatus.Complete) return LauncherPresentation.ExitCode(...)`
-  branch), `SharpProof.Worker.Launcher/LauncherProjections.generated.cs`
-  (`ExitCode`, which maps `TimedOut` to 124) and
-  `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` (the
-  error raised for any nonzero exit code without a structured error)
-- **Confidence:** Medium (from the code and documentation; not run through
-  MSBuild in a container). The fuzz harnesses did hit `run=TimedOut` for
-  40-method projects with nonlinear arithmetic under the default 300-second
-  project budget, so the status is reachable in ordinary use.
-- **What is wrong:** `docs/analysis-limits.md` describes
-  `SharpProofVerifyPolicy` as the policy for *incomplete* selected analysis
-  (`advisory`, `warn-on-unknown`, `require-proven`), and says that only
-  malformed output, backend or replay failure, containment failure and
-  infrastructure failure "make the run `Failed` and fail the build under
-  every policy". A project timeout is listed separately as run status
-  `TimedOut`. The launcher nevertheless returns exit code 124 for every
-  run that is not `Complete`, before it looks at the policy, and the targets
-  turn any nonzero exit code that is not accompanied by a structured error
-  into `SharpProof verifier failed with exit code 124.` So a verification
-  run that simply ran out of wall time fails the build under `advisory`
-  exactly as an infrastructure failure would, and the error does not say
-  that the cause was the time budget.
-- **Failure scenario:** A team enables `SharpProofVerify=true` with the
-  default `advisory` policy to get informational proofs. As the codebase
-  grows past what the worker can finish in 300 seconds, every build starts
-  failing with "SharpProof verifier failed with exit code 124", although no
-  contract was refuted and the policy they chose treats incomplete analysis
-  as information.
-- **Suggested fix:** Decide the intended behavior and make code and
-  documentation agree. If a timeout is an incomplete analysis, have the
-  launcher report the remaining claims as `Unknown(ProjectTimeout)` with the
-  policy's severity (SP0047) and exit 0, 5 or 6 as for a completed run. If it
-  is meant to be fatal, say so next to the list of fatal statuses in
-  `docs/analysis-limits.md`, and emit a structured, coded diagnostic that
-  names the project time budget and the setting that raises it
-  (`SharpProofVerifyProjectWallTimeMilliseconds`).
 
 
 ### SP0048 is reported once at the first callable instead of where assumptions are declared
