@@ -32,40 +32,13 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 16 entries: 0 P0, 0 P1 and 16 P3. The final
+The list currently has 15 entries: 0 P0, 0 P1 and 15 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
 
 
 
-### Reference-family classification uses unanchored path substrings
-
-- **File:** `SharpProof.Effects/ApiSpecResolution.cs`
-  (`ClassifyReferenceFamily`) and
-  `SharpProof.Effects/EffectContractMappings.generated.cs`
-  (`ReferenceFamilyMarkers`)
-- **Confidence:** Low
-- **What is wrong:** A spec row whose approved identity carries a reference
-  family is only admitted when the metadata reference path contains a family
-  marker anywhere, compared case-insensitively. Three markers are not
-  terminated with `/` (`/REFERENCEPACKS/NETSTANDARD`,
-  `/PACKAGES/MICROSOFT.NETFRAMEWORK.REFERENCEASSEMBLIES`,
-  `/REFERENCEPACKS/NET47`), so they also match unrelated directories such as
-  `/packages/microsoft.netframework.referenceassemblies.fork/` or
-  `/referencepacks/net472-custom/`. None of the markers is anchored to a
-  package root, and neither the package version nor the assembly version is
-  checked. The identity check it relies on compares only name and public key
-  token, which Roslyn does not verify cryptographically.
-- **Failure scenario:** A referenced `System.Runtime.dll` built with the
-  Microsoft public key token and `ReferenceAssemblyAttribute`, placed under any
-  directory whose path contains one of the markers, is classified as the
-  trusted reference family. Spec rows describing the real framework behavior are
-  then applied to calls into that assembly.
-- **Suggested fix:** Terminate every marker with `/`, and match it against the
-  resolved NuGet package root or SDK packs directory rather than any
-  substring. Record and check the expected package id and version
-  range for each family.
 
 ### SARIF results pair non-`fail` kinds with warning or error levels
 

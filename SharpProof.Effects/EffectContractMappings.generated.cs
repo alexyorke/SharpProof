@@ -233,10 +233,10 @@ internal static class EffectContractMappingCatalog
         ("/MICROSOFT.NETCORE.APP.REF/", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
         ("/PACKS/NETSTANDARD.LIBRARY.REF/", ApiSpecReferenceFamily.NetStandardReferencePack),
         ("/PACKAGES/NETSTANDARD.LIBRARY/", ApiSpecReferenceFamily.NetStandardReferencePack),
-        ("/REFERENCEPACKS/NETSTANDARD", ApiSpecReferenceFamily.NetStandardReferencePack),
+        ("/REFERENCEPACKS/NETSTANDARD/", ApiSpecReferenceFamily.NetStandardReferencePack),
         ("/REFERENCE ASSEMBLIES/MICROSOFT/FRAMEWORK/.NETFRAMEWORK/", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
-        ("/PACKAGES/MICROSOFT.NETFRAMEWORK.REFERENCEASSEMBLIES", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
-        ("/REFERENCEPACKS/NET47", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+        ("/PACKAGES/MICROSOFT.NETFRAMEWORK.REFERENCEASSEMBLIES/", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+        ("/REFERENCEPACKS/NET47/", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
         ("/SHARED/MICROSOFT.NETCORE.APP/", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
     ];
 
