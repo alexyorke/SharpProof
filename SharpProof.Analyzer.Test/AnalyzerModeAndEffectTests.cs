@@ -94,10 +94,10 @@ public sealed class AnalyzerModeAndEffectTests
     [TestCase(
         "using System; public static class Fixture { " +
         "[Obsolete] public static int Read() => 1; }")]
-    public async Task AdvisoryPotentialWorkCreatesOnlyALightweightSession(
+    public async Task UnrelatedAttributesDoNotCreateAnAnalysisSession(
         string source)
     {
-        var factory = new RecordingSessionFactory();
+        var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             source,
             mode: null,
@@ -107,9 +107,7 @@ public sealed class AnalyzerModeAndEffectTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(diagnostics, Is.Empty);
-            Assert.That(factory.Session, Is.Not.Null);
-            Assert.That(factory.Session!.HasCreatedApiSpecs, Is.False);
-            Assert.That(factory.Session.HasCreatedEffectAnalysis, Is.False);
+            Assert.That(factory.CreateCount, Is.Zero);
         }
     }
 

@@ -32,54 +32,12 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-The list currently has 21 entries: 0 P0, 0 P1 and 21 P3. The final
+The list currently has 19 entries: 0 P0, 0 P1 and 19 P3. The final
 section records the areas that were probed without finding a defect.
 
 ## P3 - Low
 
-### Mount lookup picks the shadowed mount when several mounts share a mount point
 
-- **File:** `SharpProof.Host/LinuxPathIdentity.cs`
-  (`MountInfoSnapshot.FindFileSystemType`)
-- **Confidence:** Medium
-- **What is wrong:** The longest matching mount point wins, but ties are
-  resolved with `mount.Path.Length <= bestMount.Length` â†’ `continue`, which
-  keeps the *first* entry in `/proc/self/mountinfo`. When several file systems
-  are mounted on the same directory, the kernel lists them in mount order and
-  only the last one is visible, so the check inspects the hidden file system.
-- **Failure scenario:** A CI container bind-mounts an NFS or 9p/virtiofs share
-  over an existing ext4 or overlay directory used for publication or the cache.
-  `RequireLocalPath` reports the underlying `ext4`/`overlay` type and accepts a
-  file system whose `flock`, atomic rename and directory `fsync` guarantees
-  are exactly what `SupportedLocalFileSystems` is meant to exclude. The
-  opposite stacking rejects a genuinely local tmpfs mounted over an NFS
-  directory.
-- **Suggested fix:** Use `<` instead of `<=` so later entries with the same
-  mount point replace earlier ones, or, more robustly, compare the path's
-  `st_dev` with the device numbers in field 3 of each mountinfo entry.
-
-### Advisory profile activates full analysis for any attribute
-
-- **File:** `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs`
-  (`GetAdvisoryActivation`)
-- **Confidence:** High
-- **What is wrong:** The advisory activation scan returns
-  `AdvisoryActivation.Full` as soon as it sees any `AttributeSyntax` that is not
-  an assembly or module attribute. It does not check that the attribute name
-  could bind to a SharpProof control attribute. `MayContainAdvisoryActivationSyntax`
-  also pre-selects every tree containing `[`, which includes array types,
-  indexers and collection expressions.
-- **Failure scenario:** Almost every real project contains `[Serializable]`,
-  `[Fact]`, `[HttpGet]`, `[JsonPropertyName]` or similar attributes, so the
-  advisory profile runs full symbol and operation analysis for the whole
-  compilation even when SharpProof is never referenced in source. The
-  `Lightweight` and `None` activations are effectively unreachable, and IDE
-  performance for projects that only install the package is the same as full
-  enforcement.
-- **Suggested fix:** Only activate for attributes whose simple name (after
-  removing the `Attribute` suffix and decoding Unicode escapes) matches a name
-  in the SharpProof attribute catalog, or resolve the attribute type through
-  the semantic model before choosing `Full`.
 
 ### Reference-family classification uses unanchored path substrings
 

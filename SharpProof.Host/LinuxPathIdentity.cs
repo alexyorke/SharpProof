@@ -909,7 +909,7 @@ public static partial class LinuxPathIdentity
             foreach (var mount in _mounts)
             {
                 if (!IsCanonicalPathWithin(canonicalPath, mount.Path) ||
-                    bestMount != null && mount.Path.Length <= bestMount.Length)
+                    bestMount != null && mount.Path.Length < bestMount.Length)
                 {
                     continue;
                 }

@@ -93,6 +93,31 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task UnrelatedAttributesDoNotActivateFullAnalysis()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+
+            [Serializable]
+            internal sealed class Plain
+            {
+                public int[] Values { get; } = [];
+            }
+            """,
+            ["SP0027"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
     public void AdvisoryTextScanObservesCancellationWithinBoundedReads()
     {
         using var cancellation = new CancellationTokenSource();

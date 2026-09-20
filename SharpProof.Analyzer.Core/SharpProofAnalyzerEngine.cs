@@ -220,7 +220,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (node is AttributeSyntax attribute &&
-                    !IsAssemblyOrModuleAttribute(attribute))
+                    !IsAssemblyOrModuleAttribute(attribute) &&
+                    IsSharpProofAttributeCandidate(attribute))
                 {
                     return AdvisoryActivation.Full;
                 }
@@ -632,6 +633,26 @@ internal sealed partial class SharpProofAnalyzerEngine
         return target is
             SyntaxKind.AssemblyKeyword or
             SyntaxKind.ModuleKeyword;
+    }
+
+    private static bool IsSharpProofAttributeCandidate(
+        AttributeSyntax attribute)
+    {
+        var simpleName = attribute.Name.GetLastToken().ValueText;
+        return ContractApiMetadata.Attributes.Any(descriptor =>
+            string.Equals(
+                simpleName,
+                descriptor.TypeName,
+                StringComparison.Ordinal) ||
+            descriptor.TypeName.EndsWith(
+                "Attribute",
+                StringComparison.Ordinal) &&
+            string.Equals(
+                simpleName,
+                descriptor.TypeName.Substring(
+                    0,
+                    descriptor.TypeName.Length - "Attribute".Length),
+                StringComparison.Ordinal));
     }
 
     internal static ImmutableArray<Diagnostic> GetConfigurationDiagnostics(
