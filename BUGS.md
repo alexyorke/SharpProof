@@ -38,46 +38,6 @@ section records the areas that were probed without finding a defect.
 ## P3 - Low
 
 
-### Assigning a conditional, `??`, `?.`, `&&` or `||` expression to an existing local makes every effect claim in the method `Unknown`
-
-- **File:** `SharpProof.Effects/OperationEffectScanner.Assignments.cs` (the
-  target switch in the write-location scan falls through to
-  `EffectSummaryOperations.Unsupported()` for an `IFlowCaptureReferenceOperation`
-  target) and `SharpProof.Effects/CoalesceAssignmentFlowCaptures.cs` (the
-  only target-capture resolution). The root cause is shared with the SP0027
-  conditional-assignment entry in P2.
-- **Confidence:** Confirmed. Each of these was reported with
-  `ExceptionSetUnknown: UnsupportedOperation` even though none of them can
-  throw:
-
-  ```csharp
-  [DoesNotThrow] public static int NoDivide(int p) { int d = 1; d = p > 0 ? 2 : 3; return d; }
-  [DoesNotThrow] public static int SafeDivide(int p) { int d = 1; d = p > 0 ? 2 : 3; return 10 / d; }
-  ```
-
-  The same happened for `ok = r && false;`, `ok = r || true;` and
-  `s = t ?? null;`, while the same right-hand sides written as declarations
-  of fresh locals (`int v = p > 0 ? 2 : 3;`) were analyzed normally. The
-  limitation is not listed in `docs/analysis-limits.md` or
-  `docs/unknown-reasons.md`.
-- **What is wrong:** When the right-hand side of an assignment contains
-  control flow, Roslyn's CFG captures the *target* before branching and
-  assigns through the capture reference. The effect scanner only knows how
-  to write locals, parameters, fields, array elements and properties, so the
-  capture-reference target is classified as an unsupported write. The
-  conservative outcome is sound, and it is currently what keeps the stale
-  managed-flow value from the P2 entry out of effect proofs, but it makes
-  ordinary code unprovable.
-- **Failure scenario:** `result = x > 0 ? x : -x;`, `name = input ?? "";`,
-  `found = found || Check(i);` and `len = s?.Length ?? 0;` are among the most
-  common statements in C#. Any one of them turns `[DoesNotThrow]`,
-  `[EnforcePure]` and `[ZeroAllocations]` into `Unknown` with a generic
-  reason, and users cannot tell why an obviously pure method fails.
-- **Suggested fix:** Resolve target captures to the captured storage (the
-  same fix as the P2 entry), then scan the write as a write to that local,
-  parameter or field. Until then, name the construct in the SP0045/SP0046
-  reason and list it in `docs/analysis-limits.md`.
-
 ### A valid `ContractFor` companion for an interface member reports SP0047 on the bodiless target
 
 - **File:** `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs` (selected
