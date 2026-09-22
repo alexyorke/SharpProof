@@ -43,14 +43,23 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
         EnsureLinux();
 
+        const string sessionLauncher = "/usr/bin/setsid";
+        if (!File.Exists(sessionLauncher))
+        {
+            throw new PlatformNotSupportedException(
+                "SharpProof worker containment requires /usr/bin/setsid from the canonical container.");
+        }
+
         var startInfo = new ProcessStartInfo
         {
-            FileName = executable,
+            FileName = sessionLauncher,
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             RedirectStandardInput = true,
             CreateNoWindow = true
         };
+        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(executable);
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
@@ -112,7 +121,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             if (stopwatch.Elapsed >= terminationStart)
             {
-                return CompleteAtDeadline(process, stopwatch, finalLimit);
+                return CompleteAtDeadline(process, stopwatch, finalLimit, ownsSession: true);
             }
             if (cancellationToken.WaitHandle.WaitOne(PollMilliseconds))
             {
@@ -166,7 +175,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                         0,
                         (deadline - Stopwatch.GetTimestamp()) /
                             (double)Stopwatch.Frequency));
-                _ = Terminate(process, stopwatch, remaining);
+                _ = Terminate(process, stopwatch, remaining, ownsSession: true);
             }
         }
         finally
@@ -180,7 +189,16 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         Stopwatch stopwatch,
         TimeSpan finalLimit)
     {
-        return Terminate(process, stopwatch, finalLimit)
+        return CompleteAtDeadline(process, stopwatch, finalLimit, ownsSession: false);
+    }
+
+    private static LinuxWorkerCompletion CompleteAtDeadline(
+        Process process,
+        Stopwatch stopwatch,
+        TimeSpan finalLimit,
+        bool ownsSession)
+    {
+        return Terminate(process, stopwatch, finalLimit, ownsSession)
             ? new LinuxWorkerCompletion(
                 LinuxWorkerCompletionKind.TimedOut,
                 LinuxProcessControlConstants.TimeoutExitCode)
@@ -192,13 +210,21 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     private static bool Terminate(
         Process process,
         Stopwatch stopwatch,
-        TimeSpan finalLimit)
+        TimeSpan finalLimit,
+        bool ownsSession)
     {
         if (process.HasExited)
         {
             return false;
         }
-        var descendants = CaptureDescendants(process.Id);
+        (int Id, ulong StartTime)? session = null;
+        if (ownsSession && TryReadProcessStat(process.Id, out var rootStat) &&
+            rootStat.ProcessGroupId == process.Id && rootStat.SessionId == process.Id &&
+            rootStat.StartTime is { } rootStartTime)
+        {
+            session = (process.Id, rootStartTime);
+        }
+        var descendants = CaptureDescendants(process.Id, session);
         if (LinuxProcessControl.Kill(
                 process.Id,
                 LinuxProcessControlConstants.SignalTerminate) != 0)
@@ -207,15 +233,15 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                     LinuxProcessControlConstants.ProcessNotFound &&
                 process.WaitForExit(0))
             {
+                AddDescendants(process.Id, descendants, session);
                 KillCapturedDescendants(descendants);
                 return false;
             }
             throw NativeFailure(
                 "SharpProof could not terminate the worker process.");
         }
-        // A worker can create a child from its SIGTERM handler. Keep sampling
-        // while the worker has a chance to exit so that child is included in
-        // the same start-time-checked cleanup set before it is orphaned.
+        // The owned session survives leader exit, so children created by a
+        // SIGTERM handler remain discoverable even after they are reparented.
         var remainingForTerminate = finalLimit - stopwatch.Elapsed;
         var terminateWait = checked((int)Math.Min(
             Math.Max(0, remainingForTerminate.TotalMilliseconds / 2),
@@ -227,7 +253,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         {
             AddDescendants(
                 process.Id,
-                descendants);
+                descendants, session);
             var remaining = terminateDeadline - stopwatch.Elapsed;
             var delay = remaining < TimeSpan.FromMilliseconds(PollMilliseconds)
                 ? remaining
@@ -237,14 +263,14 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                 Thread.Sleep(delay);
             }
         }
-        AddDescendants(process.Id, descendants);
+        AddDescendants(process.Id, descendants, session);
         if (!process.WaitForExit(0))
         {
             try
             {
                 if (!process.HasExited)
                 {
-                    AddDescendants(process.Id, descendants);
+                    AddDescendants(process.Id, descendants, session);
                     process.Kill(entireProcessTree: true);
                 }
             }
@@ -260,7 +286,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                 throw new InvalidOperationException(
                     "The SharpProof worker did not terminate within its grace period.");
             }
-            AddDescendants(process.Id, descendants);
+            AddDescendants(process.Id, descendants, session);
         }
         KillCapturedDescendants(descendants);
         return true;
@@ -268,9 +294,10 @@ public sealed partial class LinuxWorkerProcess : IDisposable
 
     private static void AddDescendants(
         int rootProcessId,
-        List<(int ProcessId, ulong StartTime)> descendants)
+        List<(int ProcessId, ulong StartTime)> descendants,
+        (int Id, ulong StartTime)? session)
     {
-        foreach (var descendant in CaptureDescendants(rootProcessId))
+        foreach (var descendant in CaptureDescendants(rootProcessId, session))
         {
             if (!descendants.Contains(descendant))
             {
@@ -280,26 +307,33 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     }
 
     private static List<(int ProcessId, ulong StartTime)> CaptureDescendants(
-        int rootProcessId)
+        int rootProcessId,
+        (int Id, ulong StartTime)? session)
     {
+        var descendants = new List<(int ProcessId, ulong StartTime)>();
         var childrenByParent =
             new Dictionary<int, List<(int ProcessId, ulong StartTime)>>();
         foreach (var directory in Directory.EnumerateDirectories("/proc"))
         {
             if (!int.TryParse(Path.GetFileName(directory), out var processId) ||
-                !TryReadProcessStat(processId, out var parentId, out var startTime))
+                !TryReadProcessStat(processId, out var stat) ||
+                stat.StartTime is not { } startTime)
             {
                 continue;
             }
-            if (!childrenByParent.TryGetValue(parentId, out var children))
+            if (processId != rootProcessId && session is { } owned &&
+                stat.SessionId == owned.Id && startTime >= owned.StartTime)
+            {
+                descendants.Add((processId, startTime));
+            }
+            if (!childrenByParent.TryGetValue(stat.ParentProcessId, out var children))
             {
                 children = [];
-                childrenByParent.Add(parentId, children);
+                childrenByParent.Add(stat.ParentProcessId, children);
             }
             children.Add((processId, startTime));
         }
 
-        var descendants = new List<(int ProcessId, ulong StartTime)>();
         var pending = new Queue<int>([rootProcessId]);
         while (pending.TryDequeue(out var parentId))
         {
@@ -309,7 +343,10 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             }
             foreach (var child in children)
             {
-                descendants.Add(child);
+                if (!descendants.Contains(child))
+                {
+                    descendants.Add(child);
+                }
                 pending.Enqueue(child.ProcessId);
             }
         }
@@ -345,17 +382,22 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     {
         parentId = 0;
         startTime = 0;
+        if (!TryReadProcessStat(processId, out var stat) || stat.StartTime is not { } parsedStartTime)
+        {
+            return false;
+        }
+        parentId = stat.ParentProcessId;
+        startTime = parsedStartTime;
+        return true;
+    }
+
+    private static bool TryReadProcessStat(int processId, out LinuxProcessStat processStat)
+    {
+        processStat = default;
         try
         {
             var stat = File.ReadAllText($"/proc/{processId}/stat");
-            if (!LinuxProcessStatParser.TryParse(stat, out var processStat) ||
-                processStat.StartTime is not { } parsedStartTime)
-            {
-                return false;
-            }
-            parentId = processStat.ParentProcessId;
-            startTime = parsedStartTime;
-            return true;
+            return LinuxProcessStatParser.TryParse(stat, out processStat);
         }
         catch (IOException)
         {

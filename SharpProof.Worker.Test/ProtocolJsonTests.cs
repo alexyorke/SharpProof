@@ -58,6 +58,22 @@ public sealed class ProtocolJsonTests
             $"large={large.TotalMilliseconds:F0} ms");
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void NullCallableIdentitiesProduceValidationErrors(bool nullResultIdentity)
+    {
+        var response = CreateResponse(CreateManifest());
+        response.Manifest.Callables[0].CallableId = null!;
+        if (nullResultIdentity)
+        {
+            response.CallableResults[0].CallableId = null!;
+        }
+        var validation = WorkerProtocolJson.Validate(response);
+        Assert.That(validation.IsValid, Is.False);
+        Assert.That(validation.Errors.Select(static error => error.Code),
+            Does.Contain("manifest.callable_id"));
+    }
+
     [Test]
     public void ProtocolSerializersRejectDocumentsBeyondReaderLimit()
     {

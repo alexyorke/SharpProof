@@ -72,6 +72,24 @@ internal static class IrScalarOperations
 
 public sealed partial class IrValue
 {
+    // Computed string values carry contents, but hash-consed terms do not
+    // model distinct runtime allocations. Preserve this fact through values
+    // selected by conditionals, sequence accesses, and later evaluations.
+    private bool _hasUnknownStringIdentity;
+
+    internal static bool HasUnknownStringIdentity(IrValue value)
+    {
+        return value._hasUnknownStringIdentity;
+    }
+
+    internal static IrValue WithUnknownStringIdentity(IrValue value)
+    {
+        return new IrValue(value.Type, value.Kind, value.Payload)
+        {
+            _hasUnknownStringIdentity = true
+        };
+    }
+
     public bool Boolean => Get<bool>(IrValueKind.Boolean, "The IR value is not boolean.");
     public long Integer => Get<long>(IrValueKind.Integer, "The IR value is not an integer.");
     public string String => Get<string>(IrValueKind.String, "The IR value is not a string.");
@@ -376,9 +394,10 @@ public sealed class IrInterpreter(IrFactory factory)
             return InvalidValue("String concatenation requires string values.");
         }
 
-        return Text(
+        var value = _factory.CreateStringValue(
             (left.Kind == IrValueKind.Null ? "" : left.String) +
             (right.Kind == IrValueKind.Null ? "" : right.String));
+        return Value(IrValue.WithUnknownStringIdentity(value));
     }
 
     private IrEvaluationResult EvaluateConditional(IrConditionalTerm conditional, EvaluationState state)
@@ -422,13 +441,16 @@ public sealed class IrInterpreter(IrFactory factory)
                 "Null cannot be unboxed to a non-nullable IR type.");
         }
 
-        // Every string has a known reference conversion to object. Preserve
-        // the concrete identity so a later reference comparison observes the
-        // same object rather than abstaining on a relation the IR already
-        // knows exactly.
+        // Literal and supplied string values have a concrete identity.
+        // Computed contents alone cannot establish allocation identity.
         if (cast.Type == _factory.ObjectType &&
             operand.Value.Kind == IrValueKind.String)
         {
+            if (IrValue.HasUnknownStringIdentity(operand.Value))
+            {
+                return Unsupported(IrUnsupportedReason.UnsupportedCast,
+                    "Computed string allocation identity is not represented.");
+            }
             return Value(_factory.CreateReferenceValue(
                 cast.Type,
                 operand.Value.String));

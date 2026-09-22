@@ -22,7 +22,7 @@ public sealed class LinuxWorkerProcessContainmentTests
         using var temporary = new TempDirectory("sharpproof-worker-containment-");
         var marker = Path.Combine(temporary.FullName, "descendant.pid");
         const string script =
-            "trap 'sleep 30 & echo $! > \"$1\"; sleep 0.2; exit 0' TERM; " +
+            "trap 'sleep 30 & echo $! > \"$1\"; exit 0' TERM; " +
             "while :; do :; done";
 
         using var worker = LinuxWorkerProcess.Start(

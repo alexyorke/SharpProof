@@ -45,7 +45,7 @@ public sealed class ProofKernel(ISmtBackend backend)
         // An unknown result carries only its failure classification. Accepting
         // a model or core here would hide a malformed backend response behind
         // a typed semantic failure and make the result shape ambiguous.
-        if (result.Model != null || !result.UnsatCore.IsDefaultOrEmpty ||
+        if (result is not { Model: null, UnsatCore.IsDefaultOrEmpty: true } ||
             result.FailureReason == BackendFailureReason.None)
         {
             return Unknown(AbstentionReason.MalformedBackendResult);
@@ -59,9 +59,12 @@ public sealed class ProofKernel(ISmtBackend backend)
         BackendCheckResult result,
         CancellationToken cancellationToken)
     {
-        if (result.Model != null ||
-            result.FailureReason != BackendFailureReason.None ||
-            result.UnsatCore.IsDefault)
+        if (result is not
+            {
+                Model: null,
+                FailureReason: BackendFailureReason.None,
+                UnsatCore.IsDefault: false
+            })
         {
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
@@ -91,14 +94,17 @@ public sealed class ProofKernel(ISmtBackend backend)
         BackendCheckResult result,
         CancellationToken cancellationToken)
     {
-        if (result.Model == null ||
-            result.FailureReason != BackendFailureReason.None ||
-            !result.UnsatCore.IsDefaultOrEmpty)
+        if (result is not
+            {
+                Model: { } model,
+                FailureReason: BackendFailureReason.None,
+                UnsatCore.IsDefaultOrEmpty: true
+            })
         {
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (!ValidateAssignments(query, result.Model.Assignments, cancellationToken))
+        if (!ValidateAssignments(query, model.Assignments, cancellationToken))
         {
             return Unknown(AbstentionReason.CounterexampleReplayFailed);
         }
@@ -108,14 +114,14 @@ public sealed class ProofKernel(ISmtBackend backend)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var evaluated = interpreter.Evaluate(assumption.Predicate,
-                result.Model.Assignments, cancellationToken);
+                model.Assignments, cancellationToken);
             if (!IsBoolean(evaluated, expected: true))
             {
                 return Unknown(AbstentionReason.CounterexampleReplayFailed);
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments, cancellationToken);
+        var goal = interpreter.Evaluate(query.Goal.Predicate, model.Assignments, cancellationToken);
         if (goal.Status == IrEvaluationStatus.Exception)
         {
             return Unknown(query.Goal.Diagnostic switch
@@ -129,7 +135,7 @@ public sealed class ProofKernel(ISmtBackend backend)
         }
 
         return IsBoolean(goal, expected: false)
-            ? new RefutedOutcome(new ValidatedModel(result.Model.Assignments))
+            ? new RefutedOutcome(new ValidatedModel(model.Assignments))
             : Unknown(AbstentionReason.CounterexampleReplayFailed);
     }
     private static bool ValidateAssignments(VerificationQuery query,

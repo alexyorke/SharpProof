@@ -47,10 +47,10 @@ The default profile is advisory and the default feature selection is all:
 
 SharpProofProfile accepts advisory, strict, and off. SharpProofFeatures accepts
 effects, contracts, and all. The analyzer configuration equivalents are
-sharpproof_profile and sharpproof_features:
+sharpproof_profile and sharpproof_features, set in a `.globalconfig` file:
 
 ~~~ini
-[*.cs]
+is_global = true
 sharpproof_profile = advisory
 sharpproof_features = all
 ~~~

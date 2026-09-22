@@ -27,7 +27,7 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     }
 
     [Test]
-    public void TreeAnalyzerConfigurationOverridesPackageProfileDefault()
+    public void TreeAnalyzerConfigurationCannotOverridePackageProfileDefault()
     {
         var global = new DictionaryAnalyzerConfigOptions(
             ("build_property.SharpProofProfile", "advisory"),
@@ -39,7 +39,7 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
             tree,
             global);
 
-        Assert.That(invalid, Is.Empty);
+        Assert.That(invalid, Has.Length.EqualTo(1));
     }
 
     [Test]

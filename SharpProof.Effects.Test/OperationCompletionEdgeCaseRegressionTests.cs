@@ -223,6 +223,40 @@ public sealed class OperationCompletionEdgeCaseRegressionTests
         }
     }
 
+    [TestCase("_ = value switch { 0 => 0 };")]
+    [TestCase("using (resource) { }")]
+    [TestCase("{ using var lifetime = resource; }")]
+    [TestCase("foreach (var item in sequence) { }")]
+    public void ImplicitThrowBeforeInfiniteLoopCanCompleteThroughCatch(string statement)
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            $$"""
+            public static class Sample {
+                private static int state;
+                public static void Helper(int value, System.IDisposable resource,
+                    System.Collections.Generic.IEnumerable<int> sequence) {
+                    try { {{statement}} while (true) { } }
+                    catch { }
+                }
+                public static void Run(int value, System.IDisposable resource,
+                    System.Collections.Generic.IEnumerable<int> sequence) {
+                    Helper(value, resource, sequence);
+                    state++;
+                }
+            }
+            """);
+        var helper = EffectTestHost.SampleMethod(compilation, "Helper");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(EffectTestHost.CreateCompletionFacts(compilation)
+                .MethodCanCompleteNormally(helper), Is.True);
+            Assert.That(EffectTestHost.CreateCompletionEvaluator(compilation, helper)
+                .CanMethodCompleteNormally(helper), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation,
+                EffectTestHost.SampleMethod(compilation, "Run")), Is.True);
+        }
+    }
+
     [Test]
     public void NonCompletingTryBodyDoesNotMakeCatchReachableForCompletion()
     {

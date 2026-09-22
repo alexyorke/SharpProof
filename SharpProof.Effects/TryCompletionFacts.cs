@@ -34,7 +34,13 @@ internal static class TryCompletionFacts
         while (pending.Count != 0)
         {
             var operation = pending.Pop();
-            if (SharpProof.Roslyn.RoslynCfgThrowFacts.OperationMayThrow(
+            // The CFG classifier sees lowered calls, but this traversal sees
+            // source operations. Disposal, enumeration and an unmatched switch
+            // expression can throw without an explicit throwing child.
+            if (operation is IUsingOperation or IUsingDeclarationOperation or
+                    IForEachLoopOperation or
+                    ISwitchExpressionOperation { IsExhaustive: false } ||
+                SharpProof.Roslyn.RoslynCfgThrowFacts.OperationMayThrow(
                     operation))
             {
                 return true;

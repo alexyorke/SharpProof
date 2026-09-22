@@ -7,13 +7,79 @@ namespace SharpProof.Specs;
 internal static class ApiSpecTermValidator
 {
     private const int MaximumExpressionDepth = 256;
+    private const int MaximumExpandedExpressionNodes = 65536;
 
     internal static TermFacts Validate(
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets)
     {
-        return new ValidationContext(variables, facets).Validate(declaration, depth: 1);
+        var facts = new ValidationContext(variables, facets).Validate(declaration, depth: 1);
+        ValidateExpansion(declaration);
+        return facts;
+    }
+
+    private static void ValidateExpansion(SpecTermDeclaration declaration)
+    {
+        // Digests and instantiation expand shared subtrees. Bound that work
+        // before either traversal, without changing the digest representation.
+        var measured = new Dictionary<SpecTermDeclaration, (int Height, int Nodes)>(
+            DeclarationReferenceComparer.Instance);
+        _ = Measure(declaration, 1);
+
+        (int Height, int Nodes) Measure(SpecTermDeclaration term, int depth)
+        {
+            if (term == null)
+            {
+                throw new ArgumentException("Spec expressions cannot contain null.", nameof(declaration));
+            }
+            if (depth > MaximumExpressionDepth)
+            {
+                throw new ArgumentException("Spec expressions exceed the expression depth limit.", nameof(declaration));
+            }
+            if (measured.TryGetValue(term, out var cached))
+            {
+                if (depth + cached.Height - 1 > MaximumExpressionDepth)
+                {
+                    throw new ArgumentException("Spec expressions exceed the expression depth limit.", nameof(declaration));
+                }
+                return cached;
+            }
+            var height = 1;
+            var nodes = 1;
+            switch (term)
+            {
+                case SpecUnaryDeclaration unary:
+                    Include(unary.Operand);
+                    break;
+                case SpecBinaryDeclaration binary:
+                    Include(binary.Left);
+                    Include(binary.Right);
+                    break;
+                case SpecConditionalDeclaration conditional:
+                    Include(conditional.Condition);
+                    Include(conditional.WhenTrue);
+                    Include(conditional.WhenFalse);
+                    break;
+                case SpecLengthDeclaration length:
+                    Include(length.Value);
+                    break;
+            }
+            if (nodes > MaximumExpandedExpressionNodes)
+            {
+                throw new ArgumentException("Spec expressions exceed the expanded expression work limit.", nameof(declaration));
+            }
+            var result = (height, nodes);
+            measured.Add(term, result);
+            return result;
+
+            void Include(SpecTermDeclaration child)
+            {
+                var size = Measure(child, depth + 1);
+                height = Math.Max(height, size.Height + 1);
+                nodes = Math.Min(MaximumExpandedExpressionNodes + 1, nodes + size.Nodes);
+            }
+        }
     }
 
     private sealed class ValidationContext(

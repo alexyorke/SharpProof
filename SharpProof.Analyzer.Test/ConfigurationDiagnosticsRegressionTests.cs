@@ -9,6 +9,26 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class ConfigurationDiagnosticsRegressionTests
 {
+    [TestCase("sharpproof_features", "invalid")]
+    [TestCase("sharpproof_features", "contracts")]
+    [TestCase("sharpproof_profile", "strict")]
+    [TestCase("sharpproof_profile", "off")]
+    public async Task TreeOverridesOfPackageDefaultsAreDiagnosed(string key, string value)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "public static class Fixture { public static int Run() => 1; }", ["SP0025"]);
+        var options = new FixedOptionsProvider(
+            new DictionaryAnalyzerConfigOptions(
+                ("build_property.SharpProofProfile", "advisory"),
+                ("build_property.SharpProofFeatures", "all")),
+            new DictionaryAnalyzerConfigOptions((key, value)));
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation, options, new SharpProofAnalyzer());
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+        Assert.That(diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("compilation-global"));
+    }
+
     [Test]
     public async Task GlobalAndTreeConfigurationErrorsAreReportedTogether()
     {

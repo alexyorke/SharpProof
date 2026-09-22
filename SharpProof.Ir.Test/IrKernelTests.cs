@@ -985,6 +985,63 @@ public sealed class IrKernelTests
         Assert.That(nullCast.Value.Type, Is.EqualTo(targetType));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void InterpreterDoesNotInventIdentityForComputedStrings(bool wrapConditional)
+    {
+        var factory = new IrFactory();
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        IrTerm Computed()
+        {
+            return factory.Binary(IrBinaryOperator.StringConcat,
+                factory.Conditional(factory.Variable(flag), factory.String("a"), factory.String("b")),
+                factory.String("c"));
+        }
+        IrTerm Operand()
+        {
+            return wrapConditional
+                ? factory.Conditional(factory.Variable(flag), Computed(), factory.String("d"))
+                : Computed();
+        }
+        var comparison = factory.Binary(IrBinaryOperator.NotEqual,
+            factory.Cast(factory.ObjectType, Operand()),
+            factory.Cast(factory.ObjectType, Operand()));
+        var result = new IrInterpreter(factory).Evaluate(comparison,
+            new Dictionary<IrVarId, IrValue> { [flag] = factory.CreateBooleanValue(true) });
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+    }
+
+    [Test]
+    public void ComputedStringIdentityRemainsUnknownAcrossEvaluations()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var interpreter = new IrInterpreter(factory);
+        var computed = interpreter.Evaluate(
+            factory.Binary(IrBinaryOperator.StringConcat,
+                factory.Variable(input), factory.String("suffix")),
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue("prefix") });
+        Assert.That(computed.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        var result = interpreter.Evaluate(factory.Cast(factory.ObjectType, factory.Variable(input)),
+            new Dictionary<IrVarId, IrValue> { [input] = computed.Value! });
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+    }
+
+    [Test]
+    public void SuppliedStringIdentitySurvivesObjectRoundTrip()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var supplied = new string('x', 4);
+        var widened = factory.Cast(factory.ObjectType, factory.Variable(input));
+        var roundTrip = factory.Cast(factory.ObjectType,
+            factory.Cast(factory.StringType, widened));
+        var result = new IrInterpreter(factory).Evaluate(roundTrip,
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue(supplied) });
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(result.Value!.Reference, Is.SameAs(supplied));
+    }
+
     [Test]
     public void InterpreterEvaluatesKnownStringToObjectReferenceCasts()
     {

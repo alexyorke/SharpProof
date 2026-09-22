@@ -707,7 +707,7 @@ public static partial class WorkerProtocolJson
             errors.Check(declared != null &&
                 SameAssumptionDeclarations(
                     value.Assumptions,
-                    manifestIndexes.CallableAssumptionsById[declared.CallableId]),
+                    manifestIndexes.GetCallableAssumptions(declared.CallableId)),
                 "response.callable_assumption_set");
         }
         return valid;
@@ -786,7 +786,7 @@ public static partial class WorkerProtocolJson
         var owner = manifestIndexes.CallablesById.Find(claim?.CallableId);
         errors.Check(owner != null && SameAssumptionDeclarations(
             value.Assumptions,
-            manifestIndexes.CallableAssumptionsById[owner.CallableId]),
+            manifestIndexes.GetCallableAssumptions(owner.CallableId)),
             "response.claim_assumption_set");
     }
     internal static bool HasValidEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason,
@@ -1208,6 +1208,13 @@ public static partial class WorkerProtocolJson
         internal OrdinalIdentityIndex<WorkerClaimManifestEntry> ClaimsById { get; }
         internal Dictionary<string?, (string Id, WorkerAssumptionKind Kind)[]> CallableAssumptionsById { get; }
 
+        internal (string Id, WorkerAssumptionKind Kind)[] GetCallableAssumptions(string? id)
+        {
+            return id != null && CallableAssumptionsById.TryGetValue(id, out var values)
+                ? values
+                : [];
+        }
+
         private static Dictionary<string?, (string Id, WorkerAssumptionKind Kind)[]>
             CreateCallableAssumptions(WorkerCallableManifestEntry[] callables)
         {
@@ -1215,7 +1222,7 @@ public static partial class WorkerProtocolJson
                 s_ordinal);
             foreach (var callable in callables)
             {
-                if (!result.ContainsKey(callable.CallableId))
+                if (callable.CallableId != null && !result.ContainsKey(callable.CallableId))
                 {
                     result.Add(
                         callable.CallableId,

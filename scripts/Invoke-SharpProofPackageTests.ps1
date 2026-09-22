@@ -639,7 +639,42 @@ try {
         $fixtureClasses = @(
             'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|VerifierProcessSupervisorBug202Tests|DependencyAuditScriptTests|LauncherArgumentTests|RefutedContractDiagnosticTests',
             'FinalCompilationProbeTests',
+            'LinuxWorkerProcessContainmentTests',
             'ReleasePublicationScriptTests')
+        $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($name in @($workerClass, $packageLayoutClass,
+                'SharpProof.Package.Test.BuildTaskTests')) {
+            [void]$plannedFixtures.Add($name)
+        }
+        foreach ($group in $fixtureClasses) {
+            foreach ($name in ($group -split '\|')) {
+                [void]$plannedFixtures.Add("SharpProof.Package.Test.$name")
+            }
+        }
+        # Inspect metadata without loading fixture dependencies into PowerShell's
+        # runtime. Package fixtures follow the <Name>Tests naming convention.
+        $fixtureStream = [IO.File]::OpenRead($testAssembly)
+        $fixturePeReader = [Reflection.PortableExecutable.PEReader]::new($fixtureStream)
+        try {
+            $metadata = [Reflection.Metadata.PEReaderExtensions]::GetMetadataReader(
+                $fixturePeReader, [Reflection.Metadata.MetadataReaderOptions]::None)
+            foreach ($handle in $metadata.TypeDefinitions) {
+                $definition = $metadata.GetTypeDefinition($handle)
+                $namespace = $metadata.GetString($definition.Namespace)
+                $name = $metadata.GetString($definition.Name)
+                if ($namespace -ceq 'SharpProof.Package.Test' -and $name.EndsWith('Tests', [StringComparison]::Ordinal)) {
+                    $fullName = "$namespace.$name"
+                    if (-not $plannedFixtures.Contains($fullName)) {
+                        throw "Package fixture is missing from the default shard plan: $fullName"
+                    }
+                }
+            }
+        }
+        finally {
+            $fixturePeReader.Dispose()
+            $fixtureStream.Dispose()
+        }
         foreach ($fixtureClass in $fixtureClasses) {
             $classNames = $fixtureClass -split '\|'
             $classFilters = @($classNames | ForEach-Object {

@@ -47,10 +47,10 @@ code quiet. SharpProofFeatures accepts effects, contracts, or all.
 SharpProofProfile accepts advisory, strict, or off; off omits the analyzer and
 generator from the build.
 
-The same choices can be made through analyzer configuration:
+The same choices can be made in a `.globalconfig` file:
 
 ~~~ini
-[*.cs]
+is_global = true
 sharpproof_profile = advisory
 sharpproof_features = all
 ~~~

@@ -159,6 +159,17 @@ effect summaries; `all` includes both.
 
 ## Fixed portable analyzer bounds
 
+The canonical Linux image supplies `/usr/bin/setsid`. The launcher uses it to
+create the worker's session before executing worker code. Timeout cleanup finds
+remaining session members after reparenting and checks each PID's start time
+before signaling it. This covers children created during ordinary termination;
+it does not claim containment of processes deliberately escaping the session.
+
+Trusted specification expressions are limited to 256 levels and 65,536 nodes
+after expanding shared subexpressions. Validation counts that expanded work
+before digesting or instantiating a declaration, so a small shared graph cannot
+cause exponential traversal. Accepted declarations retain their existing digests.
+
 The live analyzer's compilation-scoped managed CFG pass accepts at most 256
 Roslyn CFG blocks and 4,096 descendant operations per callable. Crossing either
 budget produces typed incomplete evidence; incomplete flow cannot discharge a

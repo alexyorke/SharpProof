@@ -4,7 +4,9 @@ namespace SharpProof.Host;
 
 internal readonly record struct LinuxProcessStat(
     int ParentProcessId,
-    ulong? StartTime);
+    ulong? StartTime,
+    int ProcessGroupId = 0,
+    int SessionId = 0);
 
 internal static class LinuxProcessStatParser
 {
@@ -40,7 +42,13 @@ internal static class LinuxProcessStatParser
                 out var parsedStartTime)
             ? parsedStartTime
             : null;
-        processStat = new LinuxProcessStat(parentId, startTime);
+        var groupId = fields.Length > 2 && int.TryParse(fields[2],
+            NumberStyles.None, CultureInfo.InvariantCulture, out var parsedGroupId)
+            ? parsedGroupId : 0;
+        var sessionId = fields.Length > 3 && int.TryParse(fields[3],
+            NumberStyles.None, CultureInfo.InvariantCulture, out var parsedSessionId)
+            ? parsedSessionId : 0;
+        processStat = new LinuxProcessStat(parentId, startTime, groupId, sessionId);
         return true;
     }
 }

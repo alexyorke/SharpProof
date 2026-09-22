@@ -14,6 +14,47 @@ public sealed class ApiSpecExpressionDepthTests
         "expression-depth-test");
 
     [Test]
+    public void SharedExpressionExpansionBeyondWorkLimitIsRejected()
+    {
+        SpecTermDeclaration expression = new SpecBooleanDeclaration(true);
+        for (var level = 0; level < 18; level++)
+        {
+            expression = new SpecBinaryDeclaration(IrBinaryOperator.AndAlso,
+                expression, expression, IrTypeKind.Boolean);
+        }
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([Declaration(expression)]));
+    }
+
+    [Test]
+    public void SharedSubtreeCannotBypassDepthLimit()
+    {
+        var shared = NestedNot(200);
+        SpecTermDeclaration nested = shared;
+        for (var level = 0; level < 100; level++)
+        {
+            nested = new SpecUnaryDeclaration(IrUnaryOperator.Not, nested, IrTypeKind.Boolean);
+        }
+        var expression = new SpecBinaryDeclaration(IrBinaryOperator.AndAlso,
+            shared, nested, IrTypeKind.Boolean);
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([Declaration(expression)]));
+    }
+
+    [Test]
+    public void BoundedSharedExpressionPreservesExpandedDigestAndInstantiation()
+    {
+        var shared = NestedNot(4);
+        var sharedTable = ApiSpecTable.Create([Declaration(new SpecBinaryDeclaration(
+            IrBinaryOperator.AndAlso, shared, shared, IrTypeKind.Boolean))]);
+        var expandedTable = ApiSpecTable.Create([Declaration(new SpecBinaryDeclaration(
+            IrBinaryOperator.AndAlso, NestedNot(4), NestedNot(4), IrTypeKind.Boolean))]);
+        Assert.That(sharedTable.ContentSha256, Is.EqualTo(expandedTable.ContentSha256));
+        var result = ApiSpecInstantiator.InstantiatePostconditions(
+            sharedTable.Templates.Single(), new IrFactory(),
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty);
+        Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+    }
+
+    [Test]
     public void ExpressionAtDepthLimitValidatesDigestsAndInstantiates()
     {
         var table = ApiSpecTable.Create([

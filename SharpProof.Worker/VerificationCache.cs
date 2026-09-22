@@ -169,6 +169,12 @@ internal sealed partial class VerificationCache(
             ArgumentException or JsonException or IOException or InvalidDataException or
                 UnauthorizedAccessException or OverflowException)
         {
+            // Maintenance must hold the same exclusive lock as normal reads.
+            if (cacheLock == null)
+            {
+                LastReadUnavailable = true;
+                return null;
+            }
             // A miss is still a cache maintenance opportunity. In
             // particular, a cache opened with a newly reduced limit must not
             // retain stale entries merely because the requested key is absent

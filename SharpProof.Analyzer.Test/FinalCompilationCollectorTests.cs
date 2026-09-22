@@ -1063,7 +1063,7 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
-    public async Task TreeLocalConfigurationOverridesPackageDefaults()
+    public async Task TreeLocalConfigurationCannotOverridePackageDefaults()
     {
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("tree-configuration");
@@ -1078,9 +1078,21 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics, Is.Empty);
-            Assert.That(File.Exists(path), Is.True);
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(path), Is.False);
         }
+    }
+
+    [Test]
+    public async Task GlobalConfigurationOverridesPackageDefaultsInArtifact()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("global-configuration");
+        var options = Options(path);
+        options["sharpproof_profile"] = "strict";
+        var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options);
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(File.Exists(path), Is.True);
     }
 
     [Test]

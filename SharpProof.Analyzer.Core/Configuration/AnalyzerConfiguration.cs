@@ -211,9 +211,7 @@ internal sealed class AnalyzerConfiguration
 
             if (globalOptions != null &&
                 TryGet(globalOptions, option, out var global) &&
-                (Is(global, value) ||
-                    (HasNonBlankValue(options, option.Key) &&
-                        IsPackageDefault(globalOptions, option, global))))
+                Is(global, value))
             {
                 continue;
             }
@@ -252,44 +250,6 @@ internal sealed class AnalyzerConfiguration
 
         value = string.Empty;
         return false;
-    }
-
-    private static bool IsPackageDefault(
-        AnalyzerConfigOptions options,
-        AnalyzerConfigurationOption option,
-        string value)
-    {
-        var packagePropertyKey =
-            "build_property." + option.BuildPropertyName;
-        if (!options.TryGetValue(packagePropertyKey, out var packageValue) ||
-            !Is(packageValue, value) ||
-            !HasPackageDefaults(options) ||
-            !IsPackageDefaultValue(option, packageValue))
-        {
-            return false;
-        }
-
-        foreach (var key in new[] {
-                     option.Key,
-                     "build_property." + option.Key
-                 })
-        {
-            if (options.TryGetValue(key, out var candidate) &&
-                !string.IsNullOrWhiteSpace(candidate))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool HasNonBlankValue(
-        AnalyzerConfigOptions options,
-        string key)
-    {
-        return options.TryGetValue(key, out var value) &&
-            !string.IsNullOrWhiteSpace(value);
     }
 
     private static bool IsPackageDefaultProperty(

@@ -754,8 +754,8 @@
   {
     "name": "launcher-single-termination-grace-deadline",
     "file": "SharpProof.Host/LinuxWorkerProcess.cs",
-    "original": "        return Terminate(process, stopwatch, finalLimit)",
-    "mutated": "        stopwatch.Restart();\n        return Terminate(process, stopwatch, finalLimit)",
+    "original": "        return Terminate(process, stopwatch, finalLimit, ownsSession)",
+    "mutated": "        stopwatch.Restart();\n        return Terminate(process, stopwatch, finalLimit, ownsSession)",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~LinuxWorkerTimeoutTerminatesTheDirectChild"
   },
@@ -834,8 +834,8 @@
   {
     "name": "contract-api-consumer-requires-identity",
     "file": "SharpProof.Effects/ManagedAbstractFlow.cs",
-    "original": "            Name: ContractApiCatalog.RequiresMethodName,",
-    "mutated": "            Name: ContractApiCatalog.EnsuresMethodName,",
+    "original": "            Name: ContractApiCatalog.RequiresMethodName or ContractApiCatalog.AssumeMethodName,",
+    "mutated": "            Name: ContractApiCatalog.EnsuresMethodName or ContractApiCatalog.AssumeMethodName,",
     "project": "SharpProof.Effects.Test/SharpProof.Effects.Test.csproj",
     "filter": "FullyQualifiedName~ContractRequiresRefinesSubsequentFacts"
   },

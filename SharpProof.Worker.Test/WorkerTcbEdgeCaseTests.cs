@@ -20,6 +20,32 @@ public sealed class WorkerTcbEdgeCaseTests
     private const string CacheFileSuffix = VerificationCache.CacheFileSuffix;
 
     [Test]
+    public async Task FailedCacheLockDoesNotEvictEntries()
+    {
+        using var directory = new TempDirectory("cache-locked-capacity-");
+        var path = Path.Combine(directory.FullName, new string('a', 64) + CacheFileSuffix);
+        var contents = new string('x', 100);
+        await File.WriteAllTextAsync(path, contents);
+        using var heldLock = new FileStream(
+            Path.Combine(directory.FullName, ".sharp-proof-cache.lock"),
+            FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        var cache = new VerificationCache(directory.FullName, 1);
+        var result = await cache.TryReadAsync(new string('b', 64),
+            new WorkerClaimManifest { Claims = [] }, [], new WorkerBudgets(),
+            CancellationToken.None);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result, Is.Null);
+            Assert.That(cache.LastReadUnavailable, Is.True);
+            Assert.That(File.Exists(path), Is.True);
+            if (File.Exists(path))
+            {
+                Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo(contents));
+            }
+        }
+    }
+
+    [Test]
     public async Task OrdinaryCacheMissReconcilesReducedCapacity()
     {
         using var directory = new TempDirectory(
