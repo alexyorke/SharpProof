@@ -261,7 +261,7 @@ public static class IrSubstitution
             return ReferenceEquals(left, binary.Left) &&
                    ReferenceEquals(right, binary.Right)
                 ? binary
-                : termFactory.Binary(binary.Operator, left, right);
+                : termFactory.RewriteBinary(binary.Operator, left, right);
         }
 
         IrTerm RewriteConditional(

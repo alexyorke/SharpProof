@@ -271,6 +271,112 @@ public sealed class CorpusGateTests
         }
     }
 
+    [TestCase("destination")]
+    [TestCase("staged")]
+    [TestCase("backup")]
+    [TestCase("symlink")]
+    [TestCase("alias")]
+    [TestCase("null-entry")]
+    [TestCase("null-path")]
+    [TestCase("missing-backup")]
+    [TestCase("missing-existed")]
+    public void CorpusRecoveryPreflightsEveryPathBeforeMutation(string corruption)
+    {
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-");
+        var root = Path.Combine(temporary.FullName, "transaction");
+        Directory.CreateDirectory(root);
+        var outside = Path.Combine(temporary.FullName, "outside.txt");
+        File.WriteAllText(outside, "outside");
+        var destination = Path.Combine(root, "first.txt");
+        var backup = Path.Combine(root, "first.old");
+        var staged = Path.Combine(root, "first.new");
+        File.WriteAllText(destination, "published");
+        File.WriteAllText(backup, "original");
+        File.WriteAllText(staged, "staged");
+        var second = new Dictionary<string, object?>
+        {
+            ["DestinationPath"] = Path.Combine(root, "second.txt"),
+            ["StagedPath"] = Path.Combine(root, "second.new"),
+            ["BackupPath"] = Path.Combine(root, "second.old"),
+            ["DestinationExisted"] = false
+        };
+        switch (corruption)
+        {
+            case "destination":
+                second["DestinationPath"] = outside;
+                break;
+            case "staged":
+                second["StagedPath"] = outside;
+                break;
+            case "backup":
+                second["BackupPath"] = outside;
+                break;
+            case "null-path":
+                second["StagedPath"] = null;
+                break;
+            case "missing-backup":
+                second["DestinationExisted"] = true;
+                break;
+            case "missing-existed":
+                second.Remove("DestinationExisted");
+                break;
+            case "alias":
+                second["StagedPath"] = Path.Combine(root, ".", "first.txt");
+                break;
+            case "symlink":
+                var link = Path.Combine(root, "link");
+                Directory.CreateSymbolicLink(link, temporary.FullName);
+                second["StagedPath"] = Path.Combine(link, "outside.txt");
+                break;
+        }
+        var marker = Path.Combine(root, ".sharpproof-corpus-transaction.json");
+        var json = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = 1,
+            Entries = new object?[]
+            {
+                new
+                {
+                    DestinationPath = destination,
+                    StagedPath = staged,
+                    BackupPath = backup,
+                    DestinationExisted = true
+                },
+                corruption == "null-entry" ? null : second
+            }
+        });
+        File.WriteAllText(marker, json);
+        if (corruption == "missing-existed")
+        {
+            Assert.Throws<JsonException>((Action)(() => CorpusFileTransaction.Recover(root)));
+        }
+        else
+        {
+            Assert.Throws<InvalidDataException>((Action)(() => CorpusFileTransaction.Recover(root)));
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllText(outside), Is.EqualTo("outside"));
+            Assert.That(File.ReadAllText(destination), Is.EqualTo("published"));
+            Assert.That(File.ReadAllText(backup), Is.EqualTo("original"));
+            Assert.That(File.ReadAllText(staged), Is.EqualTo("staged"));
+            Assert.That(File.ReadAllText(marker), Is.EqualTo(json));
+        }
+    }
+
+    [Test]
+    public void CorpusStagingFailureCleansTheCurrentEntryBackup()
+    {
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-");
+        var destination = Path.Combine(temporary.FullName, "existing.txt");
+        File.WriteAllText(destination, "original");
+        Func<Task> write = () => CorpusFileTransaction.WriteAllAsync(
+            temporary.FullName, [new CorpusFileUpdate(destination, null!)], CancellationToken.None);
+        Assert.ThrowsAsync<ArgumentNullException>(write);
+        Assert.That(File.ReadAllText(destination), Is.EqualTo("original"));
+        Assert.That(Directory.GetFiles(temporary.FullName), Is.EqualTo(new[] { destination }));
+    }
+
     [Test]
     [Platform("Linux")]
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
@@ -724,7 +830,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 message,
                 Is.EqualTo(
-                    "Call to 'Positive' violates precondition 'false'"));
+                    "Call to 'Positive' violates precondition '(v3 > 0)'"));
             Assert.That(silentUnknown[1], Is.EqualTo("SilentUnknown"));
             Assert.That(silentUnknown[2], Is.EqualTo("Unknown"));
             Assert.That(silentUnknown[3], Is.Empty);

@@ -128,6 +128,11 @@ internal static class CompilerSourceRebinding
     // encoding the compiler recorded (strict UTF-8 when none was recorded).
     private static string Decode(byte[] bytes, string encodingName)
     {
+        if (HasPrefix(bytes, 0xFF, 0xFE, 0x00, 0x00) || HasPrefix(bytes, 0x00, 0x00, 0xFE, 0xFF))
+        {
+            return new UTF32Encoding(bytes[0] == 0, false, true).GetString(
+                bytes, 4, bytes.Length - 4);
+        }
         if (HasPrefix(bytes, 0xEF, 0xBB, 0xBF))
         {
             return new UTF8Encoding(false, true).GetString(
@@ -173,17 +178,73 @@ internal static class CompilerSourceRebinding
 
     private static bool IsEnsuresInvocation(string span)
     {
-        var open = span.IndexOf('(');
-        if (open <= 0 || span[span.Length - 1] != ')')
+        if (span.Length == 0 || span[span.Length - 1] != ')')
         {
             return false;
         }
-
-        var callee = span.Substring(0, open).TrimEnd();
-        return callee.EndsWith(EnsuresMethodName, StringComparison.Ordinal) &&
-            (callee.Length == EnsuresMethodName.Length ||
-                !IsIdentifierPart(
-                    callee[callee.Length - EnsuresMethodName.Length - 1]));
+        var identifier = new StringBuilder();
+        for (var index = 0; index < span.Length; index++)
+        {
+            var character = span[index];
+            if (char.IsWhiteSpace(character))
+            {
+                continue;
+            }
+            if (character == '/' && index + 1 < span.Length)
+            {
+                var next = span[index + 1];
+                var end = next == '*'
+                    ? span.IndexOf("*/", index + 2, StringComparison.Ordinal)
+                    : next == '/' ? span.IndexOfAny(['\r', '\n', '\u0085', '\u2028', '\u2029'], index + 2) : -1;
+                if (end < 0)
+                {
+                    return false;
+                }
+                index = next == '*' ? end + 1 : end;
+                continue;
+            }
+            if (character == '(')
+            {
+                return identifier.ToString() == EnsuresMethodName;
+            }
+            if (character is '.' or ':')
+            {
+                identifier.Clear();
+                continue;
+            }
+            if (character == '@' && identifier.Length == 0)
+            {
+                continue;
+            }
+            if (character == '\\' && index + 1 < span.Length)
+            {
+                var digits = span[index + 1] == 'u' ? 4 : span[index + 1] == 'U' ? 8 : 0;
+                if (digits == 0 || index + 2 + digits > span.Length ||
+                    !uint.TryParse(span.Substring(index + 2, digits),
+                        System.Globalization.NumberStyles.AllowHexSpecifier,
+                        System.Globalization.CultureInfo.InvariantCulture, out var code) || code > char.MaxValue)
+                {
+                    return false;
+                }
+                character = (char)code;
+                index += digits + 1;
+            }
+            var category = char.GetUnicodeCategory(character);
+            if (category == System.Globalization.UnicodeCategory.Format)
+            {
+                continue;
+            }
+            if (!IsIdentifierPart(character) && category is not (
+                    System.Globalization.UnicodeCategory.NonSpacingMark or
+                    System.Globalization.UnicodeCategory.SpacingCombiningMark or
+                    System.Globalization.UnicodeCategory.ConnectorPunctuation or
+                    System.Globalization.UnicodeCategory.LetterNumber))
+            {
+                return false;
+            }
+            identifier.Append(character);
+        }
+        return false;
     }
 
     private static bool IsAttribute(string span)

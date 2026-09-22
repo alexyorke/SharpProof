@@ -68,6 +68,7 @@ internal static class CorpusFileTransaction
                 var staged = Path.Combine(directory, stem + ".new");
                 var backup = Path.Combine(directory, stem + ".old");
                 var existed = File.Exists(destination);
+                entries.Add(new TransactionEntry(destination, staged, backup, existed));
                 if (existed)
                 {
                     await CopyDurablyAsync(
@@ -81,11 +82,6 @@ internal static class CorpusFileTransaction
                         Utf8.GetBytes(updates[index].Content),
                         cancellationToken)
                     .ConfigureAwait(false);
-                entries.Add(new TransactionEntry(
-                    destination,
-                    staged,
-                    backup,
-                    existed));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -134,6 +130,7 @@ internal static class CorpusFileTransaction
         {
             return;
         }
+        OpenSourceCorpusCatalog.EnsureContained(transactionRoot, markerPath);
 
         var marker = JsonSerializer.Deserialize<TransactionMarker>(
             File.ReadAllText(markerPath, Utf8)) ??
@@ -146,6 +143,34 @@ internal static class CorpusFileTransaction
                 "The corpus transaction marker is invalid.");
         }
 
+        var paths = new HashSet<string>(StringComparer.Ordinal)
+        {
+            OpenSourceCorpusCatalog.ResolvePath(transactionRoot),
+            OpenSourceCorpusCatalog.ResolvePath(markerPath)
+        };
+        foreach (var entry in marker.Entries)
+        {
+            if (entry == null)
+            {
+                throw new InvalidDataException("A corpus transaction entry is null.");
+            }
+            foreach (var path in new[] { entry.DestinationPath, entry.StagedPath, entry.BackupPath })
+            {
+                if (string.IsNullOrEmpty(path) || !Path.IsPathFullyQualified(path))
+                {
+                    throw new InvalidDataException("A corpus transaction path is invalid.");
+                }
+                OpenSourceCorpusCatalog.EnsureContained(transactionRoot, path);
+                if (!paths.Add(OpenSourceCorpusCatalog.ResolvePath(path)) || Directory.Exists(path))
+                {
+                    throw new InvalidDataException("Corpus transaction paths must name distinct files.");
+                }
+            }
+            if (entry.DestinationExisted && !File.Exists(entry.BackupPath))
+            {
+                throw new InvalidDataException("A corpus transaction backup is unavailable.");
+            }
+        }
         Restore(marker.Entries);
         File.Delete(markerPath);
         Cleanup(marker.Entries);
@@ -283,5 +308,5 @@ internal static class CorpusFileTransaction
         string DestinationPath,
         string StagedPath,
         string BackupPath,
-        bool DestinationExisted);
+        [property: System.Text.Json.Serialization.JsonRequired] bool DestinationExisted);
 }

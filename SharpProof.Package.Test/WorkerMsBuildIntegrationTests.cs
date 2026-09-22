@@ -1771,9 +1771,10 @@ public sealed class WorkerMsBuildIntegrationTests
         }
     }
 
-    [Test]
+    [TestCase(false)]
+    [TestCase(true)]
     [SupportedOSPlatform("linux")]
-    public async Task LauncherReportsInProcessPublicationFailure()
+    public async Task LauncherReportsInProcessPublicationFailure(bool failAfterSnapshot)
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
@@ -1808,10 +1809,19 @@ public sealed class WorkerMsBuildIntegrationTests
                    TimeSpan.FromSeconds(5)))
         {
         }
-        await File.WriteAllTextAsync(publishRequestPath, stableRequest);
-        File.SetUnixFileMode(
-            publicationDirectory,
-            UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        if (failAfterSnapshot)
+        {
+            await File.WriteAllTextAsync(publishManifestPath, "original manifest");
+            Directory.CreateDirectory(publishRequestPath);
+        }
+        else
+        {
+            await File.WriteAllTextAsync(publishRequestPath, stableRequest);
+            File.SetUnixFileMode(
+                publicationDirectory,
+                UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        }
+        var originalFiles = Directory.GetFiles(publicationDirectory).Order().ToArray();
         try
         {
             var exitCode = await Program.RunMain(
@@ -1848,10 +1858,20 @@ public sealed class WorkerMsBuildIntegrationTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
-                Assert.That(
-                    await File.ReadAllTextAsync(publishRequestPath),
-                    Is.EqualTo(stableRequest));
+                if (failAfterSnapshot)
+                {
+                    Assert.That(await File.ReadAllTextAsync(publishManifestPath),
+                        Is.EqualTo("original manifest"));
+                    Assert.That(Directory.Exists(publishRequestPath), Is.True);
+                }
+                else
+                {
+                    Assert.That(await File.ReadAllTextAsync(publishRequestPath),
+                        Is.EqualTo(stableRequest));
+                }
                 Assert.That(File.Exists(publishResultPath), Is.False);
+                Assert.That(Directory.GetFiles(publicationDirectory).Order().ToArray(),
+                    Is.EqualTo(originalFiles));
             }
         }
         finally

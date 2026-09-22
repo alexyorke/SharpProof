@@ -112,6 +112,41 @@ public sealed class CompilerSourceLocationAuthorityTests
             CompilerSourceRebinding.Validate(artifact)));
     }
 
+    [TestCase("utf-8")]
+    [TestCase("utf-16")]
+    [TestCase("utf-16BE")]
+    [TestCase("utf-32")]
+    [TestCase("utf-32BE")]
+    public void SourceRebindingAcceptsCompilerByteOrderMarks(string encodingName)
+    {
+        var artifact = CreateOnDiskContractArtifact(out var source);
+        var path = artifact.Compilation.SyntaxTrees.Single().Path;
+        File.WriteAllText(path, source, Encoding.GetEncoding(encodingName));
+        Assert.DoesNotThrow((Action)(() => CompilerSourceRebinding.Validate(artifact)));
+        File.AppendAllText(path, "// changed", Encoding.GetEncoding(encodingName));
+        Assert.Throws<InvalidDataException>((Action)(() => CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [TestCase("Ensures /* comment ( */ ")]
+    [TestCase("Ensures // comment (\n")]
+    [TestCase("Ensur\\u0065s")]
+    [TestCase("@Ensures")]
+    [TestCase("Ensu\\u200Cres")]
+    public void SourceRebindingAcceptsEnsuresLexicalSpellings(string method)
+    {
+        var artifact = CreateOnDiskContractArtifact(out _, method);
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.DoesNotThrow((Action)(() => CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingAcceptsUnicodeContractAlias()
+    {
+        var artifact = CreateOnDiskContractArtifact(out _, qualifier: "C\u0301");
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.DoesNotThrow((Action)(() => CompilerSourceRebinding.Validate(artifact)));
+    }
+
     [Test]
     public void SourceRebindingRejectsResealedRelocationWithinCallable()
     {
@@ -556,12 +591,13 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     private static CompilerManifestArtifact CreateOnDiskContractArtifact(
-        out string source)
+        out string source, string ensures = "Ensures", string qualifier = "Contract")
     {
         source = "using SharpProof.Attributes;\n" +
+            (qualifier == "Contract" ? "" : "using " + qualifier + " = SharpProof.Attributes.Contract;\n") +
             "internal static class Subject {\n" +
             "  internal static int Identity(int value) {\n" +
-            "    Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "    " + qualifier + "." + ensures + "(Contract.Result<int>() == value);\n" +
             "    return value;\n" +
             "  }\n" +
             "}\n";

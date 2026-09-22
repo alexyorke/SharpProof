@@ -44,11 +44,15 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         {
             callable = NormalizeCallable(callable);
         }
-        if (implementationBody != null &&
-            !IsCallableBodyRoot(
+        if ((callable.DeclaringSyntaxReferences.Any(reference =>
+                 _treeOrdinals.ContainsKey(reference.SyntaxTree)) &&
+             !SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, _compilation.Assembly)) ||
+            (implementationBody != null &&
+             (!ReferenceEquals(implementationBody.SemanticModel?.Compilation, _compilation) ||
+              !IsCallableBodyRoot(
                 callable,
                 implementationBody,
-                cancellationToken))
+                cancellationToken))))
         {
             return new ContractClauseInventory(
                 callable,

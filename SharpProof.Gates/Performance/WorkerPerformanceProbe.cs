@@ -161,7 +161,7 @@ internal static class WorkerPerformanceProbe
                 10_000,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (result.ExitCode != 124)
+        if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(
                 "The real worker did not complete its project-timeout path " +
@@ -265,7 +265,13 @@ internal static class WorkerPerformanceProbe
             stopwatch.Stop();
             var output = await standardOutput.ConfigureAwait(false);
             var error = await standardError.ConfigureAwait(false);
-            if (process.ExitCode != 124)
+            var response = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(workspace.ResultPath("forced"), boundary.Token)
+                    .ConfigureAwait(false));
+            // Advisory policy accepts a validated timeout result. The process
+            // wait above proves termination; the result must still report it.
+            if (process.ExitCode != 0 || response is not
+                { RunStatus: WorkerRunStatus.TimedOut, FailureReason: WorkerRunFailureReason.None })
             {
                 throw new InvalidOperationException(
                     "The launcher did not force-terminate an uncooperative " +

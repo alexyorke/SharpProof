@@ -6,6 +6,58 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class OperationCompletionEdgeCaseRegressionTests
 {
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    public void StaticFieldInitializationCanReachCatchAndCallerSuffix(bool constant, bool expected)
+    {
+        var compilation = EffectTestHost.CreateCompilation("""
+            public class Other {
+                static Other() { throw new System.Exception(); }
+            """ + (constant ? "public const int Value = 1;" : "public static int Value;") + """
+            }
+            public static class Sample {
+                private static int state;
+                public static void Helper() {
+                    try { _ = Other.Value; while (true) {} } catch {}
+                }
+                public static void Run() { Helper(); state++; }
+            }
+            """);
+        var helper = EffectTestHost.SampleMethod(compilation, "Helper");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
+        var facts = new DefiniteOperationFacts(compilation, System.Threading.CancellationToken.None);
+        Assert.That(facts.MethodCanCompleteNormally(helper), Is.EqualTo(expected));
+        Assert.That(EffectTestHost.CreateCompletionEvaluator(compilation, helper)
+            .CanMethodCompleteNormally(helper), Is.EqualTo(expected));
+        Assert.That(EffectTestHost.HasStaticWrite(compilation, run), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void VirtualSelfNamedInvocationCanDispatchToReturningOverride()
+    {
+        var compilation = EffectTestHost.CreateCompilation("""
+            public class Base {
+                public Base Other;
+                public virtual void M() => Other.M();
+            }
+            public class Returning : Base { public override void M() {} }
+            public class Sample : Base {
+                private static int state;
+                public void Run() {
+                    Other = new Returning();
+                    base.M();
+                    state++;
+                }
+            }
+            """);
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
+        var method = compilation.GetTypeByMetadataName("Base")!.GetMembers("M")
+            .OfType<IMethodSymbol>().Single();
+        Assert.That(new DefiniteOperationFacts(compilation, System.Threading.CancellationToken.None)
+            .MethodCanCompleteNormally(method), Is.True);
+        Assert.That(EffectTestHost.HasStaticWrite(compilation, run), Is.True);
+    }
+
     [Test]
     public void NonexhaustiveSwitchExpressionWithReturningArmMayComplete()
     {

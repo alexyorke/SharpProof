@@ -53,6 +53,16 @@ try {
     if ($actualCommit -cne $expectedCommit) {
         throw 'Clean fuzz source state did not retain the exact commit.'
     }
+    $untrackedSource = Join-Path $gitRoot 'untracked.cs'
+    [IO.File]::WriteAllText($untrackedSource, 'class Untracked {}')
+    $untrackedRejected = $false
+    try { [void](Get-SharpProofCleanFuzzSourceCommit -RepositoryRoot $gitRoot) }
+    catch { $untrackedRejected = $true }
+    [IO.File]::Delete($untrackedSource)
+    if (-not $untrackedRejected -or
+        (Get-SharpProofCleanFuzzSourceCommit -RepositoryRoot $gitRoot) -cne $expectedCommit) {
+        throw 'Untracked fuzz source was certified as HEAD.'
+    }
     [IO.File]::AppendAllText((Join-Path $gitRoot 'tracked.txt'), 'dirty')
     $dirtyRejected = $false
     try {
@@ -60,7 +70,7 @@ try {
     }
     catch {
         $dirtyRejected = $_.Exception.Message -ceq
-            'Fuzz evidence requires a clean tracked repository tree.'
+            'Fuzz evidence requires a clean repository source tree.'
     }
     if (-not $dirtyRejected) {
         throw 'Dirty tracked fuzz source state was accepted.'
@@ -248,7 +258,65 @@ try {
         throw 'Retry did not replace only the owned stable evidence.'
     }
 
-    Write-Host 'Fuzz evidence lifecycle fixtures: 25'
+    # Execute the real campaign in a tiny committed fixture. Only external
+    # process launching is stubbed; evidence publication and leases are real.
+    $fixture = Join-Path $root 'lease-source'
+    $fixtureScripts = Join-Path $fixture 'scripts'
+    [IO.Directory]::CreateDirectory($fixtureScripts) | Out-Null
+    foreach ($name in @('Invoke-SharpProofFuzzCampaign.ps1',
+            'Resolve-SharpProofContainedPath.ps1', 'Assert-SharpProofFuzzRunnerResult.ps1',
+            'Assert-SharpProofJsonProperties.ps1', 'SharpProof.FuzzEvidenceLifecycle.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $fixtureScripts
+    }
+    $module = @'
+function Get-SharpProofDotnetWrapperPath { return 'fixture' }
+function Start-SharpProofEncodedPowerShell {
+    param($WrapperPath, $TimeoutSeconds, $WorkingDirectory, $Arguments, $StandardOutput, $StandardError)
+    if ($StandardOutput) {
+        [IO.File]::WriteAllText($StandardOutput, 'retained failed run')
+        [IO.File]::WriteAllText($StandardError, 'injected runner failure')
+        return [pscustomobject]@{ ExitCode = 1 }
+    }
+    return [pscustomobject]@{ ExitCode = 0 }
+}
+Export-ModuleMember -Function *
+'@
+    [IO.File]::WriteAllText((Join-Path $fixtureScripts 'SharpProof.ContainerExecution.psm1'), $module)
+    foreach ($directory in @('eng/acceptance', 'eng/fuzz', 'Tools/SharpProof.Fuzz/bin/Release/net9.0')) {
+        [IO.Directory]::CreateDirectory((Join-Path $fixture $directory)) | Out-Null
+    }
+    [IO.File]::WriteAllText((Join-Path $fixture '.gitignore'), "artifacts/`n")
+    [IO.File]::WriteAllText((Join-Path $fixture 'eng/acceptance/contract.json'),
+        '{"fuzz":{"nightlyCases":1,"maximumCampaignCases":1,"maximumParallelism":1},"worker":{"maximumProjectWallSeconds":1}}')
+    [IO.File]::WriteAllText((Join-Path $fixture 'eng/fuzz/retained-seeds.json'),
+        '{"schemaVersion":1,"casesPerSeed":1,"seeds":[7]}')
+    [IO.File]::WriteAllText((Join-Path $fixture 'Tools/SharpProof.Fuzz/bin/Release/net9.0/SharpProof.Fuzz.dll'), '')
+    Initialize-SharpProofFixtureRepository -RepositoryRoot $fixture `
+        -UserEmail 'fixture@sharpproof.invalid' -Paths '.' -CommitMessage baseline
+    foreach ($failure in @('dirty', 'summary')) {
+        $extra = Join-Path $fixture 'untracked.cs'
+        if ($failure -eq 'dirty') { [IO.File]::WriteAllText($extra, 'class Extra {}') }
+        $failureMessage = ''
+        try {
+            & (Join-Path $fixtureScripts 'Invoke-SharpProofFuzzCampaign.ps1') `
+                -OutputDirectory 'artifacts/fuzz' -RotatingSeed 7 -RotatingCases 1 -RetainedCases 1
+        }
+        catch { $failureMessage = $_.Exception.Message }
+        [IO.File]::Delete($extra)
+        if ($failureMessage -notlike $(if ($failure -eq 'dirty') { 'Fuzz evidence requires*' } else { 'SharpProof fuzz campaign failed*' })) {
+            throw "The campaign did not reach the expected $failure failure: $failureMessage"
+        }
+        $fixtureOutput = Join-Path $fixture 'artifacts/fuzz'
+        $retryLease = Enter-SharpProofFuzzEvidenceLease -OutputDirectory $fixtureOutput -TimeoutSeconds 0
+        Exit-SharpProofFuzzEvidenceLease -Lease $retryLease
+        if ($failure -eq 'summary' -and
+            (-not [IO.File]::Exists((Join-Path $fixtureOutput 'campaign.json')) -or
+             -not [IO.File]::Exists((Join-Path $fixtureOutput 'rotating-7.stderr.txt')))) {
+            throw 'Failed campaign evidence was lost during lease cleanup.'
+        }
+    }
+
+    Write-Host 'Fuzz evidence lifecycle fixtures: 28'
 }
 finally {
     if ([IO.Directory]::Exists($root)) {

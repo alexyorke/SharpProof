@@ -12,6 +12,23 @@ public sealed partial class IrPrinter(IrFactory factory)
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
+        // Count expanded work, not unique DAG nodes. Include a conservative
+        // escaped-text allowance so a few enormous atoms cannot bypass it.
+        IrTraversal.FoldBottomUp(term, new Dictionary<IrId, long>(), (node, children, costs) =>
+        {
+            var textLength = node switch
+            {
+                IrStringTerm text => _factory.GetString(text.Value).Length,
+                IrNullTerm or IrCastTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
+                _ => 0
+            };
+            var cost = 64L + 6L * textLength + children.Sum(child => costs[child.Id]);
+            if (cost > 1_048_576)
+            {
+                throw new InvalidOperationException("IR term exceeds the printer formatting work limit.");
+            }
+            return cost;
+        });
         return FormatChild(term, 0);
     }
 

@@ -97,6 +97,7 @@ internal static partial class VerifierProcessSupervisor
             process.StartInfo.ArgumentList.Add(
                 typeof(VerifierProcessSupervisor).Assembly.Location);
             process.StartInfo.ArgumentList.Add(Program.WorkerArgument);
+            process.StartInfo.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
             foreach (var argument in command)
             {
                 process.StartInfo.ArgumentList.Add(argument);
@@ -171,15 +172,27 @@ internal static partial class VerifierProcessSupervisor
         Console.Out.Flush();
     }
 
-    internal static int RunWorker(string[] command)
+    internal static int RunWorker(int expectedParentProcessId, string[] command)
     {
-        // Keep the verifier attached to this containment boundary.  If the
-        // supervisor is killed abruptly, Linux reparents the worker (and any
-        // verifier it starts) to init; PDEATHSIG makes the kernel terminate
-        // the whole inherited launch chain instead.
+        // Linux clears PDEATHSIG in forked children. Keep this wrapper alive
+        // as a subreaper so it can contain and reap the verifier's entire tree
+        // if the outer supervisor dies, including descendants that call setsid.
+        using var cancellation = new CancellationTokenSource();
+        using var terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+        {
+            context.Cancel = true;
+            cancellation.Cancel();
+        });
         if (LinuxPrctl.ControlProcess(
                 LinuxProcessControlConstants.ParentDeathSignal,
-                LinuxProcessControlConstants.SignalKill,
+                LinuxProcessControlConstants.SignalTerminate,
+                0,
+                0,
+                0) != 0 ||
+            NativeMethods.GetParentProcessId() != expectedParentProcessId ||
+            LinuxPrctl.ControlProcess(
+                LinuxProcessControlConstants.ChildSubreaper,
+                LinuxProcessControlConstants.Enable,
                 0,
                 0,
                 0) != 0)
@@ -199,15 +212,28 @@ internal static partial class VerifierProcessSupervisor
         {
             process.StartInfo.ArgumentList.Add(argument);
         }
-        return process.Start()
-            ? WaitForWorkerExit(process)
-            : LinuxProcessControlConstants.EnvironmentFailureExitCode;
-    }
-
-    private static int WaitForWorkerExit(Process process)
-    {
-        process.WaitForExit();
-        return process.ExitCode;
+        if (cancellation.IsCancellationRequested || !process.Start())
+        {
+            return LinuxProcessControlConstants.EnvironmentFailureExitCode;
+        }
+        while (!process.WaitForExit(25) && !cancellation.IsCancellationRequested)
+        {
+        }
+        // Always clean up before releasing this subreaper: parent death can
+        // race a normal verifier exit before its signal handler is dispatched.
+        var exitCode = process.HasExited ? process.ExitCode : 143;
+        var cleanup = StopDescendants(Environment.ProcessId, CleanupMilliseconds,
+            managedProcessId: process.Id);
+        cleanup = RetryCleanup(cleanup, -1, _ => StopDescendants(
+            Environment.ProcessId, RetryCleanupMilliseconds, managedProcessId: process.Id));
+        if (!cleanup.Complete)
+        {
+            return LinuxProcessControlConstants.EnvironmentFailureExitCode;
+        }
+        process.WaitForExit(1000);
+        ReapOwnedDescendants();
+        return cancellation.IsCancellationRequested ? 143 :
+            cleanup.HadDescendants ? LinuxProcessControlConstants.TimeoutExitCode : exitCode;
     }
 
     internal static DescendantStopResult StopDescendants(
@@ -494,6 +520,10 @@ internal static partial class VerifierProcessSupervisor
 
     private static partial class NativeMethods
     {
+        [LibraryImport("libc", EntryPoint = "getppid")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int GetParentProcessId();
+
         [LibraryImport("libc", EntryPoint = "waitpid", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int WaitForProcess(

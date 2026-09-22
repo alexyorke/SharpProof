@@ -399,6 +399,42 @@ public sealed class ContractClauseInventoryTests
         Assert.That(inventory.Clauses, Is.Empty);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SharedSyntaxTreeDoesNotAuthorizeForeignSemanticObjects(bool foreignCallable)
+    {
+        var owner = CreateCompilation("""
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Analyze(int value) {
+                    Contract.Requires(Contract.Old(value) > 0);
+                }
+            }
+            """, includeSharpProofReference: true);
+        var foreign = owner.WithAssemblyName("Foreign");
+        var tree = owner.SyntaxTrees.Single();
+        var body = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single().Body!;
+        var callable = (foreignCallable ? foreign : owner)
+            .GetTypeByMetadataName("Target")!.GetMembers("Analyze")
+            .OfType<IMethodSymbol>().Single();
+        var inventory = new ContractClauseInventoryBuilder(owner).Create(
+            callable,
+            foreignCallable ? null : foreign.GetSemanticModel(tree).GetOperation(body));
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
+        Assert.That(inventory.ImplementationBody, Is.Null);
+        Assert.That(inventory.Clauses, Is.Empty);
+
+        var ownCallable = owner.GetTypeByMetadataName("Target")!
+            .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
+        var binding = new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
+            ownCallable, owner.GetSemanticModel(tree).GetOperation(body));
+        Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.OldOutsideEnsures));
+        Assert.That(new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
+            callable, foreignCallable ? null : foreign.GetSemanticModel(tree).GetOperation(body))
+            .IsSuccess, Is.False);
+    }
+
     private static (CSharpCompilation Owner, CSharpCompilation Foreign)
         CreateForeignFixture()
     {

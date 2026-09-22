@@ -519,7 +519,7 @@ internal static class PortableIrGraphCodecProjections
             IrTermKind.Unary => factory.Unary(
                 unaryOperator(row.A),
                 term(row.B, depth + 1)),
-            IrTermKind.Binary => factory.Binary(
+            IrTermKind.Binary => factory.RewriteBinary(
                 binaryOperator(row.A),
                 term(row.B, depth + 1),
                 term(row.C, depth + 1)),

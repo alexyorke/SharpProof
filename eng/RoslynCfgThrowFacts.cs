@@ -106,7 +106,7 @@ internal static class RoslynCfgThrowFacts
                 IDynamicObjectCreationOperation or
                 IDynamicIndexerAccessOperation or
                 IDynamicMemberReferenceOperation or
-                IFieldReferenceOperation { Instance: not null } or
+                IFieldReferenceOperation { Field.IsConst: false } or
                 IEventAssignmentOperation or
                 IAwaitOperation or
                 ICompoundAssignmentOperation { OperatorMethod: not null } or

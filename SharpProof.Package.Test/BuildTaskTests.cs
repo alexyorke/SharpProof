@@ -1402,6 +1402,68 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
+    public void WorkerContainsVerifierWhenOuterSupervisorIsKilled()
+    {
+        using var directory = new TempDirectory("sharpproof-supervisor-death-");
+        var pidPath = Path.Combine(directory.FullName, "topology.txt");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(directory.FullName, """
+                using System;
+                using System.Diagnostics;
+                using System.IO;
+                using System.Runtime.InteropServices;
+                using System.Threading;
+                var wrapper = Native.GetParent();
+                var stat = File.ReadAllText("/proc/" + wrapper + "/stat");
+                var supervisor = int.Parse(stat.Substring(stat.LastIndexOf(')') + 2).Split(' ')[1]);
+                var start = new ProcessStartInfo("/usr/bin/setsid");
+                start.ArgumentList.Add("/bin/sleep");
+                start.ArgumentList.Add("30");
+                using var child = Process.Start(start)!;
+                File.WriteAllLines("topology.txt", new[]
+                {
+                    Environment.ProcessId.ToString(), wrapper.ToString(),
+                    supervisor.ToString(), child.Id.ToString()
+                });
+                Native.Kill(supervisor, 9);
+                Thread.Sleep(30000);
+                internal static class Native
+                {
+                    [DllImport("libc", EntryPoint="getppid")]
+                    internal static extern int GetParent();
+                    [DllImport("libc", EntryPoint="kill")]
+                    internal static extern int Kill(int processId, int signal);
+                }
+                """);
+            using var task = CreateVerifier(directory, helper, 2000, 1);
+            task.ContainmentAuthenticationFailureOverride = _ => { };
+            Assert.That(task.Execute(), Is.True);
+            Assert.That(File.Exists(pidPath), Is.True);
+            var processes = File.ReadAllLines(pidPath).Select(int.Parse).ToArray();
+            Assert.That(SpinWait.SpinUntil(
+                () => processes.All(id => !IsProcessRunning(id)), TimeSpan.FromSeconds(3)),
+                Is.True, "The verifier or its escaped-session child survived supervisor death.");
+        }
+        finally
+        {
+            if (File.Exists(pidPath))
+            {
+                foreach (var id in File.ReadAllLines(pidPath).Select(int.Parse))
+                {
+                    if (IsProcessRunning(id))
+                    {
+                        using var process = Process.GetProcessById(id);
+                        process.Kill(entireProcessTree: true);
+                    }
+                }
+            }
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskDoesNotReleaseCommandBeforePidFdAcquisition()
     {
         using var directory = new TempDirectory("sharpproof-launcher-gate-");

@@ -11,6 +11,21 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void RoundTripPreservesSubstitutedStringAllocationIdentity()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var term = factory.Cast(factory.ObjectType, factory.Binary(IrBinaryOperator.StringConcat,
+            factory.Variable(input), factory.String("suffix")));
+        var substituted = IrSubstitution.Substitute(factory, term, input, factory.String("prefix"));
+        var encoded = PortableIrGraphCodec.Encode(factory, null, [substituted]);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        Assert.That(new IrInterpreter(decoded.Factory).Evaluate(decoded.Roots[0]).Status,
+            Is.EqualTo(IrEvaluationStatus.Unsupported));
+        AssertGraphJsonEqual(encoded.Graph, PortableIrGraphCodec.Encode(decoded.Factory, null, decoded.Roots).Graph);
+    }
+
+    [Test]
     public void RoundTripPreservesEveryTermInstructionAndLocationShape()
     {
         var fixture = CreateFixture();

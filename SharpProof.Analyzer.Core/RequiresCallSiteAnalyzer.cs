@@ -634,10 +634,22 @@ internal static partial class RequiresCallSiteAnalyzer
                         GeneratedDiagnosticDescriptors.RequiresNotProvenRule,
                         callSite.Syntax.GetLocation(),
                         callSite.TargetMethod.Name,
-                        printer.Print(evaluation.Condition)));
+                        FormatCondition(printer, evaluation.Condition)));
                 }
             }
             return outcome;
+        }
+
+        private static string FormatCondition(IrPrinter printer, IrTerm condition)
+        {
+            try
+            {
+                return printer.Print(condition);
+            }
+            catch (InvalidOperationException)
+            {
+                return "[condition exceeds the display limit]";
+            }
         }
     }
 

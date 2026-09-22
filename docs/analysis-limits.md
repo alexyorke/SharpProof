@@ -128,6 +128,12 @@ worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
 
+IR diagnostic formatting also limits expanded work to 1,048,576 estimated
+characters, counting repeated DAG references and a conservative allowance for
+escaped literals and type names. Its existing nesting limit is 1,024. Oversized
+refuted preconditions keep their diagnostic with a short display-limit label.
+These display limits do not change the semantic result or verification budgets.
+
 Every budget and every artifact byte participates in worker input and cache
 identity. The artifact contains portable lowered callables plus a bounded
 proof-relevant compiler snapshot; it does not claim to serialize every Roslyn

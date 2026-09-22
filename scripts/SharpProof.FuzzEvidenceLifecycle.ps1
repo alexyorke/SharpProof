@@ -29,9 +29,9 @@ function Get-SharpProofCleanFuzzSourceCommit {
         throw 'Unable to bind fuzz evidence to the exact source commit.'
     }
     $dirty = @(& git -C $RepositoryRoot status `
-        --porcelain=v1 --untracked-files=no)
+        --porcelain=v1 --untracked-files=all)
     if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
-        throw 'Fuzz evidence requires a clean tracked repository tree.'
+        throw 'Fuzz evidence requires a clean repository source tree.'
     }
     return $head
 }

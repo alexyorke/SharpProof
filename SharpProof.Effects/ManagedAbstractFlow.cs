@@ -2730,6 +2730,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 .GetSemanticModel(compilation, expression.SyntaxTree);
             return model.GetOperation(expression, cancellationToken) is
                 IInvocationOperation invocation &&
+                !invocation.IsVirtual &&
                 !IsConditionallyElided(invocation) &&
                 SymbolEqualityComparer.Default.Equals(
                     invocation.TargetMethod.OriginalDefinition,

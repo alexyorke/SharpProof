@@ -5528,6 +5528,7 @@ public sealed class WorkerTests
         request.Budgets.ProjectWallTimeMilliseconds = 1_000;
         var factoryCalls = 0;
         ISmtBackend? original = null;
+        OwnershipBackend? replacement = null;
         using var worker = new SharpProofWorker(() =>
         {
             factoryCalls++;
@@ -5535,7 +5536,7 @@ public sealed class WorkerTests
             {
                 original = scenario == "dispose"
                     ? new ThrowingDisposeDelayingBackend()
-                    : new DelayingBackend();
+                    : new OwnershipBackend(delay: true);
                 return original;
             }
 
@@ -5543,8 +5544,7 @@ public sealed class WorkerTests
             {
                 "null" => null!,
                 "reuse" => original!,
-                _ => new CountingBackend(
-                    BackendCheckResult.Unsatisfiable([]))
+                _ => replacement = new OwnershipBackend(delay: false)
             };
         });
 
@@ -5553,6 +5553,11 @@ public sealed class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factoryCalls, Is.EqualTo(expectedFactoryCalls));
+            Assert.That(replacement?.DisposeCount ?? 0, Is.EqualTo(scenario == "dispose" ? 1 : 0));
+            if (original is OwnershipBackend owned)
+            {
+                Assert.That(owned.DisposeCount, Is.EqualTo(1));
+            }
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(response.FailureReason, Is.EqualTo(expectedFailure));
             Assert.That(
@@ -5562,6 +5567,58 @@ public sealed class WorkerTests
                     expectedClaimReason
                 ]));
         }
+    }
+
+    [Test]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000",
+        Justification = "The worker factory owns these backends; the test asserts their exact disposal counts.")]
+    public async Task RenewalDoesNotDisposeBackendOwnedByAnotherActiveLane()
+    {
+        using var project = TestProject.Create("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long x) { Contract.Ensures(Contract.Result<long>() == x); return x; }
+                public static long B(long x) { Contract.Ensures(Contract.Result<long>() == x); return x; }
+                public static long C(long x) { Contract.Ensures(Contract.Result<long>() == x); return x; }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 2;
+        request.Budgets.MethodWallTimeMilliseconds = 100;
+        request.Budgets.ProjectWallTimeMilliseconds = 2_000;
+        var first = new OwnershipBackend(delay: true);
+        var second = new OwnershipBackend(delay: false) { Hold = true };
+        var replacementRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        using var worker = new SharpProofWorker(() =>
+        {
+            var call = Interlocked.Increment(ref calls);
+            if (call == 1)
+            {
+                return first;
+            }
+            if (call > 2)
+            {
+                replacementRequested.TrySetResult();
+            }
+            return second;
+        });
+        var verification = worker.VerifyAsync(request);
+        try
+        {
+            await second.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await replacementRequested.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.Delay(50);
+            Assert.That(second.DisposeCount, Is.Zero, "The replacement is still owned by the active second lane.");
+        }
+        finally
+        {
+            second.Release.TrySetResult();
+            await verification;
+        }
+        Assert.That(second.DisposedDuringCheck, Is.False);
+        Assert.That(second.DisposeCount, Is.EqualTo(1));
+        Assert.That(first.DisposeCount, Is.EqualTo(1));
     }
 
     [Test]
@@ -6324,6 +6381,45 @@ public sealed class WorkerTests
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class OwnershipBackend(bool delay) : ISmtBackend, IDisposable
+    {
+        private int _disposals;
+        internal int DisposeCount => Volatile.Read(ref _disposals);
+        internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal bool Hold { get; init; }
+        internal bool DisposedDuringCheck { get; private set; }
+        private int _active;
+
+        public async Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _active);
+            Started.TrySetResult();
+            try
+            {
+                if (Hold)
+                {
+                    await Release.Task;
+                }
+                if (delay)
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                return BackendCheckResult.Unsatisfiable([]);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _active);
+            }
+        }
+
+        public void Dispose()
+        {
+            DisposedDuringCheck |= Volatile.Read(ref _active) != 0;
+            Interlocked.Increment(ref _disposals);
         }
     }
 

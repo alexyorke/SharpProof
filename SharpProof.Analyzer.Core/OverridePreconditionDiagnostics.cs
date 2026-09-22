@@ -26,9 +26,7 @@ internal static class OverridePreconditionDiagnostics
 
         var inherited = GetInheritedMethods(method)
             .Select(candidate => GetRequires(candidate, session))
-            .Where(static binding => binding != null)
-            .Cast<BoundMethodContracts>()
-            .Any(candidate => HaveSameRequires(
+            .All(candidate => candidate != null && HaveSameRequires(
                 local,
                 candidate,
                 session.IrFactory));
@@ -63,31 +61,33 @@ internal static class OverridePreconditionDiagnostics
         BoundMethodContracts right,
         IrFactory factory)
     {
-        var printer = new IrPrinter(factory);
-        return NormalizeRequires(left, printer).SequenceEqual(
-            NormalizeRequires(right, printer),
-            StringComparer.Ordinal);
+        var identities = right.Variables.ToDictionary(
+            variable => (variable.Role, variable.Ordinal, factory.GetVariableInfo(variable.Variable).Type),
+            static variable => variable.Variable);
+        return NormalizeRequires(left, factory, identities).SequenceEqual(
+            NormalizeRequires(right, factory, identities));
     }
 
-    private static ImmutableArray<string> NormalizeRequires(
+    private static ImmutableArray<IrTerm> NormalizeRequires(
         BoundMethodContracts contracts,
-        IrPrinter printer)
+        IrFactory factory,
+        Dictionary<(BoundContractVariableRole, int, IrTypeId), IrVarId> identities)
     {
-        var variables = contracts.Variables.ToDictionary(
-            static variable => variable.Variable.Value,
-            static variable => variable.Role + ":" + variable.Ordinal);
+        var variables = new Dictionary<IrVarId, IrTerm>();
+        foreach (var variable in contracts.Variables)
+        {
+            var type = factory.GetVariableInfo(variable.Variable).Type;
+            var key = (variable.Role, variable.Ordinal, type);
+            if (!identities.TryGetValue(key, out var identity))
+            {
+                continue;
+            }
+            variables.Add(variable.Variable, factory.Variable(identity));
+        }
         return [.. contracts.Clauses
             .Where(static clause => clause.Kind == BoundContractKind.Requires)
-            .Select(clause => System.Text.RegularExpressions.Regex.Replace(
-                printer.Print(clause.Condition),
-                @"\bv\d+\b",
-                match => variables.TryGetValue(
-                    int.Parse(match.Value.Substring(1),
-                        CultureInfo.InvariantCulture),
-                    out var role)
-                        ? "var:" + role
-                        : match.Value))
-            .OrderBy(static value => value, StringComparer.Ordinal)];
+            .Select(clause => IrSubstitution.Substitute(factory, clause.Condition, variables))
+            .OrderBy(static value => value.Id.Value)];
     }
 
     private static bool HasDispatchContract(IMethodSymbol method)

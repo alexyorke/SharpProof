@@ -450,6 +450,45 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.Zero);
     }
 
+    [TestCase("key: \"k\", comparisonValue: default!, newValue: answer", 1)]
+    [TestCase("key: \"k\", newValue: answer, comparisonValue: default!", 1)]
+    [TestCase("key: \"k\", comparisonValue: answer, newValue: default!", 0)]
+    public async Task GenericCacheTryUpdateUsesBoundNamedArguments(string arguments, int expected)
+    {
+        var diagnostics = await Analyze("""
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache<T> {
+                internal bool TryUpdate(string key, T newValue, T comparisonValue) => true;
+            }
+            static class Forwarder {
+                static void Forward<T>(ProofCache<T> cache, T answer) {
+                    cache.TryUpdate(
+            """ + arguments + """
+                    );
+                }
+                static void Run(ProofCache<Answer> cache) => Forward(cache, Answer.Unknown);
+            }
+            """);
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SPMETA010"), Is.EqualTo(expected));
+    }
+
+    [TestCase("internal bool TryUpdate(string key, T next, T prior) => true;", "key: \"k\", prior: answer, next: default!", 0)]
+    [TestCase("internal bool TryUpdate(string key, T value) => true;", "key: \"k\", value: answer", 1)]
+    [TestCase("", "key: \"k\", comparisonValue: answer, newValue: default!", 0)]
+    [TestCase("", "key: \"k\", comparisonValue: default!, newValue: answer", 1)]
+    public async Task GenericCacheNamedArgumentsRespectCustomAndInheritedSignatures(string declaration, string arguments, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        var diagnostics = await Analyze("using System.Collections.Concurrent; namespace SharpProof.Verify; " +
+            "enum Answer { Unknown, Proven } class ProofCache<T>" +
+            (declaration.Length == 0 ? " : ConcurrentDictionary<string, T>" : "") + " { " + declaration + " } " +
+            "static class Forwarder { static void Forward<T>(ProofCache<T> cache, T answer) { cache.TryUpdate(" + arguments +
+            "); } static void Run(ProofCache<Answer> cache) => Forward(cache, Answer.Unknown); }");
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SPMETA010"), Is.EqualTo(expected));
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
+    }
+
     [Test]
     public async Task SemanticCacheWritesDistinguishAliasVersions()
     {

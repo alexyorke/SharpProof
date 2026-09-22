@@ -722,38 +722,41 @@ internal static class Program
     {
         var backups = new Dictionary<string, string>(StringComparer.Ordinal);
         var complete = true;
-        foreach (var member in members)
+        var captured = false;
+        try
         {
-            if (File.Exists(member.Path))
+            foreach (var member in members)
             {
-                // Keep rollback snapshots on disk. Reading every destination into
-                // managed memory made publication allocation proportional to the
-                // size of all existing outputs.
-                var backup = AtomicFile.PrepareStaged(member.Path);
-                try
+                if (File.Exists(member.Path))
                 {
-                    File.Copy(member.Path, backup);
+                    // Keep rollback snapshots on disk. Reading every destination into
+                    // managed memory made publication allocation proportional to the
+                    // size of all existing outputs.
+                    var backup = AtomicFile.PrepareStaged(member.Path);
                     backups.Add(member.Path, backup);
+                    File.Copy(member.Path, backup);
+                    continue;
                 }
-                catch (Exception exception) when (
-                    exception is IOException or UnauthorizedAccessException)
+
+                if (Directory.Exists(member.Path))
                 {
-                    AtomicFile.TryDeleteStaged(backup);
-                    throw;
+                    throw new IOException(
+                        "SharpProof publication members must be regular files.");
                 }
-                continue;
-            }
 
-            if (Directory.Exists(member.Path))
-            {
-                throw new IOException(
-                    "SharpProof publication members must be regular files.");
+                complete = false;
             }
-
-            complete = false;
+            var previous = new PreviousPublication(complete, backups);
+            captured = true;
+            return previous;
         }
-
-        return new PreviousPublication(complete, backups);
+        finally
+        {
+            if (!captured)
+            {
+                new PreviousPublication(complete, backups).Dispose();
+            }
+        }
     }
 
     private static void StagePublication(

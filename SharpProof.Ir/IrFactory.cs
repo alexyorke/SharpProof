@@ -469,6 +469,16 @@ public sealed class IrFactory
 
     public IrTerm Binary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
     {
+        return Binary(@operator, left, right, foldStringConcat: true);
+    }
+
+    internal IrTerm RewriteBinary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
+    {
+        return Binary(@operator, left, right, foldStringConcat: false);
+    }
+
+    private IrTerm Binary(IrBinaryOperator @operator, IrTerm left, IrTerm right, bool foldStringConcat)
+    {
         ArgumentNullGuard.NotNull(left, nameof(left));
         ArgumentNullGuard.NotNull(right, nameof(right));
 
@@ -484,7 +494,9 @@ public sealed class IrFactory
                 semantics.Result,
                 left,
                 right);
-            var folded = IrTermServices.FoldBinary(this, @operator, left, right);
+            var folded = foldStringConcat || @operator != IrBinaryOperator.StringConcat
+                ? IrTermServices.FoldBinary(this, @operator, left, right)
+                : null;
             if (folded != null)
             {
                 return folded;

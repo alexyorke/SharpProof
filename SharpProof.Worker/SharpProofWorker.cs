@@ -676,7 +676,6 @@ public sealed class SharpProofWorker : IDisposable
                         lanes.Any(lane => !ReferenceEquals(lane, this) &&
                             ReferenceEquals(lane.Backend, replacement)))
                     {
-                        (replacement as IDisposable)?.Dispose();
                         return LaneRenewalResult.BackendUnavailable;
                     }
 
@@ -685,20 +684,24 @@ public sealed class SharpProofWorker : IDisposable
                     // instance already owned by another lane; disposing the
                     // prior backend before this check can destroy live work.
                     var priorOwner = _ownedBackend;
+                    replacementOwner = replacement as IDisposable;
                     _ownedBackend = null;
                     priorOwner?.Dispose();
-                    replacementOwner = replacement as IDisposable;
                     _backend = ProjectBackend(replacement, maximumExpressionDepth);
                     _ownedBackend = replacementOwner;
+                    replacementOwner = null;
                     return LaneRenewalResult.Success;
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException and
                     not StackOverflowException and not OperationCanceledException)
                 {
-                    replacementOwner?.Dispose();
                     return Program.IsBackendUnavailable(exception)
                         ? LaneRenewalResult.BackendUnavailable
                         : LaneRenewalResult.InfrastructureFailure;
+                }
+                finally
+                {
+                    DisposeBackend(replacementOwner);
                 }
             }
         }
@@ -713,6 +716,11 @@ public sealed class SharpProofWorker : IDisposable
         {
             var ownedBackend = _ownedBackend;
             _ownedBackend = null;
+            DisposeBackend(ownedBackend);
+        }
+
+        private static void DisposeBackend(IDisposable? ownedBackend)
+        {
             if (ownedBackend == null)
             {
                 return;

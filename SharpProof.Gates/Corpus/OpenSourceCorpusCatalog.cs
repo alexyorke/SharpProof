@@ -486,7 +486,7 @@ internal static class OpenSourceCorpusCatalog
                 .Any(static part => part == "..");
     }
 
-    private static string ResolvePath(string path)
+    internal static string ResolvePath(string path)
     {
         var fullPath = Path.GetFullPath(path);
         var current = Path.GetPathRoot(fullPath) ?? string.Empty;

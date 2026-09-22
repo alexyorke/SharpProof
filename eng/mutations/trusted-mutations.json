@@ -1034,8 +1034,8 @@
   {
     "name": "verifier-supervisor-requires-subreaper",
     "file": "SharpProof.BuildTasks/VerifierProcessSupervisor.cs",
-    "original": "                LinuxProcessControlConstants.ChildSubreaper,\n                LinuxProcessControlConstants.Enable,",
-    "mutated": "                LinuxProcessControlConstants.ChildSubreaper,\n                LinuxProcessControlConstants.Disable,",
+    "original": "RuntimeInformation.ProcessArchitecture != Architecture.X64 ||\n            LinuxPrctl.ControlProcess(\n                LinuxProcessControlConstants.ChildSubreaper,\n                LinuxProcessControlConstants.Enable,",
+    "mutated": "RuntimeInformation.ProcessArchitecture != Architecture.X64 ||\n            LinuxPrctl.ControlProcess(\n                LinuxProcessControlConstants.ChildSubreaper,\n                LinuxProcessControlConstants.Disable,",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~VerifierSupervisorStopsSessionEscapingDescendants"
   },

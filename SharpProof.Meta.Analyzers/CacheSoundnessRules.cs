@@ -137,7 +137,8 @@ internal static class CacheSoundnessRules
                             parameter.Name) &&
                         IsStoredValueArgument(
                             invocation,
-                            argument)))
+                            argument,
+                            method)))
                 {
                     continue;
                 }
@@ -159,12 +160,10 @@ internal static class CacheSoundnessRules
 
     private static bool IsStoredValueArgument(
         InvocationExpressionSyntax invocation,
-        ArgumentSyntax argument)
+        ArgumentSyntax argument,
+        IMethodSymbol method)
     {
-        // TryUpdate(cache, key, newValue, comparisonValue) reads the final
-        // argument only for comparison; it is not the value persisted in the
-        // cache. Use the bound parameter ordinal when available through the
-        // syntax position as this helper is intentionally syntax-only.
+        // Named arguments can reorder the comparison and stored values.
         if (!string.Equals(
                 GetInvokedName(invocation.Expression),
                 "TryUpdate",
@@ -173,62 +172,58 @@ internal static class CacheSoundnessRules
             return true;
         }
 
-        return invocation.ArgumentList.Arguments.IndexOf(argument) != 2;
+        if (argument.NameColon == null)
+        {
+            return invocation.ArgumentList.Arguments.IndexOf(argument) != 2;
+        }
+        var candidates = new List<IMethodSymbol>();
+        for (var type = GetSyntacticReceiverType(invocation.Expression, method) as INamedTypeSymbol;
+             type != null; type = type.BaseType)
+        {
+            candidates.AddRange(type.GetMembers("TryUpdate").OfType<IMethodSymbol>()
+                .Where(candidate => candidate.Parameters.Length >= 3 &&
+                    candidate.Parameters.Length == invocation.ArgumentList.Arguments.Count));
+        }
+        return candidates.Count == 0 || candidates.Any(candidate =>
+            candidate.Parameters[2].Name != argument.NameColon.Name.Identifier.ValueText);
     }
 
-    private static bool IsSyntacticCacheReceiver(
-        ExpressionSyntax expression,
-        IMethodSymbol method)
+    private static bool IsSyntacticCacheReceiver(ExpressionSyntax expression, IMethodSymbol method)
+    {
+        return IsCacheType(GetSyntacticReceiverType(expression, method));
+    }
+
+    private static ITypeSymbol? GetSyntacticReceiverType(ExpressionSyntax expression, IMethodSymbol method)
     {
         if (expression is SimpleNameSyntax)
         {
-            return IsCacheType(method.ContainingType);
+            return method.ContainingType;
         }
-
         if (expression is not MemberAccessExpressionSyntax member)
         {
-            return false;
+            return null;
         }
-
         var receiver = UnwrapSyntax(member.Expression);
-        if (receiver is IdentifierNameSyntax identifier)
+        var name = receiver switch
         {
-            var receiverName = identifier.Identifier.ValueText;
-            var parameter = method.Parameters.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.Name,
-                    receiverName,
-                    StringComparison.Ordinal));
-            if (parameter != null)
-            {
-                return IsCacheType(parameter.Type);
-            }
-
-            return IsCacheMember(method.ContainingType, receiverName);
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax, Name: { } memberName } =>
+                memberName.Identifier.ValueText,
+            _ => null
+        };
+        if (receiver is IdentifierNameSyntax &&
+            method.Parameters.FirstOrDefault(parameter => parameter.Name == name) is { } parameter)
+        {
+            return parameter.Type;
         }
-
-        return receiver is MemberAccessExpressionSyntax
-        {
-            Expression: ThisExpressionSyntax,
-            Name: { } memberName
-        } && IsCacheMember(
-            method.ContainingType,
-            memberName.Identifier.ValueText);
-    }
-
-    private static bool IsCacheMember(
-        INamedTypeSymbol? containingType,
-        string name)
-    {
-        return containingType?.GetMembers(name).Any(member =>
-            member switch
+        return name == null ? null : method.ContainingType.GetMembers(name)
+            .Select(static symbol => symbol switch
             {
-                IFieldSymbol field => IsCacheType(field.Type),
-                IPropertySymbol property => IsCacheType(property.Type),
-                _ => false
-            }) == true;
+                IFieldSymbol field => field.Type,
+                IPropertySymbol property => property.Type,
+                _ => null
+            }).FirstOrDefault(static type => type != null);
     }
-
     private static bool IsForwardedParameter(
         ExpressionSyntax expression,
         string parameterName)

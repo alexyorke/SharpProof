@@ -15,8 +15,9 @@ internal static class Program
         {
             SupervisorArgument =>
                 VerifierProcessSupervisor.Run(arguments[1..]),
-            WorkerArgument =>
-                VerifierProcessSupervisor.RunWorker(arguments[1..]),
+            WorkerArgument when arguments.Length >= 3 &&
+                int.TryParse(arguments[1], out var parent) && parent > 1 =>
+                VerifierProcessSupervisor.RunWorker(parent, arguments[2..]),
             _ => 2
         };
     }

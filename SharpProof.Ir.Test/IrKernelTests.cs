@@ -1028,6 +1028,41 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void SubstitutionDoesNotTurnComputedStringIntoInternedLiteralIdentity()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var computed = factory.Binary(IrBinaryOperator.StringConcat,
+            factory.Variable(input), factory.String("suffix"));
+        var widened = factory.Cast(factory.ObjectType, computed);
+        var rewritten = IrSubstitution.Substitute(factory, widened, input, factory.String("prefix"));
+        var interpreter = new IrInterpreter(factory);
+        Assert.That(interpreter.Evaluate(widened,
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue("prefix") })
+            .Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(interpreter.Evaluate(rewritten).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        var folded = factory.Binary(IrBinaryOperator.StringConcat,
+            factory.String("prefix"), factory.String("suffix"));
+        Assert.That(interpreter.Evaluate(factory.Cast(factory.ObjectType, folded)).Status,
+            Is.EqualTo(IrEvaluationStatus.Value));
+    }
+
+    [Test]
+    public void PrinterBoundsExpandedSharedGraphAndCanBeReused()
+    {
+        var factory = new IrFactory();
+        IrTerm term = factory.Variable(factory.CreateVariable("x", factory.IntegerType));
+        var small = factory.Binary(IrBinaryOperator.Add, term, term);
+        for (var index = 0; index < 18; index++)
+        {
+            term = factory.Binary(IrBinaryOperator.Add, term, term);
+        }
+        var printer = new IrPrinter(factory);
+        Assert.Throws<InvalidOperationException>((Action)(() => printer.Print(term)));
+        Assert.That(printer.Print(small), Is.EqualTo("(v0 + v0)"));
+    }
+
+    [Test]
     public void SuppliedStringIdentitySurvivesObjectRoundTrip()
     {
         var factory = new IrFactory();
