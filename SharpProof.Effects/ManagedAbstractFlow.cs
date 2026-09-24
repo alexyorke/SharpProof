@@ -402,7 +402,15 @@ internal sealed class ManagedAbstractFlow
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
                 if (!compoundAliasesUntrackedStorage)
                 {
-                    state = SetStorage(state, compound.Target, TopForType(compound.Type));
+                    var compoundResult = TopForType(compound.Type);
+                    state = SetStorage(
+                        state,
+                        compound.Target,
+                        compoundResult);
+                    state = SetStorage(
+                        state,
+                        result.ResolveCoalesceAssignmentTarget(compound.Target),
+                        compoundResult);
                 }
                 if (IsNonLocalTarget(compound.Target))
                 {
