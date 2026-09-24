@@ -281,21 +281,29 @@ public sealed class RoslynProgramLowerer(
             }
 
             var location = LowerLocation(block, operation, assignment.Target);
-            if (location.Location == null)
+            var targetLocation = location.Location;
+            if (targetLocation == null)
             {
                 _ = LowerValue(block, operation, assignment.Value);
                 Abstain(operation, location.Abstention);
                 HavocKnownState(block, operation);
                 return;
             }
+            if (ContainsStateMutationCall(assignment.Value))
+            {
+                targetLocation = CaptureLocation(
+                    block,
+                    operation,
+                    targetLocation);
+            }
             var value = LowerValue(block, operation, assignment.Value);
-            if (location.Location.Type != value.Type)
+            if (targetLocation.Type != value.Type)
             {
                 Abstain(operation, FrontendAbstention.UnsupportedType);
                 Havoc(block, operation, IrHavocKind.Memory);
                 return;
             }
-            _builder.Store(block, operation, location.Location, value);
+            _builder.Store(block, operation, targetLocation, value);
         }
 
         private IrTerm LowerValue(IrBlockId block, OperationId operation, IOperation value)
@@ -329,6 +337,13 @@ public sealed class RoslynProgramLowerer(
                     if (value.ChildOperations.Count == 0)
                     {
                         break;
+                    }
+
+                    if (ContainsStateMutationCall(value))
+                    {
+                        Abstain(
+                            operation,
+                            FrontendAbstention.UnsupportedMutation);
                     }
 
                     var nestedValues = new Dictionary<IOperation, IrTerm>();
@@ -405,11 +420,24 @@ public sealed class RoslynProgramLowerer(
             bool wantsResult)
         {
             var targetMethod = GetDispatchMethod(invocation);
+            var argumentContainsStateMutation = invocation.Arguments
+                .Select(argument =>
+                    ContainsStateMutationCall(argument.Value))
+                .ToArray();
             var receiver = LowerOptionalValue(block, operation, invocation.Instance);
+            if (receiver != null && argumentContainsStateMutation.Contains(true))
+            {
+                receiver = CaptureEvaluationValue(
+                    block,
+                    operation,
+                    receiver,
+                    "receiver");
+            }
             var loweredArguments = LowerInvocationArguments(
                 block,
                 operation,
-                invocation);
+                invocation,
+                argumentContainsStateMutation);
             var arguments = loweredArguments.Arguments;
             var mutated = loweredArguments.Mutated;
             var resultType = _expressions.GetTypeId(invocation.Type);
@@ -474,15 +502,39 @@ public sealed class RoslynProgramLowerer(
             LowerInvocationArguments(
             IrBlockId block,
             OperationId operation,
-            IInvocationOperation invocation)
+            IInvocationOperation invocation,
+            bool[] argumentContainsStateMutation)
         {
             var isDirect = IsDirectInvocation(invocation);
             HashSet<IrVarId>? mutated = null;
             var lowered = new List<(
                 int Ordinal, IrTerm Value)>(invocation.Arguments.Length);
-            foreach (var argument in invocation.Arguments)
+            var snapshotBeforeArgument = new bool[invocation.Arguments.Length];
+            var hasLaterStateMutation = false;
+            for (var index = invocation.Arguments.Length - 1;
+                 index >= 0;
+                 index--)
             {
+                snapshotBeforeArgument[index] = hasLaterStateMutation;
+                hasLaterStateMutation |= argumentContainsStateMutation[index];
+            }
+
+            for (var index = 0;
+                 index < invocation.Arguments.Length;
+                 index++)
+            {
+                var argument = invocation.Arguments[index];
                 var value = LowerValue(block, operation, argument.Value);
+                if (snapshotBeforeArgument[index] &&
+                    (argument.Parameter == null ||
+                     argument.Parameter.RefKind == RefKind.None))
+                {
+                    value = CaptureEvaluationValue(
+                        block,
+                        operation,
+                        value,
+                        "argument");
+                }
                 lowered.Add((argument.Parameter?.Ordinal ?? int.MaxValue, value));
                 if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
                     _expressions.GetReferencedVariable(argument.Value) is { } variable)
@@ -496,6 +548,79 @@ public sealed class RoslynProgramLowerer(
                 .Select(static argument => argument.Value)],
                 isDirect,
                 mutated?.ToArray() ?? []);
+        }
+
+        private IrLocation CaptureLocation(
+            IrBlockId block,
+            OperationId operation,
+            IrLocation location)
+        {
+            return location switch
+            {
+                IrMemberLocation member => _builder.MemberLocation(
+                    member.Member,
+                    member.Receiver == null
+                        ? null
+                        : CaptureEvaluationValue(
+                            block,
+                            operation,
+                            member.Receiver,
+                            "location-receiver"),
+                    [.. member.Arguments.Select(argument =>
+                        CaptureEvaluationValue(
+                            block,
+                            operation,
+                            argument,
+                            "location-argument"))]),
+                IrSequenceLocation sequence => _builder.SequenceLocation(
+                    CaptureEvaluationValue(
+                        block,
+                        operation,
+                        sequence.Sequence,
+                        "location-sequence"),
+                    CaptureEvaluationValue(
+                        block,
+                        operation,
+                        sequence.Index,
+                        "location-index")),
+                _ => throw new InvalidOperationException(
+                    "The compiler assignment location is unsupported.")
+            };
+        }
+
+        private IrVariableTerm CaptureEvaluationValue(
+            IrBlockId block,
+            OperationId operation,
+            IrTerm value,
+            string purpose)
+        {
+            var target = CreateTemporary("snapshot-" + purpose, value.Type);
+            _builder.Assign(block, operation, target, value);
+            return _factory.Variable(target);
+        }
+
+        private bool ContainsStateMutationCall(IOperation operation)
+        {
+            var pending = new Stack<IOperation>();
+            pending.Push(operation);
+            while (pending.Count != 0)
+            {
+                var current = pending.Pop();
+                if (current is IInvocationOperation invocation &&
+                    (invocation.Arguments.Any(static argument =>
+                         argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out) ||
+                     IsClosureInvocation(GetDispatchMethod(invocation))))
+                {
+                    return true;
+                }
+
+                foreach (var child in current.ChildOperations)
+                {
+                    pending.Push(child);
+                }
+            }
+
+            return false;
         }
 
         private LocationLowering LowerLocation(
@@ -532,9 +657,24 @@ public sealed class RoslynProgramLowerer(
                             FrontendAbstention.UnsupportedMemberAccess);
                     case IArrayElementReferenceOperation element
                         when element.Indices.Length == 1:
-                        return LocationLowering.FromLocation(_builder.SequenceLocation(
-                            LowerValue(block, operation, element.ArrayReference),
-                            LowerValue(block, operation, element.Indices[0])));
+                        var sequence = LowerValue(
+                            block,
+                            operation,
+                            element.ArrayReference);
+                        if (ContainsStateMutationCall(element.Indices[0]))
+                        {
+                            sequence = CaptureEvaluationValue(
+                                block,
+                                operation,
+                                sequence,
+                                "sequence-before-index-effect");
+                        }
+                        var elementIndex = LowerValue(
+                            block,
+                            operation,
+                            element.Indices[0]);
+                        return LocationLowering.FromLocation(
+                            _builder.SequenceLocation(sequence, elementIndex));
                     case IArrayElementReferenceOperation element:
                         _ = LowerValue(block, operation, element.ArrayReference);
                         foreach (var index in element.Indices)

@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **57 findings**: 0 P0, 0 P1, 19 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **56 findings**: 0 P0, 0 P1, 18 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -51,7 +51,7 @@ regressions and unexecuted downstream paths remain open.
 
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
-| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend and B15 meta-analyzer boundaries remain; B14 alias activation is fixed and covered; worker consequences remain open |
+| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 meta-analyzer boundary remains; B14 alias activation is fixed and covered |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; null module-reference rows now reject before module-name access; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 boundary observed; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request |
@@ -207,44 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B6. Later ref effects replace earlier argument, receiver, and target values
-
-**Confidence: Confirmed exact frontend IR defect; worker consequences untested.**
-
-- **Location:** `SharpProof.Frontend/RoslynProgramLowerer.cs:283-298`, `:408`,
-  `:430`, `:442`, `:485-486`, and `:535-537`;
-  `SharpProof.Frontend/RoslynOperationLowerer.cs:141-153`.
-- **Defect:** lowering retains raw variables for previously evaluated values,
-  then mutates those variables while lowering a later ref call. The eventual
-  call or store therefore uses a changed variable instead of the saved value
-  required by C# evaluation order. These are one root cause, including former C1.
-- **Observed boundary:** a fresh isolated unchanged-HEAD build with Roslyn 4.14
-  produced all three cases with `IsExact=True`:
-
-  | Source | Emitted operation sequence |
-  | --- | --- |
-  | `Use(x, Mutate(ref x), x)` | `Mutate(v0); Havoc(v0); Use(v0, v1, v0)` |
-  | `b.Use(Swap(ref b))` | `Swap(v0); Havoc(v0); Use(receiver=v0)` |
-  | `a[0] = Replace(ref a)` | `Replace(v0); Havoc(v0); Store(sequence=v0, index=0)` |
-
-  C# preserves the original early argument, receiver, and assignment target,
-  respectively. The earlier CFG probe showed parameter/nested-call/parameter
-  with no flow captures. Worker eligibility and false-proof consequences were
-  not exercised.
-- **Fifth-pass worker check (2026-09-22):** the real collector and in-process
-  worker (unchanged HEAD, project-wide `checked`) were run over
-  `x + Bump(ref x)`, `x += Bump(ref x)`, `Bump(ref x)` followed by a read,
-  `i++ + i`, and `a + (a = 2)` with true and false postconditions. Every claim
-  was `Unknown`: the `ref` calls abstained with `UnsupportedCallable` and the
-  others with `UnsupportedBody`. No worker false proof was reachable through
-  these shapes; the frontend IR defect itself remains.
-- **Proposed fix:** materialize evaluation-time values before later effects,
-  covering arguments, receivers, and assignment locations while preserving
-  ref/out aliases and C# evaluation order.
-- **Proposed regression:** retain all three examples, compare emitted IR with
-  direct execution, and add unchanged-value controls. Separately verify the
-  worker's accepted/abstained classification before claiming a worker impact.
 
 ### B7. Rejected cache reads skip capacity maintenance
 

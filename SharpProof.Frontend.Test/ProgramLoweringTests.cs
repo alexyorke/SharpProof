@@ -163,6 +163,332 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void LaterRefArgumentsPreserveEarlierByValueArguments()
+    {
+        var lowered = Lower(
+            """
+            private static long Use(long first, long second, long third) =>
+                first + second + third;
+            private static long Bump(ref long value) => ++value;
+            public static long Target(long value) =>
+                Use(value, Bump(ref value), value);
+            """);
+        var bump = FindCall(lowered, "Bump");
+        var use = FindCall(lowered, "Use");
+        var value = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+        var firstArgument = (IrVariableTerm)use.Arguments[0];
+        var snapshot = firstArgument.Variable;
+        var snapshotAssignment = lowered.Instructions
+            .OfType<IrAssignInstruction>()
+            .Single(instruction => instruction.Target == snapshot);
+        var bumpIndex = Array.IndexOf(lowered.Instructions, bump);
+        var useIndex = Array.IndexOf(lowered.Instructions, use);
+        var snapshotIndex = Array.IndexOf(
+            lowered.Instructions,
+            snapshotAssignment);
+        var havocIndex = Array.FindIndex(
+            lowered.Instructions,
+            instruction => instruction is IrHavocInstruction havoc &&
+                havoc.Operation == bump.Operation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(snapshot, Is.Not.EqualTo(value));
+            Assert.That(
+                ((IrVariableTerm)snapshotAssignment.Value).Variable,
+                Is.EqualTo(value));
+            Assert.That(use.Arguments[2], Is.EqualTo(
+                lowered.Factory.Variable(value)));
+            Assert.That(snapshotIndex, Is.LessThan(bumpIndex));
+            Assert.That(bumpIndex, Is.LessThan(havocIndex));
+            Assert.That(havocIndex, Is.LessThan(useIndex));
+        }
+
+        var initialValue = lowered.Factory.CreateIntegerValue(3);
+        var execution = new IrProgramInterpreter(lowered.Factory).Execute(
+            lowered.Result.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [value] = initialValue
+            });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(execution.Instruction, Is.EqualTo(bump));
+        Assert.That(execution.GetCurrentValue(snapshot)?.Integer, Is.EqualTo(3));
+
+        static long Bump(ref long current)
+        {
+            return ++current;
+        }
+
+        var directValue = 3L;
+        var first = directValue;
+        var second = Bump(ref directValue);
+        var third = directValue;
+        Assert.That((first, second, third), Is.EqualTo((3L, 4L, 4L)));
+    }
+
+    [Test]
+    public void LaterClosureEffectsPreserveEarlierByValueArguments()
+    {
+        var lowered = Lower(
+            """
+            private static long Use(long first, long second, long third) =>
+                first + second + third;
+            public static long Target(long value) {
+                long BumpCaptured() {
+                    value++;
+                    return value;
+                }
+                return Use(value, BumpCaptured(), value);
+            }
+            """);
+        var bump = FindCall(lowered, "BumpCaptured");
+        var use = FindCall(lowered, "Use");
+        var value = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+        var firstArgument = (IrVariableTerm)use.Arguments[0];
+        var snapshotAssignment = lowered.Instructions
+            .OfType<IrAssignInstruction>()
+            .Single(instruction =>
+                instruction.Target == firstArgument.Variable);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(firstArgument.Variable, Is.Not.EqualTo(value));
+            Assert.That(
+                ((IrVariableTerm)snapshotAssignment.Value).Variable,
+                Is.EqualTo(value));
+            Assert.That(use.Arguments[2], Is.EqualTo(
+                lowered.Factory.Variable(value)));
+            Assert.That(
+                Array.IndexOf(lowered.Instructions, snapshotAssignment),
+                Is.LessThan(Array.IndexOf(lowered.Instructions, bump)));
+        }
+    }
+
+    [Test]
+    public void LaterRefArgumentsPreserveTheEarlierInstanceReceiver()
+    {
+        var lowered = Lower(
+            """
+            public sealed class Box {
+                public long Value;
+                public long Use(long value) => Value + value;
+            }
+            private static long Replace(ref Box box) {
+                box = new Box { Value = 100L };
+                return 1L;
+            }
+            public static long Target(Box box) =>
+                box.Use(Replace(ref box));
+            """);
+        var replace = FindCall(lowered, "Replace");
+        var use = FindCall(lowered, "Use");
+        var box = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "box" }).Variable;
+        var receiver = (IrVariableTerm)use.Receiver!;
+        var receiverAssignment = lowered.Instructions
+            .OfType<IrAssignInstruction>()
+            .Single(instruction => instruction.Target == receiver.Variable);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(receiver.Variable, Is.Not.EqualTo(box));
+            Assert.That(
+                ((IrVariableTerm)receiverAssignment.Value).Variable,
+                Is.EqualTo(box));
+            Assert.That(
+                Array.IndexOf(lowered.Instructions, receiverAssignment),
+                Is.LessThan(Array.IndexOf(lowered.Instructions, replace)));
+        }
+
+        var originalIdentity = new object();
+        var originalReceiver = lowered.Factory.CreateReferenceValue(
+            receiver.Type,
+            originalIdentity);
+        var execution = new IrProgramInterpreter(lowered.Factory).Execute(
+            lowered.Result.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [box] = originalReceiver
+            });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(
+            execution.GetCurrentValue(receiver.Variable)?.Reference,
+            Is.SameAs(originalIdentity));
+    }
+
+    [Test]
+    public void RefCallsPreserveArrayAndIndexAssignmentTargets()
+    {
+        var lowered = Lower(
+            """
+            private static long Replace(ref long[] values, ref int index) {
+                values = [99L, 100L];
+                index = 1;
+                return 7L;
+            }
+            public static long Target(long[] values, int index) {
+                values[index] = Replace(ref values, ref index);
+                return 0L;
+            }
+            """);
+        var replace = FindCall(lowered, "Replace");
+        var store = lowered.Instructions
+            .OfType<IrStoreInstruction>()
+            .Single();
+        var location = (IrSequenceLocation)store.Location;
+        var values = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "values" }).Variable;
+        var index = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "index" }).Variable;
+        var sequence = (IrVariableTerm)location.Sequence;
+        var capturedIndex = (IrVariableTerm)location.Index;
+        var sequenceAssignment = lowered.Instructions
+            .OfType<IrAssignInstruction>()
+            .Single(instruction => instruction.Target == sequence.Variable);
+        var indexAssignment = lowered.Instructions
+            .OfType<IrAssignInstruction>()
+            .Single(instruction => instruction.Target == capturedIndex.Variable);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(sequence.Variable, Is.Not.EqualTo(values));
+            Assert.That(capturedIndex.Variable, Is.Not.EqualTo(index));
+            Assert.That(
+                ((IrVariableTerm)sequenceAssignment.Value).Variable,
+                Is.EqualTo(values));
+            Assert.That(
+                ((IrVariableTerm)indexAssignment.Value).Variable,
+                Is.EqualTo(index));
+            Assert.That(
+                Array.IndexOf(lowered.Instructions, sequenceAssignment),
+                Is.LessThan(Array.IndexOf(lowered.Instructions, replace)));
+            Assert.That(
+                Array.IndexOf(lowered.Instructions, indexAssignment),
+                Is.LessThan(Array.IndexOf(lowered.Instructions, replace)));
+        }
+
+        var initialSequence = lowered.Factory.CreateSequenceValue(
+            sequence.Type,
+            [lowered.Factory.CreateIntegerValue(13),
+                lowered.Factory.CreateIntegerValue(17)]);
+        var execution = new IrProgramInterpreter(lowered.Factory).Execute(
+            lowered.Result.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [values] = initialSequence,
+                [index] = lowered.Factory.CreateIntegerValue(0)
+            });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(execution.Instruction, Is.EqualTo(replace));
+        Assert.That(
+            execution.GetCurrentValue(sequence.Variable)?.Elements[0].Integer,
+            Is.EqualTo(13));
+        Assert.That(
+            execution.GetCurrentValue(capturedIndex.Variable)?.Integer,
+            Is.Zero);
+
+        static long Replace(ref long[] currentValues, ref int currentIndex)
+        {
+            currentValues = [99L, 100L];
+            currentIndex = 1;
+            return 7L;
+        }
+
+        long[] directValues = [13L, 17L];
+        var oldValues = directValues;
+        var directIndex = 0;
+        directValues[directIndex] = Replace(ref directValues, ref directIndex);
+        Assert.That(oldValues, Has.Length.EqualTo(2));
+        Assert.That(oldValues[0], Is.EqualTo(7L));
+        Assert.That(oldValues[1], Is.EqualTo(17L));
+        Assert.That(directValues, Has.Length.EqualTo(2));
+        Assert.That(directValues[0], Is.EqualTo(99L));
+        Assert.That(directValues[1], Is.EqualTo(100L));
+        Assert.That(directIndex, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void CallsAndArrayAssignmentsWithoutRefEffectsStayUncaptured()
+    {
+        var callLowered = Lower(
+            """
+            private static long Use(long first, long second, long third) =>
+                first + second + third;
+            public static long Target(long value) =>
+                Use(value, value, value);
+            """);
+        var use = FindCall(callLowered, "Use");
+        var value = callLowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(callLowered.Result.IsExact, Is.True);
+            Assert.That(use.Arguments[0], Is.EqualTo(
+                callLowered.Factory.Variable(value)));
+            Assert.That(use.Arguments[2], Is.EqualTo(
+                callLowered.Factory.Variable(value)));
+            Assert.That(
+                callLowered.Instructions.OfType<IrAssignInstruction>(),
+                Is.Empty);
+        }
+
+        var assignmentLowered = Lower(
+            """
+            public static long Target(long[] values, int index) {
+                values[index] = 7L;
+                return 0L;
+            }
+            """);
+        var assignment = assignmentLowered.Instructions
+            .OfType<IrStoreInstruction>()
+            .Single();
+        var target = (IrSequenceLocation)assignment.Location;
+        var values = assignmentLowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "values" }).Variable;
+        var index = assignmentLowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "index" }).Variable;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(assignmentLowered.Result.IsExact, Is.True);
+            Assert.That(target.Sequence, Is.EqualTo(
+                assignmentLowered.Factory.Variable(values)));
+            Assert.That(target.Index, Is.EqualTo(
+                assignmentLowered.Factory.Variable(index)));
+            Assert.That(
+                assignmentLowered.Instructions.OfType<IrAssignInstruction>(),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public void CompositeExpressionsWithNestedRefCallsAbstain()
+    {
+        var lowered = Lower(
+            """
+            private static long Bump(ref long value) => ++value;
+            public static long Target(long value) =>
+                value + Bump(ref value);
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static item => item.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+        }
+    }
+
+    [Test]
     public void ImpureLocalFunctionCallHavocsCapturedLocals()
     {
         var lowered = Lower(
@@ -821,6 +1147,17 @@ public sealed class ProgramLoweringTests
                         instruction.Id.Value +
                         "-" +
                         instruction.Kind))));
+    }
+
+    private static IrCallInstruction FindCall(
+        LoweredProgram lowered,
+        string methodName)
+    {
+        return lowered.Instructions
+            .OfType<IrCallInstruction>()
+            .Single(call => lowered.Factory.GetString(
+                    lowered.Factory.GetMemberInfo(call.Member).Name)
+                .Contains(methodName, StringComparison.Ordinal));
     }
 
     private static LoweredProgram Lower(
