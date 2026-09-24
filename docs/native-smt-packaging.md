@@ -61,9 +61,13 @@ Release evidence includes the release manifest, container-toolchain identity,
 and exact source commit. Publication promotes
 the tested bytes in dependency order:
 `SharpProof.Attributes -> SharpProof -> SharpProof.Verifier`.
-Every main package must be absent before publication, and duplicate skipping is
-never used. A main or symbol collision fails closed; any partial publication
-requires a new version rather than reusing remote bytes.
+Absent main packages are pushed normally. On the canonical NuGet.org feed, a
+retry reuses an existing main package only after its downloaded bytes match
+the protected staged `.nupkg` byte for byte; the publisher then
+submits the locally validated `.snupkg` again through NuGet.org's symbol API.
+Other feeds, mismatched bytes, unknown responses, and pending symbol uploads
+fail closed. Duplicate skipping is never used, and unresolved conflicting
+state may require a new version.
 
 The worker protocol is 11, the cache schema is 13, and compiler artifacts use
 schema 18. The worker consumes sealed compiler artifacts rather than parsing

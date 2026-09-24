@@ -148,11 +148,14 @@ tagged-byte validation, trusted-publishing workflow, package-backed sample
 matrix, and exact public API XML coverage are implemented. The tag workflow
 requires checked-in version equality, master ancestry, and predecessor-tag
 order, then allowlists private `preview.1`, public `preview.2`, public `rc.1`,
-and stable `1.0.0` promotion of the already-tested bytes. Publication
-preflights every main package and fails if the version already exists;
-duplicate skipping is never used. Main and symbol packages are then pushed
-separately in dependency order. A symbol collision or partial publication
-requires a new version. Deterministic SARIF 2.1.0 projection is available as an
+and stable `1.0.0` promotion of the already-tested bytes. Publication pushes
+absent main packages normally. For the canonical NuGet.org feed, a retry may
+reuse an existing main package only after its downloaded bytes match the
+protected staged artifact byte for byte; it then submits the locally validated
+`.snupkg` package again. Other feeds, mismatched bytes, unknown responses, and pending
+symbol uploads fail closed. Duplicate skipping is never used; unresolved
+conflicting state may require a new version. Deterministic SARIF 2.1.0
+projection is available as an
 opt-in verifier output. Owner configuration of
 protected release environments and tags, pilot-library evidence, the first
 private/public NuGet publications, and exact-candidate release evidence are

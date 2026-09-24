@@ -42,7 +42,7 @@ function Test-SharpProofPublicationPlanIdentity {
 
     if (($Plan.schemaVersion -isnot [int] -and
          $Plan.schemaVersion -isnot [int64]) -or
-        [int64]$Plan.schemaVersion -ne 3) {
+        [int64]$Plan.schemaVersion -ne 4) {
         throw 'Publication plan schema version is unsupported.'
     }
     if (-not (Test-SharpProofExactProperties -Value $Plan -Expected @(
@@ -261,13 +261,14 @@ function Test-SharpProofPublicationPlanIdentity {
         if (-not (Test-SharpProofExactProperties -Value $package -Expected @(
                     'packageId','version','mainFileName','symbolsFileName',
                     'availabilityMode','remoteState','fixtureState','remoteUrl',
-                    'mainState','mainAction','symbolsState','symbolsAction'))) {
+                    'mainState','mainAction','symbolsState','symbolsAction',
+                    'remoteArtifactSha256'))) {
             throw 'Publication plan package decision schema is invalid.'
         }
         foreach ($property in @(
-                'packageId','version','mainFileName','symbolsFileName',
-                'availabilityMode','mainState','mainAction',
-                'symbolsState','symbolsAction')) {
+            'packageId','version','mainFileName','symbolsFileName',
+            'availabilityMode','mainState','mainAction',
+            'symbolsState','symbolsAction')) {
             if ($package.$property -isnot [string]) {
                 throw 'Publication plan package decision schema is invalid.'
             }
@@ -285,6 +286,7 @@ function Test-SharpProofPublicationPlanIdentity {
                 if ($null -ne $package.remoteState -or
                     $null -ne $package.fixtureState -or
                     $null -ne $package.remoteUrl -or
+                    $null -ne $package.remoteArtifactSha256 -or
                     $package.mainState -cne 'NotTargeted' -or
                     $package.mainAction -cne 'None' -or
                     $package.symbolsState -cne 'NotTargeted' -or
@@ -295,7 +297,8 @@ function Test-SharpProofPublicationPlanIdentity {
             'registry' {
                 $expectedRemote = if ($Plan.planOnly) {
                     'Unchecked'
-                } else { 'Absent' }
+                }
+                else { [string]$package.remoteState }
                 $remoteUrlValid = $Plan.planOnly -and
                     $null -eq $package.remoteUrl
                 if (-not $Plan.planOnly -and
@@ -310,14 +313,32 @@ function Test-SharpProofPublicationPlanIdentity {
                     $remoteUrlValid = $package.remoteUrl -ceq
                         ($destination.packageBaseAddress + $expectedSuffix)
                 }
+                $expectedAction = if ($Plan.planOnly) {
+                    'PreflightThenPush'
+                }
+                elseif ($expectedRemote -ceq 'VerifiedPresent') {
+                    'ReuseVerified'
+                }
+                else { 'Push' }
+                $verifiedDigestValid = if (
+                    -not $Plan.planOnly -and
+                    $expectedRemote -ceq 'VerifiedPresent') {
+                    $package.remoteArtifactSha256 -is [string] -and
+                    $package.remoteArtifactSha256 -cmatch '^[0-9a-f]{64}\z' -and
+                    $package.remoteArtifactSha256 -ceq
+                        $artifacts[$index * 2].sha256
+                }
+                else { $null -eq $package.remoteArtifactSha256 }
                 if ($package.remoteState -isnot [string] -or
                     $package.remoteState -cne $expectedRemote -or
+                    ($Plan.planOnly -and $expectedRemote -cne 'Unchecked') -or
+                    (-not $Plan.planOnly -and
+                        $expectedRemote -cnotin @('Absent','VerifiedPresent')) -or
                     $null -ne $package.fixtureState -or
                     -not $remoteUrlValid -or
                     $package.mainState -cne $expectedRemote -or
-                    $package.mainAction -cne $(if ($Plan.planOnly) {
-                        'PreflightThenPush'
-                    } else { 'Push' }) -or
+                    $package.mainAction -cne $expectedAction -or
+                    -not $verifiedDigestValid -or
                     $package.symbolsState -cne 'Unchecked' -or
                     $package.symbolsAction -cne 'CollisionOnPush') {
                     throw 'Registry package decision is invalid.'
@@ -352,6 +373,7 @@ function Test-SharpProofPublicationPlanIdentity {
                 } else { 'FixtureAbsent' }
                 if ($null -ne $package.remoteState -or
                     $null -ne $package.remoteUrl -or
+                    $null -ne $package.remoteArtifactSha256 -or
                     $package.fixtureState -isnot [string] -or
                     $package.fixtureState -cne $expectedMainState -or
                     $package.mainState -cne $package.fixtureState -or

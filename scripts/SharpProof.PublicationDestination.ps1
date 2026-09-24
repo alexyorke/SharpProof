@@ -238,8 +238,8 @@ function New-SharpProofPublicationActionAuthority {
         throw 'Only registry publication has a main remote state.'
     }
     if ($Mode -ceq 'registry' -and
-        $MainState -cnotin @('Absent', 'Unchecked')) {
-        throw 'Registry main state must be Absent or Unchecked.'
+        $MainState -cnotin @('Absent', 'Unchecked', 'VerifiedPresent')) {
+        throw 'Registry main state is invalid.'
     }
     if ($Mode -ceq 'fixture') {
         if ([string]::IsNullOrEmpty($FixtureMainState)) {
@@ -280,6 +280,9 @@ function New-SharpProofPublicationActionAuthority {
                 mainAction = if ($MainState -ceq 'Absent') {
                     'Push'
                 }
+                elseif ($MainState -ceq 'VerifiedPresent') {
+                    'ReuseVerified'
+                }
                 else { 'PreflightThenPush' }
                 symbolsState = 'Unchecked'
                 symbolsAction = 'CollisionOnPush'
@@ -309,6 +312,118 @@ function Test-SharpProofPublicationActionAuthority {
         -Message 'Publication action authority is invalid.'
 }
 
+function Test-SharpProofNuGetOrgSymbolPublishCapability {
+    param(
+        [Parameter(Mandatory = $true)][string]$MainDestination,
+        [Parameter(Mandatory = $true)][string]$SymbolDestination,
+        [AllowNull()][AllowEmptyCollection()][object[]]$Resources
+    )
+
+    $canonicalServiceIndex = 'https://api.nuget.org/v3/index.json'
+    foreach ($destination in @($MainDestination, $SymbolDestination)) {
+        $normalized = $null
+        try {
+            $normalized = Resolve-SharpProofPublicationHttpsDestination `
+                -Value $destination `
+                -Owner 'NuGet service index'
+        }
+        catch {
+            return $false
+        }
+        if ($normalized -cne $canonicalServiceIndex) {
+            return $false
+        }
+    }
+
+    $symbolResources = @($Resources | Where-Object {
+        @($_.'@type') -ccontains 'SymbolPackagePublish/4.9.0'
+    })
+    if ($symbolResources.Count -ne 1 -or
+        $symbolResources[0].'@id' -isnot [string]) {
+        return $false
+    }
+    $symbolEndpoint = $null
+    if (-not [Uri]::TryCreate(
+            [string]$symbolResources[0].'@id',
+            [UriKind]::Absolute,
+            [ref]$symbolEndpoint) -or
+        $symbolEndpoint.Scheme -cne 'https' -or
+        $symbolEndpoint.AbsoluteUri -cne
+            'https://www.nuget.org/api/v2/symbolpackage') {
+        return $false
+    }
+    return $true
+}
+
+function Test-SharpProofFileByteEquality {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExpectedPath,
+        [Parameter(Mandatory = $true)][string]$ActualPath
+    )
+
+    $expectedInfo = Get-Item -LiteralPath $ExpectedPath -ErrorAction Stop
+    $actualInfo = Get-Item -LiteralPath $ActualPath -ErrorAction Stop
+    if ($expectedInfo.Length -ne $actualInfo.Length) {
+        return $false
+    }
+    $expected = [IO.File]::Open(
+        $ExpectedPath,
+        [IO.FileMode]::Open,
+        [IO.FileAccess]::Read,
+        [IO.FileShare]::Read)
+    try {
+        $actual = [IO.File]::Open(
+            $ActualPath,
+            [IO.FileMode]::Open,
+            [IO.FileAccess]::Read,
+            [IO.FileShare]::Read)
+        try {
+            $expectedBuffer = [byte[]]::new(65536)
+            $actualBuffer = [byte[]]::new(65536)
+            while ($true) {
+                $expectedRead = $expected.Read(
+                    $expectedBuffer, 0, $expectedBuffer.Length)
+                $actualRead = $actual.Read(
+                    $actualBuffer, 0, $actualBuffer.Length)
+                if ($expectedRead -ne $actualRead) {
+                    return $false
+                }
+                if ($expectedRead -eq 0) {
+                    return $true
+                }
+                for ($index = 0; $index -lt $expectedRead; $index++) {
+                    if ($expectedBuffer[$index] -ne $actualBuffer[$index]) {
+                        return $false
+                    }
+                }
+            }
+        }
+        finally {
+            $actual.Dispose()
+        }
+    }
+    finally {
+        $expected.Dispose()
+    }
+}
+
+function Invoke-SharpProofPublicationPushSequence {
+    param(
+        [Parameter(Mandatory = $true)][object]$Package,
+        [Parameter(Mandatory = $true)][string]$MainAction,
+        [Parameter(Mandatory = $true)][scriptblock]$PushMain,
+        [Parameter(Mandatory = $true)][scriptblock]$PushSymbols
+    )
+
+    if ($MainAction -ceq 'Push') {
+        & $PushMain $Package.mainPath
+    }
+    elseif ($MainAction -cne 'ReuseVerified') {
+        throw "Publication main action is not executable: '$MainAction'."
+    }
+    & $PushSymbols $Package.symbolsPath
+}
+
 function Get-SharpProofRemoteMainPackageUrl {
     param(
         [Parameter(Mandatory = $true)][string]$BaseAddress,
@@ -333,22 +448,71 @@ function Invoke-SharpProofMainPackagePreflight {
     param(
         [Parameter(Mandatory = $true)][object]$Package,
         [Parameter(Mandatory = $true)][string]$BaseAddress,
-        [Parameter(Mandatory = $true)][scriptblock]$Get
+        [Parameter(Mandatory = $true)][scriptblock]$Get,
+        [Parameter()][scriptblock]$CanReuseExisting
     )
 
     $remoteUrl = Get-SharpProofRemoteMainPackageUrl `
         -BaseAddress $BaseAddress `
         -PackageId $Package.packageId `
         -Version $Package.version
-    $response = & $Get $remoteUrl
+    $response = & $Get $remoteUrl 'Head' $null
     $status = [int]$response.StatusCode
     if ($status -eq 404) {
         return [pscustomobject][ordered]@{
             state = 'Absent'
             remoteUrl = $remoteUrl
+            verifiedMainSha256 = $null
+        }
+    }
+    if ($status -eq 200 -and
+        $null -ne $CanReuseExisting -and
+        [bool](& $CanReuseExisting)) {
+        if ($Package.mainPath -isnot [string] -or
+            -not (Test-Path -LiteralPath $Package.mainPath -PathType Leaf)) {
+            throw 'A staged main package is required to verify existing remote bytes.'
+        }
+        $downloadRoot = Join-Path `
+            ([IO.Path]::GetTempPath()) `
+            ('sharpproof-remote-main-' + [Guid]::NewGuid().ToString('N'))
+        $downloadPath = Join-Path $downloadRoot 'remote.nupkg'
+        try {
+            [IO.Directory]::CreateDirectory($downloadRoot) | Out-Null
+            & chmod 0700 -- $downloadRoot
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Could not protect the private remote package comparison directory.'
+            }
+            $download = & $Get $remoteUrl 'Get' $downloadPath
+            if ([int]$download.StatusCode -ne 200 -or
+                -not (Test-Path -LiteralPath $downloadPath -PathType Leaf)) {
+                throw (
+                    'NuGet PackageBaseAddress did not return the existing ' +
+                    "package bytes (HTTP $([int]$download.StatusCode)).")
+            }
+            if (-not (Test-SharpProofFileByteEquality `
+                    -ExpectedPath $Package.mainPath `
+                    -ActualPath $downloadPath)) {
+                throw (
+                    "Existing NuGet package bytes do not match the staged " +
+                    "$($Package.packageId) $($Package.version) artifact.")
+            }
+            $sha256 = (Get-FileHash `
+                -LiteralPath $Package.mainPath `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+            return [pscustomobject][ordered]@{
+                state = 'VerifiedPresent'
+                remoteUrl = $remoteUrl
+                verifiedMainSha256 = $sha256
+            }
+        }
+        finally {
+            if (Test-Path -LiteralPath $downloadRoot -PathType Container) {
+                Remove-Item -LiteralPath $downloadRoot -Recurse -Force
+            }
         }
     }
     throw (
         "NuGet PackageBaseAddress returned HTTP $status for " +
-        "$($Package.packageId) $($Package.version); the version must be absent.")
+        "$($Package.packageId) $($Package.version); only exact bytes from " +
+        'the verified NuGet.org feed may be reused.')
 }

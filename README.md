@@ -243,9 +243,14 @@ compiler and worker evidence. The preview is not production-ready; protected
 release environments, package publication, pilot evidence, and the exact
 candidate release run remain owner-controlled work.
 
-Before publication, every main package must be absent from the destination.
-Main and symbol packages are pushed without duplicate skipping; any collision
-or partial publication fails closed and requires a new version.
+Publication pushes absent main packages normally. If a main package already
+exists, automatic resume is limited to the canonical NuGet.org feed: the
+publisher downloads it and requires a byte-for-byte match with the protected
+staged package before reusing it. It then submits the staged, validated
+`.snupkg` again through NuGet.org's symbol-publish API. Other feeds, mismatched
+bytes, unknown responses, and pending symbol uploads fail closed. The publisher
+never uses `--skip-duplicate` for either package; duplicate skipping is never
+used. Unresolved conflicting state may require a new version.
 
 ## Policies
 

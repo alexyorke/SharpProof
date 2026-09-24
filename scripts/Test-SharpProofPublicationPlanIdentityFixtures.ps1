@@ -8,7 +8,9 @@ param(
         'array-version','array-commit','array-artifact-text',
         'destination-tamper','package-action-tamper','fixture-canonical',
         'fixture-authority-tamper','fixture-nonexistent-archive',
-        'registry-canonical',
+        'registry-canonical','registry-verified-canonical',
+        'registry-verified-digest-tamper',
+        'registry-verified-action-tamper',
         'registry-url-tamper','targetless-publish-tamper',
         'json-roundtrip','two-bundle')]
     [string]$Mutation
@@ -103,7 +105,7 @@ try {
         -Packages @($packages) -Directory $root -Version $version `
         -RepositoryCommit $commit)
     $plan = [pscustomobject][ordered]@{
-        schemaVersion = 3
+        schemaVersion = 4
         planOnly = $true
         packageVersion = $version
         versionAuthority = [pscustomobject][ordered]@{
@@ -137,6 +139,7 @@ try {
                 mainAction = 'None'
                 symbolsState = 'NotTargeted'
                 symbolsAction = 'None'
+                remoteArtifactSha256 = $null
             }
         })
         artifacts = $identities
@@ -163,7 +166,10 @@ try {
         }
     }
     if ($Mutation -in @(
-            'registry-canonical','registry-url-tamper','package-action-tamper')) {
+            'registry-canonical','registry-url-tamper','package-action-tamper',
+            'registry-verified-canonical',
+            'registry-verified-digest-tamper',
+            'registry-verified-action-tamper')) {
         $plan.planOnly = $false
         $plan.publicationDestination.mode = 'registry'
         $plan.publicationDestination.mainDestination =
@@ -172,18 +178,32 @@ try {
             'https://api.example.test/v3/index.json'
         $plan.publicationDestination.packageBaseAddress =
             'https://api.example.test/v3-flatcontainer'
-        foreach ($package in $plan.packages) {
+        for ($packageIndex = 0; $packageIndex -lt $plan.packages.Count; $packageIndex++) {
+            $package = $plan.packages[$packageIndex]
             $normalizedId = $package.packageId.ToLowerInvariant()
+            $verified = $Mutation.StartsWith(
+                'registry-verified-', [StringComparison]::Ordinal)
+            $mainArtifact = $plan.artifacts[$packageIndex * 2]
             $package.availabilityMode = 'registry'
-            $package.remoteState = 'Absent'
+            $package.remoteState = if ($verified) {
+                'VerifiedPresent'
+            }
+            else { 'Absent' }
             $package.remoteUrl =
                 'https://api.example.test/v3-flatcontainer/' +
                 "$normalizedId/$version/" +
                 "$normalizedId.$version.nupkg"
-            $package.mainState = 'Absent'
-            $package.mainAction = 'Push'
+            $package.mainState = $package.remoteState
+            $package.mainAction = if ($verified) {
+                'ReuseVerified'
+            }
+            else { 'Push' }
             $package.symbolsState = 'Unchecked'
             $package.symbolsAction = 'CollisionOnPush'
+            $package.remoteArtifactSha256 = if ($verified) {
+                $mainArtifact.sha256
+            }
+            else { $null }
         }
     }
     switch ($Mutation) {
@@ -198,7 +218,7 @@ try {
             $bytes[0] = [byte](([int]$bytes[0] + 1) % 256)
             [IO.File]::WriteAllBytes($path, $bytes)
         }
-        'string-schema' { $plan.schemaVersion = '3' }
+        'string-schema' { $plan.schemaVersion = '4' }
         'array-version' { $plan.packageVersion = @($version) }
         'array-commit' { $plan.repositoryCommit = @($commit) }
         'array-artifact-text' {
@@ -211,6 +231,15 @@ try {
             $plan.packages[0].remoteState = 'Present'
             $plan.packages[0].mainState = 'Present'
             $plan.packages[0].mainAction = 'Resume'
+        }
+        'registry-verified-digest-tamper' {
+            $digest = [string]$plan.packages[0].remoteArtifactSha256
+            $replacement = if ($digest[0] -eq '0') { '1' } else { '0' }
+            $plan.packages[0].remoteArtifactSha256 =
+                $replacement + $digest.Substring(1)
+        }
+        'registry-verified-action-tamper' {
+            $plan.packages[0].mainAction = 'Push'
         }
         'fixture-authority-tamper' {
             $plan.publicationDestination.fixture = 'tampered'

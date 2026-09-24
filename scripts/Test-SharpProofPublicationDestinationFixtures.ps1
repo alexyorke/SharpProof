@@ -137,8 +137,17 @@ try {
         'actions-fixture' { }
         'actions-registry-absent' { }
         'actions-registry-unchecked' { }
+        'actions-registry-verified' { }
         'mocked-main-missing' { }
         'mocked-main-exists' { }
+        'mocked-main-exists-match' {
+            $main = 'https://api.nuget.org/v3/index.json'
+            $symbols = $main
+        }
+        'mocked-main-exists-mismatch' {
+            $main = 'https://api.nuget.org/v3/index.json'
+            $symbols = $main
+        }
         'mocked-main-error' { }
         'mocked-main-query-base' { }
         default {
@@ -205,6 +214,9 @@ try {
         $mainState = if ($Mutation -eq 'actions-registry-unchecked') {
             'Unchecked'
         }
+        elseif ($Mutation -eq 'actions-registry-verified') {
+            'VerifiedPresent'
+        }
         elseif ($mode -ceq 'registry') { 'Absent' }
         else { $null }
         $action = New-SharpProofPublicationActionAuthority `
@@ -230,31 +242,145 @@ try {
     }
     if ($Mutation.StartsWith('mocked-main-', [StringComparison]::Ordinal)) {
         $script:preflightCalls = [Collections.Generic.List[string]]::new()
+        $localMainPath = Join-Path $root 'validated-main.nupkg'
+        $localSymbolsPath = Join-Path $root 'validated-symbols.snupkg'
+        [IO.File]::WriteAllBytes(
+            $localMainPath, [Text.Encoding]::UTF8.GetBytes('validated-main'))
+        [IO.File]::WriteAllBytes(
+            $localSymbolsPath, [Text.Encoding]::UTF8.GetBytes('validated-symbols'))
         $status = switch ($Mutation) {
-            'mocked-main-exists' { 200 }
+            { $_ -in @(
+                'mocked-main-exists',
+                'mocked-main-exists-match',
+                'mocked-main-exists-mismatch') } { 200 }
             'mocked-main-error' { 503 }
             default { 404 }
         }
         $package = [pscustomobject]@{
             packageId = 'SharpProof'
             version = '1.0.0-preview.1'
+            mainPath = $localMainPath
+            symbolsPath = $localSymbolsPath
         }
         $baseAddress = if ($Mutation -eq 'mocked-main-query-base') {
             'https://packages.example.test/v3-flatcontainer?q=1'
         }
         else { 'https://packages.example.test/v3-flatcontainer' }
-        $result = Invoke-SharpProofMainPackagePreflight `
-            -Package $package `
-            -BaseAddress $baseAddress `
-            -Get {
-                param($uri, $outputPath)
-                $script:preflightCalls.Add([string]$uri)
-                return [pscustomobject]@{ StatusCode = $status }
+        $resources = if ($Mutation -in @(
+                'mocked-main-exists-match',
+                'mocked-main-exists-mismatch')) {
+            @([pscustomobject]@{
+                '@type' = 'SymbolPackagePublish/4.9.0'
+                '@id' = 'https://www.nuget.org/api/v2/symbolpackage'
+            })
+        }
+        else { @() }
+        $canResume = {
+            Test-SharpProofNuGetOrgSymbolPublishCapability `
+                -MainDestination $main `
+                -SymbolDestination $(if ($null -eq $symbols) { $main } else { $symbols }) `
+                -Resources $resources
+        }
+        $preflightError = $null
+        try {
+            $result = Invoke-SharpProofMainPackagePreflight `
+                -Package $package `
+                -BaseAddress $baseAddress `
+                -Get {
+                    param($uri, $method, $outputPath)
+                    $script:preflightCalls.Add("$method|$uri")
+                    if ($method -ceq 'Get') {
+                        $remoteBytes = if (
+                            $Mutation -eq 'mocked-main-exists-mismatch') {
+                            [Text.Encoding]::UTF8.GetBytes('different-main')
+                        }
+                        else {
+                            [IO.File]::ReadAllBytes($localMainPath)
+                        }
+                        [IO.File]::WriteAllBytes($outputPath, $remoteBytes)
+                    }
+                    return [pscustomobject]@{ StatusCode = $status }
+                } `
+                -CanReuseExisting $canResume
+        }
+        catch {
+            $preflightError = $_
+        }
+        if ($Mutation -eq 'mocked-main-missing') {
+            if ($null -ne $preflightError -or
+                $result.state -cne 'Absent' -or
+                $script:preflightCalls.Count -ne 1) {
+                throw 'An absent main package must remain publishable.'
             }
-        if ($result.state -cne 'Absent' -or
-            $script:preflightCalls.Count -ne 1 -or
-            $script:preflightCalls[0] -notmatch '\.nupkg$' -or
-            $script:preflightCalls[0] -match '\.snupkg$') {
+            $pushes = [Collections.Generic.List[string]]::new()
+            $action = New-SharpProofPublicationActionAuthority `
+                -Mode registry -MainState $result.state
+            Invoke-SharpProofPublicationPushSequence `
+                -Package $package -MainAction $action.mainAction `
+                -PushMain { param($path) $pushes.Add("main|$path") } `
+                -PushSymbols { param($path) $pushes.Add("symbols|$path") }
+            if ($pushes.Count -ne 2 -or
+                $pushes[0] -cnotmatch '^main\|' -or
+                $pushes[1] -cnotmatch '^symbols\|') {
+                throw 'An absent package must publish main then symbols.'
+            }
+        }
+        elseif ($Mutation -eq 'mocked-main-exists-match') {
+            $action = New-SharpProofPublicationActionAuthority `
+                -Mode registry -MainState $result.state
+            $pushes = [Collections.Generic.List[string]]::new()
+            Invoke-SharpProofPublicationPushSequence `
+                -Package $package -MainAction $action.mainAction `
+                -PushMain { param($path) $pushes.Add("main|$path") } `
+                -PushSymbols { param($path) $pushes.Add("symbols|$path") }
+            if ($null -ne $preflightError -or
+                $result.state -cne 'VerifiedPresent' -or
+                $result.verifiedMainSha256 -notmatch '^[0-9a-f]{64}$' -or
+                $script:preflightCalls.Count -ne 2 -or
+                $script:preflightCalls[0] -notmatch '^Head\|.*\.nupkg$' -or
+                $script:preflightCalls[1] -notmatch '^Get\|.*\.nupkg$' -or
+                $pushes.Count -ne 1 -or
+                $pushes[0] -cnotmatch '^symbols\|') {
+                throw 'Exact NuGet.org bytes must resume with the staged symbols package only.'
+            }
+        }
+        elseif ($Mutation -eq 'mocked-main-exists-mismatch') {
+            if ($null -eq $preflightError -or
+                $script:preflightCalls.Count -ne 2) {
+                throw 'Mismatched existing main bytes must fail closed.'
+            }
+        }
+        elseif ($Mutation -eq 'mocked-main-exists') {
+            if ($null -eq $preflightError -or
+                $script:preflightCalls.Count -ne 1) {
+                throw 'An unverified feed must reject an existing main package.'
+            }
+        }
+        elseif ($Mutation -eq 'mocked-main-error') {
+            if ($null -eq $preflightError -or
+                $script:preflightCalls.Count -ne 1) {
+                throw 'Unknown main package status must fail closed.'
+            }
+        }
+        elseif ($Mutation -eq 'mocked-main-query-base') {
+            if ($null -eq $preflightError -or
+                $script:preflightCalls.Count -ne 0) {
+                throw 'Invalid package base address must fail before network access.'
+            }
+        }
+        if ($Mutation -notin @(
+                'mocked-main-missing','mocked-main-exists-match') -and
+            $null -eq $preflightError) {
+            throw 'An unsafe preflight state was unexpectedly accepted.'
+        }
+        if ($Mutation -in @('mocked-main-missing','mocked-main-exists-match') -and
+            $null -ne $preflightError) {
+            throw $preflightError
+        }
+        if ($Mutation -ne 'mocked-main-query-base' -and
+            $script:preflightCalls.Count -gt 0 -and
+            ($script:preflightCalls[0] -notmatch '^Head\|.*\.nupkg$' -or
+             $script:preflightCalls[0] -match '\.snupkg$')) {
             throw 'Only the exact main package may be preflighted.'
         }
     }

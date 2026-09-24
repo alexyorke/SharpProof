@@ -402,7 +402,10 @@ function Invoke-V3Get {
 
         [Parameter()]
         [ValidateSet('Get', 'Head')]
-        [string]$Method = 'Get'
+        [string]$Method = 'Get',
+
+        [Parameter()]
+        [string]$OutFile
 
     )
 
@@ -417,6 +420,9 @@ function Invoke-V3Get {
         $parameters.Headers = @{
             'X-NuGet-ApiKey' = $ReadApiKey
         }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OutFile)) {
+        $parameters.OutFile = $OutFile
     }
     return Invoke-WebRequest @parameters
 }
@@ -480,6 +486,35 @@ function Get-V3PackageBaseAddress {
         -Owner 'NuGet PackageBaseAddress').TrimEnd('/')
 }
 
+function Test-V3NuGetOrgResumeCapability {
+    param(
+        [Parameter(Mandatory = $true)][string]$MainDestination,
+        [Parameter(Mandatory = $true)][string]$SymbolDestination
+    )
+
+    $canonicalServiceIndex = 'https://api.nuget.org/v3/index.json'
+    if ($MainDestination -cne $canonicalServiceIndex -or
+        $SymbolDestination -cne $canonicalServiceIndex) {
+        return $false
+    }
+    $response = Invoke-V3Get -Uri $canonicalServiceIndex
+    if ([int]$response.StatusCode -ne 200) {
+        throw (
+            'NuGet.org service index returned HTTP ' +
+            "$([int]$response.StatusCode) during symbol retry verification.")
+    }
+    try {
+        $index = $response.Content | ConvertFrom-Json
+    }
+    catch {
+        throw 'NuGet.org service index is invalid during symbol retry verification.'
+    }
+    return Test-SharpProofNuGetOrgSymbolPublishCapability `
+        -MainDestination $MainDestination `
+        -SymbolDestination $SymbolDestination `
+        -Resources @($index.resources)
+}
+
 function Get-RemotePackageState {
     param(
         [Parameter(Mandatory = $true)]
@@ -490,6 +525,12 @@ function Get-RemotePackageState {
 
         [Parameter()]
         [string]$FixtureDirectory,
+
+        [Parameter()]
+        [string]$MainDestination,
+
+        [Parameter()]
+        [string]$SymbolDestination,
 
         [AllowNull()][AllowEmptyCollection()]
         [object[]]$FixtureCatalog
@@ -506,8 +547,13 @@ function Get-RemotePackageState {
         -Package $Package `
         -BaseAddress $BaseAddress `
         -Get {
-            param($uri)
-            Invoke-V3Get -Uri $uri -Method Head
+            param($uri, $method, $outputPath)
+            Invoke-V3Get -Uri $uri -Method $method -OutFile $outputPath
+        } `
+        -CanReuseExisting {
+            Test-V3NuGetOrgResumeCapability `
+                -MainDestination $MainDestination `
+                -SymbolDestination $SymbolDestination
         }
 }
 
@@ -559,7 +605,6 @@ function Assert-ReleaseDotNetIdentity {
 
 function New-SharpProofPublicationStage {
     param(
-        [Parameter(Mandatory = $true)][object]$Plan,
         [Parameter(Mandatory = $true)][object]$InputSnapshot,
         [Parameter(Mandatory = $true)][string]$RepositoryCommit
     )
@@ -584,6 +629,12 @@ function New-SharpProofPublicationStage {
             if ($LASTEXITCODE -ne 0) {
                 throw "Could not protect staged publication input '$destination'."
             }
+            $stagedFile = Get-Item -LiteralPath $destination
+            if ($stagedFile.Length -ne [int64]$entry.bytes -or
+                (Get-SharpProofFileSha256 -Path $destination) -cne
+                    [string]$entry.sha256) {
+                throw 'Staged publication input does not match its snapshot.'
+            }
         }
 
         $stagedRelease = Get-ValidatedRelease `
@@ -594,24 +645,13 @@ function New-SharpProofPublicationStage {
             -Directory $stageRoot `
             -Version $stagedRelease.version `
             -RepositoryCommit $RepositoryCommit)
-        $stagedPlan = $Plan.PSObject.Copy()
-        $stagedPlan.artifacts = $stagedArtifacts
-        Test-SharpProofPublicationPlanIdentity -Plan $stagedPlan
-
-        $identityProperties = @(
-            'fileName','bytes','sha256','role','version','repositoryCommit')
-        $expectedIdentities = @($Plan.artifacts | Select-Object $identityProperties) |
-            ConvertTo-Json -Compress
-        $stagedIdentities = @($stagedArtifacts | Select-Object $identityProperties) |
-            ConvertTo-Json -Compress
-        if ($stagedIdentities -cne $expectedIdentities) {
-            throw 'Staged publication identity does not match the certified release plan.'
-        }
+        Test-SharpProofPublicationInputSnapshot -Snapshot $InputSnapshot
 
         return [pscustomobject]@{
             Root = $stageRoot
             Release = $stagedRelease
-            Plan = $stagedPlan
+            ArtifactIdentities = $stagedArtifacts
+            Plan = $null
         }
     }
     catch {
@@ -620,6 +660,28 @@ function New-SharpProofPublicationStage {
         }
         throw
     }
+}
+
+function Set-SharpProofPublicationStagePlan {
+    param(
+        [Parameter(Mandatory = $true)][object]$Stage,
+        [Parameter(Mandatory = $true)][object]$Plan
+    )
+
+    $stagedPlan = $Plan.PSObject.Copy()
+    $stagedPlan.artifacts = @($Stage.ArtifactIdentities)
+    Test-SharpProofPublicationPlanIdentity -Plan $stagedPlan
+
+    $identityProperties = @(
+        'fileName','bytes','sha256','role','version','repositoryCommit')
+    $expectedIdentities = @($Plan.artifacts | Select-Object $identityProperties) |
+        ConvertTo-Json -Compress
+    $stagedIdentities = @($stagedPlan.artifacts | Select-Object $identityProperties) |
+        ConvertTo-Json -Compress
+    if ($stagedIdentities -cne $expectedIdentities) {
+        throw 'Staged publication identity does not match the certified release plan.'
+    }
+    $Stage.Plan = $stagedPlan
 }
 
 function Write-PublicationPlan {
@@ -713,140 +775,169 @@ if (-not $PlanOnly) {
         -SdkVersion (Get-RepositorySdkVersion)
 }
 
-$repositoryHead = Get-RepositoryHead
-$release = Get-ValidatedRelease `
-    -Directory $resolvedPackageSource `
-    -RepositoryCommit $repositoryHead
-$baseAddress = $null
-if (-not $PlanOnly) {
-    $baseAddress = Get-V3PackageBaseAddress `
-        -ServiceIndex $publicationDestination.mainDestination
-    $publicationDestination.packageBaseAddress = $baseAddress
-}
-$entries = [Collections.Generic.List[object]]::new()
-$fixtureCatalog = if ($publicationDestination.mode -ceq 'fixture') {
-    @($publicationDestination.fixture.archives)
-}
-else { @() }
-foreach ($package in $release.packages) {
-    $remote = if ($PlanOnly -and
-        $publicationDestination.mode -cne 'fixture') {
-        [pscustomobject][ordered]@{
-            state = if ($publicationDestination.mode -ceq 'registry') {
-                'Unchecked'
+$publicationStage = $null
+try {
+    $repositoryHead = Get-RepositoryHead
+    $release = Get-ValidatedRelease `
+        -Directory $resolvedPackageSource `
+        -RepositoryCommit $repositoryHead
+    if (-not $PlanOnly) {
+        $publicationStage = New-SharpProofPublicationStage `
+            -InputSnapshot $publicationInputSnapshot `
+            -RepositoryCommit $repositoryHead
+    }
+
+    $baseAddress = $null
+    if (-not $PlanOnly) {
+        $baseAddress = Get-V3PackageBaseAddress `
+            -ServiceIndex $publicationDestination.mainDestination
+        $publicationDestination.packageBaseAddress = $baseAddress
+    }
+    $entries = [Collections.Generic.List[object]]::new()
+    $fixtureCatalog = if ($publicationDestination.mode -ceq 'fixture') {
+        @($publicationDestination.fixture.archives)
+    }
+    else { @() }
+    $preflightPackages = if ($null -ne $publicationStage) {
+        @($publicationStage.Release.packages)
+    }
+    else { @($release.packages) }
+    foreach ($package in $preflightPackages) {
+        $remote = if ($PlanOnly -and
+            $publicationDestination.mode -cne 'fixture') {
+            [pscustomobject][ordered]@{
+                state = if ($publicationDestination.mode -ceq 'registry') {
+                    'Unchecked'
+                }
+                else { $null }
+                remoteUrl = $null
+                verifiedMainSha256 = $null
+            }
+        }
+        else {
+            Get-RemotePackageState `
+                -Package $package `
+                -BaseAddress $baseAddress `
+                -FixtureDirectory $resolvedRemoteDirectory `
+                -MainDestination $publicationDestination.mainDestination `
+                -SymbolDestination $publicationDestination.symbolDestination `
+                -FixtureCatalog $fixtureCatalog
+        }
+        $action = New-SharpProofPublicationActionAuthority `
+            -Mode $publicationDestination.mode `
+            -MainState $(if ($publicationDestination.mode -ceq 'registry') {
+                $remote.state
+            }
+            else { $null }) `
+            -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
+                $remote.mainState
+            } else { $null }) `
+            -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
+                $remote.symbolsState
+            } else { $null })
+        $entries.Add([pscustomobject][ordered]@{
+            packageId = $package.packageId
+            version = $package.version
+            mainFileName = $package.mainFileName
+            symbolsFileName = $package.symbolsFileName
+            availabilityMode = $publicationDestination.mode
+            remoteState = if ($publicationDestination.mode -ceq 'fixture') {
+                $null
+            }
+            else { $remote.state }
+            fixtureState = if ($publicationDestination.mode -ceq 'fixture') {
+                $remote.mainState
             }
             else { $null }
-            remoteUrl = $null
+            remoteUrl = $remote.remoteUrl
+            mainState = $action.mainState
+            mainAction = $action.mainAction
+            symbolsState = $action.symbolsState
+            symbolsAction = $action.symbolsAction
+            remoteArtifactSha256 = if (
+                $null -ne $remote.PSObject.Properties['verifiedMainSha256']) {
+                $remote.verifiedMainSha256
+            }
+            else { $null }
+        })
+    }
+
+    $plan = [pscustomobject][ordered]@{
+        schemaVersion = 4
+        planOnly = [bool]$PlanOnly
+        packageVersion = $release.version
+        versionAuthority = $release.versionAuthority
+        repositoryCommit = $repositoryHead
+        publicationDestination = $publicationDestination
+        packages = @($entries)
+        artifacts = @(New-SharpProofPublicationPlanIdentities `
+            -Packages @($release.packages) `
+            -Directory $resolvedPackageSource `
+            -Version $release.version `
+            -RepositoryCommit $repositoryHead)
+    }
+    Test-SharpProofPublicationPlanIdentity -Plan $plan
+    if ($PlanOnly) {
+        Write-PublicationPlan `
+            -Plan $plan `
+            -OutputPath $resolvedPlanOutputPath `
+            -InputSnapshot $publicationInputSnapshot
+        if (-not [string]::IsNullOrWhiteSpace($resolvedPlanOutputPath)) {
+            Assert-PublicationPlanRoundTrip `
+                -Plan $plan `
+                -Path $resolvedPlanOutputPath
         }
+        return
+    }
+
+    Set-SharpProofPublicationStagePlan -Stage $publicationStage -Plan $plan
+    $effectiveSymbolApiKey = if (
+        [string]::IsNullOrWhiteSpace($SymbolApiKey)) {
+        $ApiKey
     }
     else {
-        Get-RemotePackageState `
-            -Package $package `
-            -BaseAddress $baseAddress `
-            -FixtureDirectory $resolvedRemoteDirectory `
-            -FixtureCatalog $fixtureCatalog
+        $SymbolApiKey
     }
-    $action = New-SharpProofPublicationActionAuthority `
-        -Mode $publicationDestination.mode `
-        -MainState $(if ($publicationDestination.mode -ceq 'registry') {
-            $remote.state
-        }
-        else { $null }) `
-        -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
-            $remote.mainState
-        } else { $null }) `
-        -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
-            $remote.symbolsState
-        } else { $null })
-    $entries.Add([pscustomobject][ordered]@{
-        packageId = $package.packageId
-        version = $package.version
-        mainFileName = $package.mainFileName
-        symbolsFileName = $package.symbolsFileName
-        availabilityMode = $publicationDestination.mode
-        remoteState = if ($publicationDestination.mode -ceq 'fixture') {
-            $null
-        }
-        else { $remote.state }
-        fixtureState = if ($publicationDestination.mode -ceq 'fixture') {
-            $remote.mainState
-        }
-        else { $null }
-        remoteUrl = $remote.remoteUrl
-        mainState = $action.mainState
-        mainAction = $action.mainAction
-        symbolsState = $action.symbolsState
-        symbolsAction = $action.symbolsAction
-    })
-}
-
-$plan = [pscustomobject][ordered]@{
-    schemaVersion = 3
-    planOnly = [bool]$PlanOnly
-    packageVersion = $release.version
-    versionAuthority = $release.versionAuthority
-    repositoryCommit = $repositoryHead
-    publicationDestination = $publicationDestination
-    packages = @($entries)
-    artifacts = @(New-SharpProofPublicationPlanIdentities `
-        -Packages @($release.packages) `
-        -Directory $resolvedPackageSource `
-        -Version $release.version `
-        -RepositoryCommit $repositoryHead)
-}
-Test-SharpProofPublicationPlanIdentity -Plan $plan
-if ($PlanOnly) {
-    Write-PublicationPlan `
-        -Plan $plan `
-        -OutputPath $resolvedPlanOutputPath `
-        -InputSnapshot $publicationInputSnapshot
-    if (-not [string]::IsNullOrWhiteSpace($resolvedPlanOutputPath)) {
-        Assert-PublicationPlanRoundTrip `
-            -Plan $plan `
-            -Path $resolvedPlanOutputPath
-    }
-    return
-}
-
-$effectiveSymbolApiKey = if (
-    [string]::IsNullOrWhiteSpace($SymbolApiKey)) {
-    $ApiKey
-}
-else {
-    $SymbolApiKey
-}
-$publicationStage = New-SharpProofPublicationStage `
-    -Plan $plan `
-    -InputSnapshot $publicationInputSnapshot `
-    -RepositoryCommit $repositoryHead
-try {
     for ($index = 0; $index -lt $publicationStage.Release.packages.Count; $index++) {
         $package = $publicationStage.Release.packages[$index]
-        Test-SharpProofPublicationPlanIdentity `
-            -Plan $publicationStage.Plan
-        Write-Host (
-            "Publishing $($package.packageId) $($package.version) " +
-            "main package.")
-        Invoke-NuGetPush `
-            -Path $package.mainPath `
-            -Destination $publicationDestination.mainDestination `
-            -Key $ApiKey `
-            -NoSymbols $true
-        Test-SharpProofPublicationPlanIdentity `
-            -Plan $publicationStage.Plan
-        Write-Host (
-            "Publishing $($package.packageId) $($package.version) " +
-            "symbol package.")
-        Invoke-NuGetPush `
-            -Path $package.symbolsPath `
-            -Destination $publicationDestination.symbolDestination `
-            -Key $effectiveSymbolApiKey `
-            -NoSymbols $false
+        $packageDecision = $publicationStage.Plan.packages[$index]
+        Invoke-SharpProofPublicationPushSequence `
+            -Package $package `
+            -MainAction ([string]$packageDecision.mainAction) `
+            -PushMain {
+                param($path)
+                Test-SharpProofPublicationPlanIdentity `
+                    -Plan $publicationStage.Plan
+                Write-Host (
+                    "Publishing $($package.packageId) $($package.version) " +
+                    'main package.')
+                Invoke-NuGetPush `
+                    -Path $path `
+                    -Destination $publicationDestination.mainDestination `
+                    -Key $ApiKey `
+                    -NoSymbols $true
+                Test-SharpProofPublicationPlanIdentity `
+                    -Plan $publicationStage.Plan
+            } `
+            -PushSymbols {
+                param($path)
+                Test-SharpProofPublicationPlanIdentity `
+                    -Plan $publicationStage.Plan
+                Write-Host (
+                    "Publishing $($package.packageId) $($package.version) " +
+                    'symbol package.')
+                Invoke-NuGetPush `
+                    -Path $path `
+                    -Destination $publicationDestination.symbolDestination `
+                    -Key $effectiveSymbolApiKey `
+                    -NoSymbols $false
+            }
     }
+    Write-PublicationPlan -Plan $plan
 }
 finally {
-    if (Test-Path -LiteralPath $publicationStage.Root -PathType Container) {
+    if ($null -ne $publicationStage -and
+        (Test-Path -LiteralPath $publicationStage.Root -PathType Container)) {
         Remove-Item -LiteralPath $publicationStage.Root -Recurse -Force
     }
 }
-Write-PublicationPlan -Plan $plan

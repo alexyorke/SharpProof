@@ -27,6 +27,9 @@ public sealed class PublicationPlanIdentityTests
     [TestCase("fixture-nonexistent-archive", true)]
     [TestCase("registry-canonical", true)]
     [TestCase("registry-url-tamper", false)]
+    [TestCase("registry-verified-canonical", true)]
+    [TestCase("registry-verified-digest-tamper", false)]
+    [TestCase("registry-verified-action-tamper", false)]
     [TestCase("targetless-publish-tamper", false)]
     [TestCase("json-roundtrip", true)]
     public async Task ReplayRehashesEveryImmutablePlanInput(
@@ -48,7 +51,7 @@ public sealed class PublicationPlanIdentityTests
             "New-SharpProofPublicationPlanIdentities", StringComparison.Ordinal);
         var validationCall = System.Text.RegularExpressions.Regex.Match(
             script,
-            @"^Test-SharpProofPublicationPlanIdentity -Plan \$plan\r?$",
+            @"^\s*Test-SharpProofPublicationPlanIdentity -Plan \$plan\r?$",
             System.Text.RegularExpressions.RegexOptions.Multiline);
         Assert.That(validationCall.Success, Is.True,
             "The publisher must execute plan identity validation before writing the plan.");

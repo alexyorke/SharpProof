@@ -57,7 +57,7 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [Test]
-    public async Task PublicationDocumentationDescribesFailClosedDuplicates()
+    public async Task PublicationDocumentationDescribesVerifiedRetries()
     {
         var root = TestRepository.FindRoot();
         var documentationPaths = new[]
@@ -100,7 +100,11 @@ public sealed class ReleasePublicationScriptTests
                     Is.True,
                     path);
                 Assert.That(
-                    DescribesNewVersionAfterPartialPublication(policy),
+                    DescribesVerifiedMainReuse(policy),
+                    Is.True,
+                    path);
+                Assert.That(
+                    DescribesFailClosedConflicts(policy),
                     Is.True,
                     path);
             }
@@ -748,6 +752,17 @@ public sealed class ReleasePublicationScriptTests
              policy.Contains("ABSENCE", StringComparison.Ordinal));
     }
 
+    private static bool DescribesVerifiedMainReuse(string policy)
+    {
+        return policy.Contains("NUGET.ORG", StringComparison.Ordinal) &&
+            policy.Contains("STAGED", StringComparison.Ordinal) &&
+            (policy.Contains("BYTE-FOR-BYTE", StringComparison.Ordinal) ||
+             policy.Contains("BYTE FOR BYTE", StringComparison.Ordinal)) &&
+            policy.Contains("SNUPKG", StringComparison.Ordinal) &&
+            (policy.Contains("AGAIN", StringComparison.Ordinal) ||
+             policy.Contains("RESUBMIT", StringComparison.Ordinal));
+    }
+
     private static bool DescribesNoDuplicateSkipping(string policy)
     {
         return policy.Contains(
@@ -765,17 +780,12 @@ public sealed class ReleasePublicationScriptTests
                     StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool DescribesNewVersionAfterPartialPublication(
-        string policy)
+    private static bool DescribesFailClosedConflicts(string policy)
     {
-        return (policy.Contains("PARTIAL", StringComparison.Ordinal) ||
-                policy.Contains("INTERRUPTED", StringComparison.Ordinal) ||
-                policy.Contains("CONFLICTING", StringComparison.Ordinal) ||
-                policy.Contains("COLLISION", StringComparison.Ordinal)) &&
-            (policy.Contains("NEW VERSION", StringComparison.Ordinal) ||
-             policy.Contains(
-                 "NEW PACKAGE VERSION",
-                 StringComparison.Ordinal));
+        return policy.Contains("MISMATCH", StringComparison.Ordinal) &&
+            policy.Contains("FAIL CLOSED", StringComparison.Ordinal) &&
+            (policy.Contains("PENDING", StringComparison.Ordinal) ||
+             policy.Contains("CONFLICT", StringComparison.Ordinal));
     }
 
     private static void AssertPlan(
@@ -788,7 +798,7 @@ public sealed class ReleasePublicationScriptTests
     {
         Assert.That(
             root.GetProperty("schemaVersion").GetInt32(),
-            Is.EqualTo(3));
+            Is.EqualTo(4));
         Assert.That(
             root.GetProperty("planOnly").GetBoolean(),
             Is.True);

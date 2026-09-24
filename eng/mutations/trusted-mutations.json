@@ -1650,8 +1650,8 @@
   {
     "name": "release-publication-plan-identity-replay",
     "file": "scripts/Publish-SharpProofRelease.ps1",
-    "original": "}\nTest-SharpProofPublicationPlanIdentity -Plan $plan\nif ($PlanOnly) {",
-    "mutated": "}\n# Test-SharpProofPublicationPlanIdentity -Plan $plan\nif ($PlanOnly) {",
+    "original": "    Test-SharpProofPublicationPlanIdentity -Plan $plan\n    if ($PlanOnly) {",
+    "mutated": "    # Test-SharpProofPublicationPlanIdentity -Plan $plan\n    if ($PlanOnly) {",
     "project": "SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj",
     "filter": "FullyQualifiedName~PublisherValidatesCurrentIdentitiesBeforeAndAfterWritingPlan"
   },

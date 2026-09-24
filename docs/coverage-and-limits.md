@@ -321,12 +321,15 @@ host qualification. Deterministic SARIF 2.1.0 is available as an opt-in
 projection of the validated worker response. The workflow already promotes
 only the tested bytes after revalidating tag, version, master ancestry,
 predecessor-tag order, repository identity, and package
-inventory. Before publication, each of the three target V3 main-package
-identities at the release version must be absent. Main and symbol packages are
-published separately in dependency order without duplicate skipping. The
-symbol service has no symmetric V3 download surface, so a symbol-package
-collision is detected by the push and fails the release. Any partial or
-conflicting publication requires a new version. These limits are not
+inventory. Publication pushes absent main packages in dependency order. For
+the canonical NuGet.org feed, an existing main package is reused only after a
+downloaded copy matches the protected staged `.nupkg` byte for byte; the
+publisher then resubmits the locally validated `.snupkg` through the documented
+symbol-publish API, without duplicate skipping. Other feeds and mismatched or
+unknown remote states fail closed. A symbol push still fails on an API conflict,
+including a submission that has not finished publishing; operators must resolve
+that state or prepare a new version, including when a symbol upload is pending.
+These limits are not
 worker-side compilation reconstruction, postcondition-counterexample replay,
 the admitted allocation/capability/exception effect replay, package separation,
 SARIF, or external release-artifact attestation work. Replay support for receiver-field,
