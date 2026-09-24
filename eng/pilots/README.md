@@ -19,3 +19,28 @@ working set, false-positive review count, and setup friction. An advisory
 Unknown caused by a documented unsupported external callee is a reviewed
 limitation, not a false proof or a release defect. The strict pilot must finish
 with every selected claim proven.
+
+## Reviewing a release candidate
+
+An annotated release-tag run uploads a `pilot-review-report-<commit>` artifact
+containing `report.json` and `review-ledger.template.json`. Inspect every claim
+and diagnostic in the report, then set every template row's `disposition` to
+`TruePositive` or `FalsePositive`. A blank template row is never treated as an
+approval.
+
+Resume the `Package, consumers, and release qualification` workflow manually
+on the same release tag. Supply the successful tag-push run ID and the completed
+ledger JSON in `pilot_review_source_run_id` and `pilot_review_ledger`. The
+workflow checks that the source run succeeded for the same commit, reuses its
+exact package bytes and pilot report, and validates every ledger row before it
+creates the pilot receipt. Qualification and the protected publication
+environment run only after that receipt exists. Missing, stale, mismatched, or
+incomplete review input fails closed.
+
+To prepare a ledger locally from a downloaded report, run:
+
+```powershell
+./scripts/New-SharpProofPilotReviewLedger.ps1 `
+  -SourceReportPath artifacts/pilots/report.json `
+  -OutputPath artifacts/pilots/review-ledger.template.json
+```

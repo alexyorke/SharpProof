@@ -174,6 +174,56 @@ try {
     function Copy-Json($Value) { $Value | ConvertTo-Json -Depth 10 | ConvertFrom-Json }
     if (-not (Test-Report $report)) { throw 'Canonical pilot report failed.' }
     $canonicalReport = Copy-Json $report
+    $canonicalReport.pilots[0].diagnostics = @(
+        [pscustomobject]@{ id='SP0001'; count=2 }
+    )
+    $sourcePath = Join-Path $fixture 'report.json'
+    [IO.File]::WriteAllText(
+        $sourcePath,
+        ($canonicalReport | ConvertTo-Json -Depth 20) + "`n",
+        [Text.UTF8Encoding]::new($false))
+    $templatePath = Join-Path $fixture 'review-ledger.template.json'
+    & (Join-Path $PSScriptRoot 'New-SharpProofPilotReviewLedger.ps1') `
+        -SourceReportPath $sourcePath `
+        -OutputPath $templatePath `
+        -RepositoryRoot $fixture `
+        -CatalogPath $catalogPath
+    $template = Get-Content -LiteralPath $templatePath -Raw | ConvertFrom-Json
+    $expectedReviewRows = @(
+        foreach ($pilot in $canonicalReport.pilots) {
+            foreach ($claim in $pilot.claimEvidence) {
+                [pscustomobject]@{
+                    pilotId = [string]$pilot.id
+                    kind = 'Claim'
+                    id = [string]$claim.claimId
+                }
+            }
+            foreach ($diagnostic in $pilot.diagnostics) {
+                [pscustomobject]@{
+                    pilotId = [string]$pilot.id
+                    kind = 'Diagnostic'
+                    id = [string]$diagnostic.id
+                }
+            }
+        }
+    )
+    $actualReviewRows = @($template.reviews | ForEach-Object {
+            [pscustomobject]@{
+                pilotId = [string]$_.pilotId
+                kind = [string]$_.kind
+                id = [string]$_.id
+            }
+        })
+    if ([int]$template.schemaVersion -ne 2 -or
+        [string]$template.commit -cne $commit -or
+        $template.packageArtifacts.Count -ne 6 -or
+        ($actualReviewRows | ConvertTo-Json -Compress) -cne
+            ($expectedReviewRows | ConvertTo-Json -Compress) -or
+        @($template.reviews | Where-Object {
+                [string]::IsNullOrWhiteSpace([string]$_.disposition)
+            }).Count -ne $expectedReviewRows.Count) {
+        throw 'Review ledger template omitted, changed, or pre-approved a finding.'
+    }
     $report.pilots[0].evidence = @($report.pilots[0].evidence | Select-Object -Skip 1)
     if (Test-Report $report) { throw 'Stale/incomplete outputs were accepted.' }
     $report = Copy-Json $canonicalReport
@@ -241,9 +291,20 @@ try {
     [IO.File]::WriteAllText($sourcePath, ($canonicalReport | ConvertTo-Json -Depth 20) + "`n")
     $reviewRows = @($canonicalReport.pilots | ForEach-Object {
         $pilot = $_
-        @($pilot.claimEvidence | ForEach-Object {
-            [ordered]@{ pilotId=$pilot.id; kind='Claim'; id=$_.claimId; disposition='TruePositive' }
-        })
+        @(
+            foreach ($claim in $pilot.claimEvidence) {
+                [ordered]@{
+                    pilotId=$pilot.id; kind='Claim'; id=$claim.claimId
+                    disposition='TruePositive'
+                }
+            }
+            foreach ($diagnostic in $pilot.diagnostics) {
+                [ordered]@{
+                    pilotId=$pilot.id; kind='Diagnostic'; id=$diagnostic.id
+                    disposition='TruePositive'
+                }
+            }
+        )
     })
     $ledger = [ordered]@{
         schemaVersion=2
@@ -259,6 +320,8 @@ try {
             -SourceReportPath $sourcePath -ReviewLedgerPath $ledgerPath `
             -OutputPath $reviewedPath -RepositoryRoot $fixture -CatalogPath $catalogPath
     }
+    Write-Ledger $template
+    Require-Failure { Complete-Review } blank-review-template
     Write-Ledger $ledger
     Complete-Review
     $reviewed = Get-Content $reviewedPath -Raw | ConvertFrom-Json

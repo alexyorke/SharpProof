@@ -87,6 +87,48 @@ public sealed partial class ReleaseQualificationMatrixTests
     }
 
     [Test]
+    public async Task PilotReviewResumeUsesTheOriginalRunAndGatesPublication()
+    {
+        var root = TestRepository.FindRoot();
+        var workflow = await File.ReadAllTextAsync(Path.Combine(
+            root, ".github", "workflows", "package-consumers.yml"));
+        var package = Job(workflow, "package", "container-verifier");
+        var portable = Job(workflow, "portable-consumers", "release-qualification");
+        var qualification = Job(
+            workflow,
+            "release-qualification",
+            "publish-private-preview");
+        var privatePublish = Job(workflow, "publish-private-preview", "publish");
+        var publicPublish = workflow[
+            workflow.IndexOf("  publish:\n", StringComparison.Ordinal)..];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(workflow, Does.Contain("pilot_review_source_run_id"));
+            Assert.That(workflow, Does.Contain("pilot_review_ledger"));
+            Assert.That(package, Does.Contain(".head_sha == $sha"));
+            Assert.That(package, Does.Contain(".event == \"push\""));
+            Assert.That(package, Does.Contain(".conclusion == \"success\""));
+            Assert.That(package, Does.Contain("pilot-review-packages-${{ github.sha }}"));
+            Assert.That(portable, Does.Contain("inputs.pilot_review_ledger != ''"));
+            Assert.That(qualification, Does.Contain("pilot-review-report-${{ github.sha }}"));
+            Assert.That(qualification, Does.Contain(
+                "eng/pilots/*/obj/Release/net8.0/SharpProof/result.json"));
+            Assert.That(qualification, Does.Contain("path: ."));
+            Assert.That(qualification, Does.Contain("New-SharpProofPilotReviewLedger.ps1"));
+            Assert.That(qualification, Does.Contain("tooling pilot-review"));
+            Assert.That(qualification, Does.Contain("inputs.pilot_review_ledger != ''"));
+            Assert.That(qualification, Does.Contain(
+                "qualified: ${{ steps.mark-qualified.outputs.qualified }}"));
+            Assert.That(qualification, Does.Contain("id: mark-qualified"));
+            Assert.That(privatePublish, Does.Contain(
+                "needs.release-qualification.outputs.qualified == 'true'"));
+            Assert.That(publicPublish, Does.Contain(
+                "needs.release-qualification.outputs.qualified == 'true'"));
+        }
+    }
+
+    [Test]
     public async Task ReceiptWriterRejectsStaleAndPackageMismatchedMatrixRows()
     {
         var sourceRoot = TestRepository.FindRoot();

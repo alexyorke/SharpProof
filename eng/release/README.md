@@ -12,6 +12,14 @@ wiring without reading secret values.
 
 ## Candidate evidence
 
+An annotated tag run publishes an unreviewed pilot report and a blank review
+ledger template, then stops before qualification and publication. A maintainer
+reviews every claim and diagnostic, fills every ledger disposition, and manually
+dispatches this workflow on the same tag with the source run ID and completed
+ledger JSON. The resume verifies the source run, reuses its package bytes and
+pilot report, and writes the reviewed-pilot receipt before qualification. A
+missing or mismatched ledger cannot qualify the candidate.
+
 The tag workflow must use the package job's exact six NuGet files. It binds
 qualification to:
 

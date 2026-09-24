@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, advisory attribute-alias activation, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **62 findings**: 0 P0, 2 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, advisory attribute-alias activation, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **61 findings**: 0 P0, 1 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -55,7 +55,7 @@ regressions and unexecuted downstream paths remain open.
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B4 and B7 boundaries observed; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
-| Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; B13 now binds validation and receipt metadata to one byte snapshot; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches; B74 assessed standard NuGet V3 main-package download and repeated symbol-publish behavior | B8/B12 admission and B13 snapshot-binding boundaries covered by writer fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; B74 retry guard is covered by mocked exact/mismatched main bytes, canonical-feed capability, digest-plan binding, and push-sequence fixtures; no production feed was contacted, and no interrupted production release was resumed; no release CI, native workflow, or full end-to-end qualification run |
+| Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; B13 now binds validation and receipt metadata to one byte snapshot; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches; B16 review handoff now binds the human ledger to the original tag-run report and package artifacts; B74 assessed standard NuGet V3 main-package download and repeated symbol-publish behavior | B8/B12 admission and B13 snapshot-binding boundaries covered by writer fixtures; B16 resume rejects stale, wrong-commit, and incomplete review evidence; B17 helper boundary observed; B74 retry guard is covered by mocked exact/mismatched main bytes, canonical-feed capability, digest-plan binding, and push-sequence fixtures; no production feed was contacted, and no interrupted production release was resumed; no release CI, native workflow, or full end-to-end qualification run |
 
 B3 combines the hash-writer and specification-admission evidence into one
 deduplicated boundary finding; it is not counted twice. All five fourth-wave
@@ -207,31 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P1 - High
-
-### B16. Release qualification has no human pilot-review handoff
-
-**Confidence: High. Evidence: workflow and script paths source-traced.**
-
-- **Location:** `.github/workflows/package-consumers.yml:202-218`;
-  `scripts/Invoke-SharpProofContainer.ps1:607-625`;
-  `scripts/Test-SharpProofPilots.ps1:367`;
-  `scripts/Invoke-SharpProofReleaseContainer.ps1:202-207`.
-- **Defect:** the supported annotated release-tag push runs `tooling pilots`
-  then release qualification. Pilot generation writes `Unreviewed`; the
-  separate `pilot-review` command produces the receipt required at
-  the release-evidence path qualification-receipts/pilots.json. The workflow has no handoff that supplies
-  a human review and this receipt before qualification, assuming prior gates pass.
-- **Source-traced boundary:** reviewed dependencies, uploads/downloads, caches,
-  tracked files, inputs, and docs provide no receipt producer or review ledger.
-  The package job supplies only `artifacts/container-packages`; container
-  verification supplies package-consumer report/receipt; portable jobs supply
-  family receipts. Publishing-environment approval occurs after qualification.
-  No CI workflow was executed.
-- **Proposed fix:** add an explicit human-review artifact or ledger handoff
-  bound to the exact packages and pilot results before resuming qualification.
-  Preserve rejection of unreviewed evidence; do not automatically approve it.
-- **Proposed regression:** verify each required receipt has a reachable producer
-  and dependency, then cover reviewed and unreviewed qualification paths.
 
 ### B47. Normal-completion analysis crashes the compiler on deep call chains and is exponential on shared or recursive call graphs
 
