@@ -4528,6 +4528,55 @@ public sealed class WorkerTests
             Is.Empty);
     }
 
+    [Test]
+    public async Task RejectedCacheReadMaintainsCapacityBeforeNonCacheableResult()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 150;
+        var backend = new CountingBackend(
+            BackendCheckResult.Unknown(
+                BackendFailureReason.ResourceLimit));
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        var rejected = Path.Combine(
+            project.CacheDirectory,
+            first.InputHash + ".sharp-proof-cache.json");
+        var oldest = Path.Combine(
+            project.CacheDirectory,
+            new string('a', 64) + ".sharp-proof-cache.json");
+        var newest = Path.Combine(
+            project.CacheDirectory,
+            new string('b', 64) + ".sharp-proof-cache.json");
+        await File.WriteAllTextAsync(rejected, "{corrupt");
+        await File.WriteAllBytesAsync(oldest, new byte[100]);
+        await File.WriteAllBytesAsync(newest, new byte[100]);
+        File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
+
+        var second = await worker.VerifyAsync(request);
+        var remaining = CacheFiles(project);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                first.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                second.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                second.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Miss));
+            Assert.That(File.Exists(rejected), Is.False);
+            Assert.That(remaining, Is.EqualTo(new[] { newest }));
+            Assert.That(
+                remaining.Sum(static path => new FileInfo(path).Length),
+                Is.EqualTo(100));
+        }
+    }
+
     [TestCase(
         BackendFailureReason.Unavailable,
         WorkerClaimReason.BackendUnavailable,

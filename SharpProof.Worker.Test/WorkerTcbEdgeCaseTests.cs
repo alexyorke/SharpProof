@@ -75,6 +75,74 @@ public sealed class WorkerTcbEdgeCaseTests
             Is.EqualTo(new[] { newest }));
     }
 
+    [TestCase("malformed")]
+    [TestCase("oversized")]
+    [TestCase("non-cacheable")]
+    public async Task RejectedCacheEntriesReconcileReducedCapacity(
+        string rejectedKind)
+    {
+        using var directory = new TempDirectory(
+            "sharpproof-cache-rejected-capacity-");
+        var inputHash = new string('c', 64);
+        var requested = Path.Combine(
+            directory.FullName,
+            inputHash + CacheFileSuffix);
+        var oldest = Path.Combine(
+            directory.FullName,
+            new string('a', 64) + CacheFileSuffix);
+        var newest = Path.Combine(
+            directory.FullName,
+            new string('b', 64) + CacheFileSuffix);
+        await File.WriteAllBytesAsync(oldest, new byte[100]);
+        await File.WriteAllBytesAsync(newest, new byte[100]);
+        File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
+
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        switch (rejectedKind)
+        {
+            case "malformed":
+                await File.WriteAllTextAsync(requested, "{malformed");
+                break;
+            case "oversized":
+                await File.WriteAllBytesAsync(requested, new byte[151]);
+                break;
+            case "non-cacheable":
+                await WriteCacheEnvelopeAsync(
+                    directory.FullName,
+                    inputHash,
+                    manifest.Hash,
+                    [],
+                    []);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(rejectedKind));
+        }
+
+        var cache = new VerificationCache(directory.FullName, 150);
+        var response = await cache.TryReadAsync(
+            inputHash,
+            manifest,
+            [],
+            new WorkerBudgets(),
+            CancellationToken.None);
+        var entries = Directory.GetFiles(
+            directory.FullName,
+            "*" + CacheFileSuffix);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response, Is.Null);
+            Assert.That(cache.LastReadUnavailable, Is.False);
+            Assert.That(File.Exists(requested), Is.False);
+            Assert.That(entries, Is.EqualTo(new[] { newest }));
+            Assert.That(
+                entries.Sum(static path => new FileInfo(path).Length),
+                Is.EqualTo(100));
+        }
+    }
+
     [Test]
     public void SymbolicLinkIsRejectedBeforeTraversal()
     {

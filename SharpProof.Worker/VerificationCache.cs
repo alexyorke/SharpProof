@@ -66,9 +66,11 @@ internal sealed partial class VerificationCache(
                     _maximumBytes,
                     WorkerProtocolJson.MaximumJsonBytes))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                ValidatePath(path);
-                file.Delete();
+                RejectEntryAndMaintainCapacity(
+                    path,
+                    staged,
+                    cancellationToken,
+                    ref committed);
                 return null;
             }
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
@@ -82,7 +84,7 @@ internal sealed partial class VerificationCache(
             }
             catch (JsonException)
             {
-                TryQuarantineMalformedEntry(
+                RejectEntryAndMaintainCapacity(
                     path,
                     staged,
                     cancellationToken,
@@ -99,7 +101,7 @@ internal sealed partial class VerificationCache(
                 !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
             {
-                TryQuarantineMalformedEntry(
+                RejectEntryAndMaintainCapacity(
                     path,
                     staged,
                     cancellationToken,
@@ -116,7 +118,7 @@ internal sealed partial class VerificationCache(
             }
             catch (JsonException)
             {
-                TryQuarantineMalformedEntry(
+                RejectEntryAndMaintainCapacity(
                     path,
                     staged,
                     cancellationToken,
@@ -133,7 +135,7 @@ internal sealed partial class VerificationCache(
                 callables.Any(static result => result == null) ||
                 claims.Any(static result => result == null))
             {
-                TryQuarantineMalformedEntry(
+                RejectEntryAndMaintainCapacity(
                     path,
                     staged,
                     cancellationToken,
@@ -151,6 +153,11 @@ internal sealed partial class VerificationCache(
                     targets,
                     cancellationToken))
             {
+                RejectEntryAndMaintainCapacity(
+                    path,
+                    staged,
+                    cancellationToken,
+                    ref committed);
                 return null;
             }
 
@@ -420,7 +427,7 @@ internal sealed partial class VerificationCache(
     }
 
     private bool TryStageCapacity(
-        string protectedPath,
+        string? protectedPath,
         List<StagedEntry> staged,
         CancellationToken cancellationToken)
     {
@@ -495,11 +502,29 @@ internal sealed partial class VerificationCache(
         DiscardStaged(staged);
     }
 
-    private void TryQuarantineMalformedEntry(
+    private void RejectEntryAndMaintainCapacity(
         string path,
         List<StagedEntry> staged,
         CancellationToken cancellationToken,
         ref bool committed)
+    {
+        TryQuarantineMalformedEntry(
+            path,
+            staged,
+            cancellationToken);
+        if (TryStageCapacity(
+                protectedPath: null,
+                staged,
+                cancellationToken))
+        {
+            CommitStaged(staged, ref committed);
+        }
+    }
+
+    private void TryQuarantineMalformedEntry(
+        string path,
+        List<StagedEntry> staged,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -511,7 +536,6 @@ internal sealed partial class VerificationCache(
             cancellationToken.ThrowIfCancellationRequested();
             File.Move(path, stagedPath);
             staged.Add(new StagedEntry(path, stagedPath));
-            CommitStaged(staged, ref committed);
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException or
