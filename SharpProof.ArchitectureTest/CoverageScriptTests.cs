@@ -16,6 +16,20 @@ public sealed class CoverageScriptTests
         "Project/Trusted.cs"
     ];
 
+    private static readonly string[] s_pipelineCompileProjects =
+    [
+        "Project/Project.csproj"
+    ];
+
+    private static readonly object[] s_pipelineTcbComponents =
+    [
+        new
+        {
+            name = "projectAuthority",
+            paths = s_pipelineCompileProjects
+        }
+    ];
+
     [Test]
     public void ContainerCoverageRequiresExplicitComparisonAuthority()
     {
@@ -909,7 +923,8 @@ public sealed class CoverageScriptTests
                 trustedKernel = new { paths = s_trustedPaths },
                 trustedComputingBase = new
                 {
-                    components = Array.Empty<object>()
+                    pipelineCompileProjects = s_pipelineCompileProjects,
+                    components = s_pipelineTcbComponents
                 }
             }) + "\n");
         await File.WriteAllTextAsync(
@@ -1070,7 +1085,8 @@ public sealed class CoverageScriptTests
                 },
                 trustedComputingBase = new
                 {
-                    components = Array.Empty<object>()
+                    pipelineCompileProjects = s_pipelineCompileProjects,
+                    components = s_pipelineTcbComponents
                 }
             }) + "\n");
         await File.WriteAllTextAsync(
@@ -1365,7 +1381,8 @@ public sealed class CoverageScriptTests
                 },
                 trustedComputingBase = new
                 {
-                    components = Array.Empty<object>()
+                    pipelineCompileProjects = s_pipelineCompileProjects,
+                    components = s_pipelineTcbComponents
                 }
             }) + "\n");
         await File.WriteAllTextAsync(

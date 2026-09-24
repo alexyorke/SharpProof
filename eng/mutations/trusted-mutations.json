@@ -201,7 +201,7 @@
   },
   {
     "name": "effect-fresh-initializer-creation-capture-ownership",
-    "file": "SharpProof.Effects/OperationEffectScanner.cs",
+    "file": "SharpProof.Effects/OperationEffectScanner.Expressions.cs",
     "original": "        _creationCaptures.Record(capture);",
     "mutated": "        _ = _creationCaptures;",
     "project": "SharpProof.Effects.Test/SharpProof.Effects.Test.csproj",

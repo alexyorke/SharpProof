@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, and B34 implicit-constructor-initializer findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **48 findings**: 0 P0, 0 P1, 10 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, and B34 implicit-constructor-initializer and B41 trusted-computing-base-completeness findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **47 findings**: 0 P0, 0 P1, 9 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,69 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B41. Declared trusted computing base omits soundness-relevant source files
-
-**Confidence: Confirmed by comparing the contract with the compiled sources.**
-
-- **Location:** `eng/acceptance/contract.json` (`trustedKernel.paths` and
-  `trustedComputingBase.components[].paths`);
-  `scripts/Get-SharpProofTcbPaths.ps1:67-86` checks only that each declared
-  path is a production Compile item, and
-  `SharpProof.ArchitectureTest/ArchitectureTests.cs:544-620`
-  (`TrustedComputingBaseDeclarationNamesEveryRequiredPath`) checks only
-  non-empty components, no duplicates, and mutation targets inside the TCB.
-  Nothing checks the reverse direction.
-- **Defect:** the TCB is a hand-written allowlist with no completeness rule,
-  and many files that decide verdicts are missing from it. Examples at
-  baseline: `SharpProof.Effects/OperationEffectScanner.Patterns.cs`,
-  `OperationEffectScanner.ExternalExceptions.cs` and
-  `OperationEffectScanner.DirectForeach.cs` (partial files of the TCB type
-  `OperationEffectScanner`, whose other three files are listed),
-  `SharpProof.Effects/OperationNullnessEvaluator.cs`,
-  `ConversionEffectClassifier.cs`, `ManagedMutationFacts.cs`,
-  `UsingDisposalEffectResolver.cs`, `TryCompletionFacts.cs`,
-  `CatchFilterFacts.cs` (27 of 57 Effects files are outside);
-  `SharpProof.Ir/IrSubstitution.cs`, `IrTraversal.cs`, `IrTermServices.cs`,
-  `IrProgramBuilder.cs`, `IrExceptionKindFacts.cs`, `IrInstructionFacts.cs`;
-  `SharpProof.Frontend/RoslynTypeMapper.cs`, `CompilerMethodScopes.cs`,
-  `CompilerConstantAdmission.cs`;
-  `SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs`,
-  `CompilerFeatureScopeFingerprint.cs`, `CompilerSourceRebinding.cs`;
-  `SharpProof.Contracts/BoundContracts.cs`;
-  `SharpProof.Dataflow/SequenceCardinalityDomain.cs`; and
-  `SharpProof.Worker/MethodResourceBudget.cs`.
-- **Observed boundary:** a script that collected every `SharpProof*.cs` path
-  named in `contract.json` and listed each project's non-`obj`/`bin` sources
-  found 12 of 24 Ir files, 27 of 57 Effects, 5 of 21 Frontend, 7 of 19
-  CompilerArtifact, 3 of 18 Contracts, 4 of 12 Dataflow and 2 of 19 Worker
-  files outside the declaration (a few are only `GlobalUsings.cs`). TCB code
-  calls the omitted files directly: for example `OperationCompletionEvaluator.cs`
-  and `OperationEffectScanner.cs` (both in the TCB) call
-  `OperationNullnessEvaluator`, and `IrRelationalSummaryInstantiator.cs` and
-  `PostconditionObligationBuilder.cs` call `IrSubstitution`. Both
-  `IrSubstitution.cs` and the cause of B18 (`OperationNullnessEvaluator.cs`)
-  are omitted files.
-- **Impact:** changes to these files escape every TCB-scoped gate: changed-TCB
-  line coverage in `scripts/Test-SharpProofCoverage.ps1`, the release
-  authority closure in `scripts/Test-SharpProofReleaseAuthorityClosure.ps1`,
-  acceptance in `eng/acceptance/Verify.ps1`, and TCB mutation targeting. A
-  soundness regression in, for example, nullness or substitution can ship
-  without the evidence the release process claims to require for trusted
-  code. Partial files are the sharpest case, because the same type is half
-  trusted and half not.
-- **Proposed fix:** add the files above to the matching components. Then add
-  a completeness rule to `Get-SharpProofTcbPaths.ps1` (when
-  `-ProductionInventory` is given) and to the architecture test: every Compile
-  item of the pipeline projects (Ir, Smt, Effects, Frontend, CompilerArtifact,
-  CompilerCollector, Contracts, Dataflow, Summaries, Worker) must be either in
-  the TCB or in a new explicit `trustedComputingBase.excludedPaths` list with a
-  reason. Also require that all files declaring any partial of a TCB type are
-  in the TCB, which can be found with Roslyn by grouping
-  `TypeDeclarationSyntax` by symbol.
-- **Proposed regression:** an architecture test that fails when a new `.cs`
-  file is added to a pipeline project without being classified, and a
-  fixture where one partial file of a TCB type is omitted, which must fail.
 
 ### B42. `.globalconfig` profile and features are only partly honored
 

@@ -1,4 +1,7 @@
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -64,12 +67,16 @@ public sealed class ProductionInventoryAuthorityTests
             manifestPath,
             "{\"schemaVersion\":1,\"outputs\":[\"Project/Generated.g.cs\"]}\n");
         var authority = await RunInventoryAsync(repository);
+        var authorityPath = Path.Combine(repository, "authority.json");
+        var contractPath = Path.Combine(repository, "contract.json");
         await File.WriteAllTextAsync(
-            Path.Combine(repository, "authority.json"),
+            authorityPath,
             authority.RootElement.GetRawText() + "\n");
         await File.WriteAllTextAsync(
-            Path.Combine(repository, "contract.json"),
-            "{\"trustedKernel\":{\"paths\":[\"Project/Foreign.cs\"]},\"trustedComputingBase\":{\"components\":[]}}\n");
+            contractPath,
+            "{\"trustedKernel\":{\"paths\":[\"Project/Source.cs\"]}," +
+            "\"trustedComputingBase\":{\"pipelineCompileProjects\":[\"Project/Project.csproj\"]," +
+            "\"components\":[{\"name\":\"fixture\",\"paths\":[\"Project/Project.csproj\",\"Project/Generated.g.cs\"]}]}}\n");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "tcb-probe.ps1"),
             "Set-StrictMode -Version Latest\n" +
@@ -77,6 +84,24 @@ public sealed class ProductionInventoryAuthorityTests
             "$authority = Get-Content (Join-Path $PSScriptRoot 'authority.json') -Raw | ConvertFrom-Json\n" +
             "$contract = Get-Content (Join-Path $PSScriptRoot 'contract.json') -Raw | ConvertFrom-Json\n" +
             "Get-SharpProofTcbPaths -Contract $contract -ProductionInventory $authority | Out-Null\n");
+        var classifiedTcb = await ArchitectureRepository.RunProcessAsync(
+            repository,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(repository, "tcb-probe.ps1"));
+        Assert.That(
+            classifiedTcb.ExitCode,
+            Is.Zero,
+            classifiedTcb.Error + classifiedTcb.Output);
+
+        await File.WriteAllTextAsync(
+            contractPath,
+            "{\"trustedKernel\":{\"paths\":[\"Project/Source.cs\"]}," +
+            "\"trustedComputingBase\":{\"pipelineCompileProjects\":[\"Project/Project.csproj\"]," +
+            "\"components\":[{\"name\":\"fixture\",\"paths\":[\"Project/Project.csproj\",\"Project/Generated.g.cs\",\"Project/Foreign.cs\"]}]}}\n");
         var tcbMutation = await ArchitectureRepository.RunProcessAsync(
             repository,
             "pwsh",
@@ -89,6 +114,34 @@ public sealed class ProductionInventoryAuthorityTests
             tcbMutation.ExitCode,
             Is.Not.Zero,
             "A TCB source outside the evaluated Compile universe must fail closed.");
+
+        await File.WriteAllTextAsync(contractPath,
+            "{\"trustedKernel\":{\"paths\":[\"Project/Source.cs\"]}," +
+            "\"trustedComputingBase\":{\"pipelineCompileProjects\":[\"Project/Project.csproj\"]," +
+            "\"components\":[{\"name\":\"fixture\",\"paths\":[\"Project/Project.csproj\",\"Project/Generated.g.cs\"]}]}}\n");
+        await File.WriteAllTextAsync(
+            Path.Combine(repository, "Project", "Added.cs"),
+            "public partial class Shared { public static int Added() => 2; }\n");
+        using var changedAuthority = await RunInventoryAsync(repository);
+        await File.WriteAllTextAsync(
+            authorityPath,
+            changedAuthority.RootElement.GetRawText() + "\n");
+        var unclassifiedCompileItem = await ArchitectureRepository.RunProcessAsync(
+            repository,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(repository, "tcb-probe.ps1"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(unclassifiedCompileItem.ExitCode, Is.Not.Zero);
+            Assert.That(
+                unclassifiedCompileItem.Error + unclassifiedCompileItem.Output,
+                Does.Contain("Production pipeline Compile item is not classified")
+                    .And.Contain("Project/Added.cs"));
+        }
     }
 
     [Test]
@@ -124,6 +177,140 @@ public sealed class ProductionInventoryAuthorityTests
                 result.Error + result.Output,
                 Does.Contain("MissingAnalyzer.dll"));
         }
+    }
+
+    [Test]
+    public async Task ProductionPipelineSourcesAndTrustedPartialTypesAreComplete()
+    {
+        var repository = TestRepository.FindRoot();
+        using var inventory = await RunInventoryAsync(repository);
+        using var contract = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(repository, "eng", "acceptance", "contract.json")));
+        var tcb = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var path in contract.RootElement.GetProperty("trustedKernel")
+                     .GetProperty("paths").EnumerateArray())
+        {
+            tcb.Add(path.GetString() ?? "");
+        }
+        var declaration = contract.RootElement.GetProperty("trustedComputingBase");
+        foreach (var component in declaration.GetProperty("components")
+                     .EnumerateArray())
+        {
+            foreach (var path in component.GetProperty("paths").EnumerateArray())
+            {
+                tcb.Add(path.GetString() ?? "");
+            }
+        }
+
+        var pipelineProjects = declaration.GetProperty("pipelineCompileProjects")
+            .EnumerateArray()
+            .Select(static project => project.GetString() ?? "")
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var pipelineProject in pipelineProjects)
+        {
+            Assert.That(
+                tcb.Contains(pipelineProject),
+                Is.True,
+                $"Trusted pipeline project is not in the TCB: {pipelineProject}");
+        }
+        var productionProjects = inventory.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .ToArray();
+        var observedPipelineProjects = productionProjects
+            .Where(project => pipelineProjects.Contains(
+                project.GetProperty("projectPath").GetString() ?? ""))
+            .ToArray();
+        Assert.That(
+            observedPipelineProjects.Length,
+            Is.EqualTo(pipelineProjects.Count),
+            "Every declared proof pipeline project must appear in the evaluated inventory.");
+
+        foreach (var project in observedPipelineProjects)
+        {
+            var projectPath = project.GetProperty("projectPath").GetString() ?? "";
+            foreach (var file in project.GetProperty("compile").EnumerateArray())
+            {
+                var sourcePath = file.GetProperty("path").GetString() ?? "";
+                Assert.That(
+                    tcb.Contains(sourcePath),
+                    Is.True,
+                    $"Evaluated pipeline Compile source is not in the TCB: {projectPath} -> {sourcePath}");
+            }
+        }
+
+        var partialGaps = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var project in productionProjects)
+        {
+            var projectName = project.GetProperty("name").GetString() ?? "unknown";
+            var parseOptionsElement = project.GetProperty("parseOptions");
+            var preprocessorSymbols = parseOptionsElement
+                .GetProperty("preprocessorSymbols")
+                .EnumerateArray()
+                .Select(static symbol => symbol.GetString() ?? "")
+                .Where(static symbol => symbol.Length != 0)
+                .ToArray();
+            var parseOptions = new CSharpParseOptions(
+                LanguageVersion.Preview,
+                preprocessorSymbols: preprocessorSymbols);
+            var trees = project.GetProperty("compile")
+                .EnumerateArray()
+                .Select(file =>
+                {
+                    var sourcePath = file.GetProperty("path").GetString() ?? "";
+                    return CSharpSyntaxTree.ParseText(
+                        File.ReadAllText(Path.Combine(
+                            repository,
+                            sourcePath.Replace('/', Path.DirectorySeparatorChar))),
+                        parseOptions,
+                        path: sourcePath);
+                })
+                .ToArray();
+            var compilation = CSharpCompilation.Create(
+                "TcbPartialAudit_" + projectName,
+                trees,
+                options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            foreach (var tree in trees)
+            {
+                var semanticModel = compilation.GetSemanticModel(tree);
+                var syntaxRoot = await tree.GetRootAsync();
+                foreach (var typeDeclaration in syntaxRoot
+                             .DescendantNodes()
+                             .OfType<TypeDeclarationSyntax>()
+                             .Where(static declaration => declaration.Modifiers
+                                 .Any(SyntaxKind.PartialKeyword)))
+                {
+                    if (semanticModel.GetDeclaredSymbol(typeDeclaration) is not
+                        INamedTypeSymbol symbol)
+                    {
+                        continue;
+                    }
+
+                    var declarationPaths = symbol.DeclaringSyntaxReferences
+                        .Select(static reference => reference.SyntaxTree.FilePath)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray();
+                    if (!declarationPaths.Any(tcb.Contains))
+                    {
+                        continue;
+                    }
+
+                    foreach (var declarationPath in declarationPaths)
+                    {
+                        if (!tcb.Contains(declarationPath))
+                        {
+                            partialGaps.Add(
+                                $"{symbol.ToDisplayString()} -> {declarationPath}");
+                        }
+                    }
+                }
+            }
+        }
+
+        Assert.That(
+            partialGaps,
+            Is.Empty,
+            "Every source file declaring part of a TCB type must itself be in the TCB.");
     }
 
     [Test]
@@ -208,7 +395,8 @@ public sealed class ProductionInventoryAuthorityTests
             "</Project>\n");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "Project", "Source.cs"),
-            "public static class Source { public static int Value() => 1; }\n");
+            "public static class Source { public static int Value() => 1; }\n" +
+            "public partial class Shared { }\n");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "Project", "Generated.g.cs"),
             "// <auto-generated />\npublic static class Generated { public static int Value() => 1; }\n");

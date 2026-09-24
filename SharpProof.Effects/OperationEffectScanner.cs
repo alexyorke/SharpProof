@@ -607,39 +607,6 @@ internal sealed partial class OperationEffectScanner
                 static syntax => syntax is RefExpressionSyntax);
     }
 
-    private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)
-    {
-        _coalesceCaptures.Record(capture);
-        _conditionalTruthCaptures.Record(capture);
-        _creationCaptures.Record(capture);
-        _readRegionCaptures.Record(capture);
-        return Scan(capture.Value);
-    }
-
-    internal void RegisterReadRegionCaptures(
-        IEnumerable<IOperation> operations)
-    {
-        foreach (var operation in operations)
-        {
-            var pending = new Stack<IOperation>();
-            pending.Push(operation);
-            while (pending.Count != 0)
-            {
-                var current = pending.Pop();
-                if (current is IFlowCaptureOperation capture &&
-                    IsReachable(capture))
-                {
-                    _readRegionCaptures.Record(capture);
-                }
-
-                foreach (var child in current.ChildOperations)
-                {
-                    pending.Push(child);
-                }
-            }
-        }
-    }
-
     private bool ArrayStoreIsDefinitelyCompatible(
         IArrayElementReferenceOperation element,
         IArrayTypeSymbol arrayType,

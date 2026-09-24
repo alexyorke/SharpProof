@@ -28,6 +28,20 @@ public sealed class ArchitectureTests
         "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs"
     ];
 
+    private static readonly string[] TrustedPipelineCompileProjects =
+    [
+        "SharpProof.Ir/SharpProof.Ir.csproj",
+        "SharpProof.Smt/SharpProof.Smt.csproj",
+        "SharpProof.Effects/SharpProof.Effects.csproj",
+        "SharpProof.Frontend/SharpProof.Frontend.csproj",
+        "SharpProof.CompilerArtifact/SharpProof.CompilerArtifact.csproj",
+        "SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj",
+        "SharpProof.Contracts/SharpProof.Contracts.csproj",
+        "SharpProof.Dataflow/SharpProof.Dataflow.csproj",
+        "SharpProof.Summaries/SharpProof.Summaries.csproj",
+        "SharpProof.Worker/SharpProof.Worker.csproj"
+    ];
+
     private static readonly string[] AcceptanceTimingPhases = [
         "restore",
         "static-validation",
@@ -563,6 +577,12 @@ public sealed class ArchitectureTests
         Assert.That(
             declaration.GetProperty("measurement").GetString(),
             Is.Not.Empty);
+        Assert.That(
+            declaration.GetProperty("pipelineCompileProjects")
+                .EnumerateArray()
+                .Select(static project => project.GetString() ?? "")
+                .ToArray(),
+            Is.EqualTo(TrustedPipelineCompileProjects));
         var actual = declaration.GetProperty("components")
             .EnumerateArray()
             .ToDictionary(
