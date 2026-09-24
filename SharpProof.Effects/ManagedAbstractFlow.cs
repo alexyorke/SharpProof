@@ -3426,8 +3426,26 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         var baseConstructor = EffectMethodNodeBuilder
             .GetUniqueParameterlessBaseConstructor(constructor);
-        return baseConstructor != null &&
-            MethodCanCompleteNormally(baseConstructor);
+        if (baseConstructor == null ||
+            !MethodCanCompleteNormally(baseConstructor))
+        {
+            return false;
+        }
+
+        foreach (var operation in EffectMethodNodeBuilder
+                     .GetMemberInitializerOperations(
+                         compilation,
+                         constructor.ContainingType,
+                         staticInitializers: false,
+                         cancellationToken))
+        {
+            if (operation != null && !MayCompleteNormally(operation))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private bool ConstructorMayCompleteNormally(

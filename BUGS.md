@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, and B33 reachable-read-region findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **49 findings**: 0 P0, 0 P1, 11 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, and B34 implicit-constructor-initializer findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **48 findings**: 0 P0, 0 P1, 10 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,51 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B34. Implicit constructors with field initializers are unmodeled
-
-**Confidence: Confirmed through public effect summaries and analyzer
-diagnostics.**
-
-- **Location:** `SharpProof.Effects/EffectMethodNodeBuilder.cs:587-598`
-  (`IsProvablyEmptyImplicitConstructorLayer` requires
-  `!HasInstanceMemberInitializer(type)`, defined at `:633`) and its caller
-  `SharpProof.Effects/EffectCallSiteResolver.cs:113-140`; explicit constructors
-  already scan the same initializers through `GetMemberInitializerOperations`
-  (`EffectMethodNodeBuilder.cs:424`).
-- **Defect:** a compiler-generated constructor of a class with any instance
-  field initializer, even `public int V = 5;`, is resolved as an unmodeled
-  call with a Top summary. The same class with an explicit empty constructor
-  `public C() { }` has identical runtime behavior and is modeled completely.
-  Primary constructors with initializers are also `UnsupportedOperation`.
-- **Observed boundary:** `EffectAnalysisSession.Analyze` built from unchanged
-  HEAD:
-
-  | Allocation | Summary |
-  | --- | --- |
-  | `new ImplicitScalarInit()` (`int V = 5;`) | `Incomplete`, `DirectCall, UnmodeledCall` |
-  | `new ImplicitArrayInit()` / `new ImplicitObjectInit()` | `Incomplete`, `UnmodeledCall` |
-  | `new PrimaryCtor(1)` (`int V = v;`) | `Incomplete`, `UnsupportedOperation` |
-  | `new ExplicitScalarInit()` / `new ExplicitArrayInit()` | `Complete`, fresh writes only |
-  | `new NoInit()` / struct with explicit ctor | `Complete` |
-
-  The analyzer reported `SP0002` for `[EnforcePure] => new ImplicitScalarInit()`
-  and `=> new Options().Retries` (a typical options class), and
-  `SP0046 ... ExceptionSetUnknown: DirectCall, UnmodeledCall` for
-  `[DoesNotThrow]`, while the explicit-constructor twins were silent.
-- **Impact:** any method that instantiates an ordinary class with field
-  initializers (options, DTOs, collections holders) cannot satisfy
-  `[EnforcePure]`, `[DoesNotThrow]`, `[AllowedCapabilities]`, or
-  `[EffectContract]`. Fails closed, but produces widespread false positives.
-- **Proposed fix:** model an implicit constructor as an explicit empty
-  constructor body: scan `GetMemberInitializerOperations(compilation, type,
-  staticInitializers: false, ...)` with the receiver as a fresh region, then
-  chain to the unique parameterless base constructor, as the explicit path
-  already does. Handle primary-constructor parameter captures through the
-  existing `PrimaryConstructorParameterOwnership`.
-- **Proposed regression:** effect tests comparing implicit and explicit
-  constructors for scalar, array, object, and throwing initializers (the
-  throwing one must stay non-`DoesNotThrow`), plus a primary-constructor case.
 
 ### B41. Declared trusted computing base omits soundness-relevant source files
 

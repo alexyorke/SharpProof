@@ -804,7 +804,11 @@ public sealed class EffectAnalysisSession
     {
         return !method.IsAbstract &&
         !method.IsExtern &&
-        method.DeclaringSyntaxReferences.Length != 0 &&
+        (method.DeclaringSyntaxReferences.Length != 0 ||
+         EffectMethodNodeBuilder.IsSourceImplicitParameterlessConstructor(
+             method) &&
+         EffectMethodNodeBuilder.HasInstanceMemberInitializer(
+             method.ContainingType)) &&
         SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly);
     }
 

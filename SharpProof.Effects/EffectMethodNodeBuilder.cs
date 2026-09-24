@@ -33,6 +33,14 @@ internal sealed class EffectMethodNodeBuilder
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
+        if (TryBuildConstructorWithoutBody(
+                method,
+                cancellationToken,
+                out var synthesizedConstructor))
+        {
+            return synthesizedConstructor;
+        }
+
         var calls = new List<EffectCallSite>();
         var root = GetOperationRoot(method, cancellationToken);
         if (root == null)
@@ -152,6 +160,174 @@ internal sealed class EffectMethodNodeBuilder
                 ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
                 : EffectSummary.Empty);
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
+    }
+
+    private bool TryBuildConstructorWithoutBody(
+        IMethodSymbol method,
+        CancellationToken cancellationToken,
+        out EffectMethodNode node)
+    {
+        node = default;
+        if (method.MethodKind != MethodKind.Constructor ||
+            !HasInstanceMemberInitializer(method.ContainingType) ||
+            !(IsSourceImplicitParameterlessConstructor(method) ||
+              IsPrimaryConstructor(method, cancellationToken)) ||
+            IsPrimaryConstructor(method, cancellationToken) &&
+                HasExplicitPrimaryBaseArguments(method, cancellationToken))
+        {
+            return false;
+        }
+
+        var initializers = GetMemberInitializerOperations(
+                _compilation,
+                method.ContainingType,
+                staticInitializers: false,
+                cancellationToken)
+            .ToImmutableArray();
+        var calls = new List<EffectCallSite>();
+        var summary = EffectSummary.Empty;
+        var origin = initializers.FirstOrDefault(static operation =>
+            operation != null);
+        if (origin == null)
+        {
+            summary = EffectSummaryOperations.Unsupported();
+        }
+        else if (!method.ContainingType.IsValueType)
+        {
+            var baseConstructor = EffectMethodNodeBuilder
+                .GetUniqueParameterlessBaseConstructor(method);
+            var baseResolver = new EffectCallSiteResolver(
+                _session,
+                method,
+                calls,
+                flow: null);
+            var baseDepth = 0;
+            while (baseConstructor != null &&
+                   IsProvablyEmptyImplicitConstructorLayer(
+                       baseConstructor,
+                       _session.ApiSpecs))
+            {
+                if (baseDepth++ >= 256)
+                {
+                    summary = EffectSummaryOperations.Join(
+                        summary,
+                        EffectSummaryOperations.Unsupported());
+                    baseConstructor = null;
+                    break;
+                }
+
+                summary = EffectSummaryOperations.Join(
+                    summary,
+                    EffectSummaryOperations.DirectCall());
+                if (baseConstructor.ContainingType.IsValueType)
+                {
+                    baseConstructor = null;
+                    break;
+                }
+
+                baseConstructor = GetUniqueParameterlessBaseConstructor(
+                    baseConstructor);
+            }
+
+            if (baseConstructor == null)
+            {
+                summary = EffectSummaryOperations.Join(
+                    summary,
+                    EffectSummaryOperations.Unsupported());
+            }
+            else if (baseConstructor.ContainingType.SpecialType ==
+                     SpecialType.System_Object)
+            {
+                summary = EffectSummaryOperations.Join(
+                    summary,
+                    EffectSummaryOperations.DirectCall());
+            }
+            else if (baseConstructor != null)
+            {
+                var arguments = Enumerable.Repeat(
+                        EffectRegionSet.Empty,
+                        baseConstructor.Parameters.Length)
+                    .ToImmutableArray();
+                var actualArguments = Enumerable.Repeat<IOperation?>(
+                        null,
+                        baseConstructor.Parameters.Length)
+                    .ToImmutableArray();
+                summary = EffectSummaryOperations.Join(
+                    summary,
+                    baseResolver.Resolve(
+                        baseConstructor,
+                        EffectRegionSet.Create(EffectRegionId.Receiver),
+                        EffectRegionSet.Create(EffectRegionId.Receiver),
+                        arguments,
+                        actualArguments,
+                        dispatchUncertain: false,
+                        origin,
+                        instance: null,
+                        hasParamArray: false));
+            }
+        }
+
+        EnsureBeforeFieldInitNode(method, cancellationToken);
+        var receiverWrite = EffectSummaryOperations.Write(
+            EffectRegionSet.Create(EffectRegionId.Receiver));
+        foreach (var initializer in initializers)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (initializer == null)
+            {
+                summary = EffectSummaryOperations.Join(
+                    summary,
+                    EffectSummaryOperations.Unsupported());
+                continue;
+            }
+
+            var scanner = new OperationEffectScanner(
+                _session,
+                method,
+                calls,
+                initializer,
+                abstractFlow: null,
+                allowDirectWitnesses: false,
+                cancellationToken);
+            var step = scanner.ScanSequence([initializer]);
+            summary = EffectSummaryOperations.Join(summary, step.Summary);
+            if (!step.CompletesNormally)
+            {
+                break;
+            }
+
+            summary = EffectSummaryOperations.Join(summary, receiverWrite);
+        }
+
+        summary = EffectSummaryOperations.Join(
+            summary,
+            _session.ResolveEntryPreconditions(method));
+        node = new EffectMethodNode(summary, [.. calls], []);
+        return true;
+    }
+
+    private static bool IsPrimaryConstructor(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        return method.MethodKind == MethodKind.Constructor &&
+            method.DeclaringSyntaxReferences.Any(reference =>
+                reference.GetSyntax(cancellationToken) is
+                    TypeDeclarationSyntax { ParameterList: not null });
+    }
+
+    private static bool HasExplicitPrimaryBaseArguments(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        return method.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<TypeDeclarationSyntax>()
+            .Where(static declaration => declaration.ParameterList != null)
+            .Any(static declaration => declaration.BaseList?.Types
+                .SelectMany(static type => type.DescendantNodesAndSelf())
+                .OfType<ArgumentListSyntax>()
+                .Any(static arguments => arguments.Arguments.Count != 0) == true);
     }
 
     private bool TryBuildAutoPropertyAccessor(
@@ -630,7 +806,7 @@ internal sealed class EffectMethodNodeBuilder
             parameter.IsOptional || parameter.IsParams);
     }
 
-    private static bool HasInstanceMemberInitializer(INamedTypeSymbol type)
+    internal static bool HasInstanceMemberInitializer(INamedTypeSymbol type)
     {
         return type.GetMembers().Any(member =>
             !member.IsImplicitlyDeclared &&

@@ -2052,7 +2052,20 @@ public sealed class EffectAnalysisTests
             }
         }
 
-        foreach (var methodName in new[] { "Member", "Static" })
+        var memberInitializer = session.Analyze(Method(compilation, "Member"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                memberInitializer.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                "Member");
+            Assert.That(
+                memberInitializer.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "Member");
+        }
+
+        foreach (var methodName in new[] { "Static" })
         {
             var result = session.Analyze(Method(compilation, methodName));
             Assert.That(
