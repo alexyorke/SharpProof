@@ -19,6 +19,52 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
+
+function Get-ExactJsonInt32 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Text.Json.JsonElement]$Object,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+    $property = $Object.GetProperty($Name)
+    $value = 0
+    if ($property.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
+        -not $property.TryGetInt32([ref]$value)) {
+        throw "Qualification evidence '$Name' must be an Int32 JSON number."
+    }
+    return $value
+}
+
+function Get-ExactJsonInt64 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Text.Json.JsonElement]$Object,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+    $property = $Object.GetProperty($Name)
+    $value = 0L
+    if ($property.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
+        -not $property.TryGetInt64([ref]$value)) {
+        throw "Qualification evidence '$Name' must be an Int64 JSON number."
+    }
+    return $value
+}
+
+function Get-ExactJsonBoolean {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Text.Json.JsonElement]$Object,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+    $property = $Object.GetProperty($Name)
+    if ($property.ValueKind -notin @(
+            [Text.Json.JsonValueKind]::True,
+            [Text.Json.JsonValueKind]::False)) {
+        throw "Qualification evidence '$Name' must be a Boolean JSON token."
+    }
+    return $property.GetBoolean()
+}
+
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
 $relativeEvidence = [IO.Path]::GetRelativePath(
@@ -28,28 +74,65 @@ if ($relativeEvidence.StartsWith('../', [StringComparison]::Ordinal) -or
     [IO.Path]::IsPathRooted($relativeEvidence)) {
     throw 'Qualification gate evidence must remain inside the repository.'
 }
-$evidence = Get-Content -LiteralPath $resolvedEvidence -Raw |
-    ConvertFrom-Json -ErrorAction Stop
+$evidenceText = Get-Content -LiteralPath $resolvedEvidence -Raw
+$evidenceDocument = [Text.Json.JsonDocument]::Parse($evidenceText)
+$packageByteValues = [Collections.Generic.List[long]]::new()
+try {
+    $evidenceRoot = $evidenceDocument.RootElement
+    if ($evidenceRoot.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+        throw 'Qualification gate evidence must be a JSON object.'
+    }
+    if ($Gate -ne 'pilots') {
+        $schemaVersion = Get-ExactJsonInt32 $evidenceRoot 'schemaVersion'
+    }
+    if ($Gate -eq 'coverage') {
+        $coveragePassed = Get-ExactJsonBoolean $evidenceRoot 'passed'
+    }
+    if ($Gate -eq 'mutation') {
+        $mutationCount = Get-ExactJsonInt32 $evidenceRoot 'mutationCount'
+        $killedCount = Get-ExactJsonInt32 $evidenceRoot 'killedCount'
+    }
+    if ($Gate -in @(
+            'package-consumers', 'pilots', 'portable-linux',
+            'portable-windows', 'portable-macos')) {
+        $packageArray = $evidenceRoot.GetProperty('packageArtifacts')
+        if ($packageArray.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
+            throw 'Qualification packageArtifacts must be a JSON array.'
+        }
+        foreach ($packageElement in $packageArray.EnumerateArray()) {
+            $packageByteValues.Add(
+                (Get-ExactJsonInt64 $packageElement 'bytes'))
+        }
+    }
+}
+finally {
+    $evidenceDocument.Dispose()
+}
+$evidence = $evidenceText | ConvertFrom-Json -ErrorAction Stop
 $packageArtifacts = @()
 if ($Gate -in @(
         'package-consumers', 'pilots', 'portable-linux',
         'portable-windows', 'portable-macos')) {
-    $packageArtifacts = @($evidence.packageArtifacts | ForEach-Object {
-        $fileName = [string]$_.fileName
-        $bytes = [int64]$_.bytes
-        $sha256 = [string]$_.sha256
+    $packageArtifactRows = [Collections.Generic.List[object]]::new()
+    $packageIndex = 0
+    foreach ($artifact in @($evidence.packageArtifacts)) {
+        $fileName = [string]$artifact.fileName
+        $bytes = $packageByteValues[$packageIndex]
+        $packageIndex++
+        $sha256 = [string]$artifact.sha256
         if ([IO.Path]::GetFileName($fileName) -cne $fileName -or
             $fileName -notmatch '\.(?:nupkg|snupkg)$' -or
             $bytes -le 0 -or
             $sha256 -cnotmatch '^[0-9a-f]{64}$') {
             throw "Qualification package evidence is malformed: '$fileName'."
         }
-        [ordered]@{
+        $packageArtifactRows.Add([ordered]@{
             fileName = $fileName
             bytes = $bytes
             sha256 = $sha256
-        }
-    } | Sort-Object fileName)
+        })
+    }
+    $packageArtifacts = @($packageArtifactRows.ToArray() | Sort-Object fileName)
     if ($packageArtifacts.Count -ne 6 -or
         @($packageArtifacts.fileName | Group-Object).Count -ne 6) {
         throw 'Qualification evidence must bind exactly six unique package artifacts.'
@@ -57,36 +140,36 @@ if ($Gate -in @(
 }
 $valid = switch -Regex ($Gate) {
     '^acceptance-(?:debug|release)$' {
-        [int]$evidence.schemaVersion -eq 1 -and
+        $schemaVersion -eq 1 -and
         [string]$evidence.command -ceq 'acceptance' -and
         [string]$evidence.configuration -ceq $Gate.Substring(11) -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit
     }
     '^portable-(?:linux|windows|macos)$' {
-        [int]$evidence.schemaVersion -eq 2 -and
+        $schemaVersion -eq 2 -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit -and
         [string]$evidence.osFamily -ceq $Gate.Substring(9)
     }
     '^release-configuration$' {
-        [int]$evidence.schemaVersion -eq 1 -and
+        $schemaVersion -eq 1 -and
         [string]$evidence.commit -ceq $commit
     }
     'coverage' {
-        [int]$evidence.schemaVersion -eq 1 -and
-        [bool]$evidence.passed -and
+        $schemaVersion -eq 1 -and
+        $coveragePassed -and
         [string]$evidence.commit -ceq $commit
     }
     'mutation' {
-        [int]$evidence.schemaVersion -eq 2 -and
+        $schemaVersion -eq 2 -and
         [string]$evidence.selection -ceq 'full' -and
         [string]$evidence.commit -ceq $commit -and
-        [int]$evidence.mutationCount -gt 0 -and
-        [int]$evidence.mutationCount -eq [int]$evidence.killedCount
+        $mutationCount -gt 0 -and
+        $mutationCount -eq $killedCount
     }
     'package-consumers' {
-        [int]$evidence.schemaVersion -eq 2 -and
+        $schemaVersion -eq 2 -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit
     }

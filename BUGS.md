@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, and managed struct receiver-write findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **67 findings**: 0 P0, 7 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, and qualification evidence-admission findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **66 findings**: 0 P0, 6 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -55,7 +55,7 @@ regressions and unexecuted downstream paths remain open.
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; wave four reviewed summary ownership/signatures, substitution, model validation/replay, cancellation, and disposal without new probes or repeated suites | No distinct new finding: foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses | B4 and B7 boundaries observed; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
-| Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 now validates worker response status and strict outcomes through the real receipt writer; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches | B8 validator and receipt boundary covered by fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; no release CI, native workflow, or full end-to-end qualification run |
+| Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches | B8 and B12 receipt boundaries covered by fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; no release CI, native workflow, or full end-to-end qualification run |
 
 B3 combines the hash-writer and specification-admission evidence into one
 deduplicated boundary finding; it is not counted twice. All five fourth-wave
@@ -207,25 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P1 - High
-
-### B12. Qualification admission coerces invalid Boolean and integer evidence
-
-**Confidence: Confirmed admission-switch boundary; no receipt issued.**
-
-- **Location:** `scripts/Write-SharpProofQualificationReceipt.ps1:58-86`,
-  particularly `:78` and `:85-86`.
-- **Defect:** permissive Boolean and integer casts accept evidence whose types
-  do not satisfy the admission schema, potentially turning failure into success.
-- **Observed boundary:** a probe of the actual AST switch accepted coverage
-  Boolean `true` and rejected Boolean `false`, but accepted string `"false"`.
-  Mutation counts `2` and `1` were rejected, while `1.4` and `1.1` were accepted
-  after both became `[int]1`. The full receipt writer was not exercised.
-- **Proposed fix:** require exact Boolean and integer token/types, validate
-  integer ranges, and reject strings, fractions, and nulls before evaluating
-  evidence acceptance.
-- **Proposed regression:** reject malformed types and out-of-range counts;
-  preserve actual Boolean and integral-count positive/negative controls and
-  check that invalid evidence cannot issue a receipt.
 
 ### B13. Qualification receipts can bind bytes different from validated evidence
 

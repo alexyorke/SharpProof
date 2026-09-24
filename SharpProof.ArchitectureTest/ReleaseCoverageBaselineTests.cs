@@ -193,6 +193,18 @@ public sealed class ReleaseCoverageBaselineTests
                 return
                 [
                     (Evidence(packages), true),
+                    (Evidence(packages).Replace(
+                        "\"bytes\":1",
+                        "\"bytes\":\"1\"",
+                        StringComparison.Ordinal), false),
+                    (Evidence(packages).Replace(
+                        "\"bytes\":1",
+                        "\"bytes\":1.5",
+                        StringComparison.Ordinal), false),
+                    (Evidence(packages).Replace(
+                        "\"bytes\":1",
+                        "\"bytes\":9223372036854775808",
+                        StringComparison.Ordinal), false),
                     (Evidence(packages.Take(5).ToArray()), false),
                     (Evidence(packages.Select((item, index) => index == 5
                         ? new
@@ -210,6 +222,75 @@ public sealed class ReleaseCoverageBaselineTests
                             item.sha256
                         }
                         : item).ToArray()), false)
+                ];
+            });
+    }
+
+    [Test]
+    public async Task QualificationReceiptRejectsMalformedAdmissionTypesAndRanges()
+    {
+        await RunReceiptFixturesAsync(
+            "coverage",
+            "coverage.json",
+            head =>
+            {
+                string Evidence(string schemaVersion, string passed)
+                {
+                    return $"{{\"schemaVersion\":{schemaVersion},\"passed\":{passed},\"commit\":\"{head}\"}}";
+                }
+                return
+                [
+                    (Evidence("1", "true"), true),
+                    (Evidence("1", "false"), false),
+                    (Evidence("1", "\"false\""), false),
+                    (Evidence("1", "\"true\""), false),
+                    (Evidence("1", "1"), false),
+                    (Evidence("1", "null"), false),
+                    (Evidence("\"1\"", "true"), false),
+                    (Evidence("1.0", "true"), false),
+                    (Evidence("true", "true"), false),
+                    (Evidence("null", "true"), false),
+                    (Evidence("2147483648", "true"), false),
+                    (Evidence("1e0", "true"), false)
+                ];
+            });
+
+        await RunReceiptFixturesAsync(
+            "mutation",
+            "mutation.json",
+            head =>
+            {
+                string Evidence(
+                    string schemaVersion,
+                    string mutationCount,
+                    string killedCount)
+                {
+                    return $"{{\"schemaVersion\":{schemaVersion},\"selection\":\"full\",\"commit\":\"{head}\",\"mutationCount\":{mutationCount},\"killedCount\":{killedCount}}}";
+                }
+                return
+                [
+                    (Evidence("2", "1", "1"), true),
+                    (Evidence("2", "2", "1"), false),
+                    (Evidence("2", "0", "0"), false),
+                    (Evidence("2", "-1", "-1"), false),
+                    (Evidence("2", "1.4", "1.1"), false),
+                    (Evidence("2", "\"1\"", "1"), false),
+                    (Evidence("2", "true", "1"), false),
+                    (Evidence("2", "null", "0"), false),
+                    (Evidence("2", "2147483648", "1"), false),
+                    (Evidence("2", "1e0", "1"), false),
+                    (Evidence("2", "1", "1.1"), false),
+                    (Evidence("2", "1", "\"1\""), false),
+                    (Evidence("2", "1", "true"), false),
+                    (Evidence("2", "1", "null"), false),
+                    (Evidence("2", "1", "2147483648"), false),
+                    (Evidence("2", "1", "1e0"), false),
+                    (Evidence("\"2\"", "1", "1"), false),
+                    (Evidence("2.0", "1", "1"), false),
+                    (Evidence("true", "1", "1"), false),
+                    (Evidence("null", "1", "1"), false),
+                    (Evidence("2147483648", "1", "1"), false),
+                    (Evidence("2e0", "1", "1"), false)
                 ];
             });
     }
@@ -267,6 +348,11 @@ public sealed class ReleaseCoverageBaselineTests
         var receiptDirectory = Path.Combine(workspacePath, "receipts");
         foreach (var fixture in createFixtures(head))
         {
+            var gateReceipt = Path.Combine(receiptDirectory, $"{gate}.json");
+            if (File.Exists(gateReceipt))
+            {
+                File.Delete(gateReceipt);
+            }
             await File.WriteAllTextAsync(evidencePath, fixture.Content);
             var result = await RunAsync(
                 root,
@@ -288,6 +374,10 @@ public sealed class ReleaseCoverageBaselineTests
                 result.ExitCode == 0,
                 Is.EqualTo(fixture.Valid),
                 result.Output + result.Error);
+            Assert.That(
+                File.Exists(gateReceipt),
+                Is.EqualTo(fixture.Valid),
+                "A receipt must be written exactly when its evidence is admitted.");
         }
 
         if (expectedReceipt is not null)
