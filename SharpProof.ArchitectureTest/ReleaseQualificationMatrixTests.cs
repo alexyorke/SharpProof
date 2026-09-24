@@ -149,6 +149,141 @@ public sealed partial class ReleaseQualificationMatrixTests
     }
 
     [Test]
+    public async Task ReceiptWriterBindsTheValidatedEvidenceSnapshot()
+    {
+        var sourceRoot = TestRepository.FindRoot();
+        using var fixture = new TempDirectory("qualification-snapshot-");
+        var scripts = Directory.CreateDirectory(Path.Combine(
+            fixture.FullName,
+            "scripts"));
+        foreach (var name in new[]
+                 {
+                         "Write-SharpProofQualificationReceipt.ps1",
+                         "SharpProof.ReleaseBundle.ps1",
+                         "Test-SharpProofPilotReport.ps1",
+                         "SharpProof.ReleaseJson.ps1",
+                         "SharpProof.PackageIdentity.psm1"
+                     })
+        {
+            File.Copy(
+                Path.Combine(sourceRoot, "scripts", name),
+                Path.Combine(scripts.FullName, name));
+        }
+        await ArchitectureGitRepository.InitializeAsync(
+            fixture.FullName,
+            "fixture@example.invalid",
+            "Fixture");
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.FullName, "tracked.txt"),
+            "fixture\n");
+        await RunAsync(fixture.FullName, "git", "add", "tracked.txt");
+        await RunAsync(
+            fixture.FullName,
+            "git",
+            "commit",
+            "-q",
+            "-m",
+            "fixture");
+        var head = (await RunAsync(
+            fixture.FullName,
+            "git",
+            "rev-parse",
+            "HEAD")).Trim();
+        var evidencePath = Path.Combine(fixture.FullName, "coverage.json");
+        var receiptPath = Path.Combine(
+            fixture.FullName,
+            "artifacts",
+            "release-qualification",
+            "qualification-receipts",
+            "coverage.json");
+        var originalEvidence = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            passed = true,
+            commit = head
+        });
+        var replacementEvidence = originalEvidence.Replace(
+            "\"passed\":true",
+            "\"passed\":null",
+            StringComparison.Ordinal);
+        var originalBytes = System.Text.Encoding.UTF8.GetBytes(originalEvidence);
+        var replacementBytes = System.Text.Encoding.UTF8.GetBytes(replacementEvidence);
+        Assert.That(replacementBytes.Length, Is.EqualTo(originalBytes.Length));
+        var originalHash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(originalBytes));
+        var replacementHash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(replacementBytes));
+        Assert.That(replacementHash, Is.Not.EqualTo(originalHash));
+
+        async Task WriteReceiptAsync()
+        {
+            await RunAsync(
+                fixture.FullName,
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(scripts.FullName, "Write-SharpProofQualificationReceipt.ps1"),
+                "-Gate",
+                "coverage",
+                "-EvidencePath",
+                evidencePath);
+        }
+
+        async Task WriteEvidenceAsync(string content)
+        {
+            await File.WriteAllTextAsync(evidencePath, content);
+        }
+
+        async Task AssertReceiptBindsAsync(byte[] expectedBytes)
+        {
+            using var receipt = JsonDocument.Parse(
+                await File.ReadAllTextAsync(receiptPath));
+            var evidence = receipt.RootElement.GetProperty("evidence");
+            Assert.That(
+                evidence.GetProperty("bytes").GetInt64(),
+                Is.EqualTo(expectedBytes.LongLength));
+            Assert.That(
+                StringComparer.OrdinalIgnoreCase.Equals(
+                    evidence.GetProperty("sha256").GetString(),
+                    Convert.ToHexString(
+                        System.Security.Cryptography.SHA256.HashData(expectedBytes))),
+                Is.True);
+        }
+
+        await WriteEvidenceAsync(originalEvidence);
+        await WriteReceiptAsync();
+        await AssertReceiptBindsAsync(originalBytes);
+
+        var writerPath = Path.Combine(
+            scripts.FullName,
+            "Write-SharpProofQualificationReceipt.ps1");
+        var writer = await File.ReadAllTextAsync(writerPath);
+        const string bindingMarker =
+            "$receiptCandidate = if ([IO.Path]::IsPathRooted($ReceiptDirectory)) {";
+        var replacementCommand =
+            "[IO.File]::WriteAllBytes($resolvedEvidence, [Convert]::FromBase64String('" +
+            Convert.ToBase64String(replacementBytes) +
+            "'))";
+        var instrumentedWriter = writer.Replace(
+            bindingMarker,
+            replacementCommand + Environment.NewLine + bindingMarker,
+            StringComparison.Ordinal);
+        Assert.That(instrumentedWriter, Is.Not.EqualTo(writer));
+        await File.WriteAllTextAsync(
+            writerPath,
+            instrumentedWriter,
+            new System.Text.UTF8Encoding(false));
+        await WriteEvidenceAsync(originalEvidence);
+        await WriteReceiptAsync();
+
+        Assert.That(
+            await File.ReadAllBytesAsync(evidencePath),
+            Is.EqualTo(replacementBytes));
+        await AssertReceiptBindsAsync(originalBytes);
+    }
+
+    [Test]
     public async Task ReceiptWriterRequiresReviewedPilotEvidence()
     {
         var sourceRoot = TestRepository.FindRoot();

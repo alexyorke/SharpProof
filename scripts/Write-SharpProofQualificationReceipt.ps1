@@ -74,7 +74,11 @@ if ($relativeEvidence.StartsWith('../', [StringComparison]::Ordinal) -or
     [IO.Path]::IsPathRooted($relativeEvidence)) {
     throw 'Qualification gate evidence must remain inside the repository.'
 }
-$evidenceText = Get-Content -LiteralPath $resolvedEvidence -Raw
+$evidenceBytes = [IO.File]::ReadAllBytes($resolvedEvidence)
+$evidenceLength = [int64]$evidenceBytes.LongLength
+$evidenceSha256 = [BitConverter]::ToString(
+    [Security.Cryptography.SHA256]::HashData($evidenceBytes)).Replace('-', '').ToLowerInvariant()
+$evidenceText = [Text.UTF8Encoding]::new($false, $true).GetString($evidenceBytes)
 $evidenceDocument = [Text.Json.JsonDocument]::Parse($evidenceText)
 $packageByteValues = [Collections.Generic.List[long]]::new()
 try {
@@ -202,8 +206,8 @@ $receipt = [ordered]@{
     commit = $commit
     evidence = [ordered]@{
         path = $relativeEvidence
-        bytes = [int64](Get-Item -LiteralPath $resolvedEvidence).Length
-        sha256 = Get-SharpProofFileSha256 -Path $resolvedEvidence
+        bytes = $evidenceLength
+        sha256 = $evidenceSha256
     }
 }
 if ($packageArtifacts.Count -ne 0) {
