@@ -22,6 +22,22 @@ $projections = @($producer.FindAll({
         $node.Operator -eq [Management.Automation.Language.TokenKind]::PlusEquals
 }, $true))
 if ($projections.Count -ne 1) { throw 'Expected one pilot result projection.' }
+$runRootAssignments = @($producer.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -ceq '$runRoot'
+}, $true))
+$cachePathAssignments = @($producer.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -ceq '$cachePath'
+}, $true))
+if ($runRootAssignments.Count -ne 1 -or
+    $runRootAssignments[0].Right.Extent.Text -notmatch '\[IO\.Path\]::GetTempPath\(\)' -or
+    $cachePathAssignments.Count -ne 1 -or
+    $cachePathAssignments[0].Right.Extent.Text -notmatch '\$runRoot') {
+    throw 'Pilot verifier caches must use a task-local run root.'
+}
 $projectionRoot = Join-Path ([IO.Path]::GetTempPath()) ('sp-pilot-projection-' + [Guid]::NewGuid().ToString('N'))
 $projectionEvidenceDirectory = Join-Path $projectionRoot 'evidence'
 [IO.Directory]::CreateDirectory($projectionEvidenceDirectory) | Out-Null

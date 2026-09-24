@@ -103,12 +103,11 @@ $packageArtifacts = @(Get-SharpProofPilotPackageAuthority `
     -ExpectedVersion $version `
     -ExpectedCommit $head)
 $runId = [Guid]::NewGuid().ToString('N')
-# Container task workspaces redirect artifacts to the host mount. Use the
-# physical target for verifier-owned caches and requests so SharpProof's
-# publication paths never traverse that infrastructure symlink.
-$artifactsRoot = Resolve-SharpProofPhysicalPath (
-    Join-Path $repositoryRoot 'artifacts')
-$runRoot = Join-Path $artifactsRoot "pilots/runs/$runId"
+# Verifier-owned caches must stay on the task-local filesystem: the container's
+# artifacts mount may use a filesystem that the worker correctly rejects.
+# Preserve logs and report evidence under the host-mounted artifacts directory.
+$runRoot = Join-Path ([IO.Path]::GetTempPath()) "sharpproof-pilots/$runId"
+$runArtifactRoot = Join-Path $repositoryRoot "artifacts/pilots/runs/$runId"
 $nugetCache = Join-Path $runRoot 'nuget'
 $dotnetHome = Join-Path $runRoot 'dotnet-home'
 $qualificationStartedUtc = [DateTimeOffset]::UtcNow
@@ -213,7 +212,7 @@ foreach ($pilot in $catalog.pilots) {
     $manifestPath = $evidence.Manifest
     $sarifPath = $evidence.Sarif
     $cachePath = Join-Path $runRoot "cache/$($pilot.id)"
-    $logDirectory = Join-Path $runRoot 'logs'
+    $logDirectory = Join-Path $runArtifactRoot 'logs'
     [IO.Directory]::CreateDirectory($logDirectory) | Out-Null
     foreach ($stale in @($requestPath, $resultPath, $manifestPath, $sarifPath)) {
         if (Test-Path -LiteralPath $stale) {
@@ -259,8 +258,7 @@ foreach ($pilot in $catalog.pilots) {
     # Keep immutable, run-scoped copies for the report. Project obj paths are
     # reused by later builds and therefore cannot serve as qualification
     # evidence after another run replaces their contents.
-    $snapshotDirectory = Join-Path $repositoryRoot `
-        "artifacts/pilots/runs/$runId/$($pilot.id)/evidence"
+    $snapshotDirectory = Join-Path $runArtifactRoot "$($pilot.id)/evidence"
     [IO.Directory]::CreateDirectory($snapshotDirectory) | Out-Null
     $evidenceFiles = @($sourceEvidenceFiles | ForEach-Object {
             $snapshotPath = Join-Path $snapshotDirectory ([IO.Path]::GetFileName($_))
