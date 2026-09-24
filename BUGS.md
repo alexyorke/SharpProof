@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, advisory attribute-alias activation, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **64 findings**: 0 P0, 4 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, advisory attribute-alias activation, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **63 findings**: 0 P0, 3 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -54,7 +54,7 @@ regressions and unexecuted downstream paths remain open.
 | Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend and B15 meta-analyzer boundaries remain; B14 alias activation is fixed and covered; worker consequences remain open |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; wave four reviewed summary ownership/signatures, substitution, model validation/replay, cancellation, and disposal without new probes or repeated suites | No distinct new finding: foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
-| Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe | B4 and B7 boundaries observed; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
+| Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B4 and B7 boundaries observed; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
 | Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; B13 now binds validation and receipt metadata to one byte snapshot; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches; B74 assessed standard NuGet V3 main-package download and repeated symbol-publish behavior | B8/B12 admission and B13 snapshot-binding boundaries covered by writer fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; B74 retry guard is covered by mocked exact/mismatched main bytes, canonical-feed capability, digest-plan binding, and push-sequence fixtures; no production feed was contacted, and no interrupted production release was resumed; no release CI, native workflow, or full end-to-end qualification run |
 
 B3 combines the hash-writer and specification-admission evidence into one
@@ -386,59 +386,6 @@ consequences source-traced.**
   finishing within a small time budget, plus a precision control proving
   that a directly self-recursive method with no base case is still
   classified as nonreturning.
-
-### B67. `[SharpProofSuppress]` silently removes claims from strict verification, without an assumption record
-
-**Confidence: Confirmed by running the collector and worker.**
-
-- **Location:** `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:51-61`
-  (`BuildTarget` returns `null`, so the callable and all its claims are
-  omitted from the manifest, whenever
-  `SharpProofControlAttributePolicy.ValidateAndShouldSuppress` is true for
-  the method, its containing types, or the assembly). The contract is stated
-  in `docs/public-api.md` ("`SharpProofSuppressAttribute` changes diagnostic
-  reporting only"). The assumption reporting that exists for
-  `[SharpProofTrusted]` is in `SharpProof.Worker.Launcher/Program.cs:584-607`
-  (`ReportAssumptions`, SP0048).
-- **Defect:** suppression is documented as a reporting control, but it
-  actually deletes the suppressed callables' postcondition and effect claims
-  from the compiler manifest. The worker never sees them, so the launcher's
-  `require-proven` policy and `SharpProofAssumptionPolicy=error` (both strict
-  defaults) have nothing to reject. No SP0047, SP0048 or summary entry
-  records that claims were skipped. `[SharpProofTrusted]`, the explicit
-  trust mechanism, is audited as an assumption, while suppression bypasses
-  it.
-- **Observed boundary:** with the collector and in-process worker (checked
-  compilation):
-  - `[assembly: SharpProofSuppress("whole assembly")]` plus
-    `long Wrong(long x) { Contract.Ensures(Contract.Result<long>() == x + 1L); return x; }`
-    produced a manifest with **0 claims** and `run=Complete failure=None`.
-  - With `[SharpProofSuppress("type")]` on the containing class, that
-    class's claim was omitted, while the identical unsuppressed `S3b.Wrong`
-    was `Refuted` with a counterexample.
-  - A method carrying both `[SharpProofSuppress]` and a false
-    `[DoesNotThrow]` produced no worker claim and no analyzer diagnostic.
-    Callers of suppressed methods were still correctly not proven.
-- **Impact:** a single assembly-level attribute turns a strict,
-  `require-proven` build into one that verifies nothing and still succeeds,
-  and the SARIF and summary show a clean, complete run. Teams that rely on
-  strict mode as a gate can lose it by accident (a suppression added to
-  quiet an IDE message) or by design, with no audit trail. This hides a
-  mandatory check (P1).
-- **Proposed fix:** keep suppressed callables and their claims in the
-  manifest, and apply suppression only in presentation (the analyzer's
-  reporting and the launcher's diagnostic severity), as documented. If
-  skipping verification is intended, make it explicit: emit the callable
-  with `Coverage=Incomplete` and a new reason `Suppressed`, report it
-  through SP0047/SP0048 with the suppression reason, count it in the run
-  summary, and have `require-proven` and `AssumptionPolicy=error` fail on
-  it just as they do for `[SharpProofTrusted]` evidence. Update
-  `docs/public-api.md` to match.
-- **Proposed regression:** worker/launcher tests where assembly-, type- and
-  method-level suppression each covers a false `Ensures` and a false
-  `[DoesNotThrow]`. Under the strict defaults the launcher must exit
-  non-zero and name the suppressed claims; under `advisory` they appear as
-  informational suppressed claims, never as absent.
 
 ## P2 - Medium
 

@@ -1239,7 +1239,7 @@ public sealed class ClaimManifestBuilderTests
     [TestCase("method")]
     [TestCase("type")]
     [TestCase("assembly")]
-    public void SuppressionScopesRemoveSelectedClaimsFromTheManifest(
+    public void SuppressionScopesRetainSelectedClaimsInTheManifest(
         string scope)
     {
         const string template =
@@ -1249,13 +1249,14 @@ public sealed class ClaimManifestBuilderTests
             TYPE_SUPPRESSION
             public static class Subject {
                 METHOD_SUPPRESSION
-                [ZeroAllocations]
-                public static object Allocate() => new object();
+                [DoesNotThrow]
+                public static void Throwing() =>
+                    throw new System.InvalidOperationException();
 
                 METHOD_SUPPRESSION
                 public static long Identity(long value) {
                     Contract.Ensures(
-                        Contract.Result<long>() > value);
+                        Contract.Result<long>() == value + 1L);
                     return value;
                 }
             }
@@ -1297,14 +1298,21 @@ public sealed class ClaimManifestBuilderTests
                     WorkerClaimKind.Postcondition,
                     WorkerClaimKind.Effect
                 ]));
+            Assert.That(suppressed.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(
+                suppressed.Manifest.Claims.Select(static claim => claim.Kind),
+                Is.EquivalentTo(control.Manifest.Claims.Select(
+                    static claim => claim.Kind)));
             Assert.That(
                 control.Targets.Values
                     .SelectMany(static target => target.EffectClaims)
                     .Single().Evidence.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(suppressed.Manifest.Callables, Is.Empty);
-            Assert.That(suppressed.Manifest.Claims, Is.Empty);
-            Assert.That(suppressed.Targets, Is.Empty);
+            Assert.That(
+                suppressed.Targets.Values
+                    .SelectMany(static target => target.EffectClaims)
+                    .Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
         }
     }
 

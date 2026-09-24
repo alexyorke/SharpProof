@@ -1250,6 +1250,98 @@ public sealed class WorkerMsBuildIntegrationTests
         }
     }
 
+    [TestCase("method")]
+    [TestCase("type")]
+    [TestCase("assembly")]
+    public async Task SuppressedClaimsRemainInStrictVerification(string scope)
+    {
+        RequireContainerWorker();
+        const string template =
+            """
+            using SharpProof.Attributes;
+            ASSEMBLY_SUPPRESSION
+            TYPE_SUPPRESSION
+            public static class Subject {
+                METHOD_SUPPRESSION
+                [DoesNotThrow]
+                public static void Throwing() =>
+                    throw new System.InvalidOperationException();
+
+                METHOD_SUPPRESSION
+                public static long Wrong(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() > value);
+                    return value;
+                }
+            }
+            """;
+        var suppression = "[SharpProofSuppress(\"reviewed scope\")]";
+        var source = template
+            .Replace(
+                "ASSEMBLY_SUPPRESSION",
+                scope == "assembly"
+                    ? "[assembly: SharpProofSuppress(\"reviewed scope\")]"
+                    : string.Empty,
+                StringComparison.Ordinal)
+            .Replace(
+                "TYPE_SUPPRESSION",
+                scope == "type" ? suppression : string.Empty,
+                StringComparison.Ordinal)
+            .Replace(
+                "METHOD_SUPPRESSION",
+                scope == "method" ? suppression : string.Empty,
+                StringComparison.Ordinal);
+        using var project = ConsumerProject.Create(source);
+
+        var build = await project.BuildAsync(
+            verify: null,
+            ("SharpProofProfile", "strict"));
+
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("error SP0051"), build.Output);
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                request.VerifyPolicy,
+                Is.EqualTo(WorkerVerifyPolicy.RequireProven));
+            Assert.That(response.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(response.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.Summary.CallableCount, Is.EqualTo(2));
+            Assert.That(response.Summary.ClaimCount, Is.EqualTo(2));
+            Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+            var outcomesByKind = response.Manifest.Claims.Join(
+                response.ClaimResults,
+                static claim => claim.ClaimId,
+                static result => result.ClaimId,
+                static (claim, result) => new
+                {
+                    claim.Kind,
+                    result.Outcome,
+                    result.Reason
+                }).ToArray();
+            Assert.That(
+                outcomesByKind.Single(static result =>
+                    result.Kind == WorkerClaimKind.Postcondition).Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted),
+                string.Join(", ", outcomesByKind.Select(static result =>
+                    $"{result.Kind}={result.Outcome}/{result.Reason}")) +
+                Environment.NewLine + build.Output);
+            Assert.That(
+                response.Summary.OutcomeCounts.Single(static count =>
+                    count.Outcome == WorkerClaimOutcome.Refuted).Count,
+                Is.GreaterThanOrEqualTo(1));
+            Assert.That(
+                outcomesByKind.Single(static result =>
+                    result.Kind == WorkerClaimKind.Effect).Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+        }
+    }
+
     [Test]
     public async Task StrictProfileCannotDisableVerification()
     {

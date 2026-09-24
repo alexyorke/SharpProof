@@ -51,14 +51,11 @@ internal sealed partial class ClaimManifestBuilder(
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
         var target = seed.Method;
-        if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
-                target,
-                _effectSession,
-                static _ => { },
-                cancellationToken))
-        {
-            return null;
-        }
+        _ = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+            target,
+            _effectSession,
+            static _ => { },
+            cancellationToken);
 
         var resolution = _contractSources.Resolve(target);
         var source = resolution.Source;
