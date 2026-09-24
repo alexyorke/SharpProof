@@ -1,13 +1,14 @@
+using Microsoft.CodeAnalysis.Operations;
+
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
 public sealed class CompletionFactsDepthBudgetRegressionTests
 {
     [Test]
-    public void DeepAcyclicCallChainAbstainsAndPreservesCallerSuffixEffects()
+    public void ThousandMethodCallChainIsSolvedWithoutNativeMethodRecursion()
     {
-        var methodCount =
-            DefiniteOperationFacts.MaximumCompletionFactsDepth + 16;
+        const int methodCount = 1000;
         var methods = string.Join(
             Environment.NewLine,
             Enumerable.Range(0, methodCount).Select(index =>
@@ -28,20 +29,28 @@ public sealed class CompletionFactsDepthBudgetRegressionTests
                 }
             }
             """);
-        var completion = EffectTestHost.CreateCompletionFacts(compilation);
+        using var cancellation = new CancellationTokenSource(
+            TimeSpan.FromSeconds(10));
+        var completion = new DefiniteOperationFacts(
+            compilation,
+            cancellation.Token);
         var firstStep = EffectTestHost.SampleMethod(compilation, "Step0");
 
         Assert.That(
             completion.MethodCanCompleteNormally(firstStep),
-            Is.True,
-            "Exhaustion must retain the possibility of normal completion.");
+            Is.False,
+            "The iterative solver must reach the noncompleting leaf.");
 
-        var summary = EffectTestHost.AnalyzeSample(compilation, "Entry")
-            .Summary;
+        var firstInvocation = EffectTestHost.RootOperation(
+                compilation,
+                firstStep)
+            .DescendantsAndSelf()
+            .OfType<IInvocationOperation>()
+            .First();
         Assert.That(
-            summary.Writes.Contains(EffectRegionId.Static()),
-            Is.True,
-            "A depth cutoff must not suppress later source effects.");
+            completion.CompletesNormally(firstInvocation),
+            Is.False,
+            "The guarded definite query must abstain before the stack is exhausted.");
     }
 
     [Test]

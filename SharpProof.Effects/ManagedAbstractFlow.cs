@@ -2824,6 +2824,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 {
     // Method and operation recursion consume one shared per-thread limit.
     internal const int MaximumCompletionFactsDepth = 256;
+    private const int MaximumCompletionGraphMethods = 4096;
+    private const int MaximumCompletionGraphEdges = 65536;
 
     private readonly InvocationEmissionPolicy _invocationEmission = new(compilation);
 
@@ -2833,27 +2835,48 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         internal bool Exhausted { get; set; }
     }
 
+    private sealed class CompletionGraphMethod
+    {
+        internal bool CanCompleteNormally { get; set; } = true;
+        internal bool Queued { get; set; }
+        internal HashSet<IMethodSymbol> Dependencies { get; } =
+            new(SymbolEqualityComparer.Default);
+        internal HashSet<IMethodSymbol> Dependents { get; } =
+            new(SymbolEqualityComparer.Default);
+    }
+
+    private sealed class CompletionGraphState
+    {
+        internal Dictionary<IMethodSymbol, CompletionGraphMethod> Methods { get; } =
+            new(SymbolEqualityComparer.Default);
+        internal Queue<IMethodSymbol> Worklist { get; } = new();
+        internal IMethodSymbol? CurrentMethod { get; set; }
+        internal int EdgeCount { get; set; }
+        internal bool Exhausted { get; set; }
+    }
+
     internal bool IsConditionallyElided(IOperation operation)
     {
         return _invocationEmission.IsElided(operation);
     }
 
-    // The active-method sets are the cycle guard for CompletesNormally and
-    // MethodCanCompleteNormally.  ManagedAbstractFlow shares one instance per
-    // compilation across Roslyn's concurrent analysis threads, and recursive
-    // re-entry always stays on one thread, so each set is per thread and per
-    // instance rather than an instance field.
+    // Definite-completion recursion and may-completion graph solving are
+    // re-entrant per analysis thread. ManagedAbstractFlow shares this class
+    // across Roslyn's concurrent analysis threads, so keep their state both
+    // thread-local and scoped by this instance.
     [ThreadStatic]
     private static Dictionary<DefiniteOperationFacts, HashSet<IMethodSymbol>>?
         s_activeMethods;
     [ThreadStatic]
-    private static Dictionary<DefiniteOperationFacts, HashSet<IMethodSymbol>>?
-        s_cycleAffectedMethods;
-    [ThreadStatic]
     private static Dictionary<DefiniteOperationFacts, CompletionTraversalState>?
         s_completionTraversals;
+    [ThreadStatic]
+    private static Dictionary<DefiniteOperationFacts, CompletionGraphState>?
+        s_completionGraphs;
     private readonly ConcurrentDictionary<IMethodSymbol, bool>
         _methodCompletionCache = new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, bool>
+        _definiteMethodCompletionCache = new(SymbolEqualityComparer.Default);
     private readonly INamedTypeSymbol? _contractApi =
         ContractApiIdentityResolver.ForCompilation(compilation).Contract;
 
@@ -2874,7 +2897,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         if (traversal.Exhausted ||
-            traversal.Depth >= MaximumCompletionFactsDepth)
+            traversal.Depth >= MaximumCompletionFactsDepth ||
+            (traversal.Depth & 15) == 0 &&
+            !HasSufficientExecutionStack())
         {
             traversal.Exhausted = true;
             if (ownsTraversal)
@@ -2886,6 +2911,19 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         traversal.Depth++;
         return true;
+    }
+
+    private static bool HasSufficientExecutionStack()
+    {
+        try
+        {
+            RuntimeHelpers.EnsureSufficientExecutionStack();
+            return true;
+        }
+        catch (InsufficientExecutionStackException)
+        {
+            return false;
+        }
     }
 
     private void ExitCompletionTraversal(
@@ -2912,48 +2950,6 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         return methods.Add(method);
-    }
-
-    private bool IsMethodActive(IMethodSymbol method)
-    {
-        return s_activeMethods != null &&
-            s_activeMethods.TryGetValue(this, out var methods) &&
-            methods.Contains(method);
-    }
-
-    private void MarkActiveCycle()
-    {
-        if (s_activeMethods == null ||
-            !s_activeMethods.TryGetValue(this, out var active))
-        {
-            return;
-        }
-
-        var cycleAffected = s_cycleAffectedMethods ??= [];
-        if (!cycleAffected.TryGetValue(this, out var methods))
-        {
-            methods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-            cycleAffected.Add(this, methods);
-        }
-
-        methods.UnionWith(active);
-    }
-
-    private bool ExitMethodAndReportCycle(IMethodSymbol method)
-    {
-        var cycleAffected = false;
-        if (s_cycleAffectedMethods != null &&
-            s_cycleAffectedMethods.TryGetValue(this, out var methods))
-        {
-            cycleAffected = methods.Remove(method);
-            if (methods.Count == 0)
-            {
-                s_cycleAffectedMethods.Remove(this);
-            }
-        }
-
-        ExitMethod(method);
-        return cycleAffected;
     }
 
     private void ExitMethod(IMethodSymbol method)
@@ -3054,6 +3050,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private bool CompletesNormally(IMethodSymbol method)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var normalized = method.OriginalDefinition;
+        if (_definiteMethodCompletionCache.TryGetValue(
+                normalized,
+                out var cached))
+        {
+            return cached;
+        }
         if (!TryEnterCompletionTraversal(
                 out var traversal,
                 out var ownsTraversal))
@@ -3063,43 +3066,64 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         try
         {
-            var result = CompletesNormallyCore(method);
-            return traversal.Exhausted ? false : result;
-        }
-        finally
-        {
-            ExitCompletionTraversal(traversal, ownsTraversal);
-        }
-    }
+            if (_definiteMethodCompletionCache.TryGetValue(
+                    normalized,
+                    out cached))
+            {
+                return cached;
+            }
 
-    private bool CompletesNormallyCore(IMethodSymbol method)
-    {
-        if (method.IsStatic && method.ContainingType.StaticConstructors.Length != 0)
-        {
-            return false;
-        }
+            if (method.IsStatic &&
+                method.ContainingType.StaticConstructors.Length != 0)
+            {
+                _definiteMethodCompletionCache.TryAdd(normalized, false);
+                return false;
+            }
 
-        var normalized = method.OriginalDefinition;
-        if (normalized.DeclaringSyntaxReferences.Length != 1 || !TryEnterMethod(normalized))
-        {
-            return false;
-        }
+            if (normalized.DeclaringSyntaxReferences.Length != 1 ||
+                !TryEnterMethod(normalized))
+            {
+                // A recursive re-entry cannot establish definite completion.
+                _definiteMethodCompletionCache.TryAdd(normalized, false);
+                return false;
+            }
 
-        try
-        {
-            var body = ExecutableBodySyntax.Get(
-                normalized.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken));
-            if (body == null)
+            bool result;
+            try
+            {
+                var body = ExecutableBodySyntax.Get(
+                    normalized.DeclaringSyntaxReferences[0]
+                        .GetSyntax(cancellationToken));
+                if (body == null)
+                {
+                    result = false;
+                }
+                else
+                {
+                    var model = SharpProof.Frontend.Host
+                        .CompilationModelProvider.GetSemanticModel(
+                            compilation,
+                            body.SyntaxTree);
+                    result = CompletesNormally(
+                        model.GetOperation(body, cancellationToken));
+                }
+            }
+            finally
+            {
+                ExitMethod(normalized);
+            }
+
+            if (traversal.Exhausted)
             {
                 return false;
             }
 
-            var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, body.SyntaxTree);
-            return CompletesNormally(model.GetOperation(body, cancellationToken));
+            _definiteMethodCompletionCache.TryAdd(normalized, result);
+            return result;
         }
         finally
         {
-            ExitMethod(normalized);
+            ExitCompletionTraversal(traversal, ownsTraversal);
         }
     }
 
@@ -3115,6 +3139,16 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
+        var normalized = method.OriginalDefinition;
+        if (s_completionGraphs != null &&
+            s_completionGraphs.TryGetValue(this, out var activeGraph))
+        {
+            return GetCompletionGraphValue(normalized, activeGraph);
+        }
+        if (TryGetSimpleCompletionValue(normalized, out var known))
+        {
+            return known;
+        }
         if (!TryEnterCompletionTraversal(
                 out var traversal,
                 out var ownsTraversal))
@@ -3124,8 +3158,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         try
         {
-            var result = MethodCanCompleteNormallyCore(method, traversal);
-            return traversal.Exhausted ? true : result;
+            if (TryGetSimpleCompletionValue(normalized, out known))
+            {
+                return known;
+            }
+            return SolveCompletionGraph(normalized, traversal);
         }
         finally
         {
@@ -3133,108 +3170,213 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
     }
 
-    private bool MethodCanCompleteNormallyCore(
+    private bool TryGetSimpleCompletionValue(
         IMethodSymbol method,
-        CompletionTraversalState traversal)
+        out bool result)
     {
-        method = ArgumentNullGuard.NotNull(method, nameof(method));
-        cancellationToken.ThrowIfCancellationRequested();
-        var normalized = method.OriginalDefinition;
-        if (_methodCompletionCache.TryGetValue(normalized, out var cached))
+        method = method.OriginalDefinition;
+        if (_methodCompletionCache.TryGetValue(method, out result))
         {
-            return cached;
-        }
-
-        if (IsMethodActive(normalized))
-        {
-            // A recursive re-entry is uncertainty, not evidence that every
-            // invocation is nonreturning. Do not publish the conservative
-            // answer or any result that depends on it.
-            MarkActiveCycle();
             return true;
         }
 
         var isImplicitConstructor = EffectMethodNodeBuilder
-            .IsSourceImplicitParameterlessConstructor(normalized);
+            .IsSourceImplicitParameterlessConstructor(method);
         if (!isImplicitConstructor &&
-            normalized.DeclaringSyntaxReferences.Length != 1)
+            method.DeclaringSyntaxReferences.Length != 1)
         {
-            _methodCompletionCache.TryAdd(normalized, true);
+            _methodCompletionCache.TryAdd(method, true);
+            result = true;
             return true;
         }
         if (!isImplicitConstructor &&
-            HasUnconditionalSelfInvocation(normalized))
+            HasUnconditionalSelfInvocation(method))
         {
-            _methodCompletionCache.TryAdd(normalized, false);
-            return false;
+            _methodCompletionCache.TryAdd(method, false);
+            result = false;
+            return true;
         }
-        if (!TryEnterMethod(normalized))
+        result = default;
+        return false;
+    }
+
+    private bool GetCompletionGraphValue(
+        IMethodSymbol method,
+        CompletionGraphState graph)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        method = method.OriginalDefinition;
+        if (graph.Exhausted)
         {
-            // This is a may-complete query. Recursive re-entry is uncertainty,
-            // not evidence that every invocation is nonreturning.
             return true;
         }
 
-        bool result;
-        bool cycleAffected;
+        if (!graph.Methods.TryGetValue(method, out var node))
+        {
+            if (TryGetSimpleCompletionValue(method, out var known))
+            {
+                return known;
+            }
+
+            if (graph.Methods.Count >= MaximumCompletionGraphMethods)
+            {
+                graph.Exhausted = true;
+                return true;
+            }
+
+            node = new CompletionGraphMethod();
+            graph.Methods.Add(method, node);
+            EnqueueCompletionGraphMethod(method, node, graph);
+        }
+
+        var currentMethod = graph.CurrentMethod;
+        if (currentMethod != null &&
+            graph.Methods.TryGetValue(currentMethod, out var currentNode) &&
+            currentNode.Dependencies.Add(method))
+        {
+            graph.EdgeCount++;
+            if (graph.EdgeCount > MaximumCompletionGraphEdges)
+            {
+                graph.Exhausted = true;
+                return true;
+            }
+            node.Dependents.Add(currentMethod);
+        }
+
+        return node.CanCompleteNormally;
+    }
+
+    private static void EnqueueCompletionGraphMethod(
+        IMethodSymbol method,
+        CompletionGraphMethod node,
+        CompletionGraphState graph)
+    {
+        if (node.Queued)
+        {
+            return;
+        }
+        node.Queued = true;
+        graph.Worklist.Enqueue(method);
+    }
+
+    private bool SolveCompletionGraph(
+        IMethodSymbol root,
+        CompletionTraversalState traversal)
+    {
+        var graphs = s_completionGraphs ??= [];
+        var graph = new CompletionGraphState();
+        var rootNode = new CompletionGraphMethod();
+        graph.Methods.Add(root, rootNode);
+        EnqueueCompletionGraphMethod(root, rootNode, graph);
+        graphs.Add(this, graph);
         try
         {
-            if (isImplicitConstructor)
+            while (graph.Worklist.Count != 0 && !graph.Exhausted)
             {
-                result = ImplicitConstructorMayCompleteNormally(normalized);
+                cancellationToken.ThrowIfCancellationRequested();
+                var method = graph.Worklist.Dequeue();
+                var node = graph.Methods[method];
+                node.Queued = false;
+                graph.CurrentMethod = method;
+                bool result;
+                try
+                {
+                    result = EvaluateMethodCompletion(method);
+                }
+                finally
+                {
+                    graph.CurrentMethod = null;
+                }
+
+                if (traversal.Exhausted)
+                {
+                    graph.Exhausted = true;
+                    break;
+                }
+                if (node.CanCompleteNormally && !result)
+                {
+                    node.CanCompleteNormally = false;
+                    foreach (var dependent in node.Dependents)
+                    {
+                        if (graph.Methods.TryGetValue(
+                                dependent,
+                                out var dependentNode))
+                        {
+                            EnqueueCompletionGraphMethod(
+                                dependent,
+                                dependentNode,
+                                graph);
+                        }
+                    }
+                }
+                else if (!node.CanCompleteNormally && result)
+                {
+                    // The completion evaluator is monotone. A value that rises
+                    // after starting from the conservative true assignment
+                    // means an unsupported dependency shape was observed.
+                    graph.Exhausted = true;
+                }
             }
-            else
+
+            if (graph.Exhausted || traversal.Exhausted)
             {
-                var declaration = normalized.DeclaringSyntaxReferences[0]
-                    .GetSyntax(cancellationToken);
-                if (DefersBodyCompletion(normalized, declaration))
-                {
-                    result = true;
-                }
-                else
-                {
-                    var model = SharpProof.Frontend.Host.CompilationModelProvider
-                        .GetSemanticModel(compilation, declaration.SyntaxTree);
-                    var operation = model.GetOperation(
-                            declaration,
-                            cancellationToken) ??
-                        (ExecutableBodySyntax.Get(declaration) is { } methodBody
-                            ? model.GetOperation(methodBody, cancellationToken)
-                            : null);
-                    result = operation == null
-                        ? true
-                        : normalized.MethodKind == MethodKind.Constructor &&
-                          operation is IConstructorBodyOperation constructorBody
-                            ? ConstructorMayCompleteNormally(
-                                normalized,
-                                constructorBody)
-                            : MayCompleteNormally(operation);
-                }
+                return true;
             }
-        }
-        catch (ArgumentException)
-        {
-            result = true;
+
+            foreach (var pair in graph.Methods)
+            {
+                _methodCompletionCache.TryAdd(
+                    pair.Key,
+                    pair.Value.CanCompleteNormally);
+            }
+            return graph.Methods[root].CanCompleteNormally;
         }
         finally
         {
-            cycleAffected = ExitMethodAndReportCycle(normalized);
+            graphs.Remove(this);
+            if (graphs.Count == 0)
+            {
+                s_completionGraphs = null;
+            }
+        }
+    }
+
+    private bool EvaluateMethodCompletion(IMethodSymbol method)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var isImplicitConstructor = EffectMethodNodeBuilder
+            .IsSourceImplicitParameterlessConstructor(method);
+        if (isImplicitConstructor)
+        {
+            return ImplicitConstructorMayCompleteNormally(method);
         }
 
-        // Only publish results after the active-method guard has been left.
-        // Results that depended on a cycle guard are deliberately excluded;
-        // this avoids turning a recursive re-entry's conservative fallback
-        // into a definitive cache entry for the whole strongly connected
-        // component.
-        if (traversal.Exhausted)
+        try
         {
-            result = true;
+            var declaration = method.DeclaringSyntaxReferences[0]
+                .GetSyntax(cancellationToken);
+            if (DefersBodyCompletion(method, declaration))
+            {
+                return true;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, declaration.SyntaxTree);
+            var operation = model.GetOperation(declaration, cancellationToken) ??
+                (ExecutableBodySyntax.Get(declaration) is { } methodBody
+                    ? model.GetOperation(methodBody, cancellationToken)
+                    : null);
+            return operation == null
+                ? true
+                : method.MethodKind == MethodKind.Constructor &&
+                  operation is IConstructorBodyOperation constructorBody
+                    ? ConstructorMayCompleteNormally(method, constructorBody)
+                    : MayCompleteNormally(operation);
         }
-        if (!cycleAffected && !traversal.Exhausted)
+        catch (ArgumentException)
         {
-            _methodCompletionCache.TryAdd(normalized, result);
+            return true;
         }
-        return result;
     }
 
     private bool HasUnconditionalSelfInvocation(IMethodSymbol method)
