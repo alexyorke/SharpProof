@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
+using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Summaries;
 using SharpProof.Verify;
@@ -1380,6 +1381,76 @@ public sealed class WorkerTests
             Assert.That(
                 response.Errors.Single().Code,
                 Is.EqualTo("compiler_manifest.invalid"));
+        }
+    }
+
+    [Test]
+    public async Task NullModuleReferenceRowsAreTypedAsManifestInvalid()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        await WriteNullModuleReferenceRowAsync(request);
+        using var worker = new SharpProofWorker(
+            () => throw new AssertionException(
+                "An invalid manifest must fail before backend creation."));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("compiler_manifest.invalid"));
+            Assert.That(response.Manifest.Claims, Is.Empty);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task CliWritesStructuredFailureForNullModuleReferenceRows()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Assert.Ignore("The direct worker is supported only in the Linux container.");
+        }
+
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        await WriteNullModuleReferenceRowAsync(request);
+        var requestPath = Path.Combine(project.DirectoryPath, "request.json");
+        var resultPath = Path.Combine(project.DirectoryPath, "result.json");
+        await File.WriteAllTextAsync(
+            requestPath,
+            WorkerProtocolJson.SerializeRequest(request));
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            "dotnet";
+        using var process = LinuxWorkerProcess.Start(
+            host,
+            [typeof(SharpProofWorker).Assembly.Location,
+                "verify", "--request", requestPath,
+                "--result", resultPath, "--start-stdin"],
+            project.DirectoryPath);
+
+        var completion = process.WaitForExit(
+            TimeSpan.FromSeconds(10),
+            TimeSpan.FromSeconds(11));
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+            Assert.That(completion.ExitCode, Is.Zero);
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("compiler_manifest.invalid"));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
@@ -6997,6 +7068,27 @@ public sealed class WorkerTests
         bytes[methodBodyOffset + 2] = (byte)declaredMaxStack;
         bytes[methodBodyOffset + 3] = (byte)(declaredMaxStack >> 8);
         File.WriteAllBytes(path, bytes);
+    }
+
+    private static async Task WriteNullModuleReferenceRowAsync(
+        WorkerVerifyRequest request)
+    {
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(request.CompilerManifest.Path));
+        var reference = artifact.Compilation.References[0];
+        reference.Kind = "Module";
+        reference.Identity = reference.Modules[0].Name;
+        reference.EmbedInteropTypes = false;
+        reference.Aliases = [];
+        reference.Modules = [null!];
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics,
+            artifact.MaximumExpressionDepth);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(
+            CompilerManifestArtifactJson.SerializeValidated(artifact));
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
+        request.CompilerManifest.Sha256 = WorkerProtocolJson.ComputeSha256(bytes);
     }
 
     private sealed class TestProject : IDisposable

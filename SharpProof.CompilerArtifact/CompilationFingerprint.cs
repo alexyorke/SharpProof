@@ -519,6 +519,7 @@ internal static class CompilationFingerprint
         value.Modules is { Length: > 0 } &&
         (value.Kind == "Assembly" || !value.EmbedInteropTypes &&
             value.Aliases.Length == 0 && value.Modules.Length == 1 &&
+            ValidReferenceModule(value.Modules[0]) &&
             string.Equals(value.Identity, value.Modules[0].Name,
                 StringComparison.Ordinal)) &&
         ValidReferenceModules(value.Modules, ref moduleCount, ref closureBytes);

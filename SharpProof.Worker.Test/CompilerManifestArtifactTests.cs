@@ -585,6 +585,13 @@ public sealed class CompilerManifestArtifactTests
                 new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Warn }
             ],
             snapshot => snapshot.References[0].Modules = [null!],
+            snapshot =>
+            {
+                var reference = snapshot.References[0];
+                reference.Kind = "Module";
+                reference.Identity = reference.Modules[0].Name;
+                reference.Modules = [null!];
+            },
             snapshot => snapshot.References[0].Modules[0].Name = " ",
             snapshot => snapshot.References[0].Modules = [
                 snapshot.References[0].Modules[0],

@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **58 findings**: 0 P0, 0 P1, 20 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **57 findings**: 0 P0, 0 P1, 19 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -54,7 +54,7 @@ regressions and unexecuted downstream paths remain open.
 | Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend and B15 meta-analyzer boundaries remain; B14 alias activation is fixed and covered; worker consequences remain open |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
-| Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 and B7 boundaries observed; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request |
+| Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; null module-reference rows now reject before module-name access; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 boundary observed; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request |
 | Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B2 campaign scheduling now coalesces a colliding rotating/retained seed at the larger requested case count and derives budget/evidence totals from that schedule; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; B13 now binds validation and receipt metadata to one byte snapshot; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches; B16 review handoff now binds the human ledger to the original tag-run report and package artifacts; B47 now solves source-method completion dependencies with a bounded iterative graph and memoizes definite-completion queries; build-task validation now compares published results with the exact private response from that invocation; B74 assessed standard NuGet V3 main-package download and repeated symbol-publish behavior | B2 schedule fixtures cover rotating budgets below, equal to, and above retained coverage, distinct-seed budgeting, and an injected failure after the short rotating prefix; B8/B12 admission and B13 snapshot-binding boundaries covered by writer fixtures; B16 resume rejects stale, wrong-commit, and incomplete review evidence; build-task tests reject a different private invocation hash and keep a matching control, and an architecture test binds the production target to the private result path; B17 helper boundary observed; B47 tests cover a 1,000-method chain, a 20-method recursive graph, shared definite-completion calls, and direct self-recursion; B74 retry guard is covered by mocked exact/mismatched main bytes, canonical-feed capability, digest-plan binding, and push-sequence fixtures; no production feed was contacted, and no interrupted production release was resumed; no release CI, native workflow, or full end-to-end qualification run |
 
 B3 combines the hash-writer and specification-admission evidence into one
@@ -207,36 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B4. A null module row escapes typed artifact validation
-
-**Confidence: Confirmed validator boundary; downstream paths source-traced.**
-
-- **Location:** `SharpProof.CompilerArtifact/CompilationFingerprint.cs:522`
-  and its `ValidReferenceModules` validation order; `WorkerInputSnapshot.Load`
-  exception translation and worker CLI `Program.cs:101-110`.
-- **Defect:** module-reference validation reads `Modules[0].Name` before
-  checking each entry. A reference with `Kind="Module"`,
-  `Identity="module.netmodule"`, `EmbedInteropTypes=false`, `Aliases=[]`, and
-  `Modules=[null!]` throws instead of returning the intended shape rejection.
-- **Observed boundary:** the unchanged CompilerArtifact project built in the
-  canonical container with outputs under `/tmp`, with zero warnings/errors.
-  In-memory reflection invoked the actual private `ValidReference`: a valid
-  module returned `true`, an assembly reference with a null module row returned
-  `false`, and a module reference with a null row threw `NullReferenceException`.
-- **Source-traced impact:** the row can reach `Deserialize` semantic validation:
-  an empty-callable artifact can reseal `CompilationSha256`, and the feature
-  seal excludes references. `WorkerInputSnapshot.Load` translates
-  `JsonException`, `InvalidDataException`, and `DecoderFallbackException`,
-  excluding this null dereference. Public `VerifyAsync` propagates it; the CLI
-  catches the generic exception as `InfrastructureFailure`. Full deserialization,
-  public API, and CLI paths were not executed; no unhandled CLI crash is claimed.
-- **Proposed fix:** validate entries before reading the first module's name,
-  preserving typed artifact rejection and `CompilerManifestMismatch` evidence.
-- **Proposed regression:** combine existing `Kind=Module` and `Modules=[null!]`
-  mutations in `CompilerManifestArtifactTests`; assert typed rejection and
-  structured worker evidence through public API and CLI paths, retaining the
-  valid-module and invalid-assembly controls.
 
 ### B6. Later ref effects replace earlier argument, receiver, and target values
 
