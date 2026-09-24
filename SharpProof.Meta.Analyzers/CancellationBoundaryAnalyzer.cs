@@ -29,7 +29,7 @@ internal static class CancellationBoundaryAnalyzer
             CancellationHandledEarlier(clause, cancellationType, context) ||
             FilterExcludesCancellation(
                 clause, caughtType, cancellationType, context) ||
-            RethrowsCancellationImmediately(clause) ||
+            RethrowsCancellationImmediately(clause, context) ||
             IsAuditedCancellationBoundary(
                 clause,
                 context,
@@ -431,7 +431,9 @@ internal static class CancellationBoundaryAnalyzer
                 possibleBase.OriginalDefinition));
     }
 
-    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
+    private static bool RethrowsCancellationImmediately(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context)
     {
         if (clause.Block.Statements.FirstOrDefault() is not
             ThrowStatementSyntax { } throwStatement)
@@ -453,12 +455,31 @@ internal static class CancellationBoundaryAnalyzer
             expression = parenthesized.Expression;
         }
 
-        return clause.Declaration?.Identifier is { } identifier &&
-            expression is IdentifierNameSyntax thrownIdentifier &&
-            string.Equals(
-                identifier.ValueText,
-                thrownIdentifier.Identifier.ValueText,
-                StringComparison.Ordinal);
+        if (clause.Declaration == null ||
+            context.SemanticModel.GetDeclaredSymbol(
+                clause.Declaration,
+                context.CancellationToken) is not ILocalSymbol caughtLocal ||
+            expression is not IdentifierNameSyntax ||
+            !SymbolEqualityComparer.Default.Equals(
+                context.SemanticModel.GetSymbolInfo(
+                    expression,
+                    context.CancellationToken).Symbol,
+                caughtLocal))
+        {
+            return false;
+        }
+
+        if (clause.Filter?.FilterExpression is { } filter &&
+            context.SemanticModel.GetOperation(
+                filter,
+                context.CancellationToken) is { } filterOperation &&
+            filterOperation.DescendantsAndSelf().Any(operation =>
+                WritesLocal(operation, caughtLocal)))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static bool IsAuditedCancellationBoundary(
@@ -995,6 +1016,43 @@ internal static class CancellationBoundaryAnalyzer
                 ReferencesParameter(declarator.Initializer?.Value, parameter),
             _ => false
         };
+    }
+
+    private static bool WritesLocal(
+        IOperation operation,
+        ILocalSymbol local)
+    {
+        return operation switch
+        {
+            IAssignmentOperation assignment =>
+                TargetsLocal(assignment.Target, local),
+            IIncrementOrDecrementOperation increment =>
+                ReferencesLocal(increment.Target, local),
+            IArgumentOperation argument
+                when argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out =>
+                ReferencesLocal(argument.Value, local),
+            IInvocationOperation invocation
+                when HasWritableReducedReceiver(invocation) =>
+                ReferencesLocal(invocation.Instance, local),
+            IVariableDeclaratorOperation declarator
+                when declarator.Symbol.RefKind != RefKind.None =>
+                ReferencesLocal(declarator.Initializer?.Value, local),
+            _ => false
+        };
+    }
+
+    private static bool TargetsLocal(
+        IOperation operation,
+        ILocalSymbol local)
+    {
+        operation = Unwrap(operation) ?? operation;
+        if (ReferencesLocal(operation, local))
+        {
+            return true;
+        }
+
+        return operation is ITupleOperation tuple &&
+            tuple.Elements.Any(element => TargetsLocal(element, local));
     }
 
     private static bool HasWritableReducedReceiver(

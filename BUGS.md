@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **53 findings**: 0 P0, 0 P1, 15 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **53 findings**: 0 P0, 0 P1, 15 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -58,7 +58,7 @@ regressions and unexecuted downstream paths remain open.
 
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
-| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 meta-analyzer boundary remains; B14 alias activation is fixed and covered |
+| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and B15 direct/ref/out catch-filter mutation with bare and unchanged rethrow controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 filter-mutation defect fixed and Meta.Analyzers.Test passes 176/176; B75 wrapped cancellation in AggregateException remains active; B14 alias activation is fixed and covered |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B11 now snapshots roots once before validation and processing, with changing-list tests for empty and nonempty replacement maps; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B11 changing-root regressions reproduce before the fix and pass after it, with IR 128/128 and Summaries 15/15; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; null module-reference rows now reject before module-name access; rejected cache reads now stage the bad entry and reconcile capacity under the cache lock; real cache/filesystem reads compare absent, malformed, oversized, semantic-rejection, and held-lock cases; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B67 suppression now retains claims and strict verification rejects refutations; B73 call-span and string-literal rebinding reject with controls, while inactive-preprocessor rebinding remains active; downstream proof impact is untested |
@@ -216,41 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B15. A catch filter can replace cancellation before an accepted rethrow
-
-**Confidence: Confirmed meta-analyzer diagnostic boundary.**
-
-- **Location:** `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:28-34`
-  and `:434-461`.
-- **Defect:** `RethrowsCancellationImmediately` compares identifier spelling,
-  ignoring a filter that changes the caught exception's identity before
-  `throw caught`.
-- **Observed boundary:** a fresh unchanged-HEAD Meta.Analyzers.Test build had
-  zero warnings/errors. A real analyzer probe with zero compiler errors emitted
-  no `SPMETA003` for:
-
-  ```csharp
-  try { throw new OperationCanceledException(); }
-  catch (Exception caught) when ((caught = new Exception()) != null)
-  { throw caught; }
-  ```
-
-  An empty-catch control emitted `SPMETA003`; a bare-throw control correctly
-  emitted none. The probe exited successfully. No production cancellation
-  incident is claimed.
-- **Related gap (fifth pass):** a 19-case probe of the rebuilt meta analyzer
-  flagged every direct, base-type, catch-all, conditional-rethrow, lambda, and
-  local-function swallow, but was silent for
-  `try { Task.Run(() => Work(t)).Wait(); } catch (AggregateException) { }`,
-  which swallows the wrapped `TaskCanceledException`. No production code
-  currently catches `AggregateException`.
-- **Proposed fix:** require the original exception identity for throw-caught,
-  accounting for filter assignments and ref/out escapes; preserve bare throw.
-  Treat `AggregateException` handlers as cancellation-capable unless they
-  rethrow or inspect `InnerExceptions` for cancellation.
-- **Proposed regression:** cover direct and ref/out filter mutation, unchanged
-  caught variables, and bare rethrows.
 
 ### B17. Native portable qualification assumes a prepared framework package cache
 
@@ -906,6 +871,43 @@ diagnostics.**
   and end with a newline and a comment. The run must reach the worker and
   report the claim (currently `UnsupportedCallable`) instead of failing
   input validation.
+
+### B73. A resealed return-attribute claim can be rebound to disabled preprocessor text
+
+**Confidence: Confirmed at source-rebinding validation; downstream proof impact is unproven. Priority: P2.**
+
+- **Location:** `SharpProof.CompilerArtifact/CompilerSourceRebinding.cs`, `IsReturnAttribute`.
+- **Observed boundary:** initially, a return-attribute claim for `[return: Positive()]` was moved to the same-length `SideFxOp()` invocation, and its claim authority, manifest hash, and feature-scope fingerprint were updated to match. Serialization and source rebinding accepted the artifact. The validator now binds the recorded span to an item in a return-target attribute list, skips comments and literals, rejects the call and string-literal relocations, and accepts a valid list with multiple return attributes. It still scans disabled `#if` text as ordinary source, so a matching attribute in an inactive branch can be selected.
+- **Impact:** source rebinding can still accept a claim whose authority points at an attribute that is not part of the compilation. Whether this can lead to a false proof through later worker processing has not been demonstrated.
+- **Proposed fix:** distinguish active source from disabled preprocessor text while preserving the compiler-neutral runtime closure required by `RuntimeDependencyTests.WorkerAndLauncherAssembliesHaveCompilerNeutralRuntimeClosures`.
+- **Proposed regression:** keep the same-length call and string-literal relocation checks, then move a resealed claim between matching active and inactive `#if` branches under different defined-symbol sets.
+
+### B75. AggregateException catches can swallow wrapped cancellation
+
+**Confidence: Confirmed meta-analyzer diagnostic boundary.**
+
+- **Location:** `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs`
+  (`CatchesCancellation`) and the catch-clause registration in
+  `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`.
+- **Defect:** cancellation catch detection recognizes the
+  `OperationCanceledException` inheritance chain, but not
+  `AggregateException`, which can wrap a `TaskCanceledException` from
+  synchronous task waits. An empty `catch (AggregateException)` therefore
+  swallows cancellation without `SPMETA003`.
+- **Observed boundary:** a 19-case probe of the rebuilt meta analyzer flagged
+  direct, base-type, catch-all, conditional-rethrow, lambda, and local-function
+  cancellation swallows, but emitted no `SPMETA003` for
+  `try { Task.Run(() => Work(t)).Wait(); } catch (AggregateException) { }`.
+  No production code currently catches `AggregateException`.
+- **Impact:** code that synchronously waits for tasks can hide wrapped
+  cancellation from the analyzer's cancellation-boundary rule.
+- **Proposed fix:** treat `AggregateException` and its subclasses as
+  cancellation-capable; keep immediate whole-aggregate rethrows valid, and
+  exempt inner-exception handling only when cancellation is proved to be
+  forwarded.
+- **Proposed regression:** flag an empty aggregate catch, retain controls for
+  immediate rethrows and handlers that exclude cancellation, and cover any
+  supported `InnerExceptions` forwarding pattern.
 
 ## P3 - Low
 
@@ -2340,16 +2342,6 @@ established.**
   `int i = int.MaxValue; i++;` and `i += 1`, and a branching compound-assignment control
   (`int i = 0; i += (b ? int.MaxValue : int.MaxValue); i += 1;`) that must
   stay reported.
-
-### B73. A resealed return-attribute claim can be rebound to disabled preprocessor text
-
-**Confidence: Confirmed at source-rebinding validation; downstream proof impact is unproven. Priority: P2.**
-
-- **Location:** `SharpProof.CompilerArtifact/CompilerSourceRebinding.cs`, `IsReturnAttribute`.
-- **Observed boundary:** initially, a return-attribute claim for `[return: Positive()]` was moved to the same-length `SideFxOp()` invocation, and its claim authority, manifest hash, and feature-scope fingerprint were updated to match. Serialization and source rebinding accepted the artifact. The validator now binds the recorded span to an item in a return-target attribute list, skips comments and literals, rejects the call and string-literal relocations, and accepts a valid list with multiple return attributes. It still scans disabled `#if` text as ordinary source, so a matching attribute in an inactive branch can be selected.
-- **Impact:** source rebinding can still accept a claim whose authority points at an attribute that is not part of the compilation. Whether this can lead to a false proof through later worker processing has not been demonstrated.
-- **Proposed fix:** distinguish active source from disabled preprocessor text while preserving the compiler-neutral runtime closure required by `RuntimeDependencyTests.WorkerAndLauncherAssembliesHaveCompilerNeutralRuntimeClosures`.
-- **Proposed regression:** keep the same-length call and string-literal relocation checks, then move a resealed claim between matching active and inactive `#if` branches under different defined-symbol sets.
 
 ## Historical areas checked without new findings (2026-09-16 through 2026-09-18)
 

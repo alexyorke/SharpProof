@@ -1005,6 +1005,67 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsCaughtVariableRethrowAfterFilterMutation()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static bool Replace(ref Exception value) {
+                    value = new Exception();
+                    return true;
+                }
+                static bool ReplaceOut(out Exception value) {
+                    value = new Exception();
+                    return true;
+                }
+                static void DirectAssignment() {
+                    try { }
+                    catch (Exception caught)
+                        when ((caught = new Exception()) != null) {
+                        throw caught;
+                    }
+                }
+                static void RefEscape() {
+                    try { }
+                    catch (Exception caught) when (Replace(ref caught)) {
+                        throw caught;
+                    }
+                }
+                static void OutEscape() {
+                    try { }
+                    catch (Exception caught) when (ReplaceOut(out caught)) {
+                        throw caught;
+                    }
+                }
+                static void UnchangedCaughtVariable() {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is OperationCanceledException) {
+                        throw caught;
+                    }
+                }
+                static void BareRethrow() {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is OperationCanceledException) {
+                        throw;
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(3),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
+    }
+
+    [Test]
     public async Task AllowsCatchFiltersThatExcludeCancellation()
     {
         const string source =
