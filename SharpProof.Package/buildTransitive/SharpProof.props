@@ -10,6 +10,6 @@
     <_SharpProofCollectorDirectory Condition="'$(_SharpProofTestCollectorDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestCollectorDirectory)'))</_SharpProofCollectorDirectory>
   </PropertyGroup>
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;SharpProofSpecificationPacks" />
+    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;_SharpProofProfileWasDefaulted;_SharpProofFeaturesWasDefaulted;SharpProofSpecificationPacks" />
   </ItemGroup>
 </Project>

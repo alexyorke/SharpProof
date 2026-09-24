@@ -34,7 +34,7 @@ dotnet_diagnostic.SP0046.severity = suggestion
 dotnet_diagnostic.SP0027.severity = warning
 ```
 
-`SP0024` is an error and `SP0025` is a warning. The `SPCF` rules are errors once
+`SP0024` and `SP0025` are errors. The `SPCF` rules are errors once
 the generator is loaded. Unsupported unannotated methods are quiet; an
 unsupported explicitly selected method produces SP0047. SP0049 is a fatal
 compiler-collection infrastructure error during container verification. A
@@ -49,7 +49,7 @@ replayed claim counterexample produces the verifier-launcher diagnostic SP0051.
 | `SP0015` | `effects` | Info, on | Reserved |
 | `SP0016` | `effects` | Info, on | Yes |
 | `SP0024` | Any non-`off` profile | Error, on | Yes |
-| `SP0025` | Invalid configuration | Warning, on | Yes |
+| `SP0025` | Invalid configuration | Error, on | Yes |
 | `SP0027` | `contracts` | Warning, on | Yes |
 | `SP0030` | `effects` | Info, on | Reserved |
 | `SP0045` | `effects` | Info, on | Yes |
@@ -122,8 +122,10 @@ The compilation-global `sharpproof_profile`/`SharpProofProfile` or
 `sharpproof_features`/`SharpProofFeatures` value is invalid, or the removed
 `sharpproof_mode`/`SharpProofMode` alias was supplied. Valid profile values are
 `advisory`, `strict`, and `off`; feature values are `effects`, `contracts`, and
-`all`. SharpProof reports a warning and analyzes an invalid configuration as
-`off`.
+`all`. SharpProof reports an error and analyzes an invalid configuration as
+`off`. In package builds, a `.globalconfig` profile must match the MSBuild
+`SharpProofProfile` property because that property controls verification and
+package item inclusion.
 
 Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.

@@ -81,12 +81,37 @@ internal sealed class AnalyzerConfiguration
         featuresAliases = ReadOptionAliases(
             options,
             AnalyzerConfigurationOptionRegistry.Features);
-        return [.. GetInvalidConfigurationValues(
+        var invalid = GetInvalidConfigurationValues(
             options,
             null,
             parseValues: true,
             profileAliases: profileAliases,
-            featuresAliases: featuresAliases)];
+            featuresAliases: featuresAliases)
+            .ToList();
+        if (!invalid.Any(static value =>
+                value.Key == AnalyzerConfigurationOptionRegistry.Profile.Key) &&
+            options.TryGetValue(
+                AnalyzerConfigurationOptionRegistry.Profile.Key,
+                out var analyzerProfile) &&
+            options.TryGetValue(
+                "build_property." +
+                    AnalyzerConfigurationOptionRegistry.Profile.BuildPropertyName,
+                out var msBuildProfile) &&
+            AnalyzerConfigurationOptionRegistry.IsAcceptedValue(
+                AnalyzerConfigurationOptionRegistry.Profile,
+                analyzerProfile) &&
+            AnalyzerConfigurationOptionRegistry.IsAcceptedValue(
+                AnalyzerConfigurationOptionRegistry.Profile,
+                msBuildProfile) &&
+            !Is(analyzerProfile, msBuildProfile))
+        {
+            invalid.Add(new InvalidAnalyzerConfigurationValue(
+                AnalyzerConfigurationOptionRegistry.Profile.Key,
+                analyzerProfile.Trim() + " / " + msBuildProfile.Trim(),
+                "profile must match the MSBuild SharpProofProfile property, which controls package and verifier behavior"));
+        }
+
+        return [.. invalid];
     }
 
     private static (bool Found, string Value, bool HasConflict, string Conflict)
@@ -262,22 +287,11 @@ internal sealed class AnalyzerConfiguration
                 key,
                 "build_property." + option.BuildPropertyName,
                 StringComparison.OrdinalIgnoreCase) &&
-            HasPackageDefaults(options) &&
-            IsPackageDefaultValue(option, value);
-    }
-
-    private static bool HasPackageDefaults(AnalyzerConfigOptions options)
-    {
-        return options.TryGetValue(
-                "build_property." +
-                AnalyzerConfigurationOptionRegistry.Profile.BuildPropertyName,
-                out var profile) &&
-            Is(profile, "advisory") &&
             options.TryGetValue(
-                "build_property." +
-                AnalyzerConfigurationOptionRegistry.Features.BuildPropertyName,
-                out var features) &&
-            Is(features, "all");
+                "build_property._" + option.BuildPropertyName + "WasDefaulted",
+                out var wasDefaulted) &&
+            Is(wasDefaulted, "true") &&
+            IsPackageDefaultValue(option, value);
     }
 
     private static bool IsPackageDefaultValue(

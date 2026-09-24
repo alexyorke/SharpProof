@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, and B34 implicit-constructor-initializer and B41 trusted-computing-base-completeness findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **47 findings**: 0 P0, 0 P1, 9 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, and B42 .globalconfig profile consistency findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **46 findings**: 0 P0, 0 P1, 8 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,68 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B42. `.globalconfig` profile and features are only partly honored
-
-**Confidence: Confirmed by probing the analyzer; the MSBuild half is confirmed by reading the targets.**
-
-- **Location:** `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:93-150`
-  (`ReadOptionAliases`) and `:255-292` (`IsPackageDefaultProperty`,
-  `HasPackageDefaults`, `IsPackageDefaultValue`);
-  `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props:3-8`;
-  `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:19` and
-  `:32-35`; the claim in `README.md` that "The same choices can be made in a
-  `.globalconfig` file".
-- **Defect:** there are two problems.
-  1. The analyzer ignores a `build_property.SharpProof*` value only when
-     *both* MSBuild properties hold their package defaults (`advisory` and
-     `all`). If the user sets either one explicitly in MSBuild, the other
-     one's package default counts as a user value, and it conflicts with the
-     `.globalconfig` key.
-  2. Every strict-mode behavior that matters is decided in MSBuild from
-     `$(SharpProofProfile)`: `SharpProofVerify=true`,
-     `SharpProofVerifyPolicy=require-proven`, `SharpProofAssumptionPolicy=error`,
-     and omitting the items for `off`. MSBuild cannot see `.globalconfig`
-     keys, so `sharpproof_profile = strict` there only disables the analyzer's
-     advisory fast path (`SharpProofAnalyzerEngine.cs:95`). The verifier stays
-     off and no proof is required. Likewise, `sharpproof_profile = off` leaves
-     the analyzer and generator items loaded.
-- **Observed boundary:** with the real analyzer and global options
-  `build_property.SharpProofProfile=advisory`,
-  `build_property.SharpProofFeatures=effects` and `sharpproof_profile=strict`,
-  the result is `SP0025 ... 'sharpproof_profile' has invalid value
-  'strict / advisory': configuration aliases disagree`, and analysis is
-  disabled (`Profile=Off`). With `build_property.SharpProofProfile=strict`,
-  `build_property.SharpProofFeatures=all` and `sharpproof_features=effects`,
-  the result is `SP0025 ... 'sharpproof_features' ... 'effects / all'`. The
-  control (`SharpProofFeatures=all`, `sharpproof_profile=strict`) is silent,
-  as `AnalyzerConfigurationPackageDefaultTests` expects.
-- **Impact:** a project that sets `<SharpProofFeatures>effects</SharpProofFeatures>`
-  in MSBuild and `sharpproof_profile = strict` in `.globalconfig` fails its
-  build on a configuration error it did not cause. Worse, a project that uses
-  only `.globalconfig` to pick `strict`, as the README invites, gets an
-  advisory build without verification and still believes proofs are
-  enforced. This is a silent weakening of the strongest mode. Because the
-  analyzer also treats an explicit MSBuild `advisory` as a package default, an
-  explicit `<SharpProofProfile>advisory</SharpProofProfile>` plus a
-  `.globalconfig` `strict` is resolved silently to analyzer-strict with no
-  verifier.
-- **Proposed fix:** have `SharpProof.ConsumerContract.props` record whether
-  each property was defaulted (for example
-  `_SharpProofProfileWasDefaulted=true`, exposed via `CompilerVisibleProperty`).
-  Have `IsPackageDefaultProperty` use that per-option flag instead of
-  `HasPackageDefaults`. Then either make MSBuild authoritative for the
-  profile, by reporting SP0025 when `sharpproof_profile` in `.globalconfig`
-  differs from the effective `$(SharpProofProfile)`, or make the analyzer
-  report a configuration error when it sees an analyzer-strict profile while
-  `build_property.SharpProofVerify` is not `true`. Correct the README
-  sentence to say that only MSBuild properties control verification.
-- **Proposed regression:** analyzer configuration tests for the two observed
-  mixed-source cases (no SP0025 expected once defaults are tracked per
-  option), plus a package test in which `.globalconfig` sets
-  `sharpproof_profile = strict` with no MSBuild property. That test must
-  either run the verifier with `require-proven` or fail with a configuration
-  error, and must never produce a passing advisory build.
 
 ### B49. A callee that has its own contract blocks relational summaries for every caller
 

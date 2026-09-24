@@ -46,14 +46,16 @@ The default profile is advisory and the default feature selection is all:
 ```
 
 SharpProofProfile accepts advisory, strict, and off. SharpProofFeatures accepts
-effects, contracts, and all. The analyzer configuration equivalents are
-sharpproof_profile and sharpproof_features, set in a `.globalconfig` file:
+effects, contracts, and all. Select features in a `.globalconfig` file:
 
 ~~~ini
 is_global = true
-sharpproof_profile = advisory
 sharpproof_features = all
 ~~~
+
+Set `SharpProofProfile` in MSBuild because it controls verifier activation,
+strict policies, and analyzer/generator inclusion. A `.globalconfig`
+`sharpproof_profile` value, if present, must match the MSBuild property.
 
 Advisory analysis keeps unannotated code quiet. Explicitly selected unsupported
 code remains visible as an incomplete-analysis diagnostic. Set the profile to

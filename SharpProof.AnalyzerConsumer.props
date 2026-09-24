@@ -9,7 +9,7 @@
   <Import Project="$(_SharpProofConsumerContractPath)" />
 
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;SharpProofVerifyPolicy;SharpProofAssumptionPolicy;SharpProofSpecificationPacks;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
+    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;_SharpProofProfileWasDefaulted;_SharpProofFeaturesWasDefaulted;SharpProofVerifyPolicy;SharpProofAssumptionPolicy;SharpProofSpecificationPacks;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 
   <ItemGroup>

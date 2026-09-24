@@ -7,6 +7,10 @@
     isolated audit builds; ordinary repository builds remain unchanged.
   -->
   <PropertyGroup Condition="'$(SharpProofSelfApplication)' == 'true'">
+    <_SharpProofProfileWasDefaulted Condition="'$(SharpProofProfile)' == ''">true</_SharpProofProfileWasDefaulted>
+    <_SharpProofProfileWasDefaulted Condition="'$(SharpProofProfile)' != ''">false</_SharpProofProfileWasDefaulted>
+    <_SharpProofFeaturesWasDefaulted Condition="'$(SharpProofFeatures)' == ''">true</_SharpProofFeaturesWasDefaulted>
+    <_SharpProofFeaturesWasDefaulted Condition="'$(SharpProofFeatures)' != ''">false</_SharpProofFeaturesWasDefaulted>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
@@ -30,7 +34,7 @@
       '$(SharpProofSelfApplication)' == 'true' AND
       '$(_SharpProofAnalyzerConsumerPresent)' != 'true' AND
       '$(_SharpProofPortablePackagePresent)' != 'true'">
-    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;SharpProofVerifyPolicy;SharpProofAssumptionPolicy;SharpProofSpecificationPacks;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
+    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;_SharpProofProfileWasDefaulted;_SharpProofFeaturesWasDefaulted;SharpProofVerifyPolicy;SharpProofAssumptionPolicy;SharpProofSpecificationPacks;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
 
     <Analyzer Include="$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>

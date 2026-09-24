@@ -342,6 +342,9 @@ Analyzer behavior is selected through the compilation-global
   configuration error.
 - `off` constructs no analysis session, contributes no analyzer/generator
   items through the package, and does not run verification.
+- Package builds take `SharpProofProfile` from MSBuild because it controls
+  verification and analyzer/generator inclusion. A global
+  `sharpproof_profile` must match it.
 - feature value `effects` enables effect contracts, `contracts` enables
   call-site contract analysis, and `all` (the default) enables both. The
   package carries the same selection into the compiler artifact and its manifest.

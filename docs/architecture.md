@@ -329,9 +329,12 @@ verification.
 `SharpProofProfile` accepts `advisory`, `strict`, and `off`; the package
 default is `advisory`. `SharpProofFeatures` accepts `effects`, `contracts`, and
 `all`; the default is `all`. A custom host can provide the equivalent
-compilation-global `sharpproof_profile` and `sharpproof_features` keys. The
-`off` profile omits analyzer/generator items and constructs no analysis
-session. Unsupported unannotated analyzer callables are silent, while
+compilation-global `sharpproof_profile` and `sharpproof_features` keys. In a
+package build, `SharpProofProfile` remains an MSBuild setting because it
+controls verifier activation and analyzer/generator inclusion; a global
+`sharpproof_profile` must match it. The `off` profile omits analyzer/generator
+items and constructs no analysis session. Unsupported unannotated analyzer
+callables are silent, while
 unsupported explicitly selected callables report SP0047.
 
 The advisory analyzer has a conservative compilation-start fast path for

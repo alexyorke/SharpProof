@@ -70,7 +70,7 @@ internal static class GeneratedDiagnosticDescriptors
         title: "Invalid SharpProof Analyzer Configuration",
         messageFormat: "SharpProof analyzer option '{0}' has invalid value '{1}': {2}",
         category: "Configuration",
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Reports invalid compilation-global SharpProof analyzer options.",
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0025",

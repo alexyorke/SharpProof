@@ -29,6 +29,10 @@ public sealed class WorkerMsBuildIntegrationTests
         "SharpProofAssumptionPolicy",
         "SharpProofSpecificationPacks"
     ];
+    private static readonly string[] s_analyzerConfigurationProperties = [
+        "_SharpProofProfileWasDefaulted",
+        "_SharpProofFeaturesWasDefaulted"
+    ];
     private static readonly string[] s_compilerManifestProperties = [
         "_SharpProofCompilerManifestPath",
         "_SharpProofCompilationTargetFramework",
@@ -133,6 +137,35 @@ public sealed class WorkerMsBuildIntegrationTests
             ("DesignTimeBuild", "true")));
         Assert.That(File.Exists(project.RequestPath), Is.False);
         Assert.That(File.Exists(project.ResultPath), Is.False);
+    }
+
+    [Test]
+    public async Task GlobalStrictProfileMustMatchMsBuildVerifierProfile()
+    {
+        using var project = ConsumerProject.Create(IdentitySource);
+        await File.WriteAllTextAsync(
+            Path.Combine(project.Root, ".globalconfig"),
+            """
+            is_global = true
+            sharpproof_profile = strict
+            """,
+            new System.Text.UTF8Encoding(false));
+
+        var build = await project.BuildAsync(
+            verify: null,
+            ("SharpProofRunAnalyzersForPackageTests", "true"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain("error SP0025"), build.Output);
+            Assert.That(
+                build.Output,
+                Does.Contain("must match the MSBuild SharpProofProfile"),
+                build.Output);
+            Assert.That(File.Exists(project.RequestPath), Is.False);
+            Assert.That(File.Exists(project.ResultPath), Is.False);
+        }
     }
 
     [TestCase(false, "advisory")]
@@ -1233,14 +1266,25 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
+        await File.WriteAllTextAsync(
+            Path.Combine(project.Root, ".globalconfig"),
+            """
+            is_global = true
+            sharpproof_profile = strict
+            sharpproof_features = effects
+            """,
+            new System.Text.UTF8Encoding(false));
 
         var build = await BuildOkAsync(project.BuildAsync(
             verify: null,
             ("SharpProofProfile", "strict")));
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
+        var artifact = await CompilerManifestArtifact.ReadAsync(
+            request.CompilerManifest.Path);
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
             Assert.That(
                 request.VerifyPolicy,
                 Is.EqualTo(WorkerVerifyPolicy.RequireProven));
@@ -3029,7 +3073,9 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             Assert.That(
                 compilerVisible,
-                Is.SupersetOf(s_publicPolicyProperties));
+                Is.SupersetOf(
+                    s_publicPolicyProperties.Concat(
+                        s_analyzerConfigurationProperties)));
             Assert.That(
                 uint.Parse(
                     properties["SharpProofVerifyQueryRlimit"],
@@ -4502,7 +4548,8 @@ public sealed class WorkerMsBuildIntegrationTests
                         CachePath="$(_SharpProofActiveCacheDirectory)" />
                   </Target>
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
-                          BeforeTargets="CoreCompile">
+                          BeforeTargets="CoreCompile"
+                          Condition="'$(SharpProofRunAnalyzersForPackageTests)' != 'true'">
                     <ItemGroup>
                       <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath)" />
                     </ItemGroup>

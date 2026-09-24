@@ -1084,15 +1084,25 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
-    public async Task GlobalConfigurationOverridesPackageDefaultsInArtifact()
+    public async Task GlobalConfigurationOverridesDefaultFeaturesInArtifact()
     {
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("global-configuration");
-        var options = Options(path);
+        var options = Options(
+            path,
+            profile: "strict",
+            verifyPolicy: "require-proven",
+            assumptionPolicy: "error");
+        options["build_property._SharpProofProfileWasDefaulted"] = "false";
+        options["build_property._SharpProofFeaturesWasDefaulted"] = "true";
         options["sharpproof_profile"] = "strict";
+        options["sharpproof_features"] = "effects";
         var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options);
         Assert.That(diagnostics, Is.Empty);
         Assert.That(File.Exists(path), Is.True);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+        Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
     }
 
     [Test]

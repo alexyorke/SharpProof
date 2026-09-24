@@ -8,13 +8,16 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerConfigurationPackageDefaultTests
 {
     [Test]
-    public void AnalyzerConfigurationOverridesPackageProfileAndFeatureDefaults()
+    public void AnalyzerConfigurationOverridesOnlyDefaultedFeatures()
     {
         var configuration = AnalyzerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
-                    ("build_property.SharpProofProfile", "advisory"),
+                    ("build_property.SharpProofProfile", "strict"),
+                    ("build_property._SharpProofProfileWasDefaulted", "false"),
                     ("build_property.SharpProofFeatures", "all"),
+                    ("build_property._SharpProofFeaturesWasDefaulted", "true"),
+                    ("build_property.SharpProofVerify", "true"),
                     ("sharpproof_profile", "strict"),
                     ("sharpproof_features", "contracts"))));
 
@@ -23,6 +26,29 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
             Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Strict));
             Assert.That(configuration.Features, Is.EqualTo(SharpProofFeatures.Contracts));
             Assert.That(configuration.InvalidConfigurationValues, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void ExplicitFeatureDoesNotMakeDefaultProfileLookExplicit()
+    {
+        var configuration = AnalyzerConfiguration.FromOptions(
+            new DictionaryAnalyzerConfigOptionsProvider(
+                new DictionaryAnalyzerConfigOptions(
+                    ("build_property.SharpProofProfile", "advisory"),
+                    ("build_property._SharpProofProfileWasDefaulted", "true"),
+                    ("build_property.SharpProofFeatures", "effects"),
+                    ("build_property._SharpProofFeaturesWasDefaulted", "false"),
+                    ("build_property.SharpProofVerify", "false"),
+                    ("sharpproof_profile", "strict"))));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Off));
+            Assert.That(configuration.InvalidConfigurationValues, Has.Length.EqualTo(1));
+            Assert.That(
+                configuration.InvalidConfigurationValues[0].Reason,
+                Does.Contain("must match the MSBuild SharpProofProfile"));
         }
     }
 
@@ -49,7 +75,9 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
                     ("build_property.SharpProofProfile", "off"),
+                    ("build_property._SharpProofProfileWasDefaulted", "false"),
                     ("build_property.SharpProofFeatures", "all"),
+                    ("build_property._SharpProofFeaturesWasDefaulted", "true"),
                     ("sharpproof_profile", "strict"))));
 
         using (Assert.EnterMultipleScope())

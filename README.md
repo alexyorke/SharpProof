@@ -47,18 +47,21 @@ code quiet. SharpProofFeatures accepts effects, contracts, or all.
 SharpProofProfile accepts advisory, strict, or off; off omits the analyzer and
 generator from the build.
 
-The same choices can be made in a `.globalconfig` file:
+Features can also be selected in a `.globalconfig` file:
 
 ~~~ini
 is_global = true
-sharpproof_profile = advisory
 sharpproof_features = all
 ~~~
 
-The recognized configuration keys are sharpproof_profile and
-sharpproof_features. Their accepted values are `advisory`, `strict`,
-`off`, `effects`, `contracts`, and `all`, as documented in the
-[diagnostic reference](docs/diagnostic-examples.md).
+`SharpProofProfile` must be set as an MSBuild property because it controls
+verifier activation, strict policies, and analyzer/generator inclusion. If a
+`.globalconfig` sets `sharpproof_profile`, it must match that MSBuild property;
+a mismatch is an SP0025 error. Use `SharpProofProfile=off` in MSBuild to omit
+the analyzer and generator. The recognized analyzer configuration keys are
+`sharpproof_profile` and `sharpproof_features`; their accepted values are
+`advisory`, `strict`, `off`, `effects`, `contracts`, and `all`, as documented
+in the [diagnostic reference](docs/diagnostic-examples.md).
 
 ## A minimal contract
 
