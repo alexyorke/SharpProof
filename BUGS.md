@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, and qualification receipt snapshot-binding findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **65 findings**: 0 P0, 5 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, and advisory attribute-alias activation findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **63 findings**: 0 P0, 4 P1, 21 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -51,7 +51,7 @@ regressions and unexecuted downstream paths remain open.
 
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
-| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes now compare direct/aliased purity attributes and cancellation-filter mutation with controls | B6 frontend, B14 analyzer, and B15 meta-analyzer boundaries observed; wider alias cases and worker consequences remain open |
+| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend and B15 meta-analyzer boundaries remain; B14 alias activation is fixed and covered; worker consequences remain open |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; wave four reviewed summary ownership/signatures, substitution, model validation/replay, cancellation, and disposal without new probes or repeated suites | No distinct new finding: foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses | B4 and B7 boundaries observed; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
@@ -207,27 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P1 - High
-
-### B14. Attribute aliases silently disable advisory analysis
-
-**Confidence: Confirmed analyzer boundary for a local purity-attribute alias.**
-
-- **Location:** `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:95-105`,
-  `:222-226`, and `:586-603`.
-- **Defect:** spelling-only `IsSharpProofAttributeCandidate` does not resolve
-  aliases, so an otherwise eligible compilation may never activate analysis.
-- **Observed boundary:** a fresh unchanged-HEAD Analyzer.Test build completed
-  with zero warnings/errors. A real analyzer stdin probe in advisory/effects
-  configuration used a class static field and `static void M() { state++; }`.
-  Direct `[EnforcePure]` emitted `SP0002`; replacing it with `[Pure]` and
-  `using Pure = SharpProof.Attributes.EnforcePureAttribute;` emitted no
-  diagnostics when no other syntax activated analysis. The probe exited
-  successfully. Only this local alias was executed.
-- **Proposed fix:** recognize attributes semantically or conservatively activate
-  analysis for aliases that can name SharpProof attributes.
-- **Proposed regression:** cover local/global aliases, effects and closed-contract
-  attributes, direct spelling, and unrelated-alias controls. The additional
-  alias and attribute forms are proposed coverage, not observed failures.
 
 ### B16. Release qualification has no human pilot-review handoff
 
@@ -1127,51 +1106,6 @@ diagnostics.**
   report SP0027. The third remains silent only if the conditional access is
   not definitely completing. A control with a parameter receiver
   `F(K k) { k.M(); P(0); }` must stay silent.
-
-### B55. The advisory fast path skips analysis for SharpProof attributes applied through a using alias
-
-**Confidence: Confirmed by probing the analyzer.**
-
-- **Location:** `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:586-604`
-  (`IsSharpProofAttributeCandidate`), used by `GetAdvisoryActivation`
-  (`:209-250`) to decide whether an advisory compilation is analyzed at all
-  (`:95-106`).
-- **Defect:** the activation probe matches an attribute only by the last
-  token of its written name (`EnforcePure`, `EnforcePureAttribute`, ...). A
-  C# using alias (`using EP = SharpProof.Attributes.EnforcePureAttribute;`,
-  including a `global using` alias in another file) spells the attribute
-  with a different identifier. The probe then finds no candidate, returns
-  `AdvisoryActivation.None`, and no analysis runs. `docs/architecture.md`
-  calls this fast path "conservative" and says "new selection or
-  implicit-call syntax must extend the probe", but aliases were never
-  covered. The contract-method probe is not affected, because it matches
-  the member name (`Requires`) and aliases rename only the type.
-- **Observed boundary:** with the default advisory profile, `[EP]` on a
-  method that increments a static field and `[DNT]` (alias for
-  `DoesNotThrowAttribute`) on a method that throws produced no
-  diagnostics. The same file under `build_property.SharpProofProfile=strict`
-  reported `SP0002` and `SP0046`, as did the unaliased control file in the
-  advisory profile.
-  Closed preconditions are affected the same way: with only
-  `using Pos = SharpProof.Attributes.PositiveAttribute;`, the definite
-  violation `Q(0)` against `Q([Pos] int v)` is silent. A namespace alias
-  (`[SPA.EnforcePure]`) is recognized and reports normally.
-- **Impact:** in the default profile, every effect contract written through
-  an alias is silently unchecked. The build looks clean while
-  `[EnforcePure]`/`[DoesNotThrow]` claims go unverified.
-- **Proposed fix:** before scanning attributes, collect every using-alias
-  name in the compilation (`UsingDirectiveSyntax` with `Alias != null` in any
-  tree, including `global using`) whose target's last identifier is a
-  SharpProof attribute type name, and treat those alias names as candidates.
-  Alternatively, when an attribute's simple name is not a known name but a
-  using alias with that name exists in scope, fall back to
-  `SemanticModel.GetSymbolInfo(attribute)` for that attribute only.
-- **Proposed regression:** advisory analyzer tests for a local alias, a
-  `global using` alias declared in a separate tree, and an alias to the
-  `SharpProof.Attributes` namespace (`using SPA = SharpProof.Attributes;
-  [SPA.EnforcePure]`, which already works and serves as the control), and an
-  aliased `[Positive]` at a violating call site, each expecting the
-  diagnostic the unaliased form produces.
 
 ### B59. SP0027 treats a call after a guard-clause `return` as definitely executed, including dead code
 

@@ -215,15 +215,32 @@ internal sealed partial class SharpProofAnalyzerEngine
                      compilation,
                      cancellationToken))
         {
+            SemanticModel? semanticModel = null;
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (node is AttributeSyntax attribute &&
-                    !IsAssemblyOrModuleAttribute(attribute) &&
-                    IsSharpProofAttributeCandidate(attribute))
+                    !IsAssemblyOrModuleAttribute(attribute))
                 {
-                    return AdvisoryActivation.Full;
+                    if (IsSharpProofAttributeCandidate(attribute))
+                    {
+                        return AdvisoryActivation.Full;
+                    }
+
+                    if (attribute.Name is IdentifierNameSyntax name)
+                    {
+                        semanticModel ??=
+                            SharpProof.Frontend.Host.CompilationModelProvider
+                                .GetSemanticModel(compilation, tree);
+                        if (IsSharpProofAttributeAlias(
+                                semanticModel,
+                                name,
+                                cancellationToken))
+                        {
+                            return AdvisoryActivation.Full;
+                        }
+                    }
                 }
 
                 if (node is ExpressionSyntax expression &&
@@ -600,6 +617,26 @@ internal sealed partial class SharpProofAnalyzerEngine
                 descriptor.TypeName.Substring(
                     0,
                     descriptor.TypeName.Length - "Attribute".Length),
+                StringComparison.Ordinal));
+    }
+
+    private static bool IsSharpProofAttributeAlias(
+        SemanticModel semanticModel,
+        IdentifierNameSyntax name,
+        CancellationToken cancellationToken)
+    {
+        if (semanticModel.GetAliasInfo(name, cancellationToken)?.Target is
+            not INamedTypeSymbol attributeType ||
+            !IsSharpProofAttributesNamespace(
+                attributeType.ContainingNamespace))
+        {
+            return false;
+        }
+
+        return ContractApiMetadata.Attributes.Any(descriptor =>
+            string.Equals(
+                attributeType.MetadataName,
+                descriptor.TypeName,
                 StringComparison.Ordinal));
     }
 

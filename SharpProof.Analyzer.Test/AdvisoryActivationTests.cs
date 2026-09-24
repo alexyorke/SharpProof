@@ -118,6 +118,160 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task LocalAliasedEffectAttributeActivatesAdvisoryAnalysis()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using Pure = SharpProof.Attributes.EnforcePureAttribute;
+
+            internal static class Subject {
+                private static int state;
+
+                [Pure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        Assert.That(factory.CreateCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task GlobalAliasedEffectAttributeActivatesAcrossSyntaxTrees()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Subject {
+                private static int state;
+
+                [Pure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+            """,
+            ["SP0002"]);
+        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            "global using Pure = SharpProof.Attributes.EnforcePureAttribute;",
+            new CSharpParseOptions(LanguageVersion.Preview),
+            path: "GlobalAliases.cs"));
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        Assert.That(factory.CreateCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AliasedClosedAndExceptionAttributesActivateAdvisoryAnalysis()
+    {
+        var closedContractDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using Positive = SharpProof.Attributes.PositiveAttribute;
+
+            internal static class Subject {
+                private static void RequirePositive([Positive] int value) { }
+
+                internal static void Call() {
+                    RequirePositive(0);
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0027"],
+            profile: "advisory",
+            features: "contracts");
+        var exceptionContractDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using NoThrow = SharpProof.Attributes.DoesNotThrowAttribute;
+
+            internal static class Subject {
+                [NoThrow]
+                internal static void Throw() {
+                    throw new System.InvalidOperationException();
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0046"],
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(closedContractDiagnostics, "SP0027");
+        AnalyzerTestHost.AssertIds(exceptionContractDiagnostics, "SP0046");
+    }
+
+    [Test]
+    public async Task UnrelatedTypeAliasDoesNotActivateFullAnalysis()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using Pure = Other.EnforcePureAttribute;
+
+            internal static class Subject {
+                private static int state;
+
+                [Pure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+
+            namespace Other {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                internal sealed class EnforcePureAttribute : System.Attribute { }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task NamespaceAliasedEffectAttributeKeepsItsFastActivation()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SPA = SharpProof.Attributes;
+
+            internal static class Subject {
+                private static int state;
+
+                [SPA.EnforcePure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+    }
+
+    [Test]
     public void AdvisoryTextScanObservesCancellationWithinBoundedReads()
     {
         using var cancellation = new CancellationTokenSource();

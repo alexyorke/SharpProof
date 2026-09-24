@@ -458,8 +458,8 @@
   {
     "name": "advisory-full-activation-selection",
     "file": "SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs",
-    "original": "return AdvisoryActivation.Full;",
-    "mutated": "return new(\n                        RequiresSymbolAnalysis: false,\n                        RequiresOperationAnalysis: true,\n                        RequiresFullOperationAnalysis: false);",
+    "original": "if (IsSharpProofAttributeCandidate(attribute))\n                    {\n                        return AdvisoryActivation.Full;",
+    "mutated": "if (IsSharpProofAttributeCandidate(attribute))\n                    {\n                        return new(\n                            RequiresSymbolAnalysis: false,\n                            RequiresOperationAnalysis: true,\n                            RequiresFullOperationAnalysis: false);",
     "project": "SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj",
     "filter": "FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported"
   },
