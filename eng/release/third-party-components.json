@@ -108,6 +108,16 @@
         "entries": [
           "tools/net9/Microsoft.Z3.dll",
           "tools/native/linux-x64/libz3.so"
+        ],
+        "entrySha256": [
+          {
+            "path": "tools/native/linux-x64/libz3.so",
+            "sha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980"
+          },
+          {
+            "path": "tools/net9/Microsoft.Z3.dll",
+            "sha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
+          }
         ]
       },
       {

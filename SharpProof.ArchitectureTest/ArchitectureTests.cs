@@ -1820,15 +1820,22 @@ public sealed class ArchitectureTests
             "ContainerNativeLibrary.cs"));
 
         var exactLoad =
-            "NativeLibrary.Load(" + Environment.NewLine +
-            "                " +
-            "ContainerContract.ResolveZ3LibraryRequired());";
+            "var handle = ContainerContract.LoadZ3LibraryRequired();";
         Assert.That(
             host.Contains(exactLoad, StringComparison.Ordinal) &&
             !host.Contains(
                 "NativeLibrary.Load(Z3ImportName);",
                 StringComparison.Ordinal),
             Is.True);
+
+        var contract = File.ReadAllText(Path.Combine(
+            TestRepository.FindRoot(),
+            "SharpProof.Host",
+            "ContainerContract.cs"));
+        Assert.That(contract, Does.Contain("SHA256.HashData(stream)"));
+        Assert.That(
+            contract,
+            Does.Contain("/proc/self/fd/{descriptor}"));
 
         var handlePublication = host.IndexOf(
             "Volatile.Write(ref s_z3Handle, handle);",

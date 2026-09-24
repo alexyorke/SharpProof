@@ -770,7 +770,7 @@
   {
     "name": "container-z3-refuses-ambient-load",
     "file": "SharpProof.Host/ContainerNativeLibrary.cs",
-    "original": "            var handle = NativeLibrary.Load(\n                ContainerContract.ResolveZ3LibraryRequired());",
+    "original": "            var handle = ContainerContract.LoadZ3LibraryRequired();",
     "mutated": "            var handle = NativeLibrary.Load(Z3ImportName);",
     "project": "SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj",
     "filter": "FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath"

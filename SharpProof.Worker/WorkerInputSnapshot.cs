@@ -1,3 +1,5 @@
+using SharpProof.Host;
+
 namespace SharpProof.Worker;
 
 internal sealed partial record WorkerInputSnapshot
@@ -65,7 +67,9 @@ internal sealed class WorkerCacheIdentity(
         get;
     } = new(
         CurrentToolIdentity, ReadToolVersion(),
-        WorkerBinaryIdentity.ComputeSha256(typeof(SharpProofWorker).Assembly.Location),
+        WorkerBinaryIdentity.ComputeSha256(
+            typeof(SharpProofWorker).Assembly.Location,
+            ContainerContract.GetZ3LibrarySha256Required()),
         ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
         ApiSpecTable.Default.ContentSha256);
     internal string ToolIdentity { get; } = Required(toolIdentity, nameof(toolIdentity));

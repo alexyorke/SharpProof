@@ -1695,7 +1695,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--verify-policy", "advisory",
                 "--assumption-policy", "allow"
             ],
-            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            static path => WorkerBinaryIdentity.ComputeSha256(
+                path,
+                ContainerContract.GetZ3LibrarySha256Required()),
             static (arguments, _, _, _) =>
             {
                 File.WriteAllText(arguments.ResultPath, "not-json");
@@ -1739,7 +1741,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--verify-policy", "advisory",
                 "--assumption-policy", "allow"
             ],
-            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            static path => WorkerBinaryIdentity.ComputeSha256(
+                path,
+                ContainerContract.GetZ3LibrarySha256Required()),
             static (_, _, _, _) => throw new FormatException("invalid state"));
 
         Assert.That(File.Exists(resultPath), Is.True);
@@ -1782,7 +1786,9 @@ public sealed class WorkerMsBuildIntegrationTests
                     "--verify-policy", "advisory",
                     "--assumption-policy", "allow"
                 ],
-                static path => WorkerBinaryIdentity.ComputeSha256(path),
+                static path => WorkerBinaryIdentity.ComputeSha256(
+                    path,
+                    ContainerContract.GetZ3LibrarySha256Required()),
                 static (_, _, _, _) => throw new OperationCanceledException(
                     "canceled"))));
 
@@ -1867,7 +1873,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--publish-compiler-manifest", publishManifestPath,
                 "--publish-sarif", publishSarifPath
             ],
-            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            static path => WorkerBinaryIdentity.ComputeSha256(
+                path,
+                ContainerContract.GetZ3LibrarySha256Required()),
             (arguments, _, _, _) =>
             {
                 var request = WorkerProtocolJson.DeserializeRequest(
@@ -1973,7 +1981,9 @@ public sealed class WorkerMsBuildIntegrationTests
                     "--publish-result", publishResultPath,
                     "--publish-compiler-manifest", publishManifestPath
                 ],
-                static path => WorkerBinaryIdentity.ComputeSha256(path),
+                static path => WorkerBinaryIdentity.ComputeSha256(
+                    path,
+                    ContainerContract.GetZ3LibrarySha256Required()),
                 (arguments, _, _, _) =>
                 {
                     var request = WorkerProtocolJson.DeserializeRequest(
@@ -3602,7 +3612,9 @@ public sealed class WorkerMsBuildIntegrationTests
             request.CompilerManifest.Path);
         var digest = WorkerProtocolJson.ComputeSha256(artifact.Bytes);
         workerPath ??= WorkerOutputPath();
-        var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(workerPath);
+        var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(
+            workerPath,
+            ContainerContract.GetZ3LibrarySha256Required());
         var expectedInputHash = Program.ComputeExpectedInputHash(
             workerPath, request, artifact.Bytes);
         using (Assert.EnterMultipleScope())

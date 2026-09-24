@@ -389,7 +389,7 @@ public sealed class PackageLayoutSmokeTests
 
         using var document = JsonDocument.Parse(firstManifest);
         var root = document.RootElement;
-        JsonAssert.Equal(root, "schemaVersion", 3);
+        JsonAssert.Equal(root, "schemaVersion", 4);
         JsonAssert.Equal(root, "packageVersion", feed.Version);
         var artifacts = root.GetProperty("artifacts")
             .EnumerateArray()
@@ -2305,22 +2305,29 @@ public sealed class PackageLayoutSmokeTests
         VerifyPackagePayload(
             archive,
             "tools/native/linux-x64/libz3.so",
-            z3.GetProperty("libraryBytes").GetInt64());
+            z3.GetProperty("libraryBytes").GetInt64(),
+            z3.GetProperty("librarySha256").GetString()!);
         VerifyPackagePayload(
             archive,
             "tools/net9/Microsoft.Z3.dll",
-            z3.GetProperty("managedAssemblyBytes").GetInt64());
+            z3.GetProperty("managedAssemblyBytes").GetInt64(),
+            z3.GetProperty("managedAssemblySha256").GetString()!);
     }
 
     private static void VerifyPackagePayload(
         ZipArchive archive,
         string path,
-        long expectedBytes)
+        long expectedBytes,
+        string expectedSha256)
     {
         var entry = archive.GetEntry(path) ??
             throw new InvalidOperationException(
                 "Package entry was not found: " + path);
         Assert.That(entry.Length, Is.EqualTo(expectedBytes), path);
+        using var stream = entry.Open();
+        var actualSha256 = Convert.ToHexStringLower(
+            SHA256.HashData(stream));
+        Assert.That(actualSha256, Is.EqualTo(expectedSha256), path);
     }
 
     private static string ReadArchiveText(

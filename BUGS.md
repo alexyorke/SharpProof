@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, and B59 guard-clause replayability findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **43 findings**: 0 P0, 0 P1, 5 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and B65 Z3 payload integrity findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **42 findings**: 0 P0, 0 P1, 4 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,64 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B65. The Z3 solver binary is pinned only by byte length, from download to package to runtime
-
-**Confidence: Confirmed by code reading of every integrity check in the chain.**
-
-- **Location:**
-  - `eng/container/Prepare-NativePayload.ps1:36-56` downloads
-    `z3.archiveUrl` (from `eng/container/toolchain.json`) with
-    `Invoke-WebRequest`, reuses an existing archive file without checking it,
-    extracts it, and compares only `libz3.so` and `Microsoft.Z3.dll` *lengths*
-    with `libraryBytes`/`managedAssemblyBytes`. Its own error text calls it
-    "The verified Z3 archive".
-  - `scripts/Test-SharpProofPackagePayloads.ps1:255-266` validates the
-    packaged the package entry tools/native/linux-x64/libz3.so and tools/net9/Microsoft.Z3.dll
-    only by length.
-  - `SharpProof.Host/ContainerContract.cs:125-150`
-    (`ResolveZ3LibraryRequired`) checks only `information.Length` before
-    loading the library.
-  - `eng/container/toolchain.json` records no digest for the archive or
-    either file.
-  - The solver that is actually loaded is chosen by the
-    `SHARPPROOF_NATIVE_ROOT` environment variable (`SharpProof.Host/ContainerContract.cs:128-141`,
-    default `/opt/sharpproof/native`). The verifier package's own copy
-    (`_SharpProofPackageNativeZ3Path` in
-    `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:8`) is only
-    checked for existence by `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:43`
-    and is never loaded. Any directory with a same-size `libz3.so` therefore
-    supplies the solver (see also B66).
-- **Defect:** the SMT solver is the component that turns obligations into
-  `Proven` verdicts, but none of the checks binds its contents. Any
-  replacement of the same size is accepted at image build, package
-  validation and worker start: a substituted release asset, a poisoned
-  download cache, or a tampered file in the image or package. The worker's
-  runtime-closure hash (`WorkerBinaryIdentity`) covers the managed closure but
-  not this native library, so the verification cache key and the published
-  provenance do not identify it either.
-- **Observed boundary:** source-traced. There is no SHA-256 anywhere in
-  `toolchain.json` or `third-party-components.json` for these files, no
-  hash comparison in the three scripts or classes above, and the
-  `payload.json` written into the image records only `bytes`.
-- **Impact:** release and verification integrity rest on an unauthenticated
-  native binary. A same-size solver that answers `unsat` would make every
-  obligation `Proven`, and the package would still pass
-  `Test-SharpProofPackagePayloads.ps1`. This violates the P0-class
-  "verification integrity" property only under supply-chain compromise, so
-  it is filed as P2.
-- **Proposed fix:** add `archiveSha256`, `librarySha256` and
-  `managedAssemblySha256` to `eng/container/toolchain.json`. Verify the
-  archive hash immediately after download (and before reusing a cached
-  file) in `Prepare-NativePayload.ps1`. Verify both file hashes in that
-  script, in `Test-SharpProofPackagePayloads.ps1`, and at runtime in
-  `ContainerContract.ResolveZ3LibraryRequired`, hashing the opened handle
-  that is then passed to the loader. Include the library hash in the
-  worker's binary identity, so cache keys and published versions bind it,
-  and record it in `third-party-components.json`.
-- **Proposed regression:** container-contract and payload tests that replace
-  `libz3.so` with a same-length file of different content and expect
-  rejection at each of the three checkpoints.
 
 ### B66. Worker and launcher inherit the build environment, so `DOTNET_STARTUP_HOOKS` and similar variables bypass the authenticated runtime closure
 

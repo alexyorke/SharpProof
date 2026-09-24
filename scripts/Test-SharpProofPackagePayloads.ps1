@@ -39,6 +39,23 @@ function Get-SharpProofArchiveAssemblyName {
     }
 }
 
+function Get-SharpProofArchiveEntrySha256 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [IO.Compression.ZipArchiveEntry]$Entry
+    )
+
+    $input = $Entry.Open()
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        return [Convert]::ToHexString($sha256.ComputeHash($input)).ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+        $input.Dispose()
+    }
+}
+
 function Get-SharpProofPayloadSpecifications {
     param(
         [Parameter(Mandatory = $true)]
@@ -179,12 +196,21 @@ function Test-SharpProofPackagePayload {
             -RepositoryRoot $RepositoryRoot `
             -PackageId $PackageId)
     }
-    $declaredThirdParty = @(
-        $Components |
-            ForEach-Object { @($_.entries) } |
-            ForEach-Object { [string]$_ } |
-            Sort-Object
-    )
+        $declaredThirdParty = @(
+            $Components |
+                ForEach-Object { @($_.entries) } |
+                ForEach-Object { [string]$_ } |
+                Sort-Object
+        )
+        $declaredEntryDigests = @(
+            $Components |
+                ForEach-Object {
+                    if ($null -ne $_.PSObject.Properties['entrySha256']) {
+                        @($_.entrySha256)
+                    }
+                } |
+                Where-Object { -not [string]::IsNullOrEmpty([string]$_.path) }
+        )
     $ownsArchive = $null -eq $Archive
     if ($ownsArchive) {
         $Archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
@@ -223,8 +249,7 @@ function Test-SharpProofPackagePayload {
             if ($null -eq $entry) {
                 throw "Package '$PackageId' is missing payload '$($specification.Entry)'."
             }
-            if (-not $useEvidence -and
-                $entry.FullName -in @(
+            if ($entry.FullName -in @(
                     'tools/native/linux-x64/libz3.so',
                     'tools/net9/Microsoft.Z3.dll')) {
                 if (-not $ValidationCache.ContainsKey('Toolchain')) {
@@ -237,10 +262,41 @@ function Test-SharpProofPackagePayload {
                 $toolchain = $ValidationCache['Toolchain']
             }
             $assemblyName = $null
+            $entrySha256 = Get-SharpProofArchiveEntrySha256 -Entry $entry
+            $pinnedDigests = @(
+                $declaredEntryDigests |
+                    Where-Object { [string]$_.path -ceq $entry.FullName }
+            )
+            if ($pinnedDigests.Count -gt 1) {
+                throw "Third-party digest inventory has duplicate entry '$($entry.FullName)'."
+            }
+            if ($pinnedDigests.Count -eq 1 -and
+                $entrySha256 -cne [string]$pinnedDigests[0].sha256) {
+                throw "Package '$PackageId' payload digest does not match the third-party authority: '$($entry.FullName)'."
+            }
+            if ($entry.FullName -in @(
+                    'tools/native/linux-x64/libz3.so',
+                    'tools/net9/Microsoft.Z3.dll') -and
+                $pinnedDigests.Count -ne 1) {
+                throw "Third-party digest inventory is missing '$($entry.FullName)'."
+            }
             if ($useEvidence) {
                 $expected = $specification.Evidence
                 if ($entry.Length -ne [int64]$expected.bytes) {
                     throw "Package '$PackageId' payload size does not match release evidence: '$($entry.FullName)'."
+                }
+                if ($entrySha256 -cne [string]$expected.sha256) {
+                    throw "Package '$PackageId' payload digest does not match release evidence: '$($entry.FullName)'."
+                }
+                if ($entry.FullName -eq 'tools/native/linux-x64/libz3.so' -and
+                    ($entry.Length -ne [int64]$toolchain.z3.libraryBytes -or
+                     $entrySha256 -cne [string]$toolchain.z3.librarySha256)) {
+                    throw "Package '$PackageId' native Z3 payload does not match the pinned toolchain."
+                }
+                if ($entry.FullName -eq 'tools/net9/Microsoft.Z3.dll' -and
+                    ($entry.Length -ne [int64]$toolchain.z3.managedAssemblyBytes -or
+                     $entrySha256 -cne [string]$toolchain.z3.managedAssemblySha256)) {
+                    throw "Package '$PackageId' managed Z3 payload does not match the pinned toolchain."
                 }
                 if ([string]$expected.owner -eq 'thirdParty') {
                     $actualThirdParty.Add($entry.FullName)
@@ -256,11 +312,17 @@ function Test-SharpProofPackagePayload {
                 if ($entry.Length -ne [int64]$toolchain.z3.libraryBytes) {
                     throw "Package '$PackageId' native payload size is invalid: '$($entry.FullName)'."
                 }
+                if ($entrySha256 -cne [string]$toolchain.z3.librarySha256) {
+                    throw "Package '$PackageId' native payload digest is invalid: '$($entry.FullName)'."
+                }
                 $actualThirdParty.Add($entry.FullName)
             }
             elseif ($entry.FullName -eq 'tools/net9/Microsoft.Z3.dll') {
                 if ($entry.Length -ne [int64]$toolchain.z3.managedAssemblyBytes) {
                     throw "Package '$PackageId' managed Z3 payload size is invalid."
+                }
+                if ($entrySha256 -cne [string]$toolchain.z3.managedAssemblySha256) {
+                    throw "Package '$PackageId' managed Z3 payload digest is invalid."
                 }
                 $actualThirdParty.Add($entry.FullName)
                 $assemblyName = Get-SharpProofArchiveAssemblyName -Entry $entry
@@ -292,6 +354,7 @@ function Test-SharpProofPackagePayload {
                     }
                     assemblyName = $assemblyName
                     bytes = [int64]$entry.Length
+                    sha256 = $entrySha256
                 })
             }
         }

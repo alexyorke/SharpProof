@@ -25,8 +25,7 @@ public static class ContainerNativeLibrary
                 return;
             }
 
-            var handle = NativeLibrary.Load(
-                ContainerContract.ResolveZ3LibraryRequired());
+            var handle = ContainerContract.LoadZ3LibraryRequired();
             var resolverInstalled = false;
             try
             {

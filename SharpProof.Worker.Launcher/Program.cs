@@ -23,7 +23,9 @@ internal static class Program
     {
         return await RunMain(
             args,
-            static path => WorkerBinaryIdentity.ComputeSha256(path))
+            static path => WorkerBinaryIdentity.ComputeSha256(
+                path,
+                ContainerContract.GetZ3LibrarySha256Required()))
             .ConfigureAwait(false);
     }
 
@@ -63,8 +65,10 @@ internal static class Program
                 validatePreflight(arguments);
             }
             arguments.ValidateDistinctPaths(runtimeSnapshot);
+            var z3LibrarySha256 = ContainerContract.GetZ3LibrarySha256Required();
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
-                arguments.WorkerPath);
+                arguments.WorkerPath,
+                z3LibrarySha256);
             request = arguments.CreateRequest(
                 runtimeSnapshot,
                 out artifact,
@@ -334,7 +338,9 @@ internal static class Program
     internal static string ComputeExpectedInputHash(
         string workerPath, WorkerVerifyRequest request, byte[] artifactBytes)
     {
-        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(workerPath);
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
+            workerPath,
+            ContainerContract.GetZ3LibrarySha256Required());
         return ComputeExpectedInputHash(
             request,
             artifactBytes,

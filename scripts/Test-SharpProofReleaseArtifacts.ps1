@@ -40,7 +40,7 @@ $manifestPath = Join-Path $resolvedSource 'SharpProof.release.json'
 $manifest = Read-SharpProofCanonicalReleaseJson `
     -Path $manifestPath `
     -DocumentType ReleaseManifest
-if ($manifest.schemaVersion -ne 3) {
+if ($manifest.schemaVersion -ne 4) {
     throw 'Unsupported release evidence schema.'
 }
 if ([string]$manifest.packageVersion -ne $expectedVersion) {

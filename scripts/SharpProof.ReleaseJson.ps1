@@ -132,6 +132,9 @@ function Assert-SharpProofReleaseManifestShape {
         'artifacts', 'packagePayloads', 'thirdPartyComponents'
     ) 'Release manifest'
     Assert-SharpProofJsonInteger $Root.GetProperty('schemaVersion') 'Release manifest schemaVersion'
+    if ($Root.GetProperty('schemaVersion').GetInt32() -ne 4) {
+        throw 'Unsupported release manifest schema version.'
+    }
     Assert-SharpProofJsonKind $Root.GetProperty('packageVersion') String 'Release manifest packageVersion'
 
     $authority = $Root.GetProperty('versionAuthority')
@@ -182,7 +185,7 @@ function Assert-SharpProofReleaseManifestShape {
         $entryIndex = 0
         foreach ($entry in $entries.EnumerateArray()) {
             Assert-SharpProofJsonObject $entry @(
-                'path', 'owner', 'assemblyName', 'bytes') "Release manifest packagePayloads[$index].entries[$entryIndex]" -KindAlreadyValidated
+                'path', 'owner', 'assemblyName', 'bytes', 'sha256') "Release manifest packagePayloads[$index].entries[$entryIndex]" -KindAlreadyValidated
             foreach ($name in @('path', 'owner')) {
                 Assert-SharpProofJsonKind $entry.GetProperty($name) String "Release manifest packagePayloads[$index].entries[$entryIndex].$name"
             }
@@ -193,6 +196,10 @@ function Assert-SharpProofReleaseManifestShape {
                 throw "Release manifest packagePayloads[$index].entries[$entryIndex].assemblyName has an invalid JSON token type."
             }
             Assert-SharpProofJsonInteger $entry.GetProperty('bytes') "Release manifest packagePayloads[$index].entries[$entryIndex].bytes"
+            Assert-SharpProofJsonKind $entry.GetProperty('sha256') String "Release manifest packagePayloads[$index].entries[$entryIndex].sha256"
+            if ($entry.GetProperty('sha256').GetString() -cnotmatch '^[0-9a-f]{64}$') {
+                throw "Release manifest packagePayloads[$index].entries[$entryIndex].sha256 is not a lowercase SHA-256 digest."
+            }
             $entryIndex++
         }
         $index++
@@ -203,11 +210,23 @@ function Assert-SharpProofReleaseManifestShape {
     $index = 0
     foreach ($component in $components.EnumerateArray()) {
         Assert-SharpProofJsonObject $component @(
-            'packageId', 'id', 'version', 'license', 'entries') "Release manifest thirdPartyComponents[$index]" -KindAlreadyValidated
+            'packageId', 'id', 'version', 'license', 'entries', 'entrySha256') "Release manifest thirdPartyComponents[$index]" -KindAlreadyValidated
         foreach ($name in @('packageId', 'id', 'version', 'license')) {
             Assert-SharpProofJsonKind $component.GetProperty($name) String "Release manifest thirdPartyComponents[$index].$name"
         }
         Assert-SharpProofJsonArray $component.GetProperty('entries') String "Release manifest thirdPartyComponents[$index].entries"
+        $entrySha256 = $component.GetProperty('entrySha256')
+        Assert-SharpProofJsonArray $entrySha256 Object "Release manifest thirdPartyComponents[$index].entrySha256"
+        $entryHashIndex = 0
+        foreach ($entryHash in $entrySha256.EnumerateArray()) {
+            Assert-SharpProofJsonObject $entryHash @('path', 'sha256') "Release manifest thirdPartyComponents[$index].entrySha256[$entryHashIndex]" -KindAlreadyValidated
+            Assert-SharpProofJsonKind $entryHash.GetProperty('path') String "Release manifest thirdPartyComponents[$index].entrySha256[$entryHashIndex].path"
+            Assert-SharpProofJsonKind $entryHash.GetProperty('sha256') String "Release manifest thirdPartyComponents[$index].entrySha256[$entryHashIndex].sha256"
+            if ($entryHash.GetProperty('sha256').GetString() -cnotmatch '^[0-9a-f]{64}$') {
+                throw "Release manifest thirdPartyComponents[$index].entrySha256[$entryHashIndex].sha256 is not a lowercase SHA-256 digest."
+            }
+            $entryHashIndex++
+        }
         $index++
     }
 }

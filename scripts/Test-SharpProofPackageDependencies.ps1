@@ -18,14 +18,39 @@ function Get-SharpProofThirdPartyComponentGraph {
     return @($contract.packages.PSObject.Properties | ForEach-Object {
         $packageId = $_.Name
         @($_.Value) | ForEach-Object {
+            $entries = @(@($_.entries) |
+                ForEach-Object { [string]$_ } |
+                Sort-Object)
+            $entrySha256 = @()
+            if ($null -ne $_.PSObject.Properties['entrySha256']) {
+                $entrySha256 = @($_.entrySha256 | ForEach-Object {
+                    [pscustomobject][ordered]@{
+                        path = [string]$_.path
+                        sha256 = [string]$_.sha256
+                    }
+                } | Sort-Object path)
+            }
+            $entrySha256Paths = @(
+                $entrySha256 | ForEach-Object { [string]$_.path }
+            )
+            if (@($entrySha256Paths | Sort-Object -Unique).Count -ne
+                    $entrySha256Paths.Count -or
+                @($entrySha256 | Where-Object {
+                    $_.path -notin $entries -or
+                    $_.sha256 -cnotmatch '^[0-9a-f]{64}$'
+                }).Count -ne 0 -or
+                ($_.id -ceq 'Microsoft.Z3' -and
+                 ((@($entrySha256Paths | Sort-Object) -join '|') -cne
+                    (@($entries | Sort-Object) -join '|')))) {
+                throw "Third-party component '$($_.id)' has an invalid entry digest inventory."
+            }
             [pscustomobject][ordered]@{
                 packageId = $packageId
                 id = [string]$_.id
                 version = [string]$_.version
                 license = [string]$_.license
-                entries = @(@($_.entries) |
-                    ForEach-Object { [string]$_ } |
-                    Sort-Object)
+                entries = $entries
+                entrySha256 = $entrySha256
             }
         }
     })
@@ -42,7 +67,9 @@ function Test-SharpProofThirdPartyComponentProjection {
         [object[]]$ExpectedComponents
     )
 
-    $propertyNames = @('entries', 'id', 'license', 'packageId', 'version')
+    $propertyNames = @(
+        'entries', 'entrySha256', 'id', 'license', 'packageId', 'version'
+    )
     function ConvertTo-ComponentRecord {
         param(
             [Parameter(Mandatory = $true)][object]$Component,
@@ -64,6 +91,12 @@ function Test-SharpProofThirdPartyComponentProjection {
             entries = @(@($Component.entries) |
                 ForEach-Object { [string]$_ } |
                 Sort-Object)
+            entrySha256 = @($Component.entrySha256 | ForEach-Object {
+                [pscustomobject][ordered]@{
+                    path = [string]$_.path
+                    sha256 = [string]$_.sha256
+                }
+            } | Sort-Object path)
         }
     }
     $actual = @($ActualComponents |

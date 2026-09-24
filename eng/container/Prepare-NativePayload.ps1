@@ -18,13 +18,21 @@ function Assert-Equal([object]$Actual, [object]$Expected, [string]$Label) {
     }
 }
 
+function Assert-Sha256([string]$Path, [string]$Expected, [string]$Label) {
+    if ($Expected -cnotmatch '^[0-9a-f]{64}$') {
+        throw "$Label catalog digest is invalid."
+    }
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Equal $actual $Expected "$Label SHA-256"
+}
+
 $resolvedCatalog = [System.IO.Path]::GetFullPath($CatalogPath)
 $resolvedDestination = [System.IO.Path]::GetFullPath($DestinationRoot)
 $resolvedDownload = [System.IO.Path]::GetFullPath($DownloadRoot)
 $catalog = Get-Content -LiteralPath $resolvedCatalog -Raw | ConvertFrom-Json
 
-if ([int]$catalog.schemaVersion -ne 1 -or [string]$catalog.platform -cne 'linux/amd64') {
-    throw 'The native payload preparer requires container toolchain schema 1 for linux/amd64.'
+if ([int]$catalog.schemaVersion -ne 2 -or [string]$catalog.platform -cne 'linux/amd64') {
+    throw 'The native payload preparer requires container toolchain schema 2 for linux/amd64.'
 }
 
 $z3 = $catalog.z3
@@ -37,6 +45,7 @@ try {
     if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
         Invoke-WebRequest -Uri ([string]$z3.archiveUrl) -OutFile $archivePath
     }
+    Assert-Sha256 $archivePath ([string]$z3.archiveSha256) 'Z3 archive'
 
     if (Test-Path -LiteralPath $extractRoot) {
         Remove-Item -LiteralPath $extractRoot -Recurse -Force
@@ -54,6 +63,8 @@ try {
     $managed = Get-Item -LiteralPath $sourceManaged
     Assert-Equal ([int64]$library.Length) ([int64]$z3.libraryBytes) 'libz3.so byte length'
     Assert-Equal ([int64]$managed.Length) ([int64]$z3.managedAssemblyBytes) 'Microsoft.Z3.dll byte length'
+    Assert-Sha256 $sourceLibrary ([string]$z3.librarySha256) 'libz3.so'
+    Assert-Sha256 $sourceManaged ([string]$z3.managedAssemblySha256) 'Microsoft.Z3.dll'
 
     $payloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64"
     [System.IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
@@ -69,10 +80,12 @@ try {
             [ordered]@{
                 name = 'libz3.so'
                 bytes = [int64]$z3.libraryBytes
+                sha256 = [string]$z3.librarySha256
             },
             [ordered]@{
                 name = 'Microsoft.Z3.dll'
                 bytes = [int64]$z3.managedAssemblyBytes
+                sha256 = [string]$z3.managedAssemblySha256
             }
         )
     }

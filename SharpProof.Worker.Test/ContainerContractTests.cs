@@ -96,10 +96,11 @@ public sealed class ContainerContractTests
             var mutations = new Action<JsonObject>[]
             {
                 contract => contract["schemaVersion"] = "1",
-                contract => contract["schemaVersion"] = 2,
+                contract => contract["schemaVersion"] = 1,
                 contract => contract["z3LibraryBytes"] = "invalid",
                 contract => contract["z3LibraryBytes"] =
                     contract["z3LibraryBytes"]!.GetValue<long>() + 1,
+                contract => contract["z3LibrarySha256"] = new string('0', 64),
                 contract => contract["platform"] = " ",
                 contract => contract["platform"] = "linux/arm64"
                 ,contract => contract.Remove("dotnetTestRuntimeVersion")
@@ -148,8 +149,10 @@ public sealed class ContainerContractTests
         try
         {
             Environment.SetEnvironmentVariable("SHARPPROOF_NATIVE_ROOT", null);
+            var canonicalLibrary =
+                ContainerContract.ResolveZ3LibraryRequired();
             Assert.That(
-                File.Exists(ContainerContract.ResolveZ3LibraryRequired()),
+                File.Exists(canonicalLibrary),
                 Is.True);
 
             Environment.SetEnvironmentVariable("SHARPPROOF_NATIVE_ROOT", root);
@@ -166,6 +169,24 @@ public sealed class ContainerContractTests
                 "libz3.so");
             Directory.CreateDirectory(Path.GetDirectoryName(library)!);
             File.WriteAllText(library, string.Empty);
+            Assert.Throws<InvalidDataException>(
+                (Action)(() =>
+                    ContainerContract.ResolveZ3LibraryRequired()));
+
+            File.Copy(canonicalLibrary, library, overwrite: true);
+            using (var stream = new FileStream(
+                       library,
+                       FileMode.Open,
+                       FileAccess.ReadWrite,
+                       FileShare.Read))
+            {
+                var original = stream.ReadByte();
+                stream.Position = 0;
+                stream.WriteByte((byte)(original ^ 0xff));
+            }
+            Assert.That(
+                new FileInfo(library).Length,
+                Is.EqualTo(contract.Z3LibraryBytes));
             Assert.Throws<InvalidDataException>(
                 (Action)(() =>
                     ContainerContract.ResolveZ3LibraryRequired()));

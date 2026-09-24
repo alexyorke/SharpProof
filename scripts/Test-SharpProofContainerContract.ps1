@@ -333,7 +333,7 @@ function Assert-ComposeAuthority {
     }
 }
 
-Assert-Exact $catalog.schemaVersion 1 'Container toolchain schema'
+Assert-Exact $catalog.schemaVersion 2 'Container toolchain schema'
 Assert-Exact $catalog.platform 'linux/amd64' 'Container platform'
 Assert-Exact $globalJson.sdk.version $catalog.dotnet.sdkVersion '.NET SDK version'
 Assert-Exact $globalJson.sdk.rollForward 'disable' '.NET SDK roll-forward policy'
@@ -409,10 +409,15 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         throw 'SHARPPROOF_CONTAINER_CONTRACT must identify the installed marker.'
     }
     $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+    Assert-Exact $marker.schemaVersion 2 'Installed container contract schema version'
     Assert-Exact `
         $marker.contractVersion `
         $catalog.containerContractVersion `
         'Installed container contract version'
+    Assert-Exact `
+        $marker.z3LibrarySha256 `
+        $catalog.z3.librarySha256 `
+        'Installed Z3 SHA-256 digest'
     Assert-Exact $marker.platform $catalog.platform 'Installed container platform'
     Assert-Exact `
         $marker.dotnetTestRuntimeVersion `
@@ -431,6 +436,19 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         "z3/$($catalog.z3.version)/linux-x64/libz3.so"
     $information = Get-Item -LiteralPath $native
     Assert-Exact $information.Length $catalog.z3.libraryBytes 'Installed Z3 size'
+    $nativeSha256 = (Get-FileHash -LiteralPath $native -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Exact $nativeSha256 $catalog.z3.librarySha256 'Installed Z3 SHA-256 digest'
+    $managed = Join-Path (Split-Path -Parent $native) 'Microsoft.Z3.dll'
+    $managedInformation = Get-Item -LiteralPath $managed
+    Assert-Exact `
+        $managedInformation.Length `
+        $catalog.z3.managedAssemblyBytes `
+        'Installed managed Z3 size'
+    $managedSha256 = (Get-FileHash -LiteralPath $managed -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Exact `
+        $managedSha256 `
+        $catalog.z3.managedAssemblySha256 `
+        'Installed managed Z3 SHA-256 digest'
     $installedRuntimes = & dotnet --list-runtimes
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {

@@ -77,6 +77,7 @@ public sealed class BoundaryEnforcementTests
         ("SharpProof.Host", [
             "SharpProof.BuildTasks",
             "SharpProof.Package.Test",
+            "SharpProof.Worker",
             "SharpProof.Worker.Launcher",
             "SharpProof.Worker.Test"
         ]),

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace SharpProof.Host;
@@ -10,6 +11,7 @@ public sealed record ContainerContractInfo(
     string DotNetSdkVersion,
     string Z3Version,
     long Z3LibraryBytes,
+    string Z3LibrarySha256,
     string VerifierPackageId);
 
 public static class ContainerContract
@@ -65,7 +67,7 @@ public static class ContainerContract
             "dotnetMinimumSdkVersion", "dotnetMinimumSdkFrameworkVersion",
             "dotnetTestRuntimeVersion", "dotnetBaseImage", "dotnetBaseImageDigest",
             "powershellVersionLine", "powershellImageDigest", "z3Version",
-            "z3LibraryBytes", "verifierPackageId"
+            "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId"
         };
         foreach (var property in actual.EnumerateObject())
         {
@@ -80,7 +82,7 @@ public static class ContainerContract
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{required.First()}' is missing.");
         }
-        RequireInteger(actual, "schemaVersion", 1);
+        RequireInteger(actual, "schemaVersion", 2);
         var contractVersion = RequireInteger(
             actual,
             "contractVersion",
@@ -108,6 +110,10 @@ public static class ContainerContract
             actual,
             "z3LibraryBytes",
             RequireInteger64(expected.GetProperty("z3"), "libraryBytes"));
+        var z3LibrarySha256 = RequireString(
+            actual,
+            "z3LibrarySha256",
+            RequireSha256(expected.GetProperty("z3"), "librarySha256"));
         var verifierPackageId = RequireString(
             actual,
             "verifierPackageId",
@@ -121,12 +127,54 @@ public static class ContainerContract
             dotNetSdkVersion,
             z3Version,
             z3LibraryBytes,
+            z3LibrarySha256,
             verifierPackageId);
     }
 
     public static string ResolveZ3LibraryRequired()
     {
         var contract = ValidateRequired();
+        using var stream = OpenZ3LibraryRequired(contract);
+        return stream.Name;
+    }
+
+    internal static string GetZ3LibrarySha256Required()
+    {
+        var contract = ValidateRequired();
+        using var stream = OpenZ3LibraryRequired(contract);
+        return contract.Z3LibrarySha256;
+    }
+
+    internal static IntPtr LoadZ3LibraryRequired()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            throw new PlatformNotSupportedException(
+                "The pinned Z3 payload loader requires Linux.");
+        }
+
+        var contract = ValidateRequired();
+        using var stream = OpenZ3LibraryRequired(contract);
+        var fileHandle = stream.SafeFileHandle;
+        var addedReference = false;
+        fileHandle.DangerousAddRef(ref addedReference);
+        try
+        {
+            var descriptor = fileHandle.DangerousGetHandle().ToInt64();
+            return NativeLibrary.Load($"/proc/self/fd/{descriptor}");
+        }
+        finally
+        {
+            if (addedReference)
+            {
+                fileHandle.DangerousRelease();
+            }
+        }
+    }
+
+    private static FileStream OpenZ3LibraryRequired(
+        ContainerContractInfo contract)
+    {
         var nativeRoot = Environment.GetEnvironmentVariable(
             "SHARPPROOF_NATIVE_ROOT");
         if (string.IsNullOrWhiteSpace(nativeRoot))
@@ -139,13 +187,67 @@ public static class ContainerContract
             contract.Z3Version,
             "linux-x64",
             "libz3.so"));
-        var information = new FileInfo(library);
-        if (!information.Exists || information.Length != contract.Z3LibraryBytes)
+        FileStream? stream = null;
+        try
+        {
+            stream = new FileStream(
+                library,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                options: FileOptions.SequentialScan);
+            if (stream.Length != contract.Z3LibraryBytes)
+            {
+                throw new InvalidDataException(
+                    "The SharpProof Z3 native payload is missing or has the wrong size.");
+            }
+            var digest = Convert.ToHexString(SHA256.HashData(stream));
+            if (!string.Equals(
+                    digest,
+                    contract.Z3LibrarySha256.ToUpperInvariant(),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "The SharpProof Z3 native payload has the wrong SHA-256 digest.");
+            }
+            stream.Position = 0;
+            var verifiedStream = stream;
+            stream = null;
+            return verifiedStream;
+        }
+        catch (FileNotFoundException exception)
         {
             throw new InvalidDataException(
-                "The SharpProof Z3 native payload is missing or has the wrong size.");
+                "The SharpProof Z3 native payload is missing or has the wrong size.",
+                exception);
         }
-        return library;
+        catch (DirectoryNotFoundException exception)
+        {
+            throw new InvalidDataException(
+                "The SharpProof Z3 native payload is missing or has the wrong size.",
+                exception);
+        }
+        finally
+        {
+            stream?.Dispose();
+        }
+    }
+
+    private static string RequireSha256(
+        JsonElement element,
+        string property)
+    {
+        var value = RequireString(element, property);
+        if (value.Length != 64 ||
+            value.Any(static character =>
+                character is not (>= '0' and <= '9') and
+                    not (>= 'a' and <= 'f')))
+        {
+            throw new InvalidDataException(
+                $"The SharpProof toolchain property '{property}' is not a lowercase SHA-256 digest.");
+        }
+        return value;
     }
 
     private static JsonDocument ReadEmbeddedToolchain()

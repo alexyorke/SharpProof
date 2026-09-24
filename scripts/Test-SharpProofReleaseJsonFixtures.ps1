@@ -52,7 +52,7 @@ function Assert-Rejected {
 
 try {
     $manifest = [pscustomobject][ordered]@{
-        schemaVersion = 3
+        schemaVersion = 4
         packageVersion = '1.0.0-preview.1'
         versionAuthority = [pscustomobject][ordered]@{
             schemaVersion = 1; path = 'SharpProof.Release.props'
@@ -68,16 +68,29 @@ try {
         packagePayloads = @([pscustomobject][ordered]@{
             packageId = 'SharpProof'; entries = @([pscustomobject][ordered]@{
                 path = 'analyzers/dotnet/cs/SharpProof.dll'; owner = 'firstParty'
-                assemblyName = 'SharpProof'; bytes = [int64]1
+                assemblyName = 'SharpProof'; bytes = [int64]1; sha256 = ('c' * 64)
             })
         })
         thirdPartyComponents = @([pscustomobject][ordered]@{
             packageId = 'SharpProof.Verifier'; id = 'Z3'; version = '4.12.2'
             license = 'MIT'; entries = @('tools/native/linux-x64/libz3.so')
+            entrySha256 = @([pscustomobject][ordered]@{
+                path = 'tools/native/linux-x64/libz3.so'; sha256 = ('b' * 64)
+            })
         })
     }
     $manifestJson = (($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n") + "`n"
     Assert-Accepted manifest-canonical $manifestJson ReleaseManifest
+    $manifest.packagePayloads[0].entries[0].sha256 = ('C' * 64)
+    Assert-Rejected manifest-payload-hash-case `
+        ((($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n") + "`n") `
+        ReleaseManifest
+    $manifest.packagePayloads[0].entries[0].sha256 = ('c' * 64)
+    $manifest.thirdPartyComponents[0].entrySha256[0].sha256 = ('B' * 64)
+    Assert-Rejected manifest-third-party-hash-case `
+        ((($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n") + "`n") `
+        ReleaseManifest
+    $manifest.thirdPartyComponents[0].entrySha256[0].sha256 = ('b' * 64)
     Assert-Rejected manifest-duplicate-first ($manifestJson.Replace(
         '  "packageVersion": "1.0.0-preview.1",',
         "  `"packageVersion`": `"999.0.0`",`n  `"packageVersion`": `"1.0.0-preview.1`",")) ReleaseManifest
@@ -103,8 +116,8 @@ try {
         '"artifacts": [', '"artifacts": [[').Replace(
         "  ],`n  `"packagePayloads`"", "  ]],`n  `"packagePayloads`"")) ReleaseManifest
     Assert-Rejected manifest-reordered ($manifestJson.Replace(
-        "  `"schemaVersion`": 3,`n  `"packageVersion`": `"1.0.0-preview.1`",",
-        "  `"packageVersion`": `"1.0.0-preview.1`",`n  `"schemaVersion`": 3,")) ReleaseManifest
+        "  `"schemaVersion`": 4,`n  `"packageVersion`": `"1.0.0-preview.1`",",
+        "  `"packageVersion`": `"1.0.0-preview.1`",`n  `"schemaVersion`": 4,")) ReleaseManifest
     Assert-Rejected manifest-whitespace ($manifestJson.Replace('  "schemaVersion"', '    "schemaVersion"')) ReleaseManifest
 
 

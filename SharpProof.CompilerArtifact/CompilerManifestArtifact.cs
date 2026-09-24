@@ -66,8 +66,15 @@ internal static class WorkerBinaryIdentity
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
 
     internal static WorkerRuntimeClosureSnapshot CreateSnapshot(
-        string workerPath)
+        string workerPath,
+        string? z3LibrarySha256 = null)
     {
+        if (z3LibrarySha256 is not null &&
+            !WorkerProtocolJson.IsSha256(z3LibrarySha256))
+        {
+            throw new InvalidDataException(
+                "The Z3 native library identity is not a SHA-256 digest.");
+        }
         var path = NormalizeWorkerPath(workerPath);
         var stagingDirectory = CreateStagingDirectory();
         FileStream[] stagedHandles = [];
@@ -84,7 +91,8 @@ internal static class WorkerBinaryIdentity
             ValidateSnapshotBytes(dependencyBytes);
             stagedHandles = new FileStream[components.Count];
             using var hash = new CanonicalHashWriter();
-            hash.Add("SharpProof.WorkerBinarySet").Add(1);
+            hash.Add("SharpProof.WorkerBinarySet")
+                .Add(z3LibrarySha256 is null ? 1 : 2);
             long totalBytes = 0;
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
@@ -126,6 +134,10 @@ internal static class WorkerBinaryIdentity
                 }
                 stagedHandles[stagedCount++] = OpenRead(stagedPath);
             }
+            if (z3LibrarySha256 is not null)
+            {
+                hash.Add("z3-native-sha256").Add(z3LibrarySha256);
+            }
 #pragma warning restore CA2000
             var snapshot = new WorkerRuntimeClosureSnapshot(
                 path,
@@ -149,9 +161,11 @@ internal static class WorkerBinaryIdentity
         }
     }
 
-    internal static string ComputeSha256(string workerPath)
+    internal static string ComputeSha256(
+        string workerPath,
+        string? z3LibrarySha256 = null)
     {
-        using var snapshot = CreateSnapshot(workerPath);
+        using var snapshot = CreateSnapshot(workerPath, z3LibrarySha256);
         return snapshot.Sha256;
     }
 

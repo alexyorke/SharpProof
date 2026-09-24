@@ -436,6 +436,16 @@ foreach ($item in $identities |
                         ForEach-Object { [string]$_ } |
                         Sort-Object
                 )
+                entrySha256 = @(
+                    if ($null -ne $component.PSObject.Properties['entrySha256']) {
+                        $component.entrySha256 | ForEach-Object {
+                            [pscustomobject][ordered]@{
+                                path = [string]$_.path
+                                sha256 = [string]$_.sha256
+                            }
+                        } | Sort-Object path
+                    }
+                )
             })
         }
     }
@@ -479,7 +489,7 @@ $orderedArtifacts = @(
     $artifactNames | ForEach-Object { $artifactsByName[$_] }
 )
 $manifest = [pscustomobject][ordered]@{
-    schemaVersion = 3
+    schemaVersion = 4
     packageVersion = $releaseVersion
     versionAuthority = Get-SharpProofReleaseVersionAuthority `
         -RepositoryRoot $repositoryRoot

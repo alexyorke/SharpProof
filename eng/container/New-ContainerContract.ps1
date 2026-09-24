@@ -12,7 +12,7 @@ Set-StrictMode -Version Latest
 
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
 $contract = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     contractVersion = [int]$catalog.containerContractVersion
     platform = [string]$catalog.platform
     dotnetSdkVersion = [string]$catalog.dotnet.sdkVersion
@@ -26,6 +26,7 @@ $contract = [ordered]@{
     powershellImageDigest = [string]$catalog.powershell.imageDigest
     z3Version = [string]$catalog.z3.version
     z3LibraryBytes = [int64]$catalog.z3.libraryBytes
+    z3LibrarySha256 = [string]$catalog.z3.librarySha256
     verifierPackageId = [string]$catalog.support.verifierPackageId
 }
 

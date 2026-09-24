@@ -39,9 +39,11 @@ public sealed class PackageDependencyAuthorityTests
             ". $Helper\n" +
             "$expected=@(" +
             "[pscustomobject]@{packageId='SharpProof';id='Component.A';" +
-            "version='1.0';license='MIT';entries=@('tools/a.dll')}," +
+            "version='1.0';license='MIT';entries=@('tools/a.dll');" +
+            "entrySha256=@()}," +
             "[pscustomobject]@{packageId='SharpProof.Verifier';id='Component.B';" +
-            "version='2.0';license='MIT';entries=@('tools/b.so')})\n" +
+            "version='2.0';license='MIT';entries=@('tools/b.so');" +
+            "entrySha256=@()})\n" +
             "$actual=@($expected | ConvertTo-Json -Depth 4 | ConvertFrom-Json)\n" +
             "switch ($Mutation) {\n" +
             " 'fabricated' {$actual[0].id='Fabricated'}\n" +

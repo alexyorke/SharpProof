@@ -760,6 +760,8 @@ public sealed class ReleasePublicationScriptTests
     [TestCase("duplicate-first-party")]
     [TestCase("missing-managed")]
     [TestCase("missing-native")]
+    [TestCase("mutated-managed-same-length")]
+    [TestCase("mutated-native-same-length")]
     [TestCase("valid")]
     public async Task ReleaseEvidenceAuthenticatesExactPackagePayloadClosure(
         string mutation)
@@ -816,6 +818,27 @@ public sealed class ReleasePublicationScriptTests
                         "tools/native/linux-x64/libz3.so")!
                         .Delete();
                     break;
+                case "mutated-managed-same-length":
+                case "mutated-native-same-length":
+                    {
+                        var entryPath = mutation ==
+                            "mutated-managed-same-length"
+                                ? "tools/net9/Microsoft.Z3.dll"
+                                : "tools/native/linux-x64/libz3.so";
+                        var entry = archive.GetEntry(entryPath)!;
+                        using var image = new MemoryStream();
+                        await using (var input = entry.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        entry.Delete();
+                        var replacement = archive.CreateEntry(entryPath);
+                        var contents = image.ToArray();
+                        contents[^1] ^= 0x01;
+                        await using var output = replacement.Open();
+                        await output.WriteAsync(contents);
+                        break;
+                    }
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(mutation),
