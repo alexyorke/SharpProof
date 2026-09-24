@@ -62,6 +62,34 @@ public sealed class CanonicalHashWriterTests
     }
 
     [Test]
+    public void MalformedUtf16StringFramesFailClosedAndValidUtf8HashIsStable()
+    {
+        static string Hash(string value)
+        {
+            using var writer = new CanonicalHashWriter();
+            return writer.Add(value).Finish();
+        }
+
+        var replacementHash = Hash("probe\uFFFD");
+        var supplementaryHash = Hash(
+            "probe" + char.ConvertFromUtf32(0x1F642));
+        using var highSurrogateWriter = new CanonicalHashWriter();
+        using var lowSurrogateWriter = new CanonicalHashWriter();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                replacementHash,
+                Is.EqualTo("75c18c4934601c4b284d7bfa1ab16e66d070aa831d488c5af9d66f0c591dcc25"));
+            Assert.That(supplementaryHash, Is.Not.EqualTo(replacementHash));
+            Assert.Throws<System.Text.EncoderFallbackException>(
+                (Action)(() => highSurrogateWriter.Add("probe" + (char)0xD800)));
+            Assert.Throws<System.Text.EncoderFallbackException>(
+                (Action)(() => lowSurrogateWriter.Add("probe" + (char)0xDC00)));
+        }
+    }
+
+    [Test]
     public void StreamFramesPreserveByteArrayIdentity()
     {
         byte[] bytes = [0, 1, 2, 3];

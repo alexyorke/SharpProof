@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 namespace SharpProof.Ir;
 internal sealed class CanonicalHashWriter : IDisposable
 {
+    private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
     private readonly IncrementalHash _hash =
         IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
     private bool _finished;
@@ -10,7 +11,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     {
         return value == null
             ? AddFrame(ValueKind.Null, [])
-            : AddFrame(ValueKind.String, Encoding.UTF8.GetBytes(value));
+            : AddFrame(ValueKind.String, s_strictUtf8.GetBytes(value));
     }
 
     internal CanonicalHashWriter Add(bool value)
@@ -74,7 +75,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     {
         return AddFrame(
             kind,
-            Encoding.UTF8.GetBytes(
+            s_strictUtf8.GetBytes(
                 value.ToString(null, CultureInfo.InvariantCulture)));
     }
 
@@ -144,7 +145,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
         return AddFrame(
             ValueKind.Enum,
-            Encoding.UTF8.GetBytes(
+            s_strictUtf8.GetBytes(
                 (type.Assembly.GetName().Name ?? string.Empty) +
                 "\n" +
                 (type.FullName ?? type.Name) +

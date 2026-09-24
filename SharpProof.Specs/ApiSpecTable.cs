@@ -241,6 +241,7 @@ public sealed partial class ApiSpecTable
         foreach (var assembly in target.ApprovedAssemblies)
         {
             if (assembly == null || string.IsNullOrWhiteSpace(assembly.Name) ||
+                !Utf16WellFormedness.IsWellFormed(assembly.Name) ||
                 assembly.PublicKeyToken == null ||
                 assembly.PublicKeyToken.Length is not (0 or 16) ||
                 assembly.PublicKeyToken.Any(static character => !Uri.IsHexDigit(character)) ||
@@ -367,9 +368,13 @@ public sealed partial class ApiSpecTable
             throw new ArgumentException("Throw exception names must be initialized.", nameof(facets));
         }
 
-        if (throws.ExceptionMetadataNames.Any(static name => string.IsNullOrWhiteSpace(name)))
+        if (throws.ExceptionMetadataNames.Any(static name =>
+                string.IsNullOrWhiteSpace(name) ||
+                !Utf16WellFormedness.IsWellFormed(name)))
         {
-            throw new ArgumentException("Throw exception names cannot be blank.", nameof(facets));
+            throw new ArgumentException(
+                "Throw exception names must be non-empty, well-formed UTF-16.",
+                nameof(facets));
         }
 
         if (throws.Behavior != SpecThrowBehavior.MayThrow &&
@@ -398,6 +403,12 @@ public sealed partial class ApiSpecTable
         {
             throw new ArgumentException("Every facet and postcondition requires evidence.", parameterName);
         }
+        if (!Utf16WellFormedness.IsWellFormed(evidence.Source))
+        {
+            throw new ArgumentException(
+                "Evidence sources require well-formed UTF-16.",
+                parameterName);
+        }
 
         ValidateDefined(evidence.Kind, parameterName);
     }
@@ -407,6 +418,12 @@ public sealed partial class ApiSpecTable
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException("A non-empty value is required.", parameterName);
+        }
+        if (!Utf16WellFormedness.IsWellFormed(value!))
+        {
+            throw new ArgumentException(
+                "Text values require well-formed UTF-16.",
+                parameterName);
         }
     }
 

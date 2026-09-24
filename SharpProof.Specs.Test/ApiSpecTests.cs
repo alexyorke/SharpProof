@@ -78,6 +78,55 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void CustomWitnessIdentifiersRejectMalformedUtf16AndKeepValidUnicodeDistinct()
+    {
+        var malformedHigh = Declaration(
+            "probe" + (char)0xD800,
+            "M:Missing.Row.Run",
+            "Missing.Row");
+        var malformedLow = Declaration(
+            "probe" + (char)0xDC00,
+            "M:Missing.Row.Run",
+            "Missing.Row");
+        var replacement = ApiSpecTable.Create([
+            Declaration("probe\uFFFD", "M:Missing.Row.Run", "Missing.Row")
+        ]);
+        var supplementary = ApiSpecTable.Create([
+            Declaration(
+                "probe" + char.ConvertFromUtf32(0x1F642),
+                "M:Missing.Row.Run",
+                "Missing.Row")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(
+                () => ApiSpecTable.Create([malformedHigh]));
+            Assert.Throws<ArgumentException>(
+                () => ApiSpecTable.Create([malformedLow]));
+            Assert.That(
+                replacement.TryGetByWitnessIdentifier(
+                    "probe\uFFFD",
+                    out var replacementTemplate),
+                Is.True);
+            Assert.That(
+                supplementary.TryGetByWitnessIdentifier(
+                    "probe" + char.ConvertFromUtf32(0x1F642),
+                    out var supplementaryTemplate),
+                Is.True);
+            Assert.That(
+                replacementTemplate!.Target.WitnessIdentifier,
+                Is.EqualTo("probe\uFFFD"));
+            Assert.That(
+                supplementaryTemplate!.Target.WitnessIdentifier,
+                Is.EqualTo("probe" + char.ConvertFromUtf32(0x1F642)));
+            Assert.That(
+                replacement.ContentSha256,
+                Is.Not.EqualTo(supplementary.ContentSha256));
+        }
+    }
+
+    [Test]
     public void ApprovedReferenceFamiliesMustBeDefined()
     {
         var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");
