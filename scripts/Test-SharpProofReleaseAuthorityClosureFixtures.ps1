@@ -28,9 +28,12 @@ try {
 jobs:
   publish:
     uses: ./.github/actions/prepare-qualified-packages
+    steps:
+      - run: pwsh scripts/WorkflowAuthority.ps1
 '@
     Write-FixtureFile '.github/actions/prepare-qualified-packages/action.yml' `
         "name: prepare`n"
+    Write-FixtureFile 'scripts/WorkflowAuthority.ps1' "# workflow authority`n"
     Write-FixtureFile 'eng/container/entrypoint.sh' "pwsh scripts/Invoke-SharpProofContainer.ps1`n"
     Write-FixtureFile 'scripts/Invoke-SharpProofContainer.ps1' @'
 & 'scripts/New-SharpProofReleaseEvidence.ps1'
@@ -62,6 +65,7 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
     $canonical = @(Get-FixtureClosure)
     $requiredLeaves = @(
         '.github/workflows/package-consumers.yml',
+        'scripts/WorkflowAuthority.ps1',
         'scripts/New-SharpProofReleaseEvidence.ps1',
         'scripts/Test-SharpProofReleaseArtifacts.ps1',
         'scripts/Publish-SharpProofRelease.ps1',
