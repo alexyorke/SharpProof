@@ -240,6 +240,7 @@
         RequestPath="$(_SharpProofEffectiveRequestFile)"
         ResultPath="$(_SharpProofEffectiveResultFile)"
         ManifestPath="$(_SharpProofEffectiveCompilerManifestFile)"
+        InvocationResultPath="$(_SharpProofInvocationResultFile)"
         SarifPath="$(_SharpProofEffectiveSarifFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)" />
     <Message Importance="High"

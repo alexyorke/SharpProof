@@ -45,6 +45,31 @@ public sealed class VerifierPublicationTransactionTests
             Is.False);
     }
 
+    [Test]
+    public void PublishedResultValidationUsesPrivateInvocationResult()
+    {
+        var root = TestRepository.FindRoot();
+        var targets = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.targets"));
+        var taskStart = targets.IndexOf(
+            "<SharpProof.BuildTasks.ValidatePublishedVerificationResult",
+            StringComparison.Ordinal);
+        var taskEnd = taskStart < 0
+            ? -1
+            : targets.IndexOf("/>", taskStart, StringComparison.Ordinal);
+        var task = taskStart < 0 || taskEnd <= taskStart
+            ? string.Empty
+            : targets[taskStart..(taskEnd + 2)];
+
+        Assert.That(
+            task,
+            Does.Contain(
+                "InvocationResultPath=\"$(_SharpProofInvocationResultFile)\""));
+    }
+
     private static bool HasTransactionAuthority(
         string source,
         string atomicFile)

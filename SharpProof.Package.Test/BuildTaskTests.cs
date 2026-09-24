@@ -561,6 +561,96 @@ public sealed class BuildTaskTests
         Assert.That(engine.Errors, Is.Not.Empty);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    [Platform("Linux")]
+    public void PublishedResultValidatorBindsResultToPrivateInvocation(
+        bool publishedMatchesInvocation)
+    {
+        using var directory = new TempDirectory(
+            "sharpproof-result-invocation-binding-");
+        var manifestPath = Path.Combine(
+            directory.FullName,
+            "compiler-manifest.json");
+        var requestPath = Path.Combine(directory.FullName, "request.json");
+        var resultPath = Path.Combine(directory.FullName, "result.json");
+        var invocationResultPath = Path.Combine(
+            directory.FullName,
+            "invocation-result.json");
+        var manifestBytes = "{}"u8.ToArray();
+        File.WriteAllBytes(manifestPath, manifestBytes);
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = manifestPath,
+                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
+            }
+        };
+        var responseManifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(responseManifest);
+
+        WorkerVerifyResponse CreateResponse(char inputHashCharacter)
+        {
+            return new WorkerVerifyResponse
+            {
+                RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+                InputHash = new string(inputHashCharacter, 64),
+                Manifest = responseManifest,
+                RunStatus = WorkerRunStatus.Complete,
+                FailureReason = WorkerRunFailureReason.None,
+                Summary = new WorkerVerificationSummary
+                {
+                    CacheStatus = WorkerCacheStatus.Miss,
+                    Versions = new WorkerVersionSummary
+                    {
+                        WorkerVersion = "build-task-test",
+                        ApiSpecVersion = "build-task-test"
+                    },
+                    Budgets = request.Budgets
+                }
+            };
+        }
+
+        var invocationResponse = CreateResponse('a');
+        var publishedResponse = CreateResponse(
+            publishedMatchesInvocation ? 'a' : 'b');
+        Assert.That(
+            WorkerProtocolJson.Validate(request).IsValid,
+            Is.True);
+        Assert.That(
+            WorkerProtocolJson.Validate(invocationResponse).IsValid,
+            Is.True);
+        Assert.That(
+            WorkerProtocolJson.Validate(publishedResponse).IsValid,
+            Is.True);
+        File.WriteAllText(
+            requestPath,
+            WorkerProtocolJson.SerializeRequest(request));
+        File.WriteAllText(
+            invocationResultPath,
+            WorkerProtocolJson.SerializeResponse(invocationResponse));
+        File.WriteAllText(
+            resultPath,
+            WorkerProtocolJson.SerializeResponse(publishedResponse));
+
+        var engine = new RecordingBuildEngine();
+        var task = new ValidatePublishedVerificationResult
+        {
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            RequestPath = requestPath,
+            ResultPath = resultPath,
+            ManifestPath = manifestPath,
+            InvocationResultPath = invocationResultPath
+        };
+
+        Assert.That(task.Execute(), Is.EqualTo(publishedMatchesInvocation));
+        Assert.That(
+            engine.Errors,
+            publishedMatchesInvocation ? Is.Empty : Is.Not.Empty);
+    }
+
     [TestCase("invocation-result")]
     [TestCase("request")]
     [TestCase("result")]
