@@ -804,13 +804,18 @@ internal sealed partial class OperationEffectScanner
         }
 
         var receiverRegion = receiver ??
-            (method.ReducedFrom == null
-                ? _conversionOwnership.ClassifyRegion(instance)
-                : _conversionOwnership.ClassifyCallArgumentRegion(
-                    instance));
-        var writeReceiver = UsesDefensiveReceiverCopy(method, instance)
-            ? EffectRegionSet.Empty
-            : receiverRegion;
+            _conversionOwnership.ClassifyCallArgumentRegion(instance);
+        var managedValueReceiver = instance?.Type is
+        {
+            IsValueType: true,
+            IsUnmanagedType: false,
+            IsRefLikeType: false
+        };
+        var writeReceiver =
+            UsesDefensiveReceiverCopy(method, instance) &&
+            !managedValueReceiver
+                ? EffectRegionSet.Empty
+                : receiverRegion;
         var call = _callResolver.Resolve(
             method,
             receiverRegion,

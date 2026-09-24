@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, and pilot-validation findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **68 findings**: 0 P0, 8 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, and managed struct receiver-write findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **67 findings**: 0 P0, 7 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -52,7 +52,7 @@ regressions and unexecuted downstream paths remain open.
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
 | Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes now compare direct/aliased purity attributes and cancellation-filter mutation with controls | B6 frontend, B14 analyzer, and B15 meta-analyzer boundaries observed; wider alias cases and worker consequences remain open |
-| Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; public summaries omitted managed receiver writes despite concrete mutation, with unmanaged-copy control; earlier interval probes retained | B1 fixed and verified; B5 and B10 boundaries observed; EnforcePure and worker consequences untested |
+| Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; wave four reviewed summary ownership/signatures, substitution, model validation/replay, cancellation, and disposal without new probes or repeated suites | No distinct new finding: foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses | B4 and B7 boundaries observed; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
 | Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 now validates worker response status and strict outcomes through the real receipt writer; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches | B8 validator and receipt boundary covered by fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; no release CI, native workflow, or full end-to-end qualification run |
@@ -207,40 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P1 - High
-
-### B10. Managed struct receiver copies lose observable reachable writes
-
-**Confidence: Confirmed public effect-summary omission and concrete mutation.**
-
-- **Location:** `SharpProof.Effects/OperationEffectScanner.cs:806-813` and
-  `:830-850`; `SharpProof.Effects/EffectSummaryOperations.cs:178` and `:199`;
-  `SharpProof.Effects/ConversionOwnershipClassifier.cs:92-113` and `:129-134`.
-- **Defect:** defensive copies, including `in` parameters and readonly fields,
-  map `writeReceiver` to `Empty`, dropping declared receiver writes. By-value
-  struct receivers likewise map to `Empty`. Managed copies still share objects
-  reachable through reference fields; argument ownership already distinguishes
-  those fields at classifier lines 92-113.
-- **Observed boundary:** a fresh unchanged-HEAD Effects.Test build in the
-  canonical container had zero warnings/errors. A stdin/in-memory fixture in
-  an isolated `AssemblyLoadContext` used a trusted external `ManagedValue`
-  struct with `int[] Items` and an accurate, complete, precondition-free
-  `ReadsReceiverState | WritesReceiverState` contract. `Mutate` writes `1` to
-  a nonempty array's first element. The public summaries and concrete witnesses
-  were:
-
-  | Case | Summary | Concrete result |
-  | --- | --- | --- |
-  | Managed `in` receiver | `Complete=true`, `Effects=ReadsArgumentState`, `WritesEmpty=true` | Shared array element became `1` |
-  | Managed by-value receiver | `Complete=true`, `Effects=None`, `WritesEmpty=true` | Shared array element became `1` |
-  | Unmanaged scalar `in` copy | `Complete=true`, `Effects=None`, `WritesEmpty=true` | Original scalar remained `0` |
-
-  The probe exited successfully. `EnforcePure` analyzer diagnostics and worker
-  false-proof paths remain untested; the scalar-copy optimization is valid.
-- **Proposed fix:** retain reachable writes for managed receiver copies, or
-  conservatively return unknown; preserve unmanaged scalar-copy optimization.
-- **Proposed regression:** retain the trusted referenced-assembly fixture and
-  all three witnesses, requiring managed writes or abstention. Follow through
-  `EnforcePure` analysis separately to establish the diagnostic consequence.
 
 ### B12. Qualification admission coerces invalid Boolean and integer evidence
 

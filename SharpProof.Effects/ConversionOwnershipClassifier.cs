@@ -91,14 +91,14 @@ internal sealed class ConversionOwnershipClassifier
     }
 
     /// <summary>
-    /// Classifies state reachable through a call argument, including reference
+    /// Classifies state reachable through a call boundary, including reference
     /// fields copied as part of a managed value type.
     /// </summary>
     /// <remarks>
     /// <see cref="ClassifyRegion"/> describes ownership of the value itself.
     /// That distinction keeps writes to an ordinary by-value struct copy local.
     /// A call boundary can also write objects referenced by fields of that copy,
-    /// so managed value arguments need a separate reachability classification.
+    /// so managed values need a separate reachability classification.
     /// </remarks>
     internal EffectRegionSet ClassifyCallArgumentRegion(
         IOperation? operation)
@@ -820,14 +820,23 @@ internal sealed class ConversionOwnershipClassifier
             return ClassifyRegion(operation.Operand, aliasSource);
         }
 
-        // Concrete value-type boxing creates a locally owned copy. Roslyn also
-        // classifies a type-parameter-to-interface conversion as boxing when the
-        // type parameter permits both value and reference instantiations; retain
-        // the operand ownership for the reference-instantiation path.
+        // Value-type boxing creates a local box. A managed value can still
+        // expose shared objects through its copied fields. For a type parameter,
+        // retain its possible identity alias because it may be a reference type.
         if (conversion.IsBoxing)
         {
             var fresh = EffectRegionSet.Create(
                 EffectRegionId.Fresh(operation.Syntax.SpanStart));
+            if (operation.Operand.Type is
+                {
+                    IsValueType: true,
+                    IsUnmanagedType: false,
+                    IsRefLikeType: false
+                })
+            {
+                return fresh.Union(
+                    ClassifyManagedValueReachability(operation.Operand));
+            }
             if (operation.Operand.Type is ITypeParameterSymbol typeParameter)
             {
                 if (typeParameter.IsReferenceType)
