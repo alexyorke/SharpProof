@@ -90,6 +90,114 @@ public sealed class CompilerRelationalSummaryProviderTests
         }
     }
 
+    [Test]
+    public void ElidedContractCallsDoNotBlockSourceRelationalSummaries()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+
+            internal static class Subject
+            {
+                internal static int Plain(int value) => value;
+
+                internal static int WithRequires(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    return value;
+                }
+
+                internal static int WithEnsures(int value)
+                {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+
+                internal static int WithAssume(int value)
+                {
+                    Contract.Assume(value >= 0);
+                    return value;
+                }
+
+                internal static int CallsPlain(int value) => Plain(value);
+                internal static int CallsRequires(int value) => WithRequires(value);
+                internal static int CallsEnsures(int value) => WithEnsures(value);
+                internal static int CallsAssume(int value) => WithAssume(value);
+            }
+            """;
+        var compilation = CSharpCompilation.Create(
+            "ContractInvocationSummaryTests",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                "Subject.cs")],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
+
+        var factory = new IrFactory();
+        var provider = new CompilerRelationalSummaryProvider(
+            compilation,
+            factory,
+            new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation));
+        var cases = new[]
+        {
+            (Caller: "CallsPlain", Callee: "Plain"),
+            (Caller: "CallsRequires", Callee: "WithRequires"),
+            (Caller: "CallsEnsures", Callee: "WithEnsures"),
+            (Caller: "CallsAssume", Callee: "WithAssume")
+        };
+
+        foreach (var (caller, callee) in cases)
+        {
+            var call = GetCall(compilation, factory, caller, callee);
+            Assert.That(
+                provider.TryGet(
+                    call.Method,
+                    call.Member,
+                    CancellationToken.None,
+                    out var summary),
+                Is.True,
+                $"Could not prepare a relational summary for {callee}.");
+            Assert.That(summary, Is.Not.Null);
+        }
+
+        var emittedCompilation = CSharpCompilation.Create(
+            "ContractInvocationSummaryEnabledTests",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(
+                    LanguageVersion.CSharp12,
+                    preprocessorSymbols: [Contract.ConditionalSymbol]),
+                "Subject.cs")],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(emittedCompilation);
+        var emittedFactory = new IrFactory();
+        var emittedProvider = new CompilerRelationalSummaryProvider(
+            emittedCompilation,
+            emittedFactory,
+            new ApiSpecResolver(ApiSpecTable.Default)
+                .Resolve(emittedCompilation));
+        var emittedCall = GetCall(
+            emittedCompilation,
+            emittedFactory,
+            "CallsRequires",
+            "WithRequires");
+
+        Assert.That(
+            emittedProvider.TryGet(
+                emittedCall.Method,
+                emittedCall.Member,
+                CancellationToken.None,
+                out _),
+            Is.False,
+            "Contract calls must remain when their conditional symbol is defined.");
+    }
+
     [TestCase("VerifyInt", "VerifyLong")]
     [TestCase("VerifyLong", "VerifyInt")]
     public void ClosedFormsNestedInsideGenericOuterHaveIndependentCacheEntries(

@@ -1669,6 +1669,32 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task ElidedCalleeRequiresStillReportsAnInvalidCallSite()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture
+            {
+                private static int RequiresPositive(int value)
+                {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int InvalidCall() => RequiresPositive(0);
+                public static int ValidCall() => RequiresPositive(1);
+            }
+            """,
+            "contracts",
+            [],
+            new SharpProofAnalyzer());
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+    }
+
+    [Test]
     public async Task ConstructorRequiresProduceAccountableCallSiteOutcomes()
     {
         var factory = new RecordingSessionFactory();

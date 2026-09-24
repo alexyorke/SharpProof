@@ -44,6 +44,7 @@ internal sealed class CompilerRelationalSummaryProvider
     private readonly Dictionary<SyntaxTree, int>? _capturedTreeOrdinals;
     private readonly CompilerImplementationIlSummaryLowerer.MetadataResolutionContext
         _metadataResolution;
+    private readonly InvocationEmissionPolicy _invocationEmission;
     private readonly IrFactory _factory;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerSpecificationPackProvider _specificationPacks;
@@ -108,6 +109,7 @@ internal sealed class CompilerRelationalSummaryProvider
                 .ToDictionary(static pair => pair.tree, static pair => pair.index,
                     ReferenceComparer<SyntaxTree>.Instance);
         _metadataResolution = new(_compilation);
+        _invocationEmission = new(_compilation);
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
         _specificationPacks = new CompilerSpecificationPackProvider(
@@ -275,7 +277,10 @@ internal sealed class CompilerRelationalSummaryProvider
                 graph,
                 graph.Blocks[0],
                 firstOperation: 0,
-                static _ => false);
+                operation => _invocationEmission.IsElided(
+                    operation is IExpressionStatementOperation statement
+                        ? statement.Operation
+                        : operation));
         if (!selected.Lowering.IsExact)
         {
             return false;

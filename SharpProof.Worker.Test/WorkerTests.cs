@@ -4065,6 +4065,114 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task ElidedContractCallsKeepRelationalSummariesComposable()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject
+            {
+                private static int Plain(int value) => value;
+
+                private static int WithRequires(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    return value;
+                }
+
+                private static int WithEnsures(int value)
+                {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+
+                private static int WithAssume(int value)
+                {
+                    Contract.Assume(value >= 0);
+                    return value;
+                }
+
+                private static int RequiresPositive(int value)
+                {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int CallPlain(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return Plain(value);
+                }
+
+                public static int CallRequires(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return WithRequires(value);
+                }
+
+                public static int CallEnsures(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return WithEnsures(value);
+                }
+
+                public static int CallAssume(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return WithAssume(value);
+                }
+
+                public static int InvalidCalleePrecondition(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    return RequiresPositive(value);
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(6));
+        WorkerClaimResult ResultFor(string methodName)
+        {
+            return response.ClaimResults.Single(result =>
+                GetCallableId(response, result).Contains(
+                    methodName,
+                    StringComparison.Ordinal));
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "CallPlain",
+                     "CallRequires",
+                     "CallEnsures",
+                     "CallAssume"
+                 })
+        {
+            Assert.That(
+                ResultFor(methodName).Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven),
+                $"{methodName} did not compose its relational summary.");
+        }
+        Assert.That(
+            ResultFor("WithEnsures").Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(
+            ResultFor("InvalidCalleePrecondition").Outcome,
+            Is.Not.EqualTo(WorkerClaimOutcome.Proven),
+            "A callee Requires clause must not become an assumption for the caller.");
+    }
+
+    [Test]
     public async Task WholeBodyReplayCoversTrivialStateAndAnUnreachedSpecCall()
     {
         using var project = TestProject.Create(
