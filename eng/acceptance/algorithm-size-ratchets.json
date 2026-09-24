@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer. Assignment evaluation is separated from the core effect scanner so both layers retain independent reviewable ceilings. The 2026-08-31 refresh records the measured post-correctness-review ceilings for frontend null conversion, dataflow, effect completion, and verifier replay logic. The 2026-09-04 CFG block-order reuse in RoslynProgramLowerer retains the same entry-first ordering while raising that file's measured ceiling to 2451 expressions and 143 decision points.",
+  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer. Assignment evaluation is separated from the core effect scanner so both layers retain independent reviewable ceilings. The 2026-08-31 refresh records the measured post-correctness-review ceilings for frontend null conversion, dataflow, effect completion, and verifier replay logic. The 2026-09-04 CFG block-order reuse in RoslynProgramLowerer retains the same entry-first ordering while raising that file's measured ceiling to 2451 expressions and 143 decision points. B6 adds C# evaluation-order snapshots to RoslynProgramLowerer because the CFG lowerer must emit each captured argument, receiver, or assignment location before the later call that can mutate it; keeping this logic in that layer preserves the source evaluation order next to instruction emission. The reviewed regression set covers ref/out effects, closure effects, receiver and array/index target values, and unchanged controls. Its measured file ceilings are 2724 expressions and 156 decision points, with existing per-member limits unchanged and no file-level spare growth allowance.",
   "measurement": {
     "fileExpressionNodes": "Roslyn expression-node count for the complete file, excluding trivia and optional block syntax.",
     "memberExpressionNodes": "Roslyn expression-node count for each measured member, excluding trivia and optional block syntax.",
@@ -17,9 +17,9 @@
     },
     {
       "path": "SharpProof.Frontend/RoslynProgramLowerer.cs",
-      "maximumFileExpressionNodes": 2451,
+      "maximumFileExpressionNodes": 2724,
       "maximumMemberExpressionNodes": 265,
-      "maximumFileDecisionPoints": 143,
+      "maximumFileDecisionPoints": 156,
       "maximumMemberDecisionPoints": 20
     },
     {
