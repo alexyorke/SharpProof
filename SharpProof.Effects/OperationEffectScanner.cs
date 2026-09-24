@@ -1584,6 +1584,14 @@ internal sealed partial class OperationEffectScanner
 
     internal bool IsReachable(IOperation operation)
     {
+        // UsingDisposalEffectResolver models these generated invocations from
+        // the owning using operation. Do not surface them as an additional
+        // ordinary call when managed flow follows the implicit finally block.
+        if (ManagedAbstractFlow.IsGeneratedUsingDisposal(operation))
+        {
+            return false;
+        }
+
         if (_session.IsConditionallyElided(operation))
         {
             return false;

@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof finding has been fixed and verified, so it is removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **71 findings**: 1 P0, 10 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof and managed exception-region false-proof findings have been fixed and verified, so both are removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **70 findings**: 0 P0, 10 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -200,74 +200,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   `Proven` agreed exactly (84 both, none on only one side), so the IDE and
   build paths share one verdict. The confirmed false proofs affected
   both.
-
-## P0 - Critical
-
-### B61. Managed flow ignores `catch` and `finally` paths, producing false `[DoesNotThrow]` proofs
-
-**Confidence: Confirmed end to end: analyzer silence, worker `Proven`, and runtime exceptions.**
-
-- **Location:** `SharpProof.Effects/ManagedAbstractFlow.cs:1277-1300`
-  (`Successors`: only `ControlFlowBranchSemantics.Regular` fall-through and
-  conditional branches become dataflow edges), used by `CreateDataflowGraph`
-  (`:204-263`) and `Analyze` (`:121-173`).
-- **Defect:** Roslyn's `ControlFlowGraph` has no explicit edges into
-  exception handlers. A `catch` region's entry block has no predecessors, a
-  `finally` region is entered implicitly when control leaves the `try`, and
-  its exit uses `StructuredExceptionHandling` semantics. The dataflow graph
-  built from regular edges alone therefore never propagates any state into
-  `catch` or `finally` blocks: they stay bottom, and after the `try`
-  statement the analyzer sees only the `try` block's normal exit. Every
-  assignment in a handler, and every assignment in the `try` that precedes a
-  possible throw and is overwritten later on the normal path, is invisible to
-  the interval, nullness and cardinality facts that discharge exceptions
-  such as `IndexOutOfRangeException` in `[DoesNotThrow]` proofs.
-- **Observed boundary:** with the real analyzer, all three methods below are
-  silent. The collector plus in-process worker marks each `[Effect]` claim
-  `Proven` with a `compiler-effect:` core, and executing them throws
-  `IndexOutOfRangeException` (with `X5(1)` for the last):
-  ```csharp
-  [DoesNotThrow] static int X3() { int[] a = new int[3]; int i = 0; try { TX.Boom(); } catch (InvalidOperationException) { i = 7; } return a[i]; }
-  [DoesNotThrow] static int X4() { int[] a = new int[3]; int i = 0; try { TX.Boom(); } catch (InvalidOperationException) { } finally { i = 7; } return a[i]; }
-  [DoesNotThrow] static int X5(int k) { int[] a = new int[3]; int i = 0; try { i = 7; TX.Maybe(k); i = 0; } catch (InvalidOperationException) { } return a[i]; }
-  ```
-  (`TX.Boom()` always throws `InvalidOperationException`; `TX.Maybe(k)`
-  throws it when `k > 0`.) Controls that are correctly reported with
-  `SP0046`: `try { i = 7; Boom(); } catch { } return a[i];`,
-  `try { i = 7; } finally { } return a[i];`, a nested `try`/`finally`, a
-  `when` filter reading `i`, and a loop with `continue` from the `catch`.
-  The same holds for nullness and division: `string s = "a"; try { Boom(); }
-  catch (InvalidOperationException) { s = null; } return s.Length;`,
-  `string s = "a"; try { } finally { s = null; } return s.Length;`, and
-  `int d = 1; try { Boom(); } catch (...) { d = 0; } return 10 / d;` are all
-  silent under `[DoesNotThrow]`. SP0027 stayed silent on the corresponding
-  precondition cases. `[EnforcePure]`/`[ZeroAllocations]` claims whose
-  write or allocation sits behind a handler-set flag were still reported,
-  so the observed damage is to exception claims.
-- **Impact:** any `[DoesNotThrow]`, `[AllowedExceptions]`, or `EffectContract`
-  claim whose exception discharge depends on a value that a `catch` or
-  `finally` block (or a partially executed `try`) changes can be proven
-  false, and a strict `require-proven` build passes. Cleanup and fallback
-  assignments in handlers are ordinary C#. This is a P0 false proof,
-  a separate issue.
-- **Proposed fix:** model exceptional control flow in `CreateDataflowGraph`.
-  For every `ControlFlowRegion` of kind `Try`, add an edge from each block in
-  the protected region, taking the state *before* and *after* each operation
-  that may throw (or, simply, the join of all states reached in the region),
-  to the entry block of each `Catch`/`Filter` region. Route each exit of the
-  `TryAndFinally` region (normal fall-through, `return`, `break`, and the
-  exceptional exit) through the `Finally` region's entry, and connect the
-  `finally` exit to the original destinations. A simpler but sound interim
-  fix: at the entry of every `catch`/`filter` region and on every exit from a
-  `try` statement that has handlers, `Forget` (havoc) every local written
-  anywhere inside that `try` statement. Also add an architecture assertion
-  that every reachable CFG block (`BasicBlock.IsReachable`) receives a
-  non-bottom state when the method entry does.
-- **Proposed regression:** effect tests for X3, X4 and X5 expecting `SP0046`
-  (and never worker `Proven`), plus controls in which handler assignments
-  keep the index in range (`catch { i = 1; }`), which may be proven. Extend
-  the `[DoesNotThrow]` differential fuzzer to emit `try`/`catch`/`finally`
-  statements with assignments in every region.
 
 ## P1 - High
 

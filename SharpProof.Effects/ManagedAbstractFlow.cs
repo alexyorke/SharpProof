@@ -145,7 +145,11 @@ internal sealed class ManagedAbstractFlow
         s_currentMethod = method;
         try
         {
-            var dataflowGraph = CreateDataflowGraph(graph, result, cancellationToken);
+            var dataflowGraph = CreateDataflowGraph(
+                method,
+                graph,
+                result,
+                cancellationToken);
             try
             {
                 var converged = ForwardDataflowAnalysis.AnalyzeWithoutResult(dataflowGraph,
@@ -202,10 +206,15 @@ internal sealed class ManagedAbstractFlow
     }
 
     private DataflowGraph<ManagedFlowState> CreateDataflowGraph(
-        ControlFlowGraph graph, ManagedFlowResult result, CancellationToken cancellationToken)
+        IMethodSymbol method,
+        ControlFlowGraph graph,
+        ManagedFlowResult result,
+        CancellationToken cancellationToken)
     {
         var blocks = ImmutableArray.CreateBuilder<DataflowBlock<ManagedFlowState>>();
         var edges = ImmutableArray.CreateBuilder<DataflowEdge>();
+        var entryBlockIds = new int[graph.Blocks.Length];
+        var transferBlockIds = new int[graph.Blocks.Length];
         var elidedInvocations = graph.OriginalOperation.DescendantsAndSelf()
             .OfType<IInvocationOperation>()
             .Where(invocation =>
@@ -215,8 +224,16 @@ internal sealed class ManagedAbstractFlow
         foreach (var block in graph.Blocks)
         {
             var captured = block;
-            blocks.Add(new(block.Ordinal, state => TransferBlock(state, captured, result, cancellationToken)));
+            entryBlockIds[block.Ordinal] = blocks.Count;
+            blocks.Add(new(blocks.Count, static state => state));
+            transferBlockIds[block.Ordinal] = blocks.Count;
+            blocks.Add(new(
+                blocks.Count,
+                state => TransferBlock(state, captured, result, cancellationToken)));
+            edges.Add(new(entryBlockIds[block.Ordinal], transferBlockIds[block.Ordinal]));
         }
+
+        var finallyContinuations = new Dictionary<ControlFlowRegion, HashSet<int>>();
         foreach (var block in graph.Blocks)
         {
             foreach (var (branch, expected) in Successors(block))
@@ -226,8 +243,33 @@ internal sealed class ManagedAbstractFlow
                 blocks.Add(new(edgeBlock, state => expected.HasValue && condition != null &&
                     !result.HasMutation(condition)
                     ? Assume(state, condition, expected.Value) : state));
-                edges.Add(new(block.Ordinal, edgeBlock));
-                edges.Add(new(edgeBlock, branch.Destination!.Ordinal));
+                edges.Add(new(transferBlockIds[block.Ordinal], edgeBlock));
+                if (branch.FinallyRegions.IsDefaultOrEmpty)
+                {
+                    edges.Add(new(
+                        edgeBlock,
+                        entryBlockIds[branch.Destination!.Ordinal]));
+                    continue;
+                }
+
+                var finalRegions = branch.FinallyRegions;
+                edges.Add(new(
+                    edgeBlock,
+                    entryBlockIds[finalRegions[0].FirstBlockOrdinal]));
+                for (var index = 0; index < finalRegions.Length; index++)
+                {
+                    var continuation = index + 1 < finalRegions.Length
+                        ? finalRegions[index + 1].FirstBlockOrdinal
+                        : branch.Destination!.Ordinal;
+                    if (!finallyContinuations.TryGetValue(
+                            finalRegions[index],
+                            out var targets))
+                    {
+                        targets = [];
+                        finallyContinuations.Add(finalRegions[index], targets);
+                    }
+                    targets.Add(continuation);
+                }
             }
         }
 
@@ -255,10 +297,15 @@ internal sealed class ManagedAbstractFlow
                     BlockOperations(block).Any(operation =>
                         IsWithin(operation.Syntax, invocation.Syntax)))
                 {
-                    edges.Add(new(block.Ordinal, callBlock.Ordinal));
+                    edges.Add(new(
+                        transferBlockIds[block.Ordinal],
+                        entryBlockIds[callBlock.Ordinal]));
                 }
             }
         }
+
+        AddExceptionalHandlerEntries();
+        AddFinallyContinuations();
 
         return new(blocks, edges);
 
@@ -281,6 +328,321 @@ internal sealed class ManagedAbstractFlow
             return SameSyntax(candidate, container) ||
                 candidate.SyntaxTree == container.SyntaxTree &&
                 container.Span.Contains(candidate.Span);
+        }
+
+        void AddExceptionalHandlerEntries()
+        {
+            var regions = GetControlFlowRegions(graph.Root);
+            var catches = graph.OriginalOperation.DescendantsAndSelf()
+                .OfType<ICatchClauseOperation>()
+                .Where(catchClause =>
+                    !ConversionOwnershipClassifier.IsInsideNestedCallable(
+                        catchClause,
+                        graph.OriginalOperation))
+                .OrderBy(static catchClause => catchClause.Syntax.SpanStart)
+                .ToArray();
+            var tryOperations = graph.OriginalOperation.DescendantsAndSelf()
+                .OfType<ITryOperation>()
+                .Where(tryOperation =>
+                    !ConversionOwnershipClassifier.IsInsideNestedCallable(
+                        tryOperation,
+                        graph.OriginalOperation))
+                .OrderBy(static tryOperation => tryOperation.Syntax.SpanStart)
+                .ToArray();
+            var tryRegions = regions
+                .Where(static region =>
+                    region.Kind == ControlFlowRegionKind.Try)
+                .OrderBy(static region => region.FirstBlockOrdinal)
+                .ToArray();
+            var writtenStoragesByTry = new Dictionary<
+                ControlFlowRegion,
+                (bool ForgetAll, ImmutableArray<ISymbol> Storages)>();
+            for (var index = 0; index < tryRegions.Length; index++)
+            {
+                var writtenStorages = index < tryOperations.Length
+                    ? GetWrittenStorages(tryOperations[index])
+                    : (true, ImmutableArray<ISymbol>.Empty);
+                writtenStoragesByTry.Add(
+                    tryRegions[index],
+                    writtenStorages);
+            }
+
+            var handlerEntries = new List<(
+                ControlFlowRegion Region,
+                IOperation? Operation,
+                bool IsFilter,
+                bool HasFilter)>();
+            var catchRegions = regions
+                .Where(static region =>
+                    region.Kind == ControlFlowRegionKind.Catch)
+                .OrderBy(static region => region.FirstBlockOrdinal)
+                .ToArray();
+            for (var index = 0; index < catchRegions.Length; index++)
+            {
+                var catchClause = index < catches.Length
+                    ? catches[index]
+                    : null;
+                handlerEntries.Add((
+                    catchRegions[index],
+                    catchClause?.Handler,
+                    IsFilter: false,
+                    HasFilter: catchClause?.Filter != null));
+            }
+
+            var filterRegions = regions
+                .Where(static region =>
+                    region.Kind == ControlFlowRegionKind.Filter)
+                .OrderBy(static region => region.FirstBlockOrdinal)
+                .ToArray();
+            var filteredCatches = catches
+                .Where(static catchClause => catchClause.Filter != null)
+                .ToArray();
+            for (var index = 0; index < filterRegions.Length; index++)
+            {
+                handlerEntries.Add((
+                    filterRegions[index],
+                    index < filteredCatches.Length
+                        ? filteredCatches[index].Filter
+                        : null,
+                    IsFilter: true,
+                    HasFilter: true));
+            }
+
+            if (handlerEntries.Count == 0)
+            {
+                return;
+            }
+
+            var reachability = OperationEffectScanner.CreateReachabilityProbe(
+                _compilation,
+                method,
+                graph.OriginalOperation,
+                result);
+            foreach (var handler in handlerEntries)
+            {
+                // A filtered catch is reached through its filter region. An
+                // edge straight into its handler would bypass the filter test.
+                if (handler.HasFilter && !handler.IsFilter ||
+                    handler.Operation != null &&
+                    !reachability.IsReachable(handler.Operation))
+                {
+                    continue;
+                }
+
+                var tryRegion = handler.Region.EnclosingRegion?
+                    .NestedRegions.FirstOrDefault(static region =>
+                        region.Kind == ControlFlowRegionKind.Try);
+                if (tryRegion == null)
+                {
+                    continue;
+                }
+
+                (bool ForgetAll, ImmutableArray<ISymbol> Storages) writes =
+                    writtenStoragesByTry.TryGetValue(
+                    tryRegion,
+                    out var writtenStorages)
+                    ? writtenStorages
+                    : (true, ImmutableArray<ISymbol>.Empty);
+                var havocBlock = blocks.Count;
+                blocks.Add(new(
+                    havocBlock,
+                    state => writes.ForgetAll
+                        ? state.Forget()
+                        : ForgetStorages(state, writes.Storages)));
+                edges.Add(new(
+                    entryBlockIds[tryRegion.FirstBlockOrdinal],
+                    havocBlock));
+                edges.Add(new(
+                    havocBlock,
+                    entryBlockIds[handler.Region.FirstBlockOrdinal]));
+            }
+
+            (bool ForgetAll, ImmutableArray<ISymbol> Storages)
+                GetWrittenStorages(IOperation operation)
+            {
+                var storages = new HashSet<ISymbol>(
+                    SymbolEqualityComparer.Default);
+                var pending = new Stack<IOperation>();
+                pending.Push(operation);
+                while (pending.Count > 0)
+                {
+                    var current = pending.Pop();
+                    if (current is IAnonymousFunctionOperation or
+                        ILocalFunctionOperation)
+                    {
+                        continue;
+                    }
+
+                    switch (current)
+                    {
+                        case IVariableDeclaratorOperation declarator:
+                            storages.Add(declarator.Symbol);
+                            break;
+                        case ISimpleAssignmentOperation assignment:
+                            if (!AddTrackedStorage(assignment.Target))
+                            {
+                                return (true, []);
+                            }
+                            break;
+                        case ICompoundAssignmentOperation compound:
+                            if (!AddTrackedStorage(compound.Target))
+                            {
+                                return (true, []);
+                            }
+                            break;
+                        case IIncrementOrDecrementOperation increment:
+                            if (!AddTrackedStorage(increment.Target))
+                            {
+                                return (true, []);
+                            }
+                            break;
+                        case IArgumentOperation argument when
+                            argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out:
+                            if (!AddTrackedStorage(argument.Value))
+                            {
+                                return (true, []);
+                            }
+                            break;
+                        case IInvocationOperation invocation when
+                            invocation.TargetMethod.MethodKind == MethodKind.LocalFunction ||
+                            invocation.TargetMethod.ContainingType.TypeKind ==
+                                TypeKind.Delegate ||
+                            invocation.Arguments.Any(static argument =>
+                                CanCarryDelegate(argument.Value)):
+                        case IDynamicInvocationOperation or
+                            IFunctionPointerInvocationOperation:
+                            return (true, []);
+                    }
+
+                    foreach (var child in current.ChildOperations)
+                    {
+                        pending.Push(child);
+                    }
+                }
+
+                return (false, [.. storages]);
+
+                bool AddTrackedStorage(IOperation target)
+                {
+                    target = Unwrap(target);
+                    if (target is IFlowCaptureReferenceOperation capture)
+                    {
+                        var resolved = result.ResolveCoalesceAssignmentTarget(
+                            capture);
+                        return !ReferenceEquals(resolved, capture) &&
+                            AddTrackedStorage(resolved);
+                    }
+
+                    if (target is IConditionalOperation conditional)
+                    {
+                        return conditional.WhenFalse != null &&
+                            AddTrackedStorage(conditional.WhenTrue) &&
+                            AddTrackedStorage(conditional.WhenFalse);
+                    }
+
+                    switch (target)
+                    {
+                        case ILocalReferenceOperation local:
+                            storages.Add(local.Local);
+                            break;
+                        case IParameterReferenceOperation parameter:
+                            storages.Add(parameter.Parameter);
+                            break;
+                    }
+
+                    return true;
+                }
+            }
+
+            static ManagedFlowState ForgetStorages(
+                ManagedFlowState state,
+                ImmutableArray<ISymbol> storages)
+            {
+                foreach (var storage in storages)
+                {
+                    var type = storage switch
+                    {
+                        ILocalSymbol local => local.Type,
+                        IParameterSymbol parameter => parameter.Type,
+                        _ => null
+                    };
+                    state = state.Set(storage, TopForType(type));
+                }
+
+                return state;
+            }
+        }
+
+        void AddFinallyContinuations()
+        {
+            foreach (var continuation in finallyContinuations)
+            {
+                var region = continuation.Key;
+                var targets = continuation.Value;
+                foreach (var block in graph.Blocks)
+                {
+                    if (!IsFinallyRegionExit(block, region))
+                    {
+                        continue;
+                    }
+
+                    foreach (var target in targets)
+                    {
+                        edges.Add(new(
+                            transferBlockIds[block.Ordinal],
+                            entryBlockIds[target]));
+                    }
+                }
+            }
+        }
+
+        static ControlFlowRegion[] GetControlFlowRegions(
+            ControlFlowRegion root)
+        {
+            var regions = new List<ControlFlowRegion>();
+            var pending = new Stack<ControlFlowRegion>();
+            pending.Push(root);
+            while (pending.Count > 0)
+            {
+                var region = pending.Pop();
+                regions.Add(region);
+                foreach (var nested in region.NestedRegions)
+                {
+                    pending.Push(nested);
+                }
+            }
+
+            return [.. regions];
+        }
+
+        static bool IsFinallyRegionExit(
+            BasicBlock block,
+            ControlFlowRegion region)
+        {
+            var isWithinRegion = false;
+            for (var enclosing = block.EnclosingRegion;
+                 enclosing != null;
+                 enclosing = enclosing.EnclosingRegion)
+            {
+                if (enclosing.Kind == region.Kind &&
+                    enclosing.FirstBlockOrdinal == region.FirstBlockOrdinal &&
+                    enclosing.LastBlockOrdinal == region.LastBlockOrdinal)
+                {
+                    isWithinRegion = true;
+                    break;
+                }
+
+                if (enclosing.Kind == ControlFlowRegionKind.Finally)
+                {
+                    return false;
+                }
+            }
+
+            return isWithinRegion &&
+                (block.FallThroughSuccessor?.Semantics ==
+                     ControlFlowBranchSemantics.StructuredExceptionHandling ||
+                 block.ConditionalSuccessor?.Semantics ==
+                     ControlFlowBranchSemantics.StructuredExceptionHandling);
         }
     }
 
@@ -1399,6 +1761,38 @@ internal sealed class ManagedAbstractFlow
         return unreachable;
     }
 
+    internal static bool IsGeneratedUsingDisposal(IOperation operation)
+    {
+        if (operation is not IInvocationOperation
+            {
+                IsImplicit: true,
+                TargetMethod.Name: "Dispose" or "DisposeAsync"
+            } invocation)
+        {
+            return false;
+        }
+
+        foreach (var syntax in invocation.Syntax.AncestorsAndSelf())
+        {
+            if (syntax is UsingStatementSyntax)
+            {
+                return true;
+            }
+
+            if (syntax is LocalDeclarationStatementSyntax declaration)
+            {
+                return declaration.UsingKeyword.RawKind != 0;
+            }
+
+            if (syntax is ForEachStatementSyntax or ForEachVariableStatementSyntax)
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
     private static EffectAnalysisIncompleteReason CheckBudget(
         ControlFlowGraph graph, CancellationToken cancellationToken)
     {
@@ -1614,6 +2008,12 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow, IMethodSymbol?
 
     internal bool IsReachable(IOperation operation)
     {
+        if (ManagedAbstractFlow.IsGeneratedUsingDisposal(operation))
+        {
+            _reachabilityFacts[operation] = false;
+            return false;
+        }
+
         if (_reachabilityFacts.TryGetValue(operation, out var reachable))
         {
             return reachable;
