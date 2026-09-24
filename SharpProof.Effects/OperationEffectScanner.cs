@@ -12,6 +12,7 @@ internal sealed partial class OperationEffectScanner
     private readonly ConditionalTruthOperatorFlowCaptures _conditionalTruthCaptures = new();
     private readonly OperationCompletionEvaluator _completionEvaluator;
     private readonly CreationFlowCaptures _creationCaptures = new();
+    private readonly ReadRegionFlowCaptures _readRegionCaptures = new();
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
         ImmutableArray.CreateBuilder<EffectDirectWitness>();
@@ -65,7 +66,8 @@ internal sealed partial class OperationEffectScanner
             session.Compilation,
             _coalesceCaptures,
             _conditionalTruthCaptures,
-            _creationCaptures);
+            _creationCaptures,
+            _readRegionCaptures);
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
         _contractType = session.Compilation.GetTypeByMetadataName(
@@ -264,7 +266,8 @@ internal sealed partial class OperationEffectScanner
         return operation switch
         {
             IAnonymousFunctionOperation or ILocalFunctionOperation or ILiteralOperation or
-                IInstanceReferenceOperation or IDefaultValueOperation or
+                IInstanceReferenceOperation or
+                IConditionalAccessInstanceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation or ISizeOfOperation => EffectSummary.Empty,
             ILocalReferenceOperation local
                 when local.Local.RefKind != RefKind.None =>
@@ -333,7 +336,9 @@ internal sealed partial class OperationEffectScanner
 
         var region = field.Field.IsStatic
             ? EffectRegionSet.Create(EffectRegionId.Static())
-            : _conversionOwnership.ClassifyRegion(field.Instance);
+            : access == EffectAccess.Read
+                ? _conversionOwnership.ClassifyReadRegion(field.Instance)
+                : _conversionOwnership.ClassifyRegion(field.Instance);
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         return EffectSummaryOperations.Join(
@@ -433,9 +438,11 @@ internal sealed partial class OperationEffectScanner
             return evaluation.Summary;
         }
 
-        var region = _conversionOwnership.ClassifyRegion(
-            property.Instance,
-            aliasSource: true);
+        var region = access == EffectAccess.Read
+            ? _conversionOwnership.ClassifyReadRegion(property.Instance)
+            : _conversionOwnership.ClassifyRegion(
+                property.Instance,
+                aliasSource: true);
         return EffectSummaryDomain.Instance.Join(
             evaluation.Summary,
             access == EffectAccess.Read
@@ -520,12 +527,14 @@ internal sealed partial class OperationEffectScanner
             exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.IndexOutOfRangeException));
         }
 
-        var region = _conversionOwnership.ClassifyRegion(element.ArrayReference);
+        var isAliasingWrite = IsWritableReferenceUse(element);
+        var region = access == EffectAccess.Read && !isAliasingWrite
+            ? _conversionOwnership.ClassifyReadRegion(element.ArrayReference)
+            : _conversionOwnership.ClassifyRegion(element.ArrayReference);
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
 
-        if ((access == EffectAccess.Write ||
-             IsWritableReferenceUse(element)) &&
+        if ((access == EffectAccess.Write || isAliasingWrite) &&
             element.ArrayReference.Type is IArrayTypeSymbol arrayType &&
             !arrayType.ElementType.IsValueType &&
             !ArrayStoreIsDefinitelyCompatible(element, arrayType, assignedValue))
@@ -603,7 +612,32 @@ internal sealed partial class OperationEffectScanner
         _coalesceCaptures.Record(capture);
         _conditionalTruthCaptures.Record(capture);
         _creationCaptures.Record(capture);
+        _readRegionCaptures.Record(capture);
         return Scan(capture.Value);
+    }
+
+    internal void RegisterReadRegionCaptures(
+        IEnumerable<IOperation> operations)
+    {
+        foreach (var operation in operations)
+        {
+            var pending = new Stack<IOperation>();
+            pending.Push(operation);
+            while (pending.Count != 0)
+            {
+                var current = pending.Pop();
+                if (current is IFlowCaptureOperation capture &&
+                    IsReachable(capture))
+                {
+                    _readRegionCaptures.Record(capture);
+                }
+
+                foreach (var child in current.ChildOperations)
+                {
+                    pending.Push(child);
+                }
+            }
+        }
     }
 
     private bool ArrayStoreIsDefinitelyCompatible(
@@ -811,6 +845,8 @@ internal sealed partial class OperationEffectScanner
         }
 
         var receiverRegion = receiver ??
+            _conversionOwnership.ClassifyReadRegion(instance);
+        var receiverWriteRegion =
             _conversionOwnership.ClassifyCallArgumentRegion(instance);
         var managedValueReceiver = instance?.Type is
         {
@@ -822,7 +858,7 @@ internal sealed partial class OperationEffectScanner
             UsesDefensiveReceiverCopy(method, instance) &&
             !managedValueReceiver
                 ? EffectRegionSet.Empty
-                : receiverRegion;
+                : receiverWriteRegion;
         var call = _callResolver.Resolve(
             method,
             receiverRegion,

@@ -6,6 +6,7 @@ internal sealed class ConversionOwnershipClassifier
     private readonly ConditionalTruthOperatorFlowCaptures _conditionalTruthCaptures;
     private readonly Compilation _compilation;
     private readonly CreationFlowCaptures _creationCaptures;
+    private readonly ReadRegionFlowCaptures _readRegionCaptures;
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
         new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, EffectRegionSet> _refLocalStorageRegions =
@@ -23,13 +24,15 @@ internal sealed class ConversionOwnershipClassifier
         Compilation compilation,
         CoalesceAssignmentFlowCaptures coalesceCaptures,
         ConditionalTruthOperatorFlowCaptures conditionalTruthCaptures,
-        CreationFlowCaptures creationCaptures)
+        CreationFlowCaptures creationCaptures,
+        ReadRegionFlowCaptures readRegionCaptures)
     {
         _method = method;
         _compilation = compilation;
         _coalesceCaptures = coalesceCaptures;
         _conditionalTruthCaptures = conditionalTruthCaptures;
         _creationCaptures = creationCaptures;
+        _readRegionCaptures = readRegionCaptures;
     }
 
     internal EffectRegionSet ClassifyRegion(
@@ -111,6 +114,121 @@ internal sealed class ConversionOwnershipClassifier
         }
             ? ClassifyManagedValueReachability(operation)
             : ClassifyRegion(operation);
+    }
+
+    internal EffectRegionSet ClassifyReadRegion(IOperation? operation)
+    {
+        return ClassifyReadRegion(operation, new HashSet<CaptureId>());
+    }
+
+    private EffectRegionSet ClassifyReadRegion(
+        IOperation? operation,
+        HashSet<CaptureId> activeCaptures)
+    {
+        return operation switch
+        {
+            IDefaultValueOperation => EffectRegionSet.Empty,
+            ILiteralOperation { ConstantValue: { HasValue: true, Value: null } } =>
+                EffectRegionSet.Empty,
+            ILiteralOperation => EffectRegionSet.Empty,
+            IInstanceReferenceOperation =>
+                EffectRegionSet.Create(EffectRegionId.Receiver),
+            IParameterReferenceOperation parameter =>
+                ClassifyParameter(parameter.Parameter),
+            ILocalReferenceOperation local
+                when local.Local.RefKind != RefKind.None =>
+                ClassifyRefLocalStorage(local.Local),
+            IConditionalAccessInstanceOperation instance
+                when TryGetOwningConditionalAccess(instance, out var owner) =>
+                ClassifyReadRegion(owner.Operation, activeCaptures),
+            IConditionalAccessOperation
+            {
+                WhenNotNull: { } whenNotNull
+            } => ClassifyReadRegion(whenNotNull, activeCaptures),
+            IFieldReferenceOperation { Field.IsStatic: true } =>
+                EffectRegionSet.Create(EffectRegionId.Static()),
+            IFieldReferenceOperation { Instance: { } instance } =>
+                ClassifyReadRegion(instance, activeCaptures),
+            IArrayElementReferenceOperation element =>
+                ClassifyReadRegion(element.ArrayReference, activeCaptures),
+            IConditionalOperation conditional =>
+                ClassifyReadRegion(conditional.WhenTrue, activeCaptures).Union(
+                    ClassifyReadRegion(conditional.WhenFalse, activeCaptures)),
+            ICoalesceOperation coalesce =>
+                ClassifyReadRegion(coalesce.Value, activeCaptures).Union(
+                    ClassifyReadRegion(coalesce.WhenNull, activeCaptures)),
+            IParenthesizedOperation parenthesized =>
+                ClassifyReadRegion(parenthesized.Operand, activeCaptures),
+            IFlowCaptureReferenceOperation capture
+                when TryClassifyCapturedReadRegion(
+                    capture,
+                    activeCaptures,
+                    out var capturedRegions) =>
+                capturedRegions,
+            IFlowCaptureReferenceOperation
+            {
+                Type: { IsValueType: true } valueType
+            } when IsUnmanagedValueType(valueType) =>
+                EffectRegionSet.Empty,
+            IConversionOperation
+            {
+                OperatorMethod: null,
+                Type: { IsValueType: true } valueType
+            } when IsUnmanagedValueType(valueType) =>
+                EffectRegionSet.Empty,
+            IFlowCaptureReferenceOperation capture
+                when _creationCaptures.TryResolve(
+                    capture,
+                    out var creationRegion) =>
+                creationRegion,
+            IFlowCaptureReferenceOperation capture
+                when _coalesceCaptures.TryResolve(
+                    capture,
+                    out var captured) =>
+                ClassifyReadRegion(captured, activeCaptures),
+            IFlowCaptureReferenceOperation capture
+                when _conditionalTruthCaptures.TryResolve(
+                    capture,
+                    out var truthOperand) =>
+                ClassifyReadRegion(truthOperand, activeCaptures),
+            _ => ClassifyCallArgumentRegion(operation)
+        };
+    }
+
+    private bool TryClassifyCapturedReadRegion(
+        IFlowCaptureReferenceOperation capture,
+        HashSet<CaptureId> activeCaptures,
+        out EffectRegionSet regions)
+    {
+        if (!_readRegionCaptures.TryResolve(capture, out var capturedValues))
+        {
+            regions = EffectRegionSet.Empty;
+            return false;
+        }
+
+        if (!activeCaptures.Add(capture.Id))
+        {
+            regions = EffectRegionSet.Unknown;
+            return true;
+        }
+
+        regions = EffectRegionSet.Empty;
+        foreach (var capturedValue in capturedValues)
+        {
+            regions = regions.Union(
+                ClassifyReadRegion(
+                    capturedValue,
+                    new HashSet<CaptureId>(activeCaptures)));
+        }
+        activeCaptures.Remove(capture.Id);
+        return true;
+    }
+
+    private static bool IsUnmanagedValueType(ITypeSymbol type)
+    {
+        return type.IsUnmanagedType ||
+            CompilerIdentityBridge.GetNullableUnderlyingType(type)
+                ?.IsUnmanagedType == true;
     }
 
     internal EffectRegionSet ClassifyParameter(IParameterSymbol parameter)
@@ -888,5 +1006,41 @@ internal sealed class ConversionOwnershipClassifier
     {
         var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
         return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+    }
+
+    private static bool TryGetOwningConditionalAccess(
+        IConditionalAccessInstanceOperation instance,
+        out IConditionalAccessOperation owner)
+    {
+        for (var current = instance.Parent;
+             current != null;
+             current = current.Parent)
+        {
+            if (current is IConditionalAccessOperation conditional &&
+                conditional.WhenNotNull is { } whenNotNull &&
+                IsWithin(instance, whenNotNull))
+            {
+                owner = conditional;
+                return true;
+            }
+        }
+
+        owner = null!;
+        return false;
+    }
+
+    private static bool IsWithin(IOperation operation, IOperation ancestor)
+    {
+        for (var current = operation;
+             current != null;
+             current = current.Parent)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

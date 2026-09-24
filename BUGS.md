@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, and B19 signed-remainder normal-completion findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **50 findings**: 0 P0, 0 P1, 12 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, and B33 reachable-read-region findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **49 findings**: 0 P0, 0 P1, 11 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,46 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B33. Reads through `?.`, field-held references, or `?:` receivers become `Unknown`
-
-**Confidence: Confirmed through public effect summaries and analyzer
-diagnostics.**
-
-- **Location:** `SharpProof.Effects/ConversionOwnershipClassifier.cs:35-90`.
-  `ClassifyRegion` has no case for `IConditionalAccessInstanceOperation`;
-  maps every `IFieldReferenceOperation`/`IArrayElementReferenceOperation`
-  value to `EffectRegionSet.Unknown` (`:74-75`); and resolves
-  `IConditionalOperation`/`ICoalesceOperation` receivers only when
-  `aliasSource` is true (`:82-87`), so ordinary reads fall through to
-  `Unknown` at `:89`.
-- **Defect:** the region of the object a read goes through is lost in three
-  idiomatic shapes: the `b` in `b?.V`; the object held in a field, as in
-  `n.Next.V` (reachable from parameter `n`); and the chosen receiver in
-  `(c ? x : y).V`. Each read is recorded against `Unknown`, which
-  `[EnforcePure]` cannot distinguish from mutable static or ambient state.
-- **Observed boundary:** `EffectAnalysisSession.Analyze` built from unchanged
-  HEAD returned `reads=[Parameter 0]` for `b.V`, `b == null ? 0 : b.V`, and
-  `in` parameter reads, but `reads=[Unknown]` for `b?.V` (value and reference
-  fields alike), `n.Next == null ? n.V : n.Next.V`, and `(b ? x : y).V`. The
-  analyzer reported `SP0002` for `[EnforcePure]` on `b?.V`, `b?.V ?? 0`, `b?.S`,
-  the `n.Next.V` chain, and the conditional receiver, while `n.V` and the
-  explicit null-check form were silent.
-- **Impact:** false `SP0002` (and incomplete `[EffectContract]` coverage) on
-  null-safe reads and on any read that traverses an object graph (linked
-  lists, trees, nested options); fails closed, but breaks correct builds under
-  error severities.
-- **Proposed fix:** resolve an `IConditionalAccessInstanceOperation` to its
-  owning `IConditionalAccessOperation` (the nearest ancestor whose
-  `WhenNotNull` contains it) and classify that operation's `Operation`. For
-  reads (not aliasing writes), classify a field or array-element value as
-  "reachable from" the region of its instance (a transitive `ReadsArgumentState`
-  / `ReadsReceiverState` region) instead of `Unknown`. Apply the existing
-  conditional/coalesce union for read receivers as well as alias sources.
-- **Proposed regression:** effect-summary and analyzer tests for `b?.V`,
-  `b?.S`, `b?.Inner?.V`, `n.Next.V`, `a[0].V`, and `(c ? x : y).V` on
-  parameters, locals, and `this`, expecting argument/receiver reads, with a
-  control that a read through a static field remains a static read.
 
 ### B34. Implicit constructors with field initializers are unmodeled
 

@@ -767,6 +767,11 @@ internal sealed class EffectMethodNodeBuilder
         OperationEffectScanner scanner,
         ConstructorInitializationPlan? constructorPlan)
     {
+        scanner.RegisterReadRegionCaptures(
+            graph.Blocks.SelectMany(static block =>
+                block.BranchValue is { } branchValue
+                    ? block.Operations.Append(branchValue)
+                    : block.Operations));
         var summary = EffectSummary.Empty;
         var pending = new SortedSet<int> { graph.Blocks[0].Ordinal };
         var constructorInitializersScanned = false;

@@ -101,7 +101,8 @@ public sealed class CatchAndForeachOwnershipRegressionTests
             compilation,
             new CoalesceAssignmentFlowCaptures(),
             new ConditionalTruthOperatorFlowCaptures(),
-            new CreationFlowCaptures());
+            new CreationFlowCaptures(),
+            new ReadRegionFlowCaptures());
         var relevantOperations = root.Descendants()
             .Where(operation =>
                 !ConversionOwnershipClassifier.IsInsideNestedCallable(
