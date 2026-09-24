@@ -347,7 +347,7 @@ foreach ($pilot in $catalog.pilots) {
                 [IO.Path]::GetFileName($_) -ceq 'result.sarif'
             } | Select-Object -First 1) -PathType Leaf
         evidence = @($evidenceFiles | ForEach-Object {
-                [ordered]@{
+                [pscustomobject][ordered]@{
                     kind = switch ([IO.Path]::GetFileName($_)) {
                         'request.json' { 'request' }
                         'result.json' { 'result' }

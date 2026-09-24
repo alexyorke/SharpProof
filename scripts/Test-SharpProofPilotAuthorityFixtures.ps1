@@ -65,8 +65,17 @@ foreach ($fileName in @('request.json','result.json','compiler-manifest.json','r
         ForEach-Object { Join-Path $projectionEvidenceDirectory $_ }
     $results = @()
     . ([scriptblock]::Create($projections[0].Extent.Text))
-    if ($results.Count -ne 1 -or $null -ne $results[0].falsePositiveReports) {
-        throw 'A produced pilot result must leave false-positive review unreported.'
+    $invalidEvidenceRows = @()
+    if ($results.Count -eq 1) {
+        $invalidEvidenceRows = @($results[0].evidence | Where-Object {
+            $_ -isnot [pscustomobject] -or
+            (@($_.PSObject.Properties.Name | Sort-Object) -join '|') -cne
+                'bytes|kind|path|sha256'
+        })
+    }
+    if ($results.Count -ne 1 -or $null -ne $results[0].falsePositiveReports -or
+        @($results[0].evidence).Count -ne 4 -or $invalidEvidenceRows.Count -ne 0) {
+        throw 'A produced pilot result must leave review unreported and expose JSON-shaped evidence rows.'
     }
 }
 Remove-Item -LiteralPath $projectionRoot -Recurse -Force
