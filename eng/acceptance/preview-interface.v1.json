@@ -33,7 +33,7 @@
     "SharpProofToolsDirectory"
   ],
   "versions": {
-    "workerProtocol": 11,
+    "workerProtocol": 12,
     "workerManifest": 4,
     "compilerArtifact": 18,
     "relationalSummary": 2,

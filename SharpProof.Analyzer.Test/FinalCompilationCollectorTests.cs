@@ -376,7 +376,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 artifact.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("11"));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("12"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
