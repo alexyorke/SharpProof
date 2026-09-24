@@ -2822,7 +2822,16 @@ internal readonly record struct ManagedAbstractValue
 /// <summary>Fail-closed execution facts shared by analyzer and effect witnesses.</summary>
 internal sealed class DefiniteOperationFacts(Compilation compilation, CancellationToken cancellationToken)
 {
+    // Method and operation recursion consume one shared per-thread limit.
+    internal const int MaximumCompletionFactsDepth = 256;
+
     private readonly InvocationEmissionPolicy _invocationEmission = new(compilation);
+
+    private sealed class CompletionTraversalState
+    {
+        internal int Depth { get; set; }
+        internal bool Exhausted { get; set; }
+    }
 
     internal bool IsConditionallyElided(IOperation operation)
     {
@@ -2840,10 +2849,55 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     [ThreadStatic]
     private static Dictionary<DefiniteOperationFacts, HashSet<IMethodSymbol>>?
         s_cycleAffectedMethods;
+    [ThreadStatic]
+    private static Dictionary<DefiniteOperationFacts, CompletionTraversalState>?
+        s_completionTraversals;
     private readonly ConcurrentDictionary<IMethodSymbol, bool>
         _methodCompletionCache = new(SymbolEqualityComparer.Default);
     private readonly INamedTypeSymbol? _contractApi =
         ContractApiIdentityResolver.ForCompilation(compilation).Contract;
+
+    private bool TryEnterCompletionTraversal(
+        out CompletionTraversalState traversal,
+        out bool ownsTraversal)
+    {
+        var traversals = s_completionTraversals ??= [];
+        if (!traversals.TryGetValue(this, out traversal!))
+        {
+            traversal = new CompletionTraversalState();
+            traversals.Add(this, traversal);
+            ownsTraversal = true;
+        }
+        else
+        {
+            ownsTraversal = false;
+        }
+
+        if (traversal.Exhausted ||
+            traversal.Depth >= MaximumCompletionFactsDepth)
+        {
+            traversal.Exhausted = true;
+            if (ownsTraversal)
+            {
+                traversals.Remove(this);
+            }
+            return false;
+        }
+
+        traversal.Depth++;
+        return true;
+    }
+
+    private void ExitCompletionTraversal(
+        CompletionTraversalState traversal,
+        bool ownsTraversal)
+    {
+        traversal.Depth--;
+        if (ownsTraversal)
+        {
+            s_completionTraversals?.Remove(this);
+        }
+    }
 
     private bool TryEnterMethod(IMethodSymbol method)
     {
@@ -2916,6 +2970,27 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     internal bool CompletesNormally(IOperation? operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryEnterCompletionTraversal(
+                out var traversal,
+                out var ownsTraversal))
+        {
+            return false;
+        }
+
+        try
+        {
+            var result = CompletesNormallyCore(operation);
+            return traversal.Exhausted ? false : result;
+        }
+        finally
+        {
+            ExitCompletionTraversal(traversal, ownsTraversal);
+        }
+    }
+
+    private bool CompletesNormallyCore(IOperation? operation)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (operation != null && IsConditionallyElided(operation))
         {
             return true;
@@ -2978,6 +3053,27 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     private bool CompletesNormally(IMethodSymbol method)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryEnterCompletionTraversal(
+                out var traversal,
+                out var ownsTraversal))
+        {
+            return false;
+        }
+
+        try
+        {
+            var result = CompletesNormallyCore(method);
+            return traversal.Exhausted ? false : result;
+        }
+        finally
+        {
+            ExitCompletionTraversal(traversal, ownsTraversal);
+        }
+    }
+
+    private bool CompletesNormallyCore(IMethodSymbol method)
+    {
         if (method.IsStatic && method.ContainingType.StaticConstructors.Length != 0)
         {
             return false;
@@ -3016,6 +3112,30 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     /// the invocation itself noncompleting.
     /// </summary>
     internal bool MethodCanCompleteNormally(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryEnterCompletionTraversal(
+                out var traversal,
+                out var ownsTraversal))
+        {
+            return true;
+        }
+
+        try
+        {
+            var result = MethodCanCompleteNormallyCore(method, traversal);
+            return traversal.Exhausted ? true : result;
+        }
+        finally
+        {
+            ExitCompletionTraversal(traversal, ownsTraversal);
+        }
+    }
+
+    private bool MethodCanCompleteNormallyCore(
+        IMethodSymbol method,
+        CompletionTraversalState traversal)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
@@ -3106,7 +3226,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         // this avoids turning a recursive re-entry's conservative fallback
         // into a definitive cache entry for the whole strongly connected
         // component.
-        if (!cycleAffected)
+        if (traversal.Exhausted)
+        {
+            result = true;
+        }
+        if (!cycleAffected && !traversal.Exhausted)
         {
             _methodCompletionCache.TryAdd(normalized, result);
         }
@@ -3224,6 +3348,27 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     /// are all treated as potentially completing.
     /// </summary>
     internal bool MayCompleteNormally(IOperation? operation)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryEnterCompletionTraversal(
+                out var traversal,
+                out var ownsTraversal))
+        {
+            return true;
+        }
+
+        try
+        {
+            var result = MayCompleteNormallyCore(operation);
+            return traversal.Exhausted ? true : result;
+        }
+        finally
+        {
+            ExitCompletionTraversal(traversal, ownsTraversal);
+        }
+    }
+
+    private bool MayCompleteNormallyCore(IOperation? operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (operation != null && IsConditionallyElided(operation))

@@ -26,7 +26,7 @@ public sealed class OperationCompletionStackSafetyRegressionTests
             compilation,
             method);
 
-        Assert.That(evaluator.CanCompleteNormally(operation), Is.False);
+        Assert.That(evaluator.CanCompleteNormally(operation), Is.True);
     }
 
     [Test]
@@ -50,6 +50,6 @@ public sealed class OperationCompletionStackSafetyRegressionTests
             compilation,
             method);
 
-        Assert.That(evaluator.CanCompleteNormally(operation), Is.False);
+        Assert.That(evaluator.CanCompleteNormally(operation), Is.True);
     }
 }

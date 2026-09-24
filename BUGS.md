@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof and managed exception-region false-proof findings have been fixed and verified, so both are removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **70 findings**: 0 P0, 10 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, and completion-analysis recursion-budget findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **69 findings**: 0 P0, 9 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -202,37 +202,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P1 - High
-
-### B1. Completion analysis bypasses outer recursion budgets
-
-**Confidence: High. Evidence: source trace plus bounded traversal probe.**
-
-- **Location:** `SharpProof.Effects/ManagedAbstractFlow.cs:2610`, `:2683`,
-  `:2818`, `:3186`, and `:3236-3244` (`DefiniteOperationFacts`);
-  `SharpProof.Effects/EffectAnalysisSession.cs:507-519` and `:590`;
-  `SharpProof.Effects/EffectCallGraph.cs:11` and `:27`.
-- **Defect:** completion queries recursively follow source helper calls and
-  nested expressions without sharing scanner or call-graph budgets. The
-  active-method cycle guard does not bound a long acyclic chain.
-- **Reachability:** session lines 507-508 call `BuildNodes` before
-  `ComputeSummaries`; line 519 invokes the recursive-method search with its
-  call-chain depth limit of 512, and line 590 has a body-depth guard. Earlier
-  node building (line 706) invokes scanning/completion evaluation (scanner line 1320;
-  evaluator lines 722 and 737), reaching recursive facts at lines 2683 and 3186.
-- **Observed boundary:** an unchanged-source harness queried 600 distinct,
-  shallow helpers in one acyclic chain. `MethodCanCompleteNormally(M0)` was
-  `true`, and the completion cache held 600 entries. This demonstrates facts
-  traversal beyond outer 256/512 thresholds, not stack exhaustion. Existing
-  `OperationCompletionStackSafetyRegressionTests` cover direct evaluator
-  depth 256, not this facts path. No additional stress run was performed.
-- **Risk:** thousands of helpers or deeply nested expressions may exhaust the
-  process stack before an outer limit applies; a crash remains source-inferred.
-- **Proposed fix:** use iterative traversal or a shared conservative depth/work
-  budget across recursive completion entry points. Exhaustion must mean
-  unknown/may-complete, never cached definite noncompletion or suppressed effects.
-- **Proposed regression:** isolate deep acyclic-call and expression cases in a
-  process; assert bounded conservative completion and retained suffix effects,
-  with ordinary recursion and shallow-chain controls.
 
 ### B8. Pilot validation accepts strict refutations and failed responses
 

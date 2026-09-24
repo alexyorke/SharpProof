@@ -66,8 +66,10 @@ internal sealed class OperationCompletionEvaluator
         if (_completionDepth >= MaximumCompletionDepth)
         {
             // Do not cache this conservative answer.  The same operation can
-            // still be reached later from a shallower path in the tree.
-            return false;
+            // still be reached later from a shallower path in the tree. The
+            // caller asks whether this operation may complete, so exhaustion
+            // must preserve later effects instead of treating it as terminal.
+            return true;
         }
 
         _completionDepth++;
