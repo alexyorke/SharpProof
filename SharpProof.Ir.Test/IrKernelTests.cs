@@ -514,6 +514,46 @@ public sealed class IrKernelTests
                 factory.Integer(1))));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SubstituteManyUsesTheRootsItValidated(bool hasReplacement)
+    {
+        var factory = new IrFactory();
+        var foreignFactory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var root = factory.Variable(variable);
+        var foreignRoot = foreignFactory.Integer(9);
+        var changingRoots = new ChangingIrTermList(root, foreignRoot);
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements = hasReplacement
+            ? new Dictionary<IrVarId, IrTerm>
+            {
+                [variable] = factory.Integer(7)
+            }
+            : new Dictionary<IrVarId, IrTerm>();
+
+        var result = IrSubstitution.SubstituteMany(
+            factory,
+            changingRoots,
+            replacements);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(changingRoots.EnumerationCount, Is.EqualTo(1));
+            Assert.That(result, Has.Length.EqualTo(1));
+            Assert.That(
+                result[0],
+                Is.SameAs(hasReplacement ? factory.Integer(7) : root));
+        }
+
+        var stableResult = IrSubstitution.SubstituteMany(
+            factory,
+            new[] { root },
+            replacements);
+        Assert.That(
+            stableResult[0],
+            Is.SameAs(hasReplacement ? factory.Integer(7) : root));
+    }
+
     [Test]
     public void SubstitutionPreservesUnchangedCompositeSubtrees()
     {
@@ -1344,5 +1384,40 @@ public sealed class IrKernelTests
 
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(33L));
+    }
+
+    private sealed class ChangingIrTermList : IReadOnlyList<IrTerm>
+    {
+        private readonly IrTerm _first;
+        private readonly IrTerm _later;
+
+        public ChangingIrTermList(IrTerm first, IrTerm later)
+        {
+            _first = first;
+            _later = later;
+        }
+
+        public int EnumerationCount { get; private set; }
+
+        public int Count => 1;
+
+        public IrTerm this[int index] => index == 0
+            ? EnumerationCount <= 1 ? _first : _later
+            : throw new ArgumentOutOfRangeException(nameof(index));
+
+        public IEnumerator<IrTerm> GetEnumerator()
+        {
+            EnumerationCount++;
+            return new[]
+            {
+                EnumerationCount == 1 ? _first : _later
+            }.AsEnumerable().GetEnumerator();
+        }
+
+        System.Collections.IEnumerator
+            System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }

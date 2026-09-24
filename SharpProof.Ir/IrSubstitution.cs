@@ -86,7 +86,11 @@ public static class IrSubstitution
         ArgumentNullGuard.NotNull(roots, nameof(roots));
         ArgumentNullGuard.NotNull(replacements, nameof(replacements));
 
-        foreach (var root in roots)
+        // IReadOnlyList is a caller-owned view, not an immutable snapshot.
+        // Validate and process the same materialized roots so a changing view
+        // cannot substitute terms that were never checked for factory ownership.
+        var rootSnapshot = roots.ToArray();
+        foreach (var root in rootSnapshot)
         {
             ArgumentNullGuard.NotNull(root, nameof(roots));
             factory.EnsureTerm(root, nameof(roots));
@@ -95,12 +99,12 @@ public static class IrSubstitution
         var replacementMap = CreateReplacementMap(factory, replacements);
         if (replacementMap.Count == 0)
         {
-            return [.. roots];
+            return [.. rootSnapshot];
         }
 
         var memo = new Dictionary<IrId, IrTerm>();
-        var result = ImmutableArray.CreateBuilder<IrTerm>(roots.Count);
-        foreach (var root in roots)
+        var result = ImmutableArray.CreateBuilder<IrTerm>(rootSnapshot.Length);
+        foreach (var root in rootSnapshot)
         {
             result.Add(Rewrite(
                 factory,
