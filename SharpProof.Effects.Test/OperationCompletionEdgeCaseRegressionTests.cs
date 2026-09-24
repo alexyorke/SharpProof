@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Specs;
 
@@ -6,6 +7,150 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class OperationCompletionEdgeCaseRegressionTests
 {
+    [Test]
+    public void ReplayablePrefixUsesFlowFactsForSafeReceiversAndStores()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            public sealed class K {
+                public int M() => 1;
+            }
+            public sealed class Box {
+                public int Field;
+                public int Property { get; set; }
+            }
+            public class VirtualBox {
+                public virtual int M() => 1;
+            }
+            public sealed class FragileBox {
+                public int Property {
+                    get { while (true) { } }
+                    set { }
+                }
+            }
+            public static class StaticBox {
+                static StaticBox() { throw new System.Exception(); }
+                public static int Field;
+            }
+            public static class Sample {
+                private static void Check() { }
+                public static void LocalReceiver() {
+                    var value = new K();
+                    value.M();
+                    Check();
+                }
+                public static void ArrayWrite() {
+                    var values = new int[3];
+                    values[0] = 1;
+                    Check();
+                }
+                public static void InstanceFieldWrite() {
+                    var box = new Box();
+                    box.Field = 1;
+                    Check();
+                }
+                public static void PropertyWrite() {
+                    var box = new Box();
+                    box.Property = 1;
+                    Check();
+                }
+                public static void NullConditional() {
+                    K? value = null;
+                    value?.M();
+                    Check();
+                }
+                public static void UnknownReceiver(K value) {
+                    value.M();
+                    Check();
+                }
+                public static void UnknownArrayIndex(int[] values, int index) {
+                    values[index] = 1;
+                    Check();
+                }
+                public static void VirtualReceiver() {
+                    var value = new VirtualBox();
+                    value.M();
+                    Check();
+                }
+                public static void CheckedConversion(long value) {
+                    _ = checked((int)value);
+                    Check();
+                }
+                public static void DecimalConversion(decimal value) {
+                    _ = unchecked((int)value);
+                    Check();
+                }
+                public static void StaticConstructor() {
+                    StaticBox.Field = 1;
+                    Check();
+                }
+                public static void DivisionByUnknownValue(int divisor) {
+                    _ = 1 / divisor;
+                    Check();
+                }
+                public static void UnboundedLoop() {
+                    for (var index = 0; index < 1;) { }
+                    Check();
+                }
+                public static void CompoundAssignmentGetter() {
+                    var value = new FragileBox();
+                    value.Property += 1;
+                    Check();
+                }
+            }
+            """);
+
+        foreach (var (methodName, expected) in new[]
+                 {
+                     ("LocalReceiver", true),
+                     ("ArrayWrite", true),
+                     ("InstanceFieldWrite", true),
+                     ("PropertyWrite", true),
+                     ("NullConditional", true),
+                     ("UnknownReceiver", false),
+                     ("UnknownArrayIndex", false),
+                     ("VirtualReceiver", false),
+                     ("CheckedConversion", false),
+                     ("DecimalConversion", false),
+                     ("StaticConstructor", false),
+                     ("DivisionByUnknownValue", false),
+                     ("UnboundedLoop", false),
+                     ("CompoundAssignmentGetter", false)
+                 })
+        {
+            var method = EffectTestHost.SampleMethod(compilation, methodName);
+            var declaration = (MethodDeclarationSyntax)method
+                .DeclaringSyntaxReferences.Single().GetSyntax();
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            var root = (IMethodBodyOperation)model.GetOperation(declaration)!;
+            var graph = ControlFlowGraph.Create(root);
+            var flow = ManagedAbstractFlow.ForCompilation(compilation)
+                .Analyze(method, graph, null, default);
+            var target = root.DescendantsAndSelf()
+                .OfType<IInvocationOperation>()
+                .Single(static invocation =>
+                    invocation.TargetMethod.Name == "Check");
+            var targetStatement = target.Syntax.AncestorsAndSelf()
+                .OfType<StatementSyntax>()
+                .First(static statement =>
+                    statement is ExpressionStatementSyntax);
+            var priorStatements = declaration.Body!.Statements
+                .TakeWhile(statement =>
+                    !statement.Span.Contains(targetStatement.Span));
+            var facts = new DefiniteOperationFacts(
+                compilation,
+                CancellationToken.None);
+            var prefixCompletes = priorStatements.All(statement =>
+                facts.CompletesNormally(
+                    model.GetOperation(statement),
+                    flow.Result,
+                    target));
+
+            Assert.That(prefixCompletes, Is.EqualTo(expected), methodName);
+        }
+    }
+
     [TestCase(false, true)]
     [TestCase(true, false)]
     public void StaticFieldInitializationCanReachCatchAndCallerSuffix(bool constant, bool expected)

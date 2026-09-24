@@ -178,7 +178,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
                 var syntacticReplayable = HasReplayablePrefix(
                     operation,
-                    operationFacts);
+                    operationFacts,
+                    flowResult);
 
                 var hasFlowState =
                     flowResult?.TryGetState(operation, out _) == true;
@@ -222,7 +223,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.CanReplay && HasReplayableCallEvaluation(
                             operation,
                             call,
-                            operationFacts),
+                            operationFacts,
+                            flowResult),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status,
                         cancellationToken);
@@ -262,7 +264,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         operation.Syntax.SpanStart,
                         cancellationToken),
                     caller) ||
-                !HasReplayablePrefix(operation, operationFacts))
+                !HasReplayablePrefix(
+                    operation,
+                    operationFacts,
+                    flowResult))
             {
                 continue;
             }
@@ -281,7 +286,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.CanReplay && HasReplayableCallEvaluation(
                             operation,
                             call,
-                            operationFacts),
+                            operationFacts,
+                            flowResult),
                         flow: null,
                         flowAnalysis.Status,
                         cancellationToken));
@@ -350,7 +356,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     call.CanReplay && HasReplayableCallEvaluation(
                         operation,
                         call,
-                        operationFacts),
+                        operationFacts,
+                        flowResult),
                         flow: null,
                         flowAnalysis.Status,
                         cancellationToken);
@@ -594,7 +601,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private bool HasReplayablePrefix(
         IOperation callSite,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult = null)
     {
         if (declaration is EqualsValueClauseSyntax equalsValue)
         {
@@ -658,7 +666,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                        operationFacts.CompletesNormally(
                            semanticModel.GetOperation(
                                prior,
-                               cancellationToken)));
+                               cancellationToken),
+                           flowResult,
+                           callSite));
     }
 
     private static bool IsAccessorCall(IMethodSymbol method)
@@ -673,34 +683,55 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private bool HasReplayableAccessorEvaluation(
         IOperation operation,
         RequiresCallTarget call,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult)
     {
         var isInitializerMemberCall = IsInitializerMemberCall(
             operation,
             call.Instance);
         return (call.Instance == null ||
-                operationFacts.CompletesNormally(call.Instance) ||
+                operationFacts.CompletesNormally(
+                    call.Instance,
+                    flowResult,
+                    operation) ||
                 isInitializerMemberCall) &&
             call.Arguments.All(argument =>
-                operationFacts.CompletesNormally(argument.Value) ||
+                operationFacts.CompletesNormally(
+                    argument.Value,
+                    flowResult,
+                    operation) ||
                 isInitializerMemberCall &&
                 CompletesInitializerCapture(
                     argument.Value,
-                    operationFacts)) &&
+                    operationFacts,
+                    flowResult,
+                    operation)) &&
             call.ExplicitArguments.Values.All(
-                value => operationFacts.CompletesNormally(value) ||
+                value => operationFacts.CompletesNormally(
+                    value,
+                    flowResult,
+                    operation) ||
                     isInitializerMemberCall &&
-                    CompletesInitializerCapture(value, operationFacts));
+                    CompletesInitializerCapture(
+                        value,
+                        operationFacts,
+                        flowResult,
+                        operation));
     }
 
     private bool CompletesInitializerCapture(
         IOperation operation,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult,
+        IOperation flowOrigin)
     {
         return operation is IFlowCaptureReferenceOperation &&
             semanticModel.GetOperation(operation.Syntax, cancellationToken)
                 is { } source &&
-            operationFacts.CompletesNormally(source);
+            operationFacts.CompletesNormally(
+                source,
+                flowResult,
+                flowOrigin);
     }
 
     private static bool IsInitializerMemberCall(
@@ -730,7 +761,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private bool HasReplayableCallEvaluation(
         IOperation operation,
         RequiresCallTarget call,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult)
     {
         if (operation is IUsingOperation or IUsingDeclarationOperation)
         {
@@ -753,9 +785,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
             return HasReplayableAccessorEvaluation(
                 operation,
                 call,
-                operationFacts);
+                operationFacts,
+                flowResult);
         }
-        return HasReplayablePrefix(operation, operationFacts);
+        return HasReplayablePrefix(
+            operation,
+            operationFacts,
+            flowResult);
     }
 
     private static bool CanCoalesceGetterComplete(

@@ -2828,6 +2828,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private const int MaximumCompletionGraphEdges = 65536;
 
     private readonly InvocationEmissionPolicy _invocationEmission = new(compilation);
+    private readonly ResolvedApiSpecTable _apiSpecs =
+        new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
 
     private sealed class CompletionTraversalState
     {
@@ -2965,6 +2967,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     internal bool CompletesNormally(IOperation? operation)
     {
+        return CompletesNormally(operation, flow: null, flowOrigin: null);
+    }
+
+    internal bool CompletesNormally(
+        IOperation? operation,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryEnterCompletionTraversal(
                 out var traversal,
@@ -2975,7 +2985,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         try
         {
-            var result = CompletesNormallyCore(operation);
+            var result = CompletesNormallyCore(
+                operation,
+                flow,
+                flowOrigin);
             return traversal.Exhausted ? false : result;
         }
         finally
@@ -2984,10 +2997,20 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
     }
 
-    private bool CompletesNormallyCore(IOperation? operation)
+    private bool CompletesNormallyCore(
+        IOperation? operation,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (operation != null && IsConditionallyElided(operation))
+        if (operation?.ConstantValue.HasValue == true)
+        {
+            return true;
+        }
+        var emittedOperation = operation is IExpressionStatementOperation statement
+            ? statement.Operation
+            : operation;
+        if (emittedOperation != null && IsConditionallyElided(emittedOperation))
         {
             return true;
         }
@@ -2997,54 +3020,696 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILiteralOperation or ILocalReferenceOperation or IParameterReferenceOperation or
                 IDiscardOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation => true,
-            IInvocationOperation invocation => CompletesNormally(invocation),
+            IInvocationOperation invocation =>
+                CompletesNormally(invocation, flow, flowOrigin),
             IObjectCreationOperation creation =>
                 creation.Arguments.All(argument =>
-                    CompletesNormally(argument.Value)) &&
+                    CompletesNormally(argument.Value, flow, flowOrigin)) &&
+                (creation.Constructor?.ContainingType.StaticConstructors.Length ??
+                    (creation.Type as INamedTypeSymbol)?.StaticConstructors.Length ??
+                    0) == 0 &&
                 (creation.Constructor == null ||
-                 creation.Constructor.DeclaringSyntaxReferences.Length != 1 ||
-                 CompletesNormally(creation.Constructor)),
+                 CompletesNormally(creation.Constructor)) &&
+                (creation.Initializer == null ||
+                 CompletesNormally(
+                     creation.Initializer,
+                     flow,
+                     flowOrigin)),
+            IArrayCreationOperation array =>
+                ArrayCreationCompletesNormally(array, flow, flowOrigin),
+            IArrayElementReferenceOperation element =>
+                ArrayAccessCompletesNormally(element, flow, flowOrigin),
+            IFieldReferenceOperation field =>
+                FieldAccessCompletesNormally(field, flow, flowOrigin),
+            IPropertyReferenceOperation property =>
+                PropertyAccessCompletesNormally(
+                    property,
+                    property.Property.GetMethod,
+                    flow,
+                    flowOrigin),
             IMethodReferenceOperation methodReference =>
-                ChildrenCompleteNormally(methodReference) &&
+                ChildrenCompleteNormally(methodReference, flow, flowOrigin) &&
                 (methodReference.Method.IsStatic ||
                  methodReference.Instance != null &&
-                 IsDefinitelyNonNull(methodReference.Instance)),
-            IFieldReferenceOperation fieldReference =>
-                ChildrenCompleteNormally(fieldReference) &&
-                (fieldReference.Field.IsStatic ||
-                 fieldReference.Instance != null &&
-                 IsDefinitelyNonNull(fieldReference.Instance)),
+                 IsDefinitelyNonNull(
+                     methodReference.Instance,
+                     flow,
+                     flowOrigin)),
             ISimpleAssignmentOperation assignment =>
-                assignment.Target is ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation &&
-                CompletesNormally(assignment.Value),
+                AssignmentCompletesNormally(
+                    assignment,
+                    flow,
+                    flowOrigin),
+            ICompoundAssignmentOperation compound =>
+                CompoundAssignmentCompletesNormally(
+                    compound,
+                    flow,
+                    flowOrigin),
             IBinaryOperation binary =>
                 binary.OperatorMethod == null && !binary.IsChecked &&
+                !IsDecimalType(binary.Type) &&
                 binary.OperatorKind is not (BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) &&
-                ChildrenCompleteNormally(binary),
+                ChildrenCompleteNormally(binary, flow, flowOrigin),
             IUnaryOperation unary =>
-                unary.OperatorMethod == null && !unary.IsChecked && ChildrenCompleteNormally(unary),
+                unary.OperatorMethod == null && !unary.IsChecked &&
+                !IsDecimalType(unary.Type) &&
+                ChildrenCompleteNormally(unary, flow, flowOrigin),
             IIncrementOrDecrementOperation increment =>
-                increment.OperatorMethod == null && !increment.IsChecked &&
-                increment.Target is ILocalReferenceOperation or IParameterReferenceOperation,
+                IncrementCompletesNormally(increment, flow, flowOrigin),
             IConversionOperation conversion =>
-                HarmlessConversion(conversion) &&
-                CompletesNormally(conversion.Operand),
+                ConversionCompletesNormally(conversion) &&
+                CompletesNormally(conversion.Operand, flow, flowOrigin),
+            IConditionalAccessOperation conditionalAccess =>
+                ConditionalAccessCompletesNormally(
+                    conditionalAccess,
+                    flow,
+                    flowOrigin),
+            IForLoopOperation loop =>
+                ForLoopCompletesNormally(loop, flow, flowOrigin),
             IBlockOperation or IExpressionStatementOperation or IReturnOperation or
                 IVariableDeclarationGroupOperation or IVariableDeclarationOperation or
                 IVariableDeclaratorOperation or IVariableInitializerOperation or IArgumentOperation or
-                IParenthesizedOperation or IConditionalOperation => ChildrenCompleteNormally(operation),
+                IArrayInitializerOperation or
+                IObjectOrCollectionInitializerOperation or
+                IParenthesizedOperation or IConditionalOperation =>
+                ChildrenCompleteNormally(operation, flow, flowOrigin),
             _ => false
         };
     }
 
-    private bool CompletesNormally(IInvocationOperation invocation)
+    private bool CompletesNormally(
+        IInvocationOperation invocation,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
     {
-        return IsContractClause(invocation) ||
-        !invocation.IsVirtual &&
-        (invocation.Instance == null ||
-         invocation.Instance is IInstanceReferenceOperation && CompletesNormally(invocation.Instance)) &&
-        invocation.Arguments.All(argument => CompletesNormally(argument.Value)) &&
-        CompletesNormally(invocation.TargetMethod);
+        if (IsContractClause(invocation, flow, flowOrigin))
+        {
+            return true;
+        }
+
+        var target = GetExactInvocationTarget(invocation);
+        return target != null &&
+            (invocation.Instance == null ||
+             CompletesNormally(invocation.Instance, flow, flowOrigin) &&
+             IsDefinitelyNonNull(invocation.Instance, flow, flowOrigin)) &&
+            invocation.Arguments.All(argument =>
+                CompletesNormally(argument.Value, flow, flowOrigin)) &&
+            CompletesNormally(target);
+    }
+
+    private static IMethodSymbol? GetExactInvocationTarget(
+        IInvocationOperation invocation)
+    {
+        var target = invocation.TargetMethod.ReducedFrom ??
+            invocation.TargetMethod;
+        if (!invocation.IsVirtual || target.IsSealed)
+        {
+            return target;
+        }
+
+        if (invocation.Instance?.Type is not INamedTypeSymbol
+            { IsSealed: true } receiverType)
+        {
+            return null;
+        }
+
+        return ResolveSealedDispatchTarget(target, receiverType);
+    }
+
+    private static IMethodSymbol? GetExactPropertyAccessor(
+        IPropertyReferenceOperation property,
+        IMethodSymbol accessor)
+    {
+        if (!accessor.IsVirtual || accessor.IsSealed)
+        {
+            return accessor;
+        }
+
+        return property.Instance?.Type is
+            INamedTypeSymbol { IsSealed: true } receiverType
+            ? ResolveSealedDispatchTarget(accessor, receiverType)
+            : null;
+    }
+
+    private static IMethodSymbol? ResolveSealedDispatchTarget(
+        IMethodSymbol target,
+        INamedTypeSymbol receiverType)
+    {
+        if (target.ContainingType.TypeKind == TypeKind.Interface)
+        {
+            return receiverType.FindImplementationForInterfaceMember(target)
+                as IMethodSymbol;
+        }
+
+        for (var type = receiverType; type != null; type = type.BaseType)
+        {
+            var implementation = type.GetMembers(target.Name)
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(candidate =>
+                    OverridesOrMatches(candidate, target));
+            if (implementation != null)
+            {
+                return implementation;
+            }
+        }
+
+        return target;
+    }
+
+    private static bool OverridesOrMatches(
+        IMethodSymbol candidate,
+        IMethodSymbol target)
+    {
+        for (var method = candidate; method != null;
+             method = method.OverriddenMethod)
+        {
+            if (SymbolEqualityComparer.Default.Equals(
+                    method.OriginalDefinition,
+                    target.OriginalDefinition))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsDefinitelyNonNull(
+        IOperation operation,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return IsDefinitelyNonNull(operation) ||
+            flowOrigin != null &&
+            flow?.ProvesNonNull(flowOrigin, operation) == true;
+    }
+
+    private bool ArrayCreationCompletesNormally(
+        IArrayCreationOperation array,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return array.DimensionSizes.All(size =>
+                CompletesNormally(size, flow, flowOrigin) &&
+                (size.ConstantValue is { HasValue: true, Value: int length } &&
+                 length >= 0 ||
+                 flowOrigin != null &&
+                 flow?.ProvesNonNegative(flowOrigin, size) == true)) &&
+            (array.Initializer == null ||
+             CompletesNormally(array.Initializer, flow, flowOrigin));
+    }
+
+    private bool ArrayAccessCompletesNormally(
+        IArrayElementReferenceOperation element,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return ChildrenCompleteNormally(element, flow, flowOrigin) &&
+            (flow?.ProvesArrayAccess(element) == true ||
+             ArrayLengthFacts.TryGetConstantLength(
+                 element.ArrayReference,
+                 out var length) &&
+             IsDefinitelyNonNull(
+                 element.ArrayReference,
+                 flow,
+                 flowOrigin) &&
+            element.Indices.Length == 1 &&
+            element.Indices[0].ConstantValue is { HasValue: true, Value: int index } &&
+             index >= 0 && index < length);
+    }
+
+    private bool FieldAccessCompletesNormally(
+        IFieldReferenceOperation field,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        if (field.Field.IsConst)
+        {
+            return true;
+        }
+
+        if (field.Field.IsStatic)
+        {
+            return field.Field.ContainingType.StaticConstructors.Length == 0;
+        }
+
+        return field.Instance != null &&
+            CompletesNormally(field.Instance, flow, flowOrigin) &&
+            IsDefinitelyNonNull(field.Instance, flow, flowOrigin);
+    }
+
+    private bool PropertyAccessCompletesNormally(
+        IPropertyReferenceOperation property,
+        IMethodSymbol? accessor,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return property.Arguments.All(argument =>
+                CompletesNormally(argument.Value, flow, flowOrigin)) &&
+            (property.Property.IsStatic
+                ? property.Property.ContainingType.StaticConstructors.Length == 0
+                : property.Instance != null &&
+                  CompletesNormally(property.Instance, flow, flowOrigin) &&
+                  IsDefinitelyNonNull(property.Instance, flow, flowOrigin)) &&
+            (accessor == null ||
+             GetExactPropertyAccessor(property, accessor) is { } exactAccessor &&
+             CompletesNormally(exactAccessor));
+    }
+
+    private bool AssignmentCompletesNormally(
+        ISimpleAssignmentOperation assignment,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return CompletesNormally(assignment.Value, flow, flowOrigin) &&
+            StoreTargetCompletesNormally(
+                assignment.Target,
+                flow,
+                flowOrigin);
+    }
+
+    private bool StoreTargetCompletesNormally(
+        IOperation target,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return target switch
+        {
+            ILocalReferenceOperation or IParameterReferenceOperation or
+                IDiscardOperation => true,
+            IFieldReferenceOperation field =>
+                FieldAccessCompletesNormally(field, flow, flowOrigin),
+            IArrayElementReferenceOperation element =>
+                ArrayAccessCompletesNormally(element, flow, flowOrigin),
+            IPropertyReferenceOperation property =>
+                PropertyAccessCompletesNormally(
+                    property,
+                    property.Property.SetMethod,
+                    flow,
+                    flowOrigin),
+            _ => false
+        };
+    }
+
+    private bool CompoundAssignmentCompletesNormally(
+        ICompoundAssignmentOperation assignment,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return !assignment.IsChecked &&
+            !IsDecimalType(assignment.Type) &&
+            !IsDecimalType(assignment.Target.Type) &&
+            (assignment.OperatorMethod == null ||
+             CompletesNormally(assignment.OperatorMethod)) &&
+            ReadWriteTargetCompletesNormally(
+                assignment.Target,
+                flow,
+                flowOrigin) &&
+            CompletesNormally(assignment.Value, flow, flowOrigin) &&
+            assignment.OperatorKind is not (
+                BinaryOperatorKind.Divide or
+                BinaryOperatorKind.Remainder);
+    }
+
+    private bool IncrementCompletesNormally(
+        IIncrementOrDecrementOperation increment,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return !increment.IsChecked &&
+            !IsDecimalType(increment.Type) &&
+            !IsDecimalType(increment.Target.Type) &&
+            (increment.OperatorMethod == null ||
+             CompletesNormally(increment.OperatorMethod)) &&
+            ReadWriteTargetCompletesNormally(
+                increment.Target,
+                flow,
+                flowOrigin);
+    }
+
+    private bool ReadWriteTargetCompletesNormally(
+        IOperation target,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        return target is IPropertyReferenceOperation property
+            ? PropertyAccessCompletesNormally(
+                  property,
+                  property.Property.GetMethod,
+                  flow,
+                  flowOrigin) &&
+              PropertyAccessCompletesNormally(
+                  property,
+                  property.Property.SetMethod,
+                  flow,
+                  flowOrigin)
+            : StoreTargetCompletesNormally(target, flow, flowOrigin);
+    }
+
+    private static bool ConversionCompletesNormally(
+        IConversionOperation conversion)
+    {
+        if (HarmlessConversion(conversion))
+        {
+            return true;
+        }
+
+        var csharpConversion =
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(
+                conversion);
+        return conversion.OperatorMethod == null &&
+            !conversion.IsChecked &&
+            !csharpConversion.IsUserDefined &&
+            !csharpConversion.IsDynamic &&
+            (csharpConversion.IsBoxing ||
+             !IsDecimalType(conversion.Operand.Type) &&
+             !IsDecimalType(conversion.Type) &&
+             (csharpConversion.IsNumeric ||
+              csharpConversion.IsEnumeration));
+    }
+
+    private static bool IsDecimalType(ITypeSymbol? type)
+    {
+        return type?.SpecialType == SpecialType.System_Decimal ||
+            type is INamedTypeSymbol named &&
+            named.OriginalDefinition.SpecialType ==
+                SpecialType.System_Nullable_T &&
+            named.TypeArguments.Length == 1 &&
+            named.TypeArguments[0].SpecialType == SpecialType.System_Decimal;
+    }
+
+    private bool ConditionalAccessCompletesNormally(
+        IConditionalAccessOperation conditionalAccess,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        var receiver = conditionalAccess.Operation;
+        return CompletesNormally(receiver, flow, flowOrigin) &&
+            (IsDefinitelyNull(receiver) ||
+             flowOrigin != null &&
+             flow?.ProvesNull(flowOrigin, receiver) == true ||
+             CompletesNormally(
+                 conditionalAccess.WhenNotNull,
+                 flow,
+                 flowOrigin));
+    }
+
+    private bool ForLoopCompletesNormally(
+        IForLoopOperation loop,
+        ManagedFlowResult? flow,
+        IOperation? flowOrigin)
+    {
+        if (!TryGetForLoopIterations(loop, out var iterations) ||
+            !loop.Before.All(operation =>
+                CompletesNormally(operation, flow, flowOrigin)) ||
+            loop.Condition != null &&
+            !CompletesNormally(loop.Condition, flow, flowOrigin))
+        {
+            return false;
+        }
+
+        if (iterations.IsZero)
+        {
+            return true;
+        }
+
+        return loop.Body != null &&
+            !loop.Body.DescendantsAndSelf().Any(operation =>
+                operation is IReturnOperation or IThrowOperation or
+                    IBranchOperation or IAnonymousFunctionOperation or
+                    ILocalFunctionOperation) &&
+            !LoopBodyWritesCounter(loop) &&
+            CompletesNormally(loop.Body, flow, flowOrigin) &&
+            loop.AtLoopBottom.All(operation =>
+                CompletesNormally(operation, flow, flowOrigin));
+    }
+
+    private static bool TryGetForLoopIterations(
+        IForLoopOperation loop,
+        out BigInteger iterations)
+    {
+        iterations = BigInteger.Zero;
+        if (loop.Condition is not IBinaryOperation condition ||
+            condition.OperatorMethod != null || condition.IsChecked ||
+            !TryGetLoopCounterAndBound(condition, out var counter,
+                out var bound, out var comparison))
+        {
+            return false;
+        }
+
+        var initializers = loop.Before
+            .SelectMany(static operation => operation.DescendantsAndSelf())
+            .OfType<IVariableDeclaratorOperation>()
+            .Where(declaration => SymbolEqualityComparer.Default.Equals(
+                declaration.Symbol,
+                counter))
+            .Select(static declaration => declaration.Initializer?.Value)
+            .OfType<IOperation>()
+            .ToArray();
+        if (initializers.Length != 1 ||
+            !TryGetIntegralConstant(initializers[0], out var initialValue) ||
+            loop.AtLoopBottom.Length != 1 ||
+            !TryGetLoopStep(loop.AtLoopBottom[0], counter, out var step) ||
+            !ManagedAbstractValue.IntegerType(
+                counter.Type,
+                out var semantics))
+        {
+            return false;
+        }
+
+        if (step > 0 && comparison is
+                BinaryOperatorKind.LessThan or
+                BinaryOperatorKind.LessThanOrEqual)
+        {
+            if (comparison == BinaryOperatorKind.LessThan)
+            {
+                iterations = initialValue < bound
+                    ? CeilingDivide(bound - initialValue, step)
+                    : BigInteger.Zero;
+            }
+            else
+            {
+                iterations = initialValue <= bound
+                    ? (bound - initialValue) / step + BigInteger.One
+                    : BigInteger.Zero;
+            }
+        }
+        else if (step < 0 && comparison is
+                     BinaryOperatorKind.GreaterThan or
+                     BinaryOperatorKind.GreaterThanOrEqual)
+        {
+            var magnitude = BigInteger.Negate(step);
+            if (comparison == BinaryOperatorKind.GreaterThan)
+            {
+                iterations = initialValue > bound
+                    ? CeilingDivide(initialValue - bound, magnitude)
+                    : BigInteger.Zero;
+            }
+            else
+            {
+                iterations = initialValue >= bound
+                    ? (initialValue - bound) / magnitude + BigInteger.One
+                    : BigInteger.Zero;
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        var finalValue = initialValue + iterations * step;
+        return initialValue >= semantics.Minimum &&
+            initialValue <= semantics.Maximum &&
+            finalValue >= semantics.Minimum &&
+            finalValue <= semantics.Maximum;
+    }
+
+    private static bool TryGetLoopCounterAndBound(
+        IBinaryOperation condition,
+        out ILocalSymbol counter,
+        out BigInteger bound,
+        out BinaryOperatorKind comparison)
+    {
+        counter = null!;
+        bound = BigInteger.Zero;
+        comparison = condition.OperatorKind;
+        if (TryGetLocal(condition.LeftOperand, out counter) &&
+            TryGetIntegralConstant(condition.RightOperand, out bound))
+        {
+            return comparison is BinaryOperatorKind.LessThan or
+                BinaryOperatorKind.LessThanOrEqual or
+                BinaryOperatorKind.GreaterThan or
+                BinaryOperatorKind.GreaterThanOrEqual;
+        }
+
+        if (!TryGetLocal(condition.RightOperand, out counter) ||
+            !TryGetIntegralConstant(condition.LeftOperand, out bound))
+        {
+            return false;
+        }
+
+        comparison = comparison switch
+        {
+            BinaryOperatorKind.LessThan => BinaryOperatorKind.GreaterThan,
+            BinaryOperatorKind.LessThanOrEqual =>
+                BinaryOperatorKind.GreaterThanOrEqual,
+            BinaryOperatorKind.GreaterThan => BinaryOperatorKind.LessThan,
+            BinaryOperatorKind.GreaterThanOrEqual =>
+                BinaryOperatorKind.LessThanOrEqual,
+            _ => comparison
+        };
+        return comparison is BinaryOperatorKind.LessThan or
+            BinaryOperatorKind.LessThanOrEqual or
+            BinaryOperatorKind.GreaterThan or
+            BinaryOperatorKind.GreaterThanOrEqual;
+    }
+
+    private static bool TryGetLoopStep(
+        IOperation operation,
+        ILocalSymbol counter,
+        out BigInteger step)
+    {
+        operation = operation is IExpressionStatementOperation statement
+            ? statement.Operation
+            : operation;
+        if (operation is IIncrementOrDecrementOperation increment &&
+            increment.OperatorMethod == null &&
+            TryGetLocal(increment.Target, out var incremented) &&
+            SymbolEqualityComparer.Default.Equals(incremented, counter))
+        {
+            step = increment.Kind == OperationKind.Increment ? 1 : -1;
+            return true;
+        }
+
+        if (operation is ICompoundAssignmentOperation assignment &&
+            assignment.OperatorMethod == null &&
+            !assignment.IsChecked &&
+            TryGetLocal(assignment.Target, out var assigned) &&
+            SymbolEqualityComparer.Default.Equals(assigned, counter) &&
+            assignment.OperatorKind is BinaryOperatorKind.Add or
+                BinaryOperatorKind.Subtract &&
+            TryGetIntegralConstant(assignment.Value, out var amount))
+        {
+            step = assignment.OperatorKind == BinaryOperatorKind.Add
+                ? amount
+                : BigInteger.Negate(amount);
+            return !step.IsZero;
+        }
+
+        step = BigInteger.Zero;
+        return false;
+    }
+
+    private static bool TryGetLocal(
+        IOperation operation,
+        out ILocalSymbol local)
+    {
+        operation = UnwrapSimpleConversions(operation);
+        if (operation is ILocalReferenceOperation reference)
+        {
+            local = reference.Local;
+            return true;
+        }
+
+        local = null!;
+        return false;
+    }
+
+    private static bool TryGetIntegralConstant(
+        IOperation operation,
+        out BigInteger value)
+    {
+        value = BigInteger.Zero;
+        if (operation.ConstantValue is not { HasValue: true, Value: { } constant })
+        {
+            return false;
+        }
+
+        try
+        {
+            value = new BigInteger(Convert.ToInt64(
+                constant,
+                CultureInfo.InvariantCulture));
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            InvalidCastException or FormatException or OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static BigInteger CeilingDivide(
+        BigInteger dividend,
+        BigInteger divisor)
+    {
+        return (dividend + divisor - BigInteger.One) / divisor;
+    }
+
+    private static bool LoopBodyWritesCounter(IForLoopOperation loop)
+    {
+        var condition = (IBinaryOperation)loop.Condition!;
+        _ = TryGetLoopCounterAndBound(condition, out var counter,
+            out _, out _);
+        return loop.Body!.DescendantsAndSelf().Any(operation =>
+            operation switch
+            {
+                ISimpleAssignmentOperation assignment =>
+                    WritesCounter(assignment.Target, counter),
+                ICompoundAssignmentOperation assignment =>
+                    WritesCounter(assignment.Target, counter),
+                IIncrementOrDecrementOperation increment =>
+                    WritesCounter(increment.Target, counter),
+                IArgumentOperation argument =>
+                    argument.Parameter?.RefKind != RefKind.None &&
+                    WritesCounter(argument.Value, counter),
+                _ => false
+            });
+    }
+
+    private static bool WritesCounter(
+        IOperation operation,
+        ILocalSymbol counter)
+    {
+        return TryGetLocal(operation, out var written) &&
+            SymbolEqualityComparer.Default.Equals(written, counter);
+    }
+
+    private bool CompletesImplicitParameterlessConstructor(
+        IMethodSymbol method)
+    {
+        var containingType = method.ContainingType;
+        if (!method.IsImplicitlyDeclared ||
+            method.MethodKind != MethodKind.Constructor ||
+            method.Parameters.Length != 0 ||
+            containingType.DeclaringSyntaxReferences.Length == 0 ||
+            containingType.IsStatic ||
+            containingType.StaticConstructors.Length != 0)
+        {
+            return false;
+        }
+
+        if (containingType.TypeKind == TypeKind.Struct)
+        {
+            return true;
+        }
+
+        if (containingType.TypeKind != TypeKind.Class)
+        {
+            return false;
+        }
+
+        var baseType = containingType.BaseType;
+        if (baseType == null)
+        {
+            return true;
+        }
+
+        var baseConstructor = baseType.InstanceConstructors
+            .FirstOrDefault(static constructor =>
+                constructor.Parameters.Length == 0);
+        return baseConstructor != null &&
+            CompletesNormally(baseConstructor);
     }
 
     private bool CompletesNormally(IMethodSymbol method)
@@ -3080,8 +3745,29 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 return false;
             }
 
-            if (normalized.DeclaringSyntaxReferences.Length != 1 ||
-                !TryEnterMethod(normalized))
+            if (normalized.DeclaringSyntaxReferences.Length != 1)
+            {
+                if (CompletesImplicitParameterlessConstructor(normalized))
+                {
+                    _definiteMethodCompletionCache.TryAdd(normalized, true);
+                    return true;
+                }
+
+                var specified = _apiSpecs.IsNonThrowingAndTerminating(method);
+                _definiteMethodCompletionCache.TryAdd(normalized, specified);
+                return specified;
+            }
+
+            if (!normalized.IsAbstract && !normalized.IsExtern &&
+                AutoPropertyFacts.IsAccessor(
+                    normalized,
+                    cancellationToken))
+            {
+                _definiteMethodCompletionCache.TryAdd(normalized, true);
+                return true;
+            }
+
+            if (!TryEnterMethod(normalized))
             {
                 // A recursive re-entry cannot establish definite completion.
                 _definiteMethodCompletionCache.TryAdd(normalized, false);
@@ -3091,10 +3777,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             bool result;
             try
             {
-                var body = ExecutableBodySyntax.Get(
-                    normalized.DeclaringSyntaxReferences[0]
-                        .GetSyntax(cancellationToken));
-                if (body == null)
+                var declaration = normalized.DeclaringSyntaxReferences[0]
+                    .GetSyntax(cancellationToken);
+                if (DefersBodyCompletion(normalized, declaration))
+                {
+                    result = true;
+                }
+                else if (ExecutableBodySyntax.Get(declaration) is not { } body)
                 {
                     result = false;
                 }
@@ -4004,12 +4693,19 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 };
     }
 
-    private bool ChildrenCompleteNormally(IOperation operation)
+    private bool ChildrenCompleteNormally(
+        IOperation operation,
+        ManagedFlowResult? flow = null,
+        IOperation? flowOrigin = null)
     {
-        return operation.ChildOperations.All(CompletesNormally);
+        return operation.ChildOperations.All(child =>
+            CompletesNormally(child, flow, flowOrigin));
     }
 
-    private bool IsContractClause(IInvocationOperation invocation)
+    private bool IsContractClause(
+        IInvocationOperation invocation,
+        ManagedFlowResult? flow = null,
+        IOperation? flowOrigin = null)
     {
         return invocation.TargetMethod is
         {
@@ -4020,7 +4716,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         } method &&
         _contractApi != null &&
         SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, _contractApi.OriginalDefinition) &&
-        invocation.Arguments.All(argument => CompletesNormally(argument.Value));
+        invocation.Arguments.All(argument =>
+            CompletesNormally(argument.Value, flow, flowOrigin));
     }
 
     internal static bool IsHarmlessValue(IOperation operation)

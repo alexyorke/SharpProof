@@ -244,6 +244,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         var edges = ImmutableArray.Create(
             RuntimeEdge.For(() => s_integerSink = Math.Max(-3, 7)),
             RuntimeEdge.For(() => s_integerSink = Math.Max(9, 2)));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 "positive, negative, and equal integer inputs",
@@ -256,7 +258,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "positive, negative, and equal integer inputs",
                 edges,
-                DoesNotThrowMutation));
+                DoesNotThrowMutation),
+            termination: Termination(
+                "positive, negative, and equal integer inputs",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclMathMinInt32Int32Witness()
@@ -264,6 +270,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         var edges = ImmutableArray.Create(
             RuntimeEdge.For(() => s_integerSink = Math.Min(-3, 7)),
             RuntimeEdge.For(() => s_integerSink = Math.Min(9, 2)));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 "positive, negative, and equal integer inputs",
@@ -276,7 +284,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "positive, negative, and equal integer inputs",
                 edges,
-                DoesNotThrowMutation));
+                DoesNotThrowMutation),
+            termination: Termination(
+                "positive, negative, and equal integer inputs",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclStringIsNullOrEmptyWitness()
@@ -285,6 +297,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty(null) ? 1 : 0),
             RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty(string.Empty) ? 1 : 0),
             RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty("text") ? 1 : 0));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 "null, empty, and non-empty strings",
@@ -297,7 +311,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "null, empty, and non-empty strings",
                 edges,
-                DoesNotThrowMutation));
+                DoesNotThrowMutation),
+            termination: Termination(
+                "null, empty, and non-empty strings",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclStringItemInt32Witness()
@@ -483,6 +501,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclStringConcatStringStringWitness()
     {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(ConcatNulls),
+            RuntimeEdge.For(ConcatNullAndValue),
+            RuntimeEdge.For(ConcatNonEmpty));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 "null/null, null/value, and two non-empty strings",
@@ -490,23 +514,20 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 SpecEffect.WritesArgumentState),
             allocation: Allocation(
                 "null/null and two non-empty strings",
-                [
-                    RuntimeEdge.For(ConcatNulls),
-                    RuntimeEdge.For(ConcatNonEmpty)
-                ],
+                edges,
                 SpecAllocationBehavior.None),
             throws: Throws(
                 "null/null, null/value, and two non-empty strings",
-                [
-                    RuntimeEdge.For(ConcatNulls),
-                    RuntimeEdge.For(ConcatNullAndValue),
-                    RuntimeEdge.For(ConcatNonEmpty)
-                ],
+                edges,
                 DoesNotThrowMutation),
             nullness: Nullness(
                 "null/null, null/value, and two non-empty strings",
                 ObserveStringConcatNullness,
-                SpecNullness.Null));
+                SpecNullness.Null),
+            termination: Termination(
+                "null/null, null/value, and two non-empty strings",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclStringLengthWitness()

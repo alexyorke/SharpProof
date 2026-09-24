@@ -37,9 +37,15 @@ internal static class AnalyzerTestHost
         IEnumerable<Diagnostic> diagnostics,
         params string[] expected)
     {
+        var actual = diagnostics.ToArray();
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(expected));
+            actual.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(expected),
+            string.Join(
+                Environment.NewLine,
+                actual.Select(static diagnostic =>
+                    $"{diagnostic.Id}@{diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1}: " +
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 
     internal static void AssertIds(

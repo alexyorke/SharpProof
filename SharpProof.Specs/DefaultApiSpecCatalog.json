@@ -236,6 +236,10 @@
           "result": "NotApplicable",
           "exactCount": null,
           "evidence": "documented"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
         }
       },
       "postconditions": []
@@ -715,6 +719,10 @@
           "result": "NotApplicable",
           "exactCount": null,
           "evidence": "documented"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
         }
       },
       "postconditions": []

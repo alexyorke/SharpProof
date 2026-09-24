@@ -327,6 +327,114 @@ public sealed class RequiresAndControlTests
             }
             """, "SP0027"),
         RequiresCase(
+            "NormallyCompletingPrefixesPreservePreconditionDiagnostics",
+            """
+            #nullable enable
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class K {
+                public int M() => 1;
+            }
+
+            public sealed class Box {
+                public int Field;
+                public static int StaticField;
+                public int Property { get; set; }
+            }
+
+            public static class Fixture {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void FreshReceiver() {
+                    new K().M();
+                    Positive(-1);
+                }
+
+                public static void LocalReceiver() {
+                    var value = new K();
+                    value.M();
+                    Positive(-2);
+                }
+
+                public static void ApprovedApiCall() {
+                    _ = Math.Max(1, 2);
+                    Positive(-3);
+                }
+
+                public static void ApprovedStringPredicateCall() {
+                    _ = string.IsNullOrEmpty("a");
+                    Positive(-4);
+                }
+
+                public static void ApprovedStringConcatCall() {
+                    _ = string.Concat("a", "b");
+                    Positive(-5);
+                }
+
+                public static void ArrayWrite() {
+                    var values = new int[3];
+                    values[0] = 1;
+                    Positive(-4);
+                }
+
+                public static void StaticFieldWrite() {
+                    Box.StaticField = 1;
+                    Positive(-5);
+                }
+
+                public static void InstanceFieldWrite() {
+                    var box = new Box();
+                    box.Field = 1;
+                    Positive(-6);
+                }
+
+                public static void PropertyWrite() {
+                    var box = new Box();
+                    box.Property = 1;
+                    Positive(-7);
+                }
+
+                public static void ConstantDivision() {
+                    var value = 10 / 2;
+                    Positive(value - 6);
+                }
+
+                public static void ConstantConcatenation() {
+                    var value = "a" + "b";
+                    Positive(-8);
+                }
+
+                public static void Boxing() {
+                    object value = 1;
+                    Positive(-9);
+                }
+
+                public static void UncheckedNumericConversion() {
+                    var value = unchecked((int)long.MaxValue);
+                    Positive(-11);
+                }
+
+                public static void BoundedLoop() {
+                    for (var index = 0; index < 1; index++) { }
+                    Positive(-12);
+                }
+
+                public static void NullConditionalCall() {
+                    K? value = null;
+                    value?.M();
+                    Positive(-13);
+                }
+
+                public static void UnknownReceiver(K value) {
+                    value.M();
+                    Positive(-14);
+                }
+            }
+            """, "SP0027", 15),
+        RequiresCase(
             "AcyclicIfElseJoinsRefinePreconditionArguments",
             """
             using SharpProof.Attributes;

@@ -380,7 +380,7 @@ public sealed partial class ApiSpecTable
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    null),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -396,7 +396,7 @@ public sealed partial class ApiSpecTable
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    null),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -492,7 +492,7 @@ public sealed partial class ApiSpecTable
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    null),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -508,7 +508,7 @@ public sealed partial class ApiSpecTable
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    null),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
