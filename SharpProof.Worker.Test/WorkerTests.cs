@@ -2814,6 +2814,95 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task ImplementationIlRemainderExcludesSignedOverflowInput()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int RemainderRelation(int left, int right) {
+                    Contract.Requires(right != 0);
+                    Contract.Ensures(left != int.MinValue || right != -1);
+                    return ExternalRemainder.Remainder(left, right);
+                }
+
+                public static int RemainderOverflowVacuous(int left) {
+                    Contract.Requires(left == int.MinValue);
+                    Contract.Ensures(Contract.Result<int>() != 0);
+                    return ExternalRemainder.Remainder(left, -1);
+                }
+
+                public static int RemainderNormalResult() {
+                    Contract.Ensures(Contract.Result<int>() == 0);
+                    return ExternalRemainder.Remainder(7, -1);
+                }
+
+                public static int DivisionControl(int left, int right) {
+                    Contract.Requires(right != 0);
+                    Contract.Ensures(left != int.MinValue || right != -1);
+                    return ExternalRemainder.Divide(left, right);
+                }
+
+                public static long LongRemainderControl(long left, long right) {
+                    Contract.Requires(right != 0);
+                    Contract.Ensures(left != long.MinValue || right != -1);
+                    return ExternalRemainder.LongRemainder(left, right);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalRemainder {
+                public static int Remainder(int left, int right) => left % right;
+                public static int Divide(int left, int right) => left / right;
+                public static long LongRemainder(long left, long right) =>
+                    left % right;
+            }
+            """);
+        var compilation = project.CreateCompilation();
+        var subject = compilation.GetTypeByMetadataName("Subject")!;
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        foreach (var methodName in new[]
+                 {
+                     "RemainderRelation",
+                     "RemainderOverflowVacuous",
+                     "RemainderNormalResult",
+                     "DivisionControl",
+                     "LongRemainderControl"
+                 })
+        {
+            var method = subject.GetMembers(methodName)
+                .OfType<IMethodSymbol>()
+                .Single();
+            var callableId = DocumentationCommentId.CreateDeclarationId(method);
+            Assert.That(callableId, Is.Not.Null, methodName);
+            var claim = response.Manifest.Claims.Single(candidate =>
+                candidate.CallableId == callableId);
+            var result = response.ClaimResults.Single(candidate =>
+                candidate.ClaimId == claim.ClaimId);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Outcome,
+                    Is.EqualTo(WorkerClaimOutcome.Proven),
+                    methodName + ": " + result.Reason);
+                Assert.That(
+                    result.ProofCore.Any(static item => item.StartsWith(
+                        "il-summary:",
+                        StringComparison.Ordinal)),
+                    Is.True,
+                    methodName + " did not use an implementation-IL summary.");
+            }
+        }
+    }
+
+    [Test]
     public void ImplementationIlRejectsStackDepthBeyondDeclaredMaximum()
     {
         using var project = TestProject.Create(

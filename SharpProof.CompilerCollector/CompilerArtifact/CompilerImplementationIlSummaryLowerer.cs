@@ -1310,6 +1310,18 @@ internal static class CompilerImplementationIlSummaryLowerer
                     return false;
                 }
 
+                if (instruction.OpCode == ILOpCode.Rem)
+                {
+                    var quotient = _factory.Binary(
+                        IrBinaryOperator.Divide,
+                        left.Term,
+                        right.Term);
+                    context.Builder.Assume(
+                        context.Block,
+                        Operation(instruction.Offset),
+                        InRange(quotient, minimum, maximum));
+                }
+
                 context.Builder.Assume(
                     context.Block,
                     Operation(instruction.Offset),
