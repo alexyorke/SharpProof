@@ -290,7 +290,7 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("11"));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("12"));
             Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(
@@ -402,7 +402,7 @@ public sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("11"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("12"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(

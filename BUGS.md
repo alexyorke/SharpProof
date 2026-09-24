@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, advisory attribute-alias activation, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **63 findings**: 0 P0, 3 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, advisory attribute-alias activation, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **62 findings**: 0 P0, 2 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -53,7 +53,7 @@ regressions and unexecuted downstream paths remain open.
 | --- | --- | --- |
 | Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and cancellation-filter mutation with controls | B6 frontend and B15 meta-analyzer boundaries remain; B14 alias activation is fixed and covered; worker consequences remain open |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
-| IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; wave four reviewed summary ownership/signatures, substitution, model validation/replay, cancellation, and disposal without new probes or repeated suites | No distinct new finding: foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
+| IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B4 and B7 boundaries observed; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
 | Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; B13 now binds validation and receipt metadata to one byte snapshot; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches; B74 assessed standard NuGet V3 main-package download and repeated symbol-publish behavior | B8/B12 admission and B13 snapshot-binding boundaries covered by writer fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; B74 retry guard is covered by mocked exact/mismatched main bytes, canonical-feed capability, digest-plan binding, and push-sequence fixtures; no production feed was contacted, and no interrupted production release was resumed; no release CI, native workflow, or full end-to-end qualification run |
 
@@ -232,70 +232,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   Preserve rejection of unreviewed evidence; do not automatically approve it.
 - **Proposed regression:** verify each required receipt has a reachable producer
   and dependency, then cover reviewed and unreviewed qualification paths.
-
-### B27. Solver incompleteness on nonlinear arithmetic fails the whole verifier run
-
-**Confidence: Confirmed end to end in the worker; launcher and MSBuild
-consequences source-traced.**
-
-- **Location:** `SharpProof.Smt/IrSmtBackend.cs:276-292` (`ClassifyUnknown`,
-  whose default branch returns `InfrastructureFailure`);
-  `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:280-300` (`Classify`,
-  where any claim-level infrastructure failure makes the run `Failed`);
-  `SharpProof.Worker.Launcher/Program.cs:531-538` (a non-complete,
-  non-timeout run returns exit code 3); and
-  `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:237-238`
-  (a nonzero exit without a structured error is a build error).
-- **Defect:** when Z3 answers `unknown` because nonlinear integer arithmetic is
-  incomplete, `ReasonUnknown` is `(incomplete (theory arithmetic))`.
-  `ClassifyUnknown` recognizes only timeout, resource, rlimit, memory, and
-  `canceled` reasons, so this ordinary, expected solver outcome becomes
-  `BackendFailureReason.InfrastructureFailure`, then
-  `WorkerClaimReason.InfrastructureFailure`. `Classify` then marks the whole
-  run `Failed/InfrastructureFailure`, although every other claim completed.
-- **Observed boundary:** 20 seeds of the IL-summary differential fuzzer
-  (random int32 library helpers with multiplication, 40 contract-bearing
-  clients each; implementation-IL summaries lower int32 wraparound through
-  `%`, so products become nonlinear) were run through the real collector and
-  the in-process worker, both built from unchanged HEAD sources. 7 seeds
-  (7000, 7002, 7004, 7006, 7007, 7017, 7018) ended `run=Failed
-  failure=InfrastructureFailure`, caused by one or two claims each. The
-  source-summary fuzzers hit the same outcome on 1 of 20 seeds each. First-chance
-  exception logging showed no exception on these paths. A scratch-only
-  logging line in `ClassifyUnknown` (outside the repository) printed
-  `Z3 UNKNOWN REASON: '(incomplete (theory arithmetic))'` for the failing
-  claim of seed 7000 (the other unknowns were `canceled`, correctly classified
-  as resource limits). Re-solving the same query on a fresh context returned
-  `SATISFIABLE`, so the outcome depends on solver state and is not
-  deterministic across queries. Through the production multi-lane path (the
-  internal `SharpProofWorker(Func<ISmtBackend>)` constructor that
-  `SharpProofWorker.Create` uses, minus its container check), the same seed
-  7002 manifest ended `Failed/InfrastructureFailure` in three runs and
-  `Complete` in one 4-lane run, with no timeouts in any of them. Seed 7000's
-  count of claims with reason `None` also varied between 2 and 3 across
-  identical runs. The build verdict for unchanged inputs therefore depends on
-  lane scheduling.
-- **Impact:** a single hard nonlinear obligation anywhere in a project turns
-  an otherwise complete, correct verification into a failed run. The launcher
-  returns exit code 3, and the MSBuild target reports "SharpProof verifier
-  failed with exit code 3" as a build error under every policy, including
-  `advisory`. Published results for all other claims are marked as belonging to
-  a failed run, and the build error blames infrastructure rather than proof
-  difficulty. No false proof is involved.
-- **Proposed fix:** classify solver-reported incompleteness as a semantic
-  `Unknown`, not an infrastructure fault. For example, add
-  `BackendFailureReason.Incomplete` (mapped to a new
-  `AbstentionReason`/`WorkerClaimReason.SolverIncomplete` that
-  `SummarizeClaimReasons` does not count as a run failure), and match
-  reasons containing `incomplete` in `ClassifyUnknown`. Keep
-  `InfrastructureFailure` for exceptions and unexpected native states.
-  Consider also retrying once on a fresh lane before abstaining, because the
-  same query was satisfiable on a fresh context.
-- **Proposed regression:** unit-test `ClassifyUnknown` with
-  `(incomplete (theory arithmetic))` and an unknown/empty reason; add a worker
-  test whose single nonlinear claim is `Unknown` while the run stays
-  `Complete`; retain the `canceled` → `ResourceLimit` and exception →
-  `InfrastructureFailure` controls.
 
 ### B47. Normal-completion analysis crashes the compiler on deep call chains and is exponential on shared or recursive call graphs
 

@@ -9,7 +9,7 @@ is acceptable only when:
 - the supported-language gate is exhaustive, unsupported unannotated analyzer
   methods remain quiet, and unsupported explicitly selected methods report
   SP0047;
-- protocol version 11 binds compiler-manifest evidence and manifests every
+- protocol version 12 binds compiler-manifest evidence and manifests every
   selected callable, postcondition, and selected effect-attribute occurrence
   with a stable semantic ID, every lowered callable exactly matches that manifest,
   and every response has exact manifest/result equality;

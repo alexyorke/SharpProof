@@ -25,7 +25,7 @@ public sealed class ProtocolModelSchemaTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("11"));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("12"));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
         }

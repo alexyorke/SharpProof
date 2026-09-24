@@ -436,7 +436,7 @@ foreach ($assertion in @(
         @{ Actual = $previewEvidence.requiredHumanApprovals; Expected = 0; Name = 'previewEvidence.requiredHumanApprovals' },
         @{ Actual = @($previewEvidence.requiredEvidence) -join ','; Expected = 'executable-regression,mutation-evidence,soundness-note-when-semantics-change,exact-commit-release-artifacts,debug-solution-gate,release-acceptance-gate'; Name = 'previewEvidence.requiredEvidence' },
         @{ Actual = $contract.supportedTargetFrameworks -join ','; Expected = 'netstandard2.0,net8.0,net472'; Name = 'supportedTargetFrameworks' },
-        @{ Actual = $contract.worker.protocolVersion; Expected = 11; Name = 'worker.protocolVersion' },
+        @{ Actual = $contract.worker.protocolVersion; Expected = 12; Name = 'worker.protocolVersion' },
         @{ Actual = $contract.worker.manifestSchemaVersion; Expected = 4; Name = 'worker.manifestSchemaVersion' },
         @{ Actual = $contract.worker.compilerArtifactSchemaVersion; Expected = 18; Name = 'worker.compilerArtifactSchemaVersion' },
         @{ Actual = $contract.worker.maximumCompilerReferenceModuleBytes; Expected = 268435456; Name = 'worker.maximumCompilerReferenceModuleBytes' },

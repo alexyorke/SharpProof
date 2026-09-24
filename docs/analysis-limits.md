@@ -245,7 +245,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 11, cache schema version 13,
+The active contract also fixes protocol version 12, cache schema version 13,
 claim-manifest schema version 4, compiler artifact schema version 18,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral

@@ -34,6 +34,7 @@ internal static class WorkerProjections
             AbstentionReason.ResourceLimit => WorkerClaimReason.ResourceLimit,
             AbstentionReason.Timeout => WorkerClaimReason.MethodTimeout,
             AbstentionReason.BackendUnavailable => WorkerClaimReason.BackendUnavailable,
+            AbstentionReason.SolverIncomplete => WorkerClaimReason.SolverIncomplete,
             AbstentionReason.InfrastructureFailure => WorkerClaimReason.InfrastructureFailure,
             AbstentionReason.MalformedBackendResult => WorkerClaimReason.MalformedBackendResult,
             AbstentionReason.CounterexampleReplayFailed => WorkerClaimReason.CounterexampleReplayFailed,

@@ -137,7 +137,8 @@
         ["Unknown","PostconditionMayBeUndefined"],
         ["Unknown","CounterexampleNotReplayable"],
         ["Unknown","EffectSummaryIncomplete"],
-        ["Unknown","EffectContractNotEstablished"]
+        ["Unknown","EffectContractNotEstablished"],
+        ["Unknown","SolverIncomplete"]
       ]
     },
     {
@@ -167,7 +168,8 @@
         ["Postcondition","Unknown","PostconditionMayBeUndefined"],
         ["*","Unknown","CounterexampleNotReplayable"],
         ["Effect","Unknown","EffectSummaryIncomplete"],
-        ["Effect","Unknown","EffectContractNotEstablished"]
+        ["Effect","Unknown","EffectContractNotEstablished"],
+        ["*","Unknown","SolverIncomplete"]
       ]
     },
     {
@@ -528,7 +530,7 @@
     ]
   },
   "declarations": [
-    {"kind":"staticClass","name":"WorkerProtocolVersions","constants":[{"name":"Current","type":"string","value":"11"},{"name":"EmptySha256","type":"string","value":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]},
+    {"kind":"staticClass","name":"WorkerProtocolVersions","constants":[{"name":"Current","type":"string","value":"12"},{"name":"EmptySha256","type":"string","value":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]},
     {"kind":"staticClass","name":"WorkerCacheVersions","constants":[{"name":"Current","type":"int","value":13}]},
     {"kind":"staticClass","name":"WorkerManifestVersions","constants":[{"name":"Current","type":"int","value":4}]},
     {"kind":"staticClass","name":"WorkerLauncherDefaults","constants":[{"name":"TerminationGraceMilliseconds","type":"int","value":1000},{"name":"MaximumTerminationGraceMilliseconds","type":"int","value":300000}]},
@@ -557,7 +559,7 @@
     {"kind":"enum","name":"WorkerEffectSet","underlyingType":"long","flags":true,"members":[{"name":"None","value":0},{"name":"ReadsReceiverState","value":1},{"name":"ReadsArgumentState","value":2},{"name":"ReadsCapturedState","value":4},{"name":"ReadsStaticState","value":8},{"name":"ReadsAmbientState","value":16},{"name":"WritesReceiverState","value":32},{"name":"WritesArgumentState","value":64},{"name":"WritesCapturedState","value":128},{"name":"WritesStaticState","value":256},{"name":"WritesAmbientState","value":512},{"name":"Allocates","value":1024},{"name":"Throws","value":2048},{"name":"Synchronizes","value":4096},{"name":"UsesNondeterminism","value":8192},{"name":"UsesNativeCode","value":16384},{"name":"UsesReflection","value":32768},{"name":"AllKnown","value":65535}]},
     {"kind":"enum","name":"WorkerEffectCapabilitySet","underlyingType":"int","flags":true,"members":[{"name":"None","value":0},{"name":"IO","value":1},{"name":"FileRead","value":2},{"name":"FileWrite","value":4},{"name":"Network","value":8},{"name":"Console","value":16},{"name":"Process","value":32},{"name":"Environment","value":64},{"name":"Registry","value":128},{"name":"Clock","value":256},{"name":"Randomness","value":512},{"name":"Reflection","value":1024},{"name":"Synchronization","value":2048},{"name":"NativeInterop","value":4096},{"name":"AllKnown","value":8191}]},
     {"kind":"enum","name":"WorkerVacuityKind","underlyingType":"int","flags":false,"members":[{"name":"None","value":0},{"name":"ContradictoryPreconditions","value":1},{"name":"NoModeledNormalReturn","value":2}]},
-    {"kind":"enum","name":"WorkerClaimReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"UnsupportedCallable","value":2},{"name":"UnsupportedContract","value":3},{"name":"UnsupportedBody","value":4},{"name":"UnsupportedExpression","value":5},{"name":"DeepPostcondition","value":6},{"name":"MissingReturnValue","value":7},{"name":"ResourceLimit","value":8},{"name":"MethodTimeout","value":9},{"name":"ProjectTimeout","value":10},{"name":"Canceled","value":11},{"name":"BackendUnavailable","value":12},{"name":"InfrastructureFailure","value":13},{"name":"MalformedBackendResult","value":14},{"name":"CounterexampleReplayFailed","value":15},{"name":"PostconditionMayBeUndefined","value":16},{"name":"CounterexampleNotReplayable","value":17},{"name":"EffectSummaryIncomplete","value":18},{"name":"EffectContractNotEstablished","value":19}]},
+    {"kind":"enum","name":"WorkerClaimReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"UnsupportedCallable","value":2},{"name":"UnsupportedContract","value":3},{"name":"UnsupportedBody","value":4},{"name":"UnsupportedExpression","value":5},{"name":"DeepPostcondition","value":6},{"name":"MissingReturnValue","value":7},{"name":"ResourceLimit","value":8},{"name":"MethodTimeout","value":9},{"name":"ProjectTimeout","value":10},{"name":"Canceled","value":11},{"name":"BackendUnavailable","value":12},{"name":"InfrastructureFailure","value":13},{"name":"MalformedBackendResult","value":14},{"name":"CounterexampleReplayFailed","value":15},{"name":"PostconditionMayBeUndefined","value":16},{"name":"CounterexampleNotReplayable","value":17},{"name":"EffectSummaryIncomplete","value":18},{"name":"EffectContractNotEstablished","value":19},{"name":"SolverIncomplete","value":20}]},
     {"kind":"enum","name":"WorkerAssumptionKind","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Precondition","value":1},{"name":"UserAssume","value":2},{"name":"TrustedBoundary","value":3},{"name":"ApiSpecification","value":4},{"name":"SourceDomain","value":5},{"name":"NormalCompletion","value":6}]},
     {"kind":"class","name":"WorkerAssumptionEvidence","properties":[{"name":"Id","jsonName":"id","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Kind","jsonName":"kind","order":1,"type":"WorkerAssumptionKind","set":true,"default":{"kind":"implicit"}},{"name":"Used","jsonName":"used","order":2,"type":"bool","set":true,"default":{"kind":"implicit"}}]},
     {"kind":"class","name":"WorkerCallableResult","properties":[{"name":"CallableId","jsonName":"callableId","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Coverage","jsonName":"coverage","order":1,"type":"WorkerCallableCoverage","set":true,"default":{"kind":"implicit"}},{"name":"Reason","jsonName":"reason","order":2,"type":"WorkerCallableCoverageReason","set":true,"default":{"kind":"implicit"}},{"name":"Assumptions","jsonName":"assumptions","order":3,"type":"WorkerAssumptionEvidence[]","set":true,"default":{"kind":"emptyArray"}}]},

@@ -193,7 +193,7 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 11 binds each request to a compiler-produced closed artifact.
+Protocol version 12 binds each request to a compiler-produced closed artifact.
 Stable semantic IDs identify selected callables, postcondition/effect claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
@@ -318,7 +318,7 @@ Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
 remain noncacheable. Under compiler artifact schema 18, worker protocol version
-11 and cache schema version 13 carry the current request and cache wire break.
+12 and cache schema version 13 carry the current request and cache wire break.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the
 same atomic publication boundary and does not participate in semantic

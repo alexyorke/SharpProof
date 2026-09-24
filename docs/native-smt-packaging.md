@@ -69,7 +69,7 @@ Other feeds, mismatched bytes, unknown responses, and pending symbol uploads
 fail closed. Duplicate skipping is never used, and unresolved conflicting
 state may require a new version.
 
-The worker protocol is 11, the cache schema is 13, and compiler artifacts use
+The worker protocol is 12, the cache schema is 13, and compiler artifacts use
 schema 18. The worker consumes sealed compiler artifacts rather than parsing
 source or rereading references. The admitted semantic subset and typed
 `Unknown` behavior are documented separately in `SEMANTICS.md` and

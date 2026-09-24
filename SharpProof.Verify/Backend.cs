@@ -15,7 +15,8 @@ public enum BackendFailureReason
     Timeout,
     Unavailable,
     MalformedResult,
-    InfrastructureFailure
+    InfrastructureFailure,
+    Incomplete
 }
 
 public sealed partial class BackendModel

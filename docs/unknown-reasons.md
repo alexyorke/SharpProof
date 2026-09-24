@@ -108,7 +108,7 @@ before assembling a `Refuted` record.
 
 ## Worker verification records
 
-Protocol version 11 binds compiler-manifest evidence and separates run state,
+Protocol version 12 binds compiler-manifest evidence and separates run state,
 callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
@@ -196,6 +196,7 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `CounterexampleNotReplayable` | A postcondition candidate depends on an executed modeled call, or a definite effect candidate is outside the admitted unconditional effect-event replay subset |
 | `EffectSummaryIncomplete` | The compiler-produced effect summary has an unknown facet or is otherwise incomplete |
 | `EffectContractNotEstablished` | A complete may-effect summary does not establish the selected effect contract and no definite replayable violation witness is available |
+| `SolverIncomplete` | The SMT solver returned `unknown` because its supported theory is incomplete; the claim remains unproved and unrefuted |
 
 The exact typed outcome and effect-certainty authority follows.
 

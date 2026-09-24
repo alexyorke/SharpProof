@@ -21,6 +21,7 @@
             {"pattern": "BackendFailureReason.ResourceLimit", "expression": "AbstentionReason.ResourceLimit"},
             {"pattern": "BackendFailureReason.Timeout", "expression": "AbstentionReason.Timeout"},
             {"pattern": "BackendFailureReason.Unavailable", "expression": "AbstentionReason.BackendUnavailable"},
+            {"pattern": "BackendFailureReason.Incomplete", "expression": "AbstentionReason.SolverIncomplete"},
             {"pattern": "BackendFailureReason.InfrastructureFailure", "expression": "AbstentionReason.InfrastructureFailure"}
           ],
           "fallback": "AbstentionReason.MalformedBackendResult"
@@ -110,6 +111,7 @@
             {"pattern": "AbstentionReason.ResourceLimit", "expression": "WorkerClaimReason.ResourceLimit"},
             {"pattern": "AbstentionReason.Timeout", "expression": "WorkerClaimReason.MethodTimeout"},
             {"pattern": "AbstentionReason.BackendUnavailable", "expression": "WorkerClaimReason.BackendUnavailable"},
+            {"pattern": "AbstentionReason.SolverIncomplete", "expression": "WorkerClaimReason.SolverIncomplete"},
             {"pattern": "AbstentionReason.InfrastructureFailure", "expression": "WorkerClaimReason.InfrastructureFailure"},
             {"pattern": "AbstentionReason.MalformedBackendResult", "expression": "WorkerClaimReason.MalformedBackendResult"},
             {"pattern": "AbstentionReason.CounterexampleReplayFailed", "expression": "WorkerClaimReason.CounterexampleReplayFailed"},

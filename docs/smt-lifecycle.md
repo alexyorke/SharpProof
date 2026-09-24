@@ -44,9 +44,11 @@ fatal `CounterexampleReplayFailed` discrepancy. An UNSAT result becomes
 `Proven` only when every core item has admissible justification. Unsupported
 encoding, resource limits, and method boundaries produce typed claim-level
 `Unknown` results. An undefined postcondition is also a typed `Unknown`
-result. Backend unavailability, malformed backend results, failure to replay
+result. Solver-reported theory incompleteness produces
+`Unknown(SolverIncomplete)` while leaving the worker run complete. Backend
+unavailability, malformed backend results, failure to replay
 an otherwise replayable counterexample, containment failure, and
-infrastructure failure make the protocol version 11 run `Failed` and fail the
+infrastructure failure make the protocol version 12 run `Failed` and fail the
 build under every policy.
 Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
@@ -60,7 +62,7 @@ effects, capabilities, and exact exception hierarchy without trusting compiler
 witness bits or executing user code. Unsupported definite effect candidates
 become `CounterexampleNotReplayable`, while an otherwise valid semantic replay
 disagreement becomes the fatal `CounterexampleReplayFailed`. Effect results
-remain outside cache schema 13. Protocol version 11 carries relational-summary
+remain outside cache schema 13. Protocol version 12 carries relational-summary
 evidence.
 
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected

@@ -4497,6 +4497,34 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task SolverIncompletenessLeavesTheRunCompleteWithAnUnknownClaim()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(BackendCheckResult.Unknown(
+                BackendFailureReason.Incomplete)));
+
+        var response = await worker.VerifyAsync(request);
+        var claim = response.ClaimResults.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(claim.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
+            Assert.That(
+                response.CallableResults.Single().Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                response.CallableResults.Single().Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
     public async Task UnexpectedBackendExceptionBecomesTypedInfrastructureFailure()
     {
         using var project = TestProject.Create(TautologySource);

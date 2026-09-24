@@ -14,7 +14,8 @@ public enum AbstentionReason
     MalformedBackendResult = 8,
     CounterexampleReplayFailed = 9,
     PostconditionMayBeUndefined = 10,
-    InternalConsistencyMayBeUndefined = 11
+    InternalConsistencyMayBeUndefined = 11,
+    SolverIncomplete = 12
 }
 
 public abstract class ProofOutcome

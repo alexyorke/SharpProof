@@ -10,7 +10,7 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "11";
+    public const string Current = "12";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
@@ -308,7 +308,8 @@ public enum WorkerClaimReason
     PostconditionMayBeUndefined = 16,
     CounterexampleNotReplayable = 17,
     EffectSummaryIncomplete = 18,
-    EffectContractNotEstablished = 19
+    EffectContractNotEstablished = 19,
+    SolverIncomplete = 20
 }
 
 public enum WorkerAssumptionKind
@@ -632,7 +633,7 @@ internal static class WorkerProtocolMetadata
         WorkerClaimReason.BackendUnavailable, WorkerClaimReason.InfrastructureFailure, WorkerClaimReason.MalformedBackendResult,
         WorkerClaimReason.CounterexampleReplayFailed, WorkerClaimReason.PostconditionMayBeUndefined,
         WorkerClaimReason.CounterexampleNotReplayable, WorkerClaimReason.EffectSummaryIncomplete,
-        WorkerClaimReason.EffectContractNotEstablished,
+        WorkerClaimReason.EffectContractNotEstablished, WorkerClaimReason.SolverIncomplete,
         WorkerEffectEvidenceCertainty.Unspecified, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary,
         WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary,
         WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerEffectEvidenceCertainty.Unavailable,
@@ -722,7 +723,7 @@ internal static class WorkerProtocolMetadata
                 or WorkerClaimReason.InfrastructureFailure or WorkerClaimReason.MalformedBackendResult
                 or WorkerClaimReason.CounterexampleReplayFailed or WorkerClaimReason.PostconditionMayBeUndefined
                 or WorkerClaimReason.CounterexampleNotReplayable or WorkerClaimReason.EffectSummaryIncomplete
-                or WorkerClaimReason.EffectContractNotEstablished,
+                or WorkerClaimReason.EffectContractNotEstablished or WorkerClaimReason.SolverIncomplete,
             _ => false
         };
     internal static bool MatchesClaimKindOutcome(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerClaimReason reason) =>
@@ -745,7 +746,8 @@ internal static class WorkerProtocolMetadata
             or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.PostconditionMayBeUndefined)
             or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable)
             or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete)
-            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished);
+            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.SolverIncomplete);
     internal static bool MatchesEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty) =>
         (outcome, reason, certainty) is
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)

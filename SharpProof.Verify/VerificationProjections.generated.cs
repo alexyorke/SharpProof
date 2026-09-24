@@ -19,6 +19,7 @@ internal static class VerificationProjections
             BackendFailureReason.ResourceLimit => AbstentionReason.ResourceLimit,
             BackendFailureReason.Timeout => AbstentionReason.Timeout,
             BackendFailureReason.Unavailable => AbstentionReason.BackendUnavailable,
+            BackendFailureReason.Incomplete => AbstentionReason.SolverIncomplete,
             BackendFailureReason.InfrastructureFailure => AbstentionReason.InfrastructureFailure,
             _ => AbstentionReason.MalformedBackendResult
         };

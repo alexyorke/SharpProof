@@ -511,7 +511,7 @@ public sealed class BuildTaskTests
             SHA256.HashData(File.ReadAllBytes(manifest)));
         var requestJson = JsonSerializer.Serialize(new
         {
-            protocolVersion = "11",
+            protocolVersion = WorkerProtocolVersions.Current,
             compilerManifest = new { path = manifest, sha256 = manifestHash },
             budgets = new { },
             cache = new { },
@@ -527,7 +527,7 @@ public sealed class BuildTaskTests
         {
             File.WriteAllText(result, JsonSerializer.Serialize(new
             {
-                protocolVersion = "11",
+                protocolVersion = WorkerProtocolVersions.Current,
                 requestHash = new string('0', 64),
                 inputHash = new string('1', 64),
                 runStatus = "Complete"
@@ -541,7 +541,7 @@ public sealed class BuildTaskTests
                 result,
                 JsonSerializer.Serialize(new
                 {
-                    protocolVersion = "11",
+                    protocolVersion = WorkerProtocolVersions.Current,
                     requestHash,
                     inputHash = new string('z', 64),
                     runStatus = "Complete"

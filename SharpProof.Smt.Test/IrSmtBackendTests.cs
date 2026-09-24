@@ -478,7 +478,13 @@ public sealed class IrSmtBackendTests
             classify.Invoke(null, ["resource limit"]),
             Is.EqualTo(BackendFailureReason.ResourceLimit));
         Assert.That(
+            classify.Invoke(null, ["(incomplete (theory arithmetic))"]),
+            Is.EqualTo(BackendFailureReason.Incomplete));
+        Assert.That(
             classify.Invoke(null, ["opaque backend failure"]),
+            Is.EqualTo(BackendFailureReason.InfrastructureFailure));
+        Assert.That(
+            classify.Invoke(null, [string.Empty]),
             Is.EqualTo(BackendFailureReason.InfrastructureFailure));
     }
 

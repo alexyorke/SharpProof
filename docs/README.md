@@ -47,7 +47,7 @@ The implementation remains the authority for enumerated surfaces:
   `*DiagnosticDescriptors.generated.cs` files are checked-in compiled
   projections.
 - `SharpProof.Worker.Protocol/ProtocolModel.schema.json` declares protocol
-  version 11, manifest schema version 4, cache schema version 13, policies, run
+  version 12, manifest schema version 4, cache schema version 13, policies, run
   statuses, callable coverage, claim outcomes/reasons, and summary records.
   `ProtocolModel.generated.cs` is the checked-in compiled projection.
 - `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` is the
@@ -140,7 +140,7 @@ framework explicit throw, empty `lock`, and exact `Monitor` calls. The worker
 authenticates the selected effect, capability, and exception constraints,
 derives the replayed witness, and publishes only matching violations. Other
 effect candidates still fail closed as typed `Unknown`, and effect results
-remain noncacheable. Worker protocol 11, cache schema 13, relational-summary
+remain noncacheable. Worker protocol 12, cache schema 13, relational-summary
 schema version 2, and specification-pack schema version 1 carry the current
 wire contract. The three-package split, portable SourceLink symbols,
 package validation, immutable

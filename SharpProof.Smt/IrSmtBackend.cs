@@ -275,6 +275,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
     private static BackendFailureReason ClassifyUnknown(string? reason)
     {
+        if (reason?.IndexOf("incomplete", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return BackendFailureReason.Incomplete;
+        }
+
         if (reason?.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             return BackendFailureReason.Timeout;
