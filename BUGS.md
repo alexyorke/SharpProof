@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, and B17 cold framework-package bootstrap findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **52 findings**: 0 P0, 0 P1, 14 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, and B18 nullable value-type receiver findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **51 findings**: 0 P0, 0 P1, 13 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -58,7 +58,7 @@ regressions and unexecuted downstream paths remain open.
 
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
-| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, and B15 direct/ref/out catch-filter mutation with bare and unchanged rethrow controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 filter-mutation defect fixed and Meta.Analyzers.Test passes 176/176; B75 wrapped cancellation in AggregateException remains active; B14 alias activation is fixed and covered |
+| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, B15 direct/ref/out catch-filter mutation with bare and unchanged rethrow controls, and B18 nullable receiver calls with `.Value`, boxed-call, and reference controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 filter-mutation defect fixed and Meta.Analyzers.Test passes 176/176; B18 false `SP0046`/`SP0045` diagnostics removed, with Analyzer.Test 528/528 and Effects.Test 458/458; B75 wrapped cancellation in AggregateException remains active; B14 alias activation is fixed and covered |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; analyzer rejection is covered, while end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B11 now snapshots roots once before validation and processing, with changing-list tests for empty and nonempty replacement maps; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B11 changing-root regressions reproduce before the fix and pass after it, with IR 128/128 and Summaries 15/15; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; null module-reference rows now reject before module-name access; rejected cache reads now stage the bad entry and reconcile capacity under the cache lock; real cache/filesystem reads compare absent, malformed, oversized, semantic-rejection, and held-lock cases; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B67 suppression now retains claims and strict verification rejects refutations; B73 call-span and string-literal rebinding reject with controls, while inactive-preprocessor rebinding remains active; downstream proof impact is untested |
@@ -216,52 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B18. Nullable value-type receivers are treated as possibly null references
-
-**Confidence: Confirmed analyzer false positive.**
-
-- **Location:** `SharpProof.Effects/OperationEffectScanner.cs:793-803` (the
-  receiver check in the invocation scan) calling `PotentialNullCheck` in
-  `SharpProof.Effects/OperationEffectScanner.Expressions.cs:18-27`, which relies
-  on `IsStaticallyNonNull` in
-  `SharpProof.Effects/OperationNullnessEvaluator.cs:155-162`.
-- **Defect:** `IsStaticallyNonNull` deliberately returns `false` for
-  `Nullable<T>` because a nullable value can be "null" (have no value). The
-  invocation scan reuses that answer as "the receiver may be a null
-  reference" for every instance call. A `Nullable<T>` receiver is a value type:
-  `HasValue`, `GetValueOrDefault()`, and `GetValueOrDefault(T)` can never throw
-  `NullReferenceException`. Only `Value` can throw, and its
-  `InvalidOperationException` is already modeled by the API spec.
-- **Observed boundary:** a real analyzer built from unchanged HEAD sources
-  (`features=all`, advisory profile) reported
-  `SP0046 ... may-effect summary includes disallowed exceptions:
-  System.NullReferenceException` for `[DoesNotThrow] bool Hv(int? v) =>
-  v.HasValue;`, `v.GetValueOrDefault()`, `v.GetValueOrDefault(7)`, and a
-  `long?` variant. It also reported `SP0045 ... allocation: Managed` for
-  `[ZeroAllocations] bool AllocHvParam(int? v) => v.HasValue;`, because the
-  spurious exception path is charged as an allocation. Controls: the same
-  member on a local `int? v = 3` produced no diagnostic; `v != null` and
-  `v ?? 0` produced none; `[EnforcePure]` on `v.HasValue` produced none;
-  `string s; s.Length` correctly reported `NullReferenceException`.
-- **Documentation conflict:** `docs/coverage-and-limits.md:142-144` lists
-  `HasValue`, `GetValueOrDefault()`, and `GetValueOrDefault(T)` as "Does not
-  throw" with no allocation; the analyzer reports both for nullable parameters.
-- **Impact:** false `SP0046`/`SP0045` diagnostics on common nullable-value code.
-  In `RequireProven`/error configurations this fails builds that are correct.
-  This fails closed; no false proof is involved.
-- **Proposed fix:** in the receiver check at `OperationEffectScanner.cs:793`,
-  skip `PotentialNullCheck` when `instance.Type` is a value type (including
-  `Nullable<T>`), e.g. `if (instance != null && method.ReducedFrom == null &&
-  instance.Type?.IsValueType != true)`. Keep `IsStaticallyNonNull` unchanged,
-  because null-value questions (`v == null`, unboxing, `v.Value`) still need
-  the `Nullable<T>` exclusion. A boxed receiver (for example `v.GetType()`) is
-  a conversion whose type is `object`, so it keeps its null check.
-- **Proposed regression:** `[DoesNotThrow]` and `[ZeroAllocations]` over
-  `HasValue`/`GetValueOrDefault` on nullable parameters must be silent. Keep
-  controls that `((int?)null).Value` still reports `InvalidOperationException`,
-  that `v.GetType()` on a nullable parameter still reports
-  `NullReferenceException`, and that reference receivers are still checked.
 
 ### B19. IL summaries treat `int.MinValue % -1` as normal completion
 

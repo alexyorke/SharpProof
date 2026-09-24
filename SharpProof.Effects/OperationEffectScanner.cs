@@ -790,7 +790,14 @@ internal sealed partial class OperationEffectScanner
             }
         }
 
-        if (instance != null && method.ReducedFrom == null)
+        var nullableBoxedGetType =
+            instance?.Type is { IsValueType: true } instanceType &&
+            ManagedAbstractValue.IsNullableType(instanceType) &&
+            method.ContainingType.SpecialType == SpecialType.System_Object &&
+            method.Name == nameof(object.GetType);
+        if (instance != null &&
+            method.ReducedFrom == null &&
+            (instance.Type?.IsValueType != true || nullableBoxedGetType))
         {
             var receiverCheck = PotentialNullCheck(
                 instance,
