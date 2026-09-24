@@ -89,7 +89,10 @@ function New-FrameworkPackageSource {
         [string]$Root,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
+        [string]$RepositoryRoot,
+
+        [Parameter()]
+        [scriptblock]$DownloadPackageArchive
     )
 
     $configuredPackages = [Environment]::GetEnvironmentVariable(
@@ -155,15 +158,79 @@ function New-FrameworkPackageSource {
             [string]$package.Id,
             [string]$package.Version,
             $fileName)
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-            throw (
-                'The offline framework package is missing from the ' +
-                "restored global package cache: $source")
+        $downloadRoot = $null
+        $packagePath = $source
+        try {
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+                $downloadRoot = Join-Path `
+                    ([IO.Path]::GetTempPath()) `
+                    ('sharpproof-framework-package-' +
+                        [Guid]::NewGuid().ToString('N'))
+                [IO.Directory]::CreateDirectory($downloadRoot) | Out-Null
+                $packagePath = Join-Path $downloadRoot $fileName
+                $normalizedId = $package.Id.ToLowerInvariant()
+                $normalizedVersion = $package.Version.ToLowerInvariant()
+                $uri = (
+                    'https://api.nuget.org/v3-flatcontainer/' +
+                    "$normalizedId/$normalizedVersion/" +
+                    "$normalizedId.$normalizedVersion.nupkg")
+                try {
+                    if ($null -ne $DownloadPackageArchive) {
+                        & $DownloadPackageArchive $uri $packagePath |
+                            Out-Null
+                    }
+                    else {
+                        Invoke-WebRequest `
+                            -Uri $uri `
+                            -OutFile $packagePath `
+                            -MaximumRedirection 5 `
+                            -TimeoutSec 90 `
+                            -ErrorAction Stop | Out-Null
+                    }
+                }
+                catch {
+                    throw (
+                        "Could not download framework package '$($package.Id) " +
+                        "$($package.Version)' from NuGet.org: " +
+                        $_.Exception.Message)
+                }
+                if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+                    throw (
+                        "NuGet.org did not create the requested framework " +
+                        "package archive '$fileName'.")
+                }
+            }
+
+            $identity = Get-SharpProofPackageIdentity `
+                -Path $packagePath `
+                -RequireSingleIdentity
+            if (-not [string]::Equals(
+                    [string]$identity.Id,
+                    [string]$package.Id,
+                    [StringComparison]::OrdinalIgnoreCase) -or
+                [string]$identity.Version -cne [string]$package.Version) {
+                throw (
+                    "Framework package archive '$packagePath' has identity " +
+                    "'$($identity.Id) $($identity.Version)'; expected " +
+                    "'$($package.Id) $($package.Version)'.")
+            }
+
+            if ($null -ne $downloadRoot) {
+                [IO.Directory]::CreateDirectory(
+                    [IO.Path]::GetDirectoryName($source)) | Out-Null
+                [IO.File]::Copy($packagePath, $source, $true)
+            }
+            [IO.File]::Copy(
+                $source,
+                (Join-Path $frameworkSource $fileName),
+                $true)
         }
-        [IO.File]::Copy(
-            $source,
-            (Join-Path $frameworkSource $fileName),
-            $true)
+        finally {
+            if ($null -ne $downloadRoot -and
+                (Test-Path -LiteralPath $downloadRoot -PathType Container)) {
+                Remove-Item -LiteralPath $downloadRoot -Recurse -Force
+            }
+        }
     }
 
     $unexpectedPackages = @(

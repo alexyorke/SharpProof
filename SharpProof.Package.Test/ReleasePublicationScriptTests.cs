@@ -57,6 +57,148 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [Test]
+    public async Task FrameworkPackageSourceBootstrapsAndValidatesColdArchives()
+    {
+        var repositoryRoot = TestRepository.FindRoot();
+        using var directory = new TempDirectory(
+            "sharpproof-framework-package-bootstrap-");
+        var fixtureSource = Path.Combine(directory.FullName, "fixtures");
+        var packageCache = Path.Combine(directory.FullName, "empty-cache");
+        var consumerRoot = Path.Combine(directory.FullName, "consumer");
+        var wrongPackageCache = Path.Combine(
+            directory.FullName,
+            "wrong-identity-cache");
+        Directory.CreateDirectory(fixtureSource);
+        Directory.CreateDirectory(packageCache);
+        Directory.CreateDirectory(consumerRoot);
+
+        using var toolchain = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(
+                repositoryRoot,
+                "eng",
+                "container",
+                "toolchain.json")));
+        var runtimeVersion = toolchain.RootElement
+            .GetProperty("dotnet")
+            .GetProperty("testRuntimeVersion")
+            .GetString()!;
+        var frameworkPackages = new[]
+        {
+            (Id: "netstandard.library", Version: "2.0.3"),
+            (Id: "microsoft.netcore.platforms", Version: "1.1.0"),
+            (Id: "microsoft.netcore.app.ref", Version: runtimeVersion),
+            (Id: "microsoft.aspnetcore.app.ref", Version: runtimeVersion),
+            (Id: "microsoft.netframework.referenceassemblies", Version: "1.0.3"),
+            (Id: "microsoft.netframework.referenceassemblies.net472", Version: "1.0.3")
+        };
+        foreach (var package in frameworkPackages)
+        {
+            WriteFrameworkPackageFixture(
+                Path.Combine(
+                    fixtureSource,
+                    $"{package.Id}.{package.Version}.nupkg"),
+                package.Id,
+                package.Version);
+        }
+        WriteFrameworkPackageFixture(
+            Path.Combine(fixtureSource, "wrong.nupkg"),
+            "wrong.package",
+            "0.0.1");
+
+        var command = """
+            $ErrorActionPreference = 'Stop'
+            $repositoryRoot = $env:SHARPPROOF_B17_REPOSITORY
+            $sourcePath = Join-Path $repositoryRoot 'scripts/Test-SharpProofPackageConsumers.ps1'
+            $tokens = $null
+            $parseErrors = $null
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                $sourcePath, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -ne 0) { throw 'Consumer script parsing failed.' }
+            $definitions = @($ast.FindAll({ param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -ceq 'New-FrameworkPackageSource'
+            }, $true))
+            if ($definitions.Count -ne 1) { throw 'Expected one framework source helper.' }
+            Import-Module (Join-Path $repositoryRoot 'scripts/SharpProof.PackageIdentity.psm1') -Force
+            Invoke-Expression $definitions[0].Extent.Text
+            $env:NUGET_PACKAGES = $env:SHARPPROOF_B17_CACHE
+            $script:downloadCount = 0
+            $downloadFixture = {
+                param([string]$Uri, [string]$Destination)
+                if (-not $Uri.StartsWith(
+                        'https://api.nuget.org/v3-flatcontainer/',
+                        [StringComparison]::Ordinal)) {
+                    throw "Unexpected framework package URL: $Uri"
+                }
+                $script:downloadCount++
+                $fixture = Join-Path $env:SHARPPROOF_B17_FIXTURES `
+                    ([IO.Path]::GetFileName($Destination))
+                [IO.File]::Copy($fixture, $Destination, $true)
+            }
+            $result = New-FrameworkPackageSource `
+                -Root $env:SHARPPROOF_B17_ROOT `
+                -RepositoryRoot $repositoryRoot `
+                -DownloadPackageArchive $downloadFixture
+            if ($script:downloadCount -ne 6) {
+                throw "Cold cache downloaded $script:downloadCount archives, expected 6."
+            }
+            if (@(Get-ChildItem -LiteralPath $result.Source -File -Filter '*.nupkg').Count -ne 6) {
+                throw 'The framework source did not contain all six archives.'
+            }
+            $noDownload = { throw 'A prepared cache unexpectedly attempted a download.' }
+            $prepared = New-FrameworkPackageSource `
+                -Root $env:SHARPPROOF_B17_ROOT `
+                -RepositoryRoot $repositoryRoot `
+                -DownloadPackageArchive $noDownload
+            if ($prepared.Packages.Count -ne 6) {
+                throw 'The prepared-cache control did not retain all packages.'
+            }
+            $env:NUGET_PACKAGES = $env:SHARPPROOF_B17_WRONG_CACHE
+            $wrongIdentity = {
+                param([string]$Uri, [string]$Destination)
+                [IO.File]::Copy(
+                    (Join-Path $env:SHARPPROOF_B17_FIXTURES 'wrong.nupkg'),
+                    $Destination,
+                    $true)
+            }
+            try {
+                $null = New-FrameworkPackageSource `
+                    -Root $env:SHARPPROOF_B17_ROOT `
+                    -RepositoryRoot $repositoryRoot `
+                    -DownloadPackageArchive $wrongIdentity
+                throw 'A mismatched framework archive was accepted.'
+            }
+            catch {
+                if ($_.Exception.Message -notlike '*has identity*') { throw }
+            }
+            'Framework bootstrap downloaded 6 expected archives; prepared cache was reused; wrong identity rejected.'
+            """;
+        var startInfo = ProcessRunner.CreateStartInfo(
+            repositoryRoot,
+            "pwsh",
+            [
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                command
+            ]);
+        startInfo.Environment["SHARPPROOF_B17_REPOSITORY"] = repositoryRoot;
+        startInfo.Environment["SHARPPROOF_B17_FIXTURES"] = fixtureSource;
+        startInfo.Environment["SHARPPROOF_B17_CACHE"] = packageCache;
+        startInfo.Environment["SHARPPROOF_B17_ROOT"] = consumerRoot;
+        startInfo.Environment["SHARPPROOF_B17_WRONG_CACHE"] = wrongPackageCache;
+
+        var result = await ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
+
+        Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
+        Assert.That(
+            result.CombinedOutput,
+            Does.Contain("wrong identity rejected"));
+    }
+
+    [Test]
     public async Task PublicationDocumentationDescribesVerifiedRetries()
     {
         var root = TestRepository.FindRoot();
@@ -930,6 +1072,31 @@ public sealed class ReleasePublicationScriptTests
                     new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
                 document.Save(output);
             });
+    }
+
+    private static void WriteFrameworkPackageFixture(
+        string path,
+        string id,
+        string version)
+    {
+        using var stream = File.Create(path);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+        var entry = archive.CreateEntry(id + ".nuspec");
+        var ns = XNamespace.Get(
+            "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd");
+        var document = new XDocument(
+            new XElement(
+                ns + "package",
+                new XElement(
+                    ns + "metadata",
+                    new XElement(ns + "id", id),
+                    new XElement(ns + "version", version),
+                    new XElement(ns + "authors", "SharpProof tests"),
+                    new XElement(ns + "description", "Framework fixture"))));
+        using var writer = new StreamWriter(
+            entry.Open(),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        document.Save(writer);
     }
 
     private static void RewriteEntry(
