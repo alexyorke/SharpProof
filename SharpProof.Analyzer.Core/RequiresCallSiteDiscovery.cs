@@ -663,12 +663,98 @@ internal sealed partial class RequiresCallSiteDiscovery(
                    .All(prior =>
                        prior is EmptyStatementSyntax or
                            LocalFunctionStatementSyntax ||
-                       operationFacts.CompletesNormally(
+                       ReachesNextStatement(
                            semanticModel.GetOperation(
                                prior,
                                cancellationToken),
+                           operationFacts,
                            flowResult,
                            callSite));
+    }
+
+    private bool ReachesNextStatement(
+        IOperation? operation,
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult,
+        IOperation flowOrigin)
+    {
+        return operation != null &&
+            !HasReachableControlFlowExit(operation, flowResult) &&
+            operationFacts.CompletesNormally(
+                operation,
+                flowResult,
+                flowOrigin);
+    }
+
+    private bool HasReachableControlFlowExit(
+        IOperation operation,
+        ManagedFlowResult? flowResult)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (operation is IAnonymousFunctionOperation or
+            ILocalFunctionOperation)
+        {
+            return false;
+        }
+
+        if (operation is IReturnOperation or IThrowOperation or
+            IBranchOperation)
+        {
+            return !IsControlFlowExitInfeasible(operation, flowResult);
+        }
+
+        return operation.ChildOperations.Any(child =>
+            HasReachableControlFlowExit(child, flowResult));
+    }
+
+    private bool IsControlFlowExitInfeasible(
+        IOperation exit,
+        ManagedFlowResult? flowResult)
+    {
+        foreach (var conditional in exit.Syntax.AncestorsAndSelf()
+                     .OfType<IfStatementSyntax>())
+        {
+            var inThen = conditional.Statement.Span.Contains(
+                exit.Syntax.Span);
+            var inElse = conditional.Else?.Statement.Span.Contains(
+                exit.Syntax.Span) == true;
+            if (!inThen && !inElse)
+            {
+                continue;
+            }
+
+            var conditionOperation = semanticModel.GetOperation(
+                conditional.Condition,
+                cancellationToken);
+            bool? conditionValue = null;
+            var constantValue = semanticModel.GetConstantValue(
+                conditional.Condition,
+                cancellationToken);
+            if (constantValue.HasValue &&
+                constantValue.Value is bool constant)
+            {
+                conditionValue = constant;
+            }
+            if (conditionValue == null &&
+                conditionOperation != null &&
+                flowResult != null &&
+                flowResult.TryEvaluateAtOrigin(
+                    conditionOperation,
+                    conditionOperation,
+                    out var abstractCondition) &&
+                abstractCondition.TryGetBoolean(out var provenCondition))
+            {
+                conditionValue = provenCondition;
+            }
+
+            if (conditionValue.HasValue &&
+                conditionValue.Value != inThen)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsAccessorCall(IMethodSymbol method)

@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, and B54 replayable-prefix-completion findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **44 findings**: 0 P0, 0 P1, 6 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, and B59 guard-clause replayability findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **43 findings**: 0 P0, 0 P1, 5 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -58,7 +58,7 @@ regressions and unexecuted downstream paths remain open.
 
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
-| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, B15 direct/ref/out catch-filter mutation with bare and unchanged rethrow controls, and B18 nullable receiver calls with `.Value`, boxed-call, and reference controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 filter-mutation defect fixed and Meta.Analyzers.Test passes 176/176; B18 false `SP0046`/`SP0045` diagnostics removed, with Analyzer.Test 528/528 and Effects.Test 458/458; B75 wrapped cancellation in AggregateException remains active; B14 alias activation is fixed and covered; B54 restores SP0027 after flow-proven receiver calls and safe BCL, store, conversion, constant, and bounded-loop prefixes, with unknown parameter receivers silent; Analyzer.Test 533/533 |
+| Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; B6 now snapshots earlier by-value arguments, receivers, and array assignment locations before later `ref`/`out` or closure effects, with six focused regression tests; real analyzer probes cover local/global effect aliases, aliased closed-contract attributes, namespace aliases, unrelated aliases, B15 direct/ref/out catch-filter mutation with bare and unchanged rethrow controls, and B18 nullable receiver calls with `.Value`, boxed-call, and reference controls | B6 frontend defect fixed and verified; worker consequences remain untested; B15 filter-mutation defect fixed and Meta.Analyzers.Test passes 176/176; B18 false `SP0046`/`SP0045` diagnostics removed, with Analyzer.Test 528/528 and Effects.Test 458/458; B75 wrapped cancellation in AggregateException remains active; B14 alias activation is fixed and covered; B54 restores SP0027 after flow-proven receiver calls and safe BCL, store, conversion, constant, and bounded-loop prefixes, with unknown parameter receivers silent; B59 suppresses calls after reachable control-flow exits while retaining flow-proven infeasible-guard diagnostics; Analyzer.Test 534/534 |
 | Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; B10 now checks managed receiver and boxed-value writes against concrete runtime mutation, with unmanaged-copy controls; earlier interval probes retained | B1 and B10 fixed and verified; B5 remains observed; B54 flow-aware definite-completion regressions pass, including unknown-receiver and array/field/property controls; Effects.Test 463/463; end-to-end worker replay remains untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B11 now snapshots roots once before validation and processing, with changing-list tests for empty and nonempty replacement maps; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B11 changing-root regressions reproduce before the fix and pass after it, with IR 128/128 and Summaries 15/15; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; null module-reference rows now reject before module-name access; rejected cache reads now stage the bad entry and reconcile capacity under the cache lock; real cache/filesystem reads compare absent, malformed, oversized, semantic-rejection, and held-lock cases; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions; B19 int32 remainder summaries now bound the signed quotient | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B19 collector-worker claims prove overflow exclusion while division, long-remainder, and `(7, -1) => 0` controls pass; B49 source-summary lowering now removes conditionally-elided CFG expression statements through InvocationEmissionPolicy; regressions cover Requires, Ensures, and Assume callers plus emitted-contract and invalid-precondition controls. Worker.Test 746/746; B54 now records DoesNotThrow plus Terminates for reviewed Math and String BCL calls with runtime witnesses; Specs.Test 108/108; B67 suppression now retains claims and strict verification rejects refutations; B73 call-span and string-literal rebinding reject with controls, while inactive-preprocessor rebinding remains active; downstream proof impact is untested |
@@ -216,62 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B59. SP0027 treats a call after a guard-clause `return` as definitely executed, including dead code
-
-**Confidence: Confirmed by probing the analyzer; root cause located by code reading.**
-
-- **Location:** `SharpProof.Effects/ManagedAbstractFlow.cs:2553`
-  (`DefiniteOperationFacts.CompletesNormally(IOperation)` puts
-  `IReturnOperation`, and `IConditionalOperation` statements containing one,
-  in the "completes if children complete" group). It is consumed by
-  `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:595-660`
-  (`HasReplayablePrefix`: every earlier statement must "complete normally").
-- **Defect:** one predicate is used with two meanings. When it evaluates a
-  callee body, "completes normally" means the *method* returns, so a
-  `return` completes. When it vets the statements *before* a call site, it
-  must mean "control reaches the next statement", which a `return` does
-  not. Because the prefix check reuses the callee meaning, any earlier
-  `if (...) { return; }` guard counts as a completing prefix, and the later
-  call is replayed as if definitely executed. This contradicts
-  `docs/diagnostic-examples.md` ("non-definitely-executed calls remain
-  silent"; "Conditional branches ... remain silent unless the flow proof
-  establishes definite execution").
-- **Observed boundary:** with `Pos(int v)` requiring `v > 0`:
-  - `if (3 > 0) { return; } Pos(0);` and `if (true) return; Pos(0);` report
-    SP0027, although `Pos(0)` is unreachable (the compiler itself warns
-    CS0162).
-  - `if (x > 0) { return; } Pos(0);`, `if (b) return; Pos(0);` and
-    `if (x > 0) { Pos(1); return; } Pos(0);` report SP0027 although the call
-    runs only on some paths.
-  - Controls: `int a = 7; if (a > 0) { return; } Pos(0);` and a `throw`
-    guard (`if (x > 0) throw ...; Pos(0);`) are silent.
-  - The flow-based SP0027 differential fuzzer (extended with early
-    `return` guards, `switch`, `while` and `do` statements; 3,000 methods)
-    reported four false violations. All four are calls after a guard whose
-    return is always taken at runtime (for example
-    `int v0 = 100; ... if (v0 > 0) { return; } Pos(v0);`).
-- **Impact:** SP0027, documented as the strong diagnostic ("emitted only
-  after concrete predicate replay evaluates to false" for definitely
-  executed calls), fires on dead code and on merely possible paths in
-  ordinary guard-clause code. That erodes trust in the one diagnostic that
-  is supposed to be definite, and it can break builds that treat SP0027 as
-  an error. It is not unsound for proofs.
-- **Proposed fix:** give the prefix check its own predicate,
-  `ReachesNextStatement(IOperation)`, that returns `false` for
-  `IReturnOperation`, `IBranchOperation` (`break`/`continue`/`goto`),
-  `IThrowOperation`, and any statement containing one of them on some path
-  (an `if` whose branch returns, `switch` sections, `try` bodies with
-  `return`), unless the managed flow proves that path infeasible. Keep
-  `CompletesNormally` for callee-body evaluation. Alternatively, derive
-  definite execution from the CFG: the call's block must post-dominate the
-  method entry along all feasible edges.
-- **Proposed regression:** analyzer tests for the five reporting shapes
-  above (all silent after the fix, except that a flow-proven-infeasible
-  guard such as `if (x != x) return;` may still allow a report), plus the
-  fuzzer's always-taken-guard cases, with a control where the guard is
-  provably never taken (`int a = 0; if (a > 0) return; Pos(0);` must still
-  report).
 
 ### B65. The Z3 solver binary is pinned only by byte length, from download to package to runtime
 

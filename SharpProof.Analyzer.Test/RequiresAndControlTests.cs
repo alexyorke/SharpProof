@@ -327,6 +327,63 @@ public sealed class RequiresAndControlTests
             }
             """, "SP0027"),
         RequiresCase(
+            "GuardClausePrefixesDoNotReplayPossiblySkippedCalls",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void ConstantTrueComparison() {
+                    if (3 > 0) { return; }
+                    Positive(-1);
+                }
+
+                public static void ConstantTrueLiteral() {
+                    if (true) return;
+                    Positive(-2);
+                }
+
+                public static void RuntimeGuard(int value) {
+                    if (value > 0) { return; }
+                    Positive(-3);
+                }
+
+                public static void BooleanGuard(bool condition) {
+                    if (condition) return;
+                    Positive(-4);
+                }
+
+                public static void BranchCallAndReturn(int value) {
+                    if (value > 0) {
+                        Positive(1);
+                        return;
+                    }
+                    Positive(-5);
+                }
+
+                public static void FlowProvenTaken() {
+                    int value = 7;
+                    if (value > 0) return;
+                    Positive(-6);
+                }
+
+                public static void FlowProvenNotTaken() {
+                    int value = 0;
+                    if (value > 0) return;
+                    Positive(-7);
+                }
+
+                public static void ThrowGuard(int value) {
+                    if (value > 0) throw new InvalidOperationException();
+                    Positive(-8);
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
             "NormallyCompletingPrefixesPreservePreconditionDiagnostics",
             """
             #nullable enable
@@ -574,7 +631,7 @@ public sealed class RequiresAndControlTests
                     Positive(value);
                 }
             }
-            """, "SP0027", 3),
+            """, "SP0027", 2),
         RequiresCase(
             "CompilerConstantArgumentsReplayPreconditionViolations",
             """
