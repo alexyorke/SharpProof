@@ -247,13 +247,26 @@ foreach ($pilot in $catalog.pilots) {
         throw "Pilot '$($pilot.id)' build failed; see '$buildLog'."
     }
 
-    $evidenceFiles = @($requestPath, $resultPath, $manifestPath, $sarifPath)
-    if (@($evidenceFiles | Where-Object {
+    $sourceEvidenceFiles = @($requestPath, $resultPath, $manifestPath, $sarifPath)
+    if (@($sourceEvidenceFiles | Where-Object {
                 -not (Test-Path -LiteralPath $_ -PathType Leaf) -or
+                (Get-Item -LiteralPath $_).Length -le 0 -or
                 (Get-Item -LiteralPath $_).LastWriteTimeUtc -lt $pilotStartedUtc.UtcDateTime
             }).Count -ne 0) {
         throw "Pilot '$($pilot.id)' did not publish a fresh complete evidence set."
     }
+
+    # Keep immutable, run-scoped copies for the report. Project obj paths are
+    # reused by later builds and therefore cannot serve as qualification
+    # evidence after another run replaces their contents.
+    $snapshotDirectory = Join-Path $repositoryRoot `
+        "artifacts/pilots/runs/$runId/$($pilot.id)/evidence"
+    [IO.Directory]::CreateDirectory($snapshotDirectory) | Out-Null
+    $evidenceFiles = @($sourceEvidenceFiles | ForEach-Object {
+            $snapshotPath = Join-Path $snapshotDirectory ([IO.Path]::GetFileName($_))
+            Copy-Item -LiteralPath $_ -Destination $snapshotPath -Force
+            $snapshotPath
+        })
     $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     $claims = @($response.claimResults)
     $manifestClaims = @($response.manifest.claims)
@@ -328,8 +341,13 @@ foreach ($pilot in $catalog.pilots) {
         falsePositiveReports = $null
         negativeProbePassed = $negativeProbePassed
         setupFriction = [string]$pilot.setupFriction
-        resultPath = [IO.Path]::GetRelativePath($repositoryRoot, $resultPath).Replace('\', '/')
-        sarifProduced = Test-Path -LiteralPath $sarifPath -PathType Leaf
+        resultPath = [IO.Path]::GetRelativePath(
+            $repositoryRoot,
+            ($evidenceFiles | Where-Object { [IO.Path]::GetFileName($_) -ceq 'result.json' } |
+                Select-Object -First 1)).Replace('\', '/')
+        sarifProduced = Test-Path -LiteralPath ($evidenceFiles | Where-Object {
+                [IO.Path]::GetFileName($_) -ceq 'result.sarif'
+            } | Select-Object -First 1) -PathType Leaf
         evidence = @($evidenceFiles | ForEach-Object {
                 [ordered]@{
                     kind = switch ([IO.Path]::GetFileName($_)) {
@@ -340,6 +358,7 @@ foreach ($pilot in $catalog.pilots) {
                     }
                     path = [IO.Path]::GetRelativePath($repositoryRoot, $_).Replace('\', '/')
                     bytes = [int64](Get-Item -LiteralPath $_).Length
+                    sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
                 }
             })
     }
@@ -363,7 +382,7 @@ if (@($results | Where-Object {
 }
 
 $report = [ordered]@{
-    schemaVersion = 4
+    schemaVersion = 5
     reviewStatus = 'Unreviewed'
     runId = $runId
     runStartedUtc = $qualificationStartedUtc.ToString('O')

@@ -2,25 +2,27 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot-validation, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **55 findings**: 0 P0, 0 P1, 17 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, and B74 release-resume findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **54 findings**: 0 P0, 0 P1, 16 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
 validation, substitution ownership, cache maintenance, effect summaries, and
 analyzer diagnostics. A bounded completion-facts probe traversed 600 helpers;
 no stack-exhaustion run was attempted. Historical isolated pilot-validator
-probes used result-file doubles; the working-tree B8 fixture now runs the real
-validator and receipt writer against a temporary Git repository, rejects failed
-responses and strict Refuted/Unknown claims, preserves advisory Unknown, and
-checks the passed receipt's evidence hash and pilot IDs. Receipt probes also
+probes used result-file doubles; the working-tree B8/B9 fixtures now run the real
+validator and receipt writer against a temporary Git repository, reject failed
+responses and strict Refuted/Unknown claims, preserve advisory Unknown, check
+every run-scoped publication file's size and hash, and bind the request,
+compiler manifest, result claims, and SARIF before checking the receipt hash and
+pilot IDs. Receipt probes also
 exercised an actual admission switch and a simulated changing file view. A framework-source helper was tested with empty
 and prepared package caches. No full fuzz campaign, physical file race, native
 workflow, release CI run, or end-to-end qualification was executed. Worker
 eligibility and false-proof consequences of frontend and effects findings
 remain untested. The earlier Summaries suite passed 15/15 tests; it was not
 rerun in wave four and does not reproduce or disprove these findings. The B1
-change passed Effects 455/455 and Analyzer 521/521; the B8 pilot authority and
-receipt regression passed 1/1. Earlier coverage from the 2026-09-16 through
+change passed Effects 455/455 and Analyzer 521/521; the B8/B9 pilot authority
+and receipt regression passed 1/1. Earlier coverage from the 2026-09-16 through
 2026-09-18 audits is preserved below.
 
 Confidence definitions:
@@ -56,6 +58,8 @@ regressions and unexecuted downstream paths remain open.
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; B27 solver `incomplete` answers now map to a typed semantic Unknown; full SMT suite 39/39 | B27 nonlinear incompleteness no longer fails the worker run; worker suite 736/736 and protocol/package validation passed; foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B3 canonical-hash and B4 validator probes; canonical hashing now rejects malformed UTF-16 while preserving valid UTF-8 bytes; null module-reference rows now reject before module-name access; rejected cache reads now stage the bad entry and reconcile capacity under the cache lock; real cache/filesystem reads compare absent, malformed, oversized, semantic-rejection, and held-lock cases; follow-up same-length, resealed source-span relocation probe; B67 method/type/assembly suppression passed collector and strict MSBuild/worker regressions | B3 high/low surrogate hashes reject, replacement-character and supplementary Unicode hashes remain distinct, and custom-table lookup/digest regressions pass; B4 null module rows produce typed `JsonException` and structured `CompilerManifestMismatch` responses through `VerifyAsync` and CLI; B7 rejected-read capacity reconciliation passes direct and complete Worker regressions, valid-hit, ordinary-miss, and lock-failure controls; B67 suppression now retains claims and strict verification rejects refutations; B73 source-owner validation gap confirmed, but downstream proof impact remains untested |
 | Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B2 campaign scheduling now coalesces a colliding rotating/retained seed at the larger requested case count and derives budget/evidence totals from that schedule; B8 and B12 now validate response status, strict outcomes, and exact qualification evidence token types through the real receipt writer; B13 now binds validation and receipt metadata to one byte snapshot; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches; B16 review handoff now binds the human ledger to the original tag-run report and package artifacts; B47 now solves source-method completion dependencies with a bounded iterative graph and memoizes definite-completion queries; build-task validation now compares published results with the exact private response from that invocation; B74 assessed standard NuGet V3 main-package download and repeated symbol-publish behavior | B2 schedule fixtures cover rotating budgets below, equal to, and above retained coverage, distinct-seed budgeting, and an injected failure after the short rotating prefix; B8/B12 admission and B13 snapshot-binding boundaries covered by writer fixtures; B16 resume rejects stale, wrong-commit, and incomplete review evidence; build-task tests reject a different private invocation hash and keep a matching control, and an architecture test binds the production target to the private result path; B17 helper boundary observed; B47 tests cover a 1,000-method chain, a 20-method recursive graph, shared definite-completion calls, and direct self-recursion; B74 retry guard is covered by mocked exact/mismatched main bytes, canonical-feed capability, digest-plan binding, and push-sequence fixtures; no production feed was contacted, and no interrupted production release was resumed; no release CI, native workflow, or full end-to-end qualification run |
+
+B9 now stores the four publication files under `artifacts/pilots/runs/<runId>/<pilotId>/evidence`, records their exact sizes and SHA-256 values, binds the request's compiler-manifest hash to the captured manifest, and compares compiler-manifest claims with result claims. The authority fixture rejects each file when missing, empty, or altered, plus mismatched request-manifest hashes and result paths from another run.
 
 B3 combines the hash-writer and specification-admission evidence into one
 deduplicated boundary finding; it is not counted twice. All five fourth-wave
@@ -207,26 +211,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B9. Pilot validation accepts absent required publication files
-
-**Confidence: Confirmed at the isolated validator boundary.**
-
-- **Location:** `scripts/Test-SharpProofPilotReport.ps1:147-160`; the existing
-  `scripts/Test-SharpProofPilotAuthorityFixtures.ps1:130-132` fixture names
-  nonexistent publication files.
-- **Defect:** the validator checks result-file existence and length but accepts
-  missing request, compiler-manifest, and SARIF files named by the report.
-- **Observed boundary:** the same isolated actual-validator probe as B8 used
-  file doubles only for result paths. All 15 non-result paths across five pilots
-  were genuinely absent, and validation accepted the report. No end-to-end
-  qualification issuance was exercised.
-- **Proposed fix:** validate every required publication file's existence,
-  nonempty content, content identity, and binding to the reported run and its
-  other artifacts before accepting qualification input.
-- **Proposed regression:** start with a complete valid publication, then delete
-  and alter each required file independently. Reject missing, empty, stale,
-  or mismatched artifacts while retaining the complete-publication control.
 
 ### B11. Substitution validates one root enumeration and returns another
 

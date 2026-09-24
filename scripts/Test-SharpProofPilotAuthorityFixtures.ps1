@@ -22,6 +22,12 @@ $projections = @($producer.FindAll({
         $node.Operator -eq [Management.Automation.Language.TokenKind]::PlusEquals
 }, $true))
 if ($projections.Count -ne 1) { throw 'Expected one pilot result projection.' }
+$projectionRoot = Join-Path ([IO.Path]::GetTempPath()) ('sp-pilot-projection-' + [Guid]::NewGuid().ToString('N'))
+$projectionEvidenceDirectory = Join-Path $projectionRoot 'evidence'
+[IO.Directory]::CreateDirectory($projectionEvidenceDirectory) | Out-Null
+foreach ($fileName in @('request.json','result.json','compiler-manifest.json','result.sarif')) {
+    [IO.File]::WriteAllText((Join-Path $projectionEvidenceDirectory $fileName), '{}')
+}
 & {
     $pilot = [pscustomobject]@{
         id='projection'; project='Projection.csproj'; category='contract-heavy'
@@ -36,16 +42,18 @@ if ($projections.Count -ne 1) { throw 'Expected one pilot result projection.' }
         elapsedMilliseconds=1; observedPeakWorkingSetBytes=0
     }
     $negativeProbePassed = $true
-    $repositoryRoot = $PSScriptRoot
-    $resultPath = Join-Path $PSScriptRoot 'result.json'
-    $sarifPath = Join-Path $PSScriptRoot 'result.sarif'
-    $evidenceFiles = @()
+    $repositoryRoot = $projectionRoot
+    $resultPath = Join-Path $projectionEvidenceDirectory 'result.json'
+    $sarifPath = Join-Path $projectionEvidenceDirectory 'result.sarif'
+    $evidenceFiles = @('request.json','result.json','compiler-manifest.json','result.sarif') |
+        ForEach-Object { Join-Path $projectionEvidenceDirectory $_ }
     $results = @()
     . ([scriptblock]::Create($projections[0].Extent.Text))
     if ($results.Count -ne 1 -or $null -ne $results[0].falsePositiveReports) {
         throw 'A produced pilot result must leave false-positive review unreported.'
     }
 }
+Remove-Item -LiteralPath $projectionRoot -Recurse -Force
 
 function Write-Package([string]$Id, [string]$Extension, [string]$Commit = $commit,
     [string]$PackageVersion = $version) {
@@ -140,21 +148,44 @@ try {
         $claimResults = @($manifestClaims | ForEach-Object {
                 [pscustomobject]@{ claimId=$_.claimId; outcome='Proven' }
             })
-        $resultPath = Join-Path $fixture "results/$($row.id).json"
-        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resultPath)) | Out-Null
+        $evidenceDirectory = Join-Path $fixture "artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence"
+        [IO.Directory]::CreateDirectory($evidenceDirectory) | Out-Null
+        $manifestPath = Join-Path $evidenceDirectory 'compiler-manifest.json'
+        [IO.File]::WriteAllText($manifestPath,
+            ([ordered]@{ manifest=[ordered]@{ claims=$manifestClaims } } | ConvertTo-Json -Depth 6),
+            [Text.UTF8Encoding]::new($false))
+        $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $requestPath = Join-Path $evidenceDirectory 'request.json'
+        [IO.File]::WriteAllText($requestPath,
+            ([ordered]@{ protocolVersion='12'; compilerManifest=[ordered]@{
+                    path='compiler-manifest.json'; sha256=$manifestHash
+                } } | ConvertTo-Json -Depth 6),
+            [Text.UTF8Encoding]::new($false))
+        $resultPath = Join-Path $evidenceDirectory 'result.json'
         [IO.File]::WriteAllText($resultPath,
-            ([ordered]@{ runStatus='Complete'; manifest=[ordered]@{ claims=$manifestClaims }; claimResults=$claimResults } |
+            ([ordered]@{ requestHash=('0' * 64); runStatus='Complete'; manifest=[ordered]@{ claims=$manifestClaims }; claimResults=$claimResults } |
                 ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
-        $relativeResult = [IO.Path]::GetRelativePath($fixture, $resultPath).Replace('\','/')
-        $evidence = @('request','compilerManifest','sarif') | ForEach-Object {
-            [pscustomobject]@{ kind=$_; path="evidence/$($row.id)-$_.json"; bytes=1 }
-        }
-        $evidence += [pscustomobject]@{
-            kind='result'; path=$relativeResult; bytes=[int64](Get-Item $resultPath).Length
+        $sarifPath = Join-Path $evidenceDirectory 'result.sarif'
+        [IO.File]::WriteAllText($sarifPath,
+            '{"version":"2.1.0","runs":[{}]}',
+            [Text.UTF8Encoding]::new($false))
+        $evidence = @(
+            [pscustomobject]@{ kind='request'; path="artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence/request.json" },
+            [pscustomobject]@{ kind='result'; path="artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence/result.json" },
+            [pscustomobject]@{ kind='compilerManifest'; path="artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence/compiler-manifest.json" },
+            [pscustomobject]@{ kind='sarif'; path="artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence/result.sarif" }
+        ) | ForEach-Object {
+            $path = Join-Path $fixture $_.path
+            [pscustomobject]@{
+                kind=$_.kind; path=$_.path
+                bytes=[int64](Get-Item -LiteralPath $path).Length
+                sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
         }
         [pscustomobject]@{
             id=$row.id; project=$row.project; category=$row.category; library=$row.library
             libraryVersion=$row.libraryVersion; runStatus='Complete'; sarifProduced=$true
+            resultPath="artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence/result.json"
             claimEvidence=@($manifestClaims | ForEach-Object {
                     [pscustomobject]@{ claimId=$_.claimId; kind=$_.kind; outcome='Proven' }
                 })
@@ -164,7 +195,7 @@ try {
         }
     })
     $report = [pscustomobject]@{
-        schemaVersion=4; reviewStatus='Unreviewed'; runId=('1' * 32); commit=$commit; packageVersion=$version; pilotCount=5
+        schemaVersion=5; reviewStatus='Unreviewed'; runId=('1' * 32); commit=$commit; packageVersion=$version; pilotCount=5
         packageArtifacts=$artifacts
         pilots=$reportPilots
     }
@@ -172,8 +203,57 @@ try {
         Test-SharpProofPilotReport $Value $commit -RepositoryRoot $fixture -CatalogPath $catalogPath
     }
     function Copy-Json($Value) { $Value | ConvertTo-Json -Depth 10 | ConvertFrom-Json }
+    function Set-EvidenceContentIdentity($Evidence, [string]$Path) {
+        $Evidence.bytes = [int64](Get-Item -LiteralPath $Path).Length
+        $Evidence.sha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
     if (-not (Test-Report $report)) { throw 'Canonical pilot report failed.' }
     $canonicalReport = Copy-Json $report
+    foreach ($kind in @('request','result','compilerManifest','sarif')) {
+        $pilot = $canonicalReport.pilots[0]
+        $evidence = @($pilot.evidence | Where-Object kind -CEQ $kind)[0]
+        $path = Join-Path $fixture $evidence.path
+        $original = [IO.File]::ReadAllBytes($path)
+        try {
+            Remove-Item -LiteralPath $path -Force
+            if (Test-Report $canonicalReport) {
+                throw "Missing '$kind' publication evidence was accepted."
+            }
+            [IO.File]::WriteAllBytes($path, [byte[]]::new(0))
+            if (Test-Report $canonicalReport) {
+                throw "Empty '$kind' publication evidence was accepted."
+            }
+            [IO.File]::WriteAllBytes($path, $original)
+            $altered = [byte[]]$original.Clone()
+            $altered[0] = [byte]($altered[0] -bxor 1)
+            [IO.File]::WriteAllBytes($path, $altered)
+            if (Test-Report $canonicalReport) {
+                throw "Altered '$kind' publication evidence was accepted."
+            }
+        } finally {
+            [IO.File]::WriteAllBytes($path, $original)
+        }
+    }
+    $changed = Copy-Json $canonicalReport
+    $changed.pilots[0].resultPath = 'results/other-run/result.json'
+    if (Test-Report $changed) { throw 'A result path from another run was accepted.' }
+    $requestEvidence = @($canonicalReport.pilots[0].evidence | Where-Object kind -CEQ 'request')[0]
+    $requestPath = Join-Path $fixture $requestEvidence.path
+    $originalRequest = [IO.File]::ReadAllBytes($requestPath)
+    try {
+        $request = [Text.Encoding]::UTF8.GetString($originalRequest) | ConvertFrom-Json
+        $request.compilerManifest.sha256 = 'f' * 64
+        [IO.File]::WriteAllText(
+            $requestPath,
+            ($request | ConvertTo-Json -Depth 10),
+            [Text.UTF8Encoding]::new($false))
+        $changed = Copy-Json $canonicalReport
+        $changedRequestEvidence = @($changed.pilots[0].evidence | Where-Object kind -CEQ 'request')[0]
+        Set-EvidenceContentIdentity $changedRequestEvidence $requestPath
+        if (Test-Report $changed) { throw 'A request bound to a different compiler manifest was accepted.' }
+    } finally {
+        [IO.File]::WriteAllBytes($requestPath, $originalRequest)
+    }
     $canonicalReport.pilots[0].diagnostics = @(
         [pscustomobject]@{ id='SP0001'; count=2 }
     )
@@ -237,14 +317,15 @@ try {
     if (Test-Report $changed) { throw 'Mislabeled pilot category was accepted.' }
     $changed = Copy-Json $canonicalReport; $changed.pilots[0].claimEvidence = @()
     if (Test-Report $changed) { throw 'Zero claim evidence was accepted.' }
-    $firstResultPath = Join-Path $fixture $canonicalReport.pilots[0].evidence.Where({$_.kind -eq 'result'})[0].path
+    $firstResultEvidence = $canonicalReport.pilots[0].evidence.Where({$_.kind -eq 'result'})[0]
+    $firstResultPath = Join-Path $fixture $firstResultEvidence.path
     $originalResult = [IO.File]::ReadAllText($firstResultPath)
     [IO.File]::WriteAllText($firstResultPath,
         '{"manifest":{"claims":[]},"claimResults":[]}')
     $changed = Copy-Json $canonicalReport
     $changed.pilots[0].claimEvidence = @()
     $changedResultEvidence = $changed.pilots[0].evidence.Where({$_.kind -eq 'result'})[0]
-    $changedResultEvidence.bytes = [int64](Get-Item $firstResultPath).Length
+    Set-EvidenceContentIdentity $changedResultEvidence $firstResultPath
     if (Test-Report $changed) { throw 'Zero-claim result was accepted.' }
     [IO.File]::WriteAllText($firstResultPath, $originalResult)
     $contractResultEvidence = $canonicalReport.pilots[2].evidence.Where({$_.kind -eq 'result'})[0]
@@ -257,7 +338,7 @@ try {
             claimId='wrong-kind'; kind='Effect'; outcome='Proven'
         })
     $changedResultEvidence = $changed.pilots[2].evidence.Where({$_.kind -eq 'result'})[0]
-    $changedResultEvidence.bytes = [int64](Get-Item $contractResultPath).Length
+    Set-EvidenceContentIdentity $changedResultEvidence $contractResultPath
     if (Test-Report $changed) { throw 'Contract pilot without a postcondition was accepted.' }
     [IO.File]::WriteAllText($contractResultPath, $originalContractResult)
     $canonicalCatalog = Get-Content $catalogPath -Raw | ConvertFrom-Json
@@ -380,7 +461,7 @@ try {
                 $resultPath,
                 ($response | ConvertTo-Json -Depth 10),
                 [Text.UTF8Encoding]::new($false))
-            $resultEvidence.bytes = [int64](Get-Item $resultPath).Length
+            Set-EvidenceContentIdentity $resultEvidence $resultPath
             $invalidReportPath = Join-Path $fixture "$Name-report.json"
             [IO.File]::WriteAllText(
                 $invalidReportPath,
@@ -417,7 +498,7 @@ try {
             $advisoryResultPath,
             ($advisoryResponse | ConvertTo-Json -Depth 10),
             [Text.UTF8Encoding]::new($false))
-        $advisoryResult.bytes = [int64](Get-Item $advisoryResultPath).Length
+        Set-EvidenceContentIdentity $advisoryResult $advisoryResultPath
         if (-not (Test-Report $advisoryUnknown)) {
             throw 'Documented advisory Unknown outcome was rejected.'
         }

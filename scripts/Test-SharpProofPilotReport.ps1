@@ -97,7 +97,7 @@ function Test-SharpProofPilotReport {
     }
     catch { return $false }
 
-    if ([int]$Report.schemaVersion -ne 4 -or
+    if ([int]$Report.schemaVersion -ne 5 -or
         @('Unreviewed', 'Reviewed') -cnotcontains [string]$Report.reviewStatus -or
         [string]$Report.runId -cnotmatch '^[0-9a-f]{32}$' -or
         [string]$Report.commit -cne $ExpectedCommit -or
@@ -141,37 +141,120 @@ function Test-SharpProofPilotReport {
             [string]$pilot.library -cne $expectedPilot.library -or
             [string]$pilot.libraryVersion -cne $expectedPilot.version -or
             [string]$pilot.runStatus -cne 'Complete' -or -not [bool]$pilot.sarifProduced -or
+            [string]$pilot.resultPath -cne
+                "artifacts/pilots/runs/$([string]$Report.runId)/$([string]$pilot.id)/evidence/result.json" -or
             @($pilot.evidence).Count -ne 4 -or
             @($pilot.evidence.kind | Sort-Object) -join '|' -cne
                 'compilerManifest|request|result|sarif') { return $false }
-        foreach ($evidence in @($pilot.evidence)) {
-            $path = [string]$evidence.path
-            if ([string]::IsNullOrWhiteSpace($path) -or [IO.Path]::IsPathRooted($path) -or
-                $path.Contains('..') -or [int64]$evidence.bytes -le 0) { return $false }
+        $expectedEvidenceNames = @{
+            request = 'request.json'
+            result = 'result.json'
+            compilerManifest = 'compiler-manifest.json'
+            sarif = 'result.sarif'
         }
-        $resultEvidence = @($pilot.evidence | Where-Object kind -ceq 'result')
-        if ($resultEvidence.Count -ne 1) { return $false }
-        $resultPath = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot ([string]$resultEvidence[0].path)))
+        $pathComparison = if ([IO.Path]::DirectorySeparatorChar -eq [char]'\') {
+            [StringComparison]::OrdinalIgnoreCase
+        } else {
+            [StringComparison]::Ordinal
+        }
         $root = [IO.Path]::GetFullPath($RepositoryRoot)
-        if (-not $resultPath.StartsWith($root + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::Ordinal) -or
-            -not (Test-Path -LiteralPath $resultPath -PathType Leaf) -or
-            [int64](Get-Item -LiteralPath $resultPath).Length -ne [int64]$resultEvidence[0].bytes) { return $false }
-        try { $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json -ErrorAction Stop }
-        catch { return $false }
-        if ($response -isnot [pscustomobject] -or
-            @($response.PSObject.Properties.Name) -cnotcontains 'runStatus' -or
-            [string]$response.runStatus -cne 'Complete') { return $false }
-        $manifestClaims = @($response.manifest.claims)
+        $rootPath = [IO.Path]::GetPathRoot($root)
+        if (-not [string]::Equals($root, $rootPath, $pathComparison)) {
+            $root = $root.TrimEnd(
+                [IO.Path]::DirectorySeparatorChar,
+                [IO.Path]::AltDirectorySeparatorChar)
+        }
+        $rootPrefix = $root + [IO.Path]::DirectorySeparatorChar
+        $evidenceByKind = @{}
+        foreach ($evidence in @($pilot.evidence)) {
+            if ((@($evidence.PSObject.Properties.Name | Sort-Object) -join '|') -cne
+                'bytes|kind|path|sha256') { return $false }
+            $kind = [string]$evidence.kind
+            $path = [string]$evidence.path
+            $expectedPath = "artifacts/pilots/runs/$([string]$Report.runId)/" +
+                "$([string]$pilot.id)/evidence/$($expectedEvidenceNames[$kind])"
+            if ([string]::IsNullOrWhiteSpace($path) -or
+                [IO.Path]::IsPathRooted($path) -or
+                $path -cne $expectedPath -or
+                [int64]$evidence.bytes -le 0 -or
+                [string]$evidence.sha256 -cnotmatch '^[0-9a-f]{64}$') { return $false }
+            try {
+                $resolvedPath = [IO.Path]::GetFullPath((Join-Path $root $path))
+                if (-not $resolvedPath.StartsWith($rootPrefix, $pathComparison) -or
+                    -not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+                    return $false
+                }
+                $file = Get-Item -LiteralPath $resolvedPath
+                if ($file.Length -ne [int64]$evidence.bytes -or $file.Length -le 0) {
+                    return $false
+                }
+                $actualSha256 = (Get-FileHash -LiteralPath $resolvedPath `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
+            } catch { return $false }
+            if ($actualSha256 -cne [string]$evidence.sha256 -or
+                $evidenceByKind.ContainsKey($kind)) { return $false }
+            $evidenceByKind[$kind] = [pscustomobject]@{
+                path = $resolvedPath
+                sha256 = $actualSha256
+            }
+        }
+        if ($evidenceByKind.Count -ne 4) { return $false }
+        try {
+            $request = Get-Content -LiteralPath $evidenceByKind['request'].path -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+            $compilerManifest = Get-Content -LiteralPath $evidenceByKind['compilerManifest'].path -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+            $response = Get-Content -LiteralPath $evidenceByKind['result'].path -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+            $sarif = Get-Content -LiteralPath $evidenceByKind['sarif'].path -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+        } catch { return $false }
+        if ($request -isnot [pscustomobject] -or
+            $compilerManifest -isnot [pscustomobject] -or
+            $response -isnot [pscustomobject] -or
+            $sarif -isnot [pscustomobject] -or
+            $request.PSObject.Properties.Name -cnotcontains 'compilerManifest' -or
+            $compilerManifest.PSObject.Properties.Name -cnotcontains 'manifest' -or
+            $compilerManifest.manifest -isnot [pscustomobject] -or
+            $compilerManifest.manifest.PSObject.Properties.Name -cnotcontains 'claims' -or
+            $response.PSObject.Properties.Name -cnotcontains 'requestHash' -or
+            $response.PSObject.Properties.Name -cnotcontains 'runStatus' -or
+            $response.PSObject.Properties.Name -cnotcontains 'manifest' -or
+            $response.manifest -isnot [pscustomobject] -or
+            $response.manifest.PSObject.Properties.Name -cnotcontains 'claims' -or
+            $response.PSObject.Properties.Name -cnotcontains 'claimResults' -or
+            $sarif.PSObject.Properties.Name -cnotcontains 'version' -or
+            $sarif.PSObject.Properties.Name -cnotcontains 'runs') { return $false }
+        if ($request.compilerManifest -isnot [pscustomobject] -or
+            $request.compilerManifest.PSObject.Properties.Name -cnotcontains 'path' -or
+            $request.compilerManifest.PSObject.Properties.Name -cnotcontains 'sha256') {
+            return $false
+        }
+        if (
+            [string]::IsNullOrWhiteSpace([string]$request.compilerManifest.path) -or
+            [IO.Path]::GetFileName([string]$request.compilerManifest.path) -cne 'compiler-manifest.json' -or
+            [string]$request.compilerManifest.sha256 -cne $evidenceByKind['compilerManifest'].sha256 -or
+            [string]$response.requestHash -cnotmatch '^[0-9a-f]{64}$' -or
+            [string]$response.runStatus -cne 'Complete' -or
+            [string]$sarif.version -cne '2.1.0' -or
+            @($sarif.runs).Count -eq 0) { return $false }
+        $manifestClaims = @($compilerManifest.manifest.claims)
+        $resultManifestClaims = @($response.manifest.claims)
         $claimResults = @($response.claimResults)
         $actual = @(ConvertTo-SharpProofPilotClaimEvidence `
             -ManifestClaims $manifestClaims `
             -ClaimResults $claimResults)
+        $resultManifestEvidence = @(ConvertTo-SharpProofPilotClaimEvidence `
+            -ManifestClaims $resultManifestClaims `
+            -ClaimResults $claimResults)
         $reported = @($pilot.claimEvidence | Sort-Object claimId)
         if ($actual.Count -eq 0 -or $actual.Count -ne $reported.Count -or
+            $resultManifestEvidence.Count -ne $actual.Count -or
             @($actual.claimId | Select-Object -Unique).Count -ne $actual.Count) { return $false }
         for ($index = 0; $index -lt $actual.Count; $index++) {
-            if ([string]$reported[$index].claimId -cne [string]$actual[$index].claimId -or
+            if ([string]$actual[$index].claimId -cne [string]$resultManifestEvidence[$index].claimId -or
+                [string]$actual[$index].kind -cne [string]$resultManifestEvidence[$index].kind -or
+                [string]$reported[$index].claimId -cne [string]$actual[$index].claimId -or
                 [string]$reported[$index].kind -cne [string]$actual[$index].kind -or
                 [string]$reported[$index].outcome -cne [string]$actual[$index].outcome) { return $false }
         }
