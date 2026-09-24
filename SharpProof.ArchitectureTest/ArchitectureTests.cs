@@ -2451,6 +2451,8 @@ public sealed class ArchitectureTests
             root, "eng", "container", "entrypoint.sh"));
         var campaign = File.ReadAllText(Path.Combine(
             root, "scripts", "Invoke-SharpProofFuzzCampaign.ps1"));
+        var fuzzLifecycle = File.ReadAllText(Path.Combine(
+            root, "scripts", "SharpProof.FuzzEvidenceLifecycle.ps1"));
         var acceptance = File.ReadAllText(Path.Combine(
             root, "eng", "acceptance", "Verify.ps1"));
         using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
@@ -2487,22 +2489,27 @@ public sealed class ArchitectureTests
             Assert.That(campaign,
                 Does.Contain("contract.fuzz.nightlyCases")
                     .And.Contain("contract.fuzz.maximumCampaignCases")
-                    .And.Contain("Assert-SharpProofFuzzCampaignBudget")
+                    .And.Contain("Get-SharpProofFuzzCampaignSchedule")
                     .And.Contain("ContainsKey('RotatingSeed')")
                     .And.Contain("Read-SharpProofRetainedFuzzSeedManifest")
                     .And.Contain("$retained.Seeds")
                     .And.Contain("Invoke-FuzzRun")
                     .And.Contain("yyyyMMdd")
-                    .And.Contain("schemaVersion = 4")
+                    .And.Contain("schemaVersion = 5")
                     .And.Contain("commit = $sourceCommit")
-                     .And.Contain("rotatingCases = $effectiveRotatingCases")
-                     .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
-                     .And.Contain("retainedSeeds = $retainedSeeds")
+                    .And.Contain("rotatingCases = $schedule.RotatingCases")
+                    .And.Contain("requestedRotatingCases = $schedule.RequestedRotatingCases")
+                    .And.Contain("retainedCasesPerSeed = $schedule.RetainedCasesPerSeed")
+                    .And.Contain("retainedSeeds = $schedule.RetainedSeeds")
                      .And.Not.Contain("retainedSeedManifestSha256")
                      .And.Not.Contain("runnerSha256")
                      .And.Not.Contain("resultSha256")
                      .And.Not.Contain("Get-FileHash")
                      .And.Contain("status = if"));
+            Assert.That(fuzzLifecycle,
+                Does.Contain("function Get-SharpProofFuzzCampaignSchedule")
+                    .And.Contain("Assert-SharpProofFuzzCampaignBudget")
+                    .And.Contain("$scheduledRotatingCases = $retainedCaseCount"));
             Assert.That(acceptance,
                 Does.Contain("contract.fuzz.pullRequestCases")
                     .And.Not.Contain("contract.fuzz.nightlyCases"));

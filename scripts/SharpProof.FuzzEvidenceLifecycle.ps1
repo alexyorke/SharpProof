@@ -72,6 +72,59 @@ function Assert-SharpProofFuzzCampaignBudget {
     return [int]$requestedCases
 }
 
+function Get-SharpProofFuzzCampaignSchedule {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][int]$RotatingSeed,
+        [Parameter(Mandatory = $true)][int[]]$RetainedSeeds,
+        [Parameter(Mandatory = $true)][int]$RotatingCases,
+        [Parameter(Mandatory = $true)][int]$RetainedCases,
+        [Parameter(Mandatory = $true)][int]$MaximumCases
+    )
+
+    $rotatingCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $RotatingCases -Name 'rotatingCases'
+    $retainedCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $RetainedCases -Name 'retainedCasesPerSeed'
+    $maximumCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $MaximumCases -Name 'maximumCampaignCases'
+    $retainedRunSeeds = [Collections.Generic.List[int]]::new()
+    $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+    $sharedRetainedSeed = $false
+    foreach ($seed in $RetainedSeeds) {
+        if (-not $seenSeeds.Add($seed)) {
+            throw 'The retained fuzz seed schedule contains duplicate seeds.'
+        }
+        if ($seed -eq $RotatingSeed) {
+            $sharedRetainedSeed = $true
+        }
+        else {
+            $retainedRunSeeds.Add($seed)
+        }
+    }
+
+    $scheduledRotatingCases = $rotatingCaseCount
+    if ($sharedRetainedSeed -and
+        $retainedCaseCount -gt $scheduledRotatingCases) {
+        $scheduledRotatingCases = $retainedCaseCount
+    }
+    $requestedCases = Assert-SharpProofFuzzCampaignBudget `
+        -RotatingCases $scheduledRotatingCases `
+        -RetainedCases $retainedCaseCount `
+        -RetainedRunCount $retainedRunSeeds.Count `
+        -MaximumCases $maximumCaseCount
+
+    return [pscustomobject]@{
+        RotatingCases = $scheduledRotatingCases
+        RequestedRotatingCases = $rotatingCaseCount
+        RetainedCasesPerSeed = $retainedCaseCount
+        RetainedSeeds = [int[]]$RetainedSeeds
+        RetainedRunSeeds = $retainedRunSeeds.ToArray()
+        SharedRetainedSeed = $sharedRetainedSeed
+        RequestedCases = $requestedCases
+    }
+}
+
 function Read-SharpProofRetainedFuzzSeedManifest {
     [CmdletBinding()]
     param(

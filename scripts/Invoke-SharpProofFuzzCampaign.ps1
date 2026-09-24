@@ -70,16 +70,11 @@ try {
     $maximumCampaignCases = Assert-SharpProofFuzzCaseBudget `
         -Value $contract.fuzz.maximumCampaignCases `
         -Name 'contract.fuzz.maximumCampaignCases'
-    $retainedRunSeeds = @($retainedSeeds | Where-Object {
-            # Both runners start at case zero.  Replaying a retained seed that
-            # matches the rotating seed would therefore duplicate its prefix when
-            # the rotating run is shorter than the retained run.
-            [int]$_ -ne $RotatingSeed
-        })
-    $requestedCampaignCases = Assert-SharpProofFuzzCampaignBudget `
+    $schedule = Get-SharpProofFuzzCampaignSchedule `
+        -RotatingSeed $RotatingSeed `
+        -RetainedSeeds ([int[]]$retainedSeeds) `
         -RotatingCases $effectiveRotatingCases `
         -RetainedCases $effectiveRetainedCases `
-        -RetainedRunCount $retainedRunSeeds.Count `
         -MaximumCases $maximumCampaignCases
     $dotnetWrapper = Get-SharpProofDotnetWrapperPath
     $fuzzProject = Join-Path `
@@ -188,9 +183,9 @@ try {
     $runs = [Collections.Generic.List[object]]::new()
     $runs.Add((Invoke-FuzzRun `
         -Name "rotating-$RotatingSeed" `
-        -Cases $effectiveRotatingCases `
+        -Cases $schedule.RotatingCases `
         -Seed $RotatingSeed))
-    foreach ($seed in $retainedRunSeeds) {
+    foreach ($seed in $schedule.RetainedRunSeeds) {
         $runs.Add((Invoke-FuzzRun `
             -Name "retained-$seed" `
             -Cases $effectiveRetainedCases `
@@ -206,14 +201,15 @@ try {
         })
     $campaignPassed = $failedRuns.Count -eq 0
     $summary = [pscustomobject][ordered]@{
-        schemaVersion = 4
+        schemaVersion = 5
         status = if ($campaignPassed) { 'passed' } else { 'failed' }
         commit = $sourceCommit
         rotatingSeed = $RotatingSeed
-        rotatingCases = $effectiveRotatingCases
-        retainedCasesPerSeed = $effectiveRetainedCases
-        retainedSeeds = $retainedSeeds
-        requestedCases = $requestedCampaignCases
+        rotatingCases = $schedule.RotatingCases
+        requestedRotatingCases = $schedule.RequestedRotatingCases
+        retainedCasesPerSeed = $schedule.RetainedCasesPerSeed
+        retainedSeeds = $schedule.RetainedSeeds
+        requestedCases = $schedule.RequestedCases
         totalCases = [int](@($runs |
             Measure-Object -Property observedCases -Sum).Sum)
         runs = @($runs)

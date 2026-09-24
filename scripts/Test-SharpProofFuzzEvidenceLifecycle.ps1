@@ -12,13 +12,38 @@ if ((($seedAfterStride - $seedToday) % 397) -eq 0) {
     throw 'Rotating seeds repeat the FuzzRunner case stride after 397 days.'
 }
 
-$campaignScript = Get-Content -Raw (Join-Path $PSScriptRoot 'Invoke-SharpProofFuzzCampaign.ps1')
-if ($campaignScript -notmatch '\[int\]\$_ -ne \$RotatingSeed') {
-    throw 'Campaign must not replay a retained seed used by the rotating run.'
+$scheduleCases = @(
+    [pscustomobject]@{ RotatingCases = 1; RetainedCases = 1000; ExpectedRotatingCases = 1000 },
+    [pscustomobject]@{ RotatingCases = 1000; RetainedCases = 1000; ExpectedRotatingCases = 1000 },
+    [pscustomobject]@{ RotatingCases = 2000; RetainedCases = 1000; ExpectedRotatingCases = 2000 }
+)
+foreach ($case in $scheduleCases) {
+    $schedule = Get-SharpProofFuzzCampaignSchedule `
+        -RotatingSeed 7 -RetainedSeeds ([int[]]@(7)) `
+        -RotatingCases $case.RotatingCases `
+        -RetainedCases $case.RetainedCases `
+        -MaximumCases $case.ExpectedRotatingCases
+    if ($schedule.RotatingCases -ne $case.ExpectedRotatingCases -or
+        $schedule.RetainedRunSeeds.Count -ne 0 -or
+        $schedule.RequestedCases -ne $case.ExpectedRotatingCases -or
+        -not $schedule.SharedRetainedSeed) {
+        throw "A colliding retained seed was not covered by the effective schedule: $($case | ConvertTo-Json -Compress)"
+    }
+}
+$noncollidingSchedule = Get-SharpProofFuzzCampaignSchedule `
+    -RotatingSeed 7 -RetainedSeeds ([int[]]@(8)) `
+    -RotatingCases 1 -RetainedCases 1000 -MaximumCases 1001
+if ($noncollidingSchedule.RotatingCases -ne 1 -or
+    $noncollidingSchedule.RetainedRunSeeds.Count -ne 1 -or
+    $noncollidingSchedule.RequestedCases -ne 1001 -or
+    $noncollidingSchedule.SharedRetainedSeed) {
+    throw 'A distinct retained seed lost its independently scheduled cases.'
 }
 
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'SharpProof-fuzz-evidence-' + [Guid]::NewGuid().ToString('N'))
+$failureCaseVariable = 'SHARPPROOF_FIXTURE_FAILURE_CASE'
+$originalFailureCase = [Environment]::GetEnvironmentVariable($failureCaseVariable)
 try {
     [IO.Directory]::CreateDirectory($root) | Out-Null
     $campaign = Join-Path $root 'campaign.json'
@@ -208,7 +233,7 @@ try {
     }
 
     $failedSummary = [pscustomobject][ordered]@{
-        schemaVersion = 4
+        schemaVersion = 5
         status = 'failed'
         commit = ('0' * 40)
         runs = @([pscustomobject][ordered]@{
@@ -273,9 +298,59 @@ function Get-SharpProofDotnetWrapperPath { return 'fixture' }
 function Start-SharpProofEncodedPowerShell {
     param($WrapperPath, $TimeoutSeconds, $WorkingDirectory, $Arguments, $StandardOutput, $StandardError)
     if ($StandardOutput) {
-        [IO.File]::WriteAllText($StandardOutput, 'retained failed run')
-        [IO.File]::WriteAllText($StandardError, 'injected runner failure')
-        return [pscustomobject]@{ ExitCode = 1 }
+        $cases = [int]$Arguments[2]
+        $seed = [int]$Arguments[4]
+        $maximumParallelism = [int]$Arguments[6]
+        $failureCase = [int][Environment]::GetEnvironmentVariable(
+            'SHARPPROOF_FIXTURE_FAILURE_CASE')
+        $hasFailure = $cases -gt $failureCase
+        $failures = if ($hasFailure) {
+            ,@([pscustomobject][ordered]@{
+                Case = $failureCase
+                Seed = $seed + $failureCase * 397
+                Oracle = 'Fixture'
+                Original = 'input'
+                Minimized = 'input'
+                Detail = 'injected failure beyond the rotating prefix'
+                Term = 'false'
+            })
+        }
+        else {
+            ,@()
+        }
+        $result = [pscustomobject][ordered]@{
+            SchemaVersion = 4
+            Cases = $cases
+            Seed = $seed
+            MaximumParallelism = $maximumParallelism
+            Agreements = $cases
+            Abstentions = 0
+            FrontendAgreements = $cases
+            SmtAgreements = $cases
+            PartialSmtAgreements = $cases
+            FrontendCoverage = [pscustomobject][ordered]@{
+                TextParameters = 0
+                StringLiterals = 0
+                NullStrings = 0
+                StringConcatenations = 0
+                StringLengths = 0
+                StringCasts = 0
+                ArrayLengths = 0
+                ArrayIndexes = 0
+                DivideByZeroExceptions = 0
+                OverflowExceptions = 0
+                NullReferenceExceptions = 0
+                IndexOutOfRangeExceptions = 0
+                InvalidCastExceptions = 0
+            }
+            CoverageSatisfied = -not $hasFailure
+            Failures = $failures
+            Passed = -not $hasFailure
+        }
+        $json = ($result | ConvertTo-Json -Depth 5 -Compress)
+        [IO.File]::WriteAllText($StandardOutput, $json)
+        [IO.File]::WriteAllText($StandardError, 'fixture runner output')
+        return [pscustomobject]@{ ExitCode = if ($hasFailure) { 1 } else { 0 } }
     }
     return [pscustomobject]@{ ExitCode = 0 }
 }
@@ -287,13 +362,14 @@ Export-ModuleMember -Function *
     }
     [IO.File]::WriteAllText((Join-Path $fixture '.gitignore'), "artifacts/`n")
     [IO.File]::WriteAllText((Join-Path $fixture 'eng/acceptance/contract.json'),
-        '{"fuzz":{"nightlyCases":1,"maximumCampaignCases":1,"maximumParallelism":1},"worker":{"maximumProjectWallSeconds":1}}')
+        '{"fuzz":{"nightlyCases":1,"maximumCampaignCases":5,"maximumParallelism":1},"worker":{"maximumProjectWallSeconds":1}}')
     [IO.File]::WriteAllText((Join-Path $fixture 'eng/fuzz/retained-seeds.json'),
         '{"schemaVersion":1,"casesPerSeed":1,"seeds":[7]}')
     [IO.File]::WriteAllText((Join-Path $fixture 'Tools/SharpProof.Fuzz/bin/Release/net9.0/SharpProof.Fuzz.dll'), '')
     Initialize-SharpProofFixtureRepository -RepositoryRoot $fixture `
         -UserEmail 'fixture@sharpproof.invalid' -Paths '.' -CommitMessage baseline
     foreach ($failure in @('dirty', 'summary')) {
+        [Environment]::SetEnvironmentVariable($failureCaseVariable, '0')
         $extra = Join-Path $fixture 'untracked.cs'
         if ($failure -eq 'dirty') { [IO.File]::WriteAllText($extra, 'class Extra {}') }
         $failureMessage = ''
@@ -316,9 +392,46 @@ Export-ModuleMember -Function *
         }
     }
 
+    # A collision must extend the rotating invocation through the retained
+    # suffix, so a failure beyond the shorter configured prefix is executed.
+    [Environment]::SetEnvironmentVariable($failureCaseVariable, '4')
+    $failureMessage = ''
+    try {
+        & (Join-Path $fixtureScripts 'Invoke-SharpProofFuzzCampaign.ps1') `
+            -OutputDirectory 'artifacts/fuzz' -RotatingSeed 7 `
+            -RotatingCases 1 -RetainedCases 5
+    }
+    catch { $failureMessage = $_.Exception.Message }
+    if ($failureMessage -notlike 'SharpProof fuzz campaign failed*') {
+        throw "The colliding schedule hid a failure beyond the rotating prefix: $failureMessage"
+    }
+    $collisionOutput = Join-Path $fixture 'artifacts/fuzz'
+    $collisionSummary = Get-Content -LiteralPath (
+        Join-Path $collisionOutput 'campaign.json') -Raw | ConvertFrom-Json
+    $collisionResult = Get-Content -LiteralPath (
+        Join-Path $collisionOutput 'rotating-7.stdout.json') -Raw | ConvertFrom-Json
+    $collisionRun = @($collisionSummary.runs | Where-Object {
+            $_.name -ceq 'rotating-7'
+        })
+    if ($collisionSummary.schemaVersion -ne 5 -or
+        $collisionSummary.rotatingCases -ne 5 -or
+        $collisionSummary.requestedRotatingCases -ne 1 -or
+        $collisionSummary.retainedCasesPerSeed -ne 5 -or
+        $collisionSummary.requestedCases -ne 5 -or
+        $collisionRun.Count -ne 1 -or
+        $collisionRun[0].requestedCases -ne 5 -or
+        $collisionResult.Cases -ne 5 -or
+        @($collisionResult.Failures).Count -ne 1 -or
+        $collisionResult.Failures[0].Case -ne 4) {
+        throw 'Collision campaign evidence did not report its complete effective schedule and executed suffix failure.'
+    }
+    Write-Host 'Fuzz collision scheduling fixtures: 4'
+
     Write-Host 'Fuzz evidence lifecycle fixtures: 28'
 }
 finally {
+    [Environment]::SetEnvironmentVariable(
+        $failureCaseVariable, $originalFailureCase)
     if ([IO.Directory]::Exists($root)) {
         [IO.Directory]::Delete($root, $true)
     }

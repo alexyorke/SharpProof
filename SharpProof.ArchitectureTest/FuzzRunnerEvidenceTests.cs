@@ -9,7 +9,7 @@ public sealed class FuzzRunnerEvidenceTests
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromMinutes(2);
 
     [Test]
-    public async Task FuzzRunnerEvidenceUsesStrictSchemaFourDecoder()
+    public async Task FuzzRunnerEvidenceUsesStrictSchemaFourDecoderAndVersionedCampaignSummary()
     {
         var root = TestRepository.FindRoot();
         var start = ProcessRunner.CreateStartInfo(root, "pwsh",
@@ -25,12 +25,14 @@ public sealed class FuzzRunnerEvidenceTests
             root,
             "scripts",
             "Invoke-SharpProofFuzzCampaign.ps1"));
+        var validator = await File.ReadAllTextAsync(Path.Combine(
+            root,
+            "scripts",
+            "Assert-SharpProofFuzzRunnerResult.ps1"));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                campaign,
-                Does.Contain("Assert-SharpProofFuzzRunnerResult"));
-            Assert.That(campaign, Does.Contain("schemaVersion = 4"));
+            Assert.That(validator, Does.Contain("if ($schema -ne 4)"));
+            Assert.That(campaign, Does.Contain("schemaVersion = 5"));
         }
     }
 
