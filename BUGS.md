@@ -2,21 +2,26 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, and completion-analysis recursion-budget findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **69 findings**: 0 P0, 9 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget, and pilot-validation findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the remaining findings have not been implemented. The active backlog contains **68 findings**: 0 P0, 8 P1, 22 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
 validation, substitution ownership, cache maintenance, effect summaries, and
 analyzer diagnostics. A bounded completion-facts probe traversed 600 helpers;
-no stack-exhaustion run was attempted. Isolated pilot-validator probes used
-result-file doubles; receipt probes exercised an actual admission switch and a
-simulated changing file view. A framework-source helper was tested with empty
+no stack-exhaustion run was attempted. Historical isolated pilot-validator
+probes used result-file doubles; the working-tree B8 fixture now runs the real
+validator and receipt writer against a temporary Git repository, rejects failed
+responses and strict Refuted/Unknown claims, preserves advisory Unknown, and
+checks the passed receipt's evidence hash and pilot IDs. Receipt probes also
+exercised an actual admission switch and a simulated changing file view. A framework-source helper was tested with empty
 and prepared package caches. No full fuzz campaign, physical file race, native
 workflow, release CI run, or end-to-end qualification was executed. Worker
 eligibility and false-proof consequences of frontend and effects findings
 remain untested. The earlier Summaries suite passed 15/15 tests; it was not
-rerun in wave four and does not reproduce or disprove these findings. Earlier
-coverage from the 2026-09-16 through 2026-09-18 audits is preserved below.
+rerun in wave four and does not reproduce or disprove these findings. The B1
+change passed Effects 455/455 and Analyzer 521/521; the B8 pilot authority and
+receipt regression passed 1/1. Earlier coverage from the 2026-09-16 through
+2026-09-18 audits is preserved below.
 
 Confidence definitions:
 
@@ -47,10 +52,10 @@ regressions and unexecuted downstream paths remain open.
 | Area | Evidence in this audit | Finding or remaining gap |
 | --- | --- | --- |
 | Contracts, Frontend, ContractForGenerator, plus Analyzer/Core, Meta.Analyzers, and Attributes in wave four | Earlier exact frontend IR probes; real analyzer probes now compare direct/aliased purity attributes and cancellation-filter mutation with controls | B6 frontend, B14 analyzer, and B15 meta-analyzer boundaries observed; wider alias cases and worker consequences remain open |
-| Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; public summaries omitted managed receiver writes despite concrete mutation, with unmanaged-copy control; earlier interval probes retained | B1 bypass observed without a crash; B5 and B10 boundaries observed; EnforcePure and worker consequences untested |
+| Effects, Dataflow, and shared throw facts | Bounded facts traversal reached 600 helpers; B1 now has a shared completion-depth limit and deep-chain/tree regressions; public summaries omitted managed receiver writes despite concrete mutation, with unmanaged-copy control; earlier interval probes retained | B1 fixed and verified; B5 and B10 boundaries observed; EnforcePure and worker consequences untested |
 | IR, SMT, Summaries, and Verify | Earlier B3/B11 probes and Summaries 15/15; wave four reviewed summary ownership/signatures, substitution, model validation/replay, cancellation, and disposal without new probes or repeated suites | No distinct new finding: foreign actuals rejected by replacement validation, null models rejected before replay, extra mutable views duplicate B11; downstream gaps remain |
 | Worker, Protocol, CompilerArtifact, CompilerCollector, and Specs | Earlier B4 validator controls; real cache/filesystem reads now compare absent, malformed, oversized, and held-lock misses | B4 and B7 boundaries observed; no valid-cache-hit control or complete worker request; B3 custom-table and other downstream consequences source-traced |
-| Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches | B16 missing review handoff source-traced; B17 helper boundary observed; no release CI, native workflow, or end-to-end qualification run |
+| Host, BuildTasks, Launcher, Gates, scripts, Tools, and .github | Earlier B2/B8/B9/B12/B13 probes; B8 now validates worker response status and strict outcomes through the real receipt writer; reviewed workflow receipt producers/dependencies and exercised actual framework-source helper with empty/prepared caches | B8 validator and receipt boundary covered by fixtures; B16 missing review handoff source-traced; B17 helper boundary observed; no release CI, native workflow, or full end-to-end qualification run |
 
 B3 combines the hash-writer and specification-admission evidence into one
 deduplicated boundary finding; it is not counted twice. All five fourth-wave
@@ -202,29 +207,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P1 - High
-
-### B8. Pilot validation accepts strict refutations and failed responses
-
-**Confidence: Confirmed at the isolated validator boundary.**
-
-- **Location:** `scripts/Test-SharpProofPilotReport.ps1:143` and `:160-179`;
-  generator requirements in `scripts/Test-SharpProofPilots.ps1:353-362`;
-  receipt consumer `scripts/Write-SharpProofQualificationReceipt.ps1:94-96`.
-- **Defect:** the validator matches reported claims but does not enforce the
-  actual response's `runStatus` or require every strict-pilot outcome to be
-  `Proven`. The generator requires both conditions; the qualification receipt
-  consumer trusts validator success.
-- **Observed boundary:** an isolated probe of the actual validator, catalog,
-  and projects with in-memory result-file doubles returned
-  `baselineAccepted=true`, `strictRefutedAccepted=true`, and
-  `failedResponseAccepted=true`. These were synthetic response inputs, not an
-  actual failed worker run or an issued qualification receipt.
-- **Proposed fix:** independently validate actual response completion status
-  and strict-pilot outcomes before accepting a report or qualification input.
-- **Proposed regression:** reject strict `Refuted` and `Unknown` outcomes and
-  `Failed` responses even when reported claims match. Retain a `Complete`
-  response with all strict claims `Proven` as a positive control, then exercise
-  the receipt path with real publication files.
 
 ### B10. Managed struct receiver copies lose observable reachable writes
 

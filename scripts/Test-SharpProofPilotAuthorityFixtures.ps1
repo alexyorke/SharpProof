@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('sp-pilot-' + [Guid]::NewGuid().ToString('N'))
 $packages = Join-Path $fixture 'packages'
-$commit = '1111111111111111111111111111111111111111'
+$commit = ''
 $version = '1.0.0-preview.1'
 
 # Execute the producer's result projection with controlled build evidence.
@@ -73,7 +73,27 @@ function Require-Failure([scriptblock]$Action, [string]$Name) {
     catch { if ($_.Exception.Message -eq "Fixture '$Name' was accepted.") { throw } }
 }
 
+function Initialize-FixtureRepository {
+    [IO.Directory]::CreateDirectory($fixture) | Out-Null
+    & git -C $fixture init --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to initialize the receipt fixture repository.' }
+    & git -C $fixture config user.email 'fixture@example.invalid'
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to configure the receipt fixture repository.' }
+    & git -C $fixture config user.name 'Fixture'
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to configure the receipt fixture repository.' }
+    [IO.File]::WriteAllText((Join-Path $fixture 'tracked.txt'), "fixture`n")
+    & git -C $fixture add -- tracked.txt
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the receipt fixture repository.' }
+    & git -C $fixture commit --quiet -m fixture
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to commit the receipt fixture repository.' }
+    $script:commit = (& git -C $fixture rev-parse HEAD).Trim()
+    if ($script:commit -cnotmatch '^[0-9a-f]{40}$') {
+        throw 'Receipt fixture repository has no full commit identity.'
+    }
+}
+
 try {
+    Initialize-FixtureRepository
     Reset-Packages
     $valid = @(Get-SharpProofPilotPackageAuthority $packages $version $commit)
     if ($valid.Count -ne 6) { throw 'Canonical package authority failed.' }
@@ -90,7 +110,7 @@ try {
 
     # Restore canonical after the wrong-version case.
     Reset-Packages; $artifacts = @(Get-SharpProofPilotPackageAuthority $packages $version $commit)
-    $pilotRoot = Join-Path $fixture 'pilots'
+    $pilotRoot = Join-Path $fixture 'eng/pilots'
     [IO.Directory]::CreateDirectory($pilotRoot) | Out-Null
     $catalogRows = @(
         [ordered]@{ id='effect-one'; category='effect-heavy'; project='EffectOne/EffectOne.csproj'; library='Library.One'; libraryVersion='1.0.0'; setupFriction='none' },
@@ -123,7 +143,7 @@ try {
         $resultPath = Join-Path $fixture "results/$($row.id).json"
         [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resultPath)) | Out-Null
         [IO.File]::WriteAllText($resultPath,
-            ([ordered]@{ manifest=[ordered]@{ claims=$manifestClaims }; claimResults=$claimResults } |
+            ([ordered]@{ runStatus='Complete'; manifest=[ordered]@{ claims=$manifestClaims }; claimResults=$claimResults } |
                 ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
         $relativeResult = [IO.Path]::GetRelativePath($fixture, $resultPath).Replace('\','/')
         $evidence = @('request','compilerManifest','sarif') | ForEach-Object {
@@ -246,6 +266,108 @@ try {
         @($reviewed.pilots | Where-Object falsePositiveReports -ne 0).Count -ne 0) {
         throw 'Honest zero false-positive review failed.'
     }
+    $receiptScripts = Join-Path $fixture 'scripts'
+    [IO.Directory]::CreateDirectory($receiptScripts) | Out-Null
+    foreach ($scriptName in @(
+            'Write-SharpProofQualificationReceipt.ps1',
+            'SharpProof.ReleaseBundle.ps1',
+            'SharpProof.ReleaseJson.ps1',
+            'Test-SharpProofPilotReport.ps1',
+            'SharpProof.PackageIdentity.psm1')) {
+        Copy-Item (Join-Path $PSScriptRoot $scriptName) `
+            (Join-Path $receiptScripts $scriptName)
+    }
+    $receiptWriter = Join-Path $receiptScripts 'Write-SharpProofQualificationReceipt.ps1'
+    $receiptDirectory = Join-Path $fixture 'artifacts/release-qualification/qualification-receipts'
+    $receiptPath = Join-Path $receiptDirectory 'pilots.json'
+    function Write-PilotReceipt([string]$EvidencePath) {
+        & $receiptWriter -Gate pilots -EvidencePath $EvidencePath `
+            -ReceiptDirectory $receiptDirectory
+    }
+    Write-PilotReceipt $reviewedPath
+    $receipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
+    $reviewedHash = (Get-FileHash -LiteralPath $reviewedPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ([string]$receipt.status -cne 'passed' -or
+        [string]$receipt.commit -cne $commit -or
+        [string]$receipt.evidence.sha256 -cne $reviewedHash -or
+        @($receipt.pilotEvidence).Count -ne 5 -or
+        (@($receipt.pilotEvidence.id | Sort-Object) -join '|') -cne
+            (@($reviewed.pilots.id | Sort-Object) -join '|')) {
+        throw 'Canonical reviewed pilot evidence did not produce an authoritative receipt.'
+    }
+
+    function Require-PilotReceiptRejection(
+        [string]$Name,
+        [string]$PilotId,
+        [string]$Mutation) {
+        $variant = Copy-Json $reviewed
+        $pilot = @($variant.pilots | Where-Object { [string]$_.id -ceq $PilotId })[0]
+        $resultEvidence = @($pilot.evidence | Where-Object kind -ceq 'result')[0]
+        $resultPath = Join-Path $fixture $resultEvidence.path
+        $originalResult = [IO.File]::ReadAllText($resultPath)
+        try {
+            $response = $originalResult | ConvertFrom-Json
+            if ($Mutation -ceq 'Failed') {
+                $response.runStatus = 'Failed'
+            } else {
+                $response.claimResults[0].outcome = $Mutation
+                $pilot.claimEvidence[0].outcome = $Mutation
+            }
+            [IO.File]::WriteAllText(
+                $resultPath,
+                ($response | ConvertTo-Json -Depth 10),
+                [Text.UTF8Encoding]::new($false))
+            $resultEvidence.bytes = [int64](Get-Item $resultPath).Length
+            $invalidReportPath = Join-Path $fixture "$Name-report.json"
+            [IO.File]::WriteAllText(
+                $invalidReportPath,
+                ($variant | ConvertTo-Json -Depth 20) + "`n",
+                [Text.UTF8Encoding]::new($false))
+            if (Test-Report $variant) {
+                throw "Validator accepted '$Name' pilot evidence."
+            }
+            if (Test-Path -LiteralPath $receiptPath) {
+                Remove-Item -LiteralPath $receiptPath -Force
+            }
+            Require-Failure { Write-PilotReceipt $invalidReportPath } $Name
+            if (Test-Path -LiteralPath $receiptPath) {
+                throw "Receipt writer published '$Name' pilot evidence."
+            }
+        } finally {
+            [IO.File]::WriteAllText(
+                $resultPath,
+                $originalResult,
+                [Text.UTF8Encoding]::new($false))
+        }
+    }
+
+    $advisoryUnknown = Copy-Json $reviewed
+    $advisoryPilot = @($advisoryUnknown.pilots | Where-Object id -ceq 'effect-one')[0]
+    $advisoryResult = @($advisoryPilot.evidence | Where-Object kind -ceq 'result')[0]
+    $advisoryResultPath = Join-Path $fixture $advisoryResult.path
+    $advisoryOriginalResult = [IO.File]::ReadAllText($advisoryResultPath)
+    try {
+        $advisoryResponse = $advisoryOriginalResult | ConvertFrom-Json
+        $advisoryResponse.claimResults[0].outcome = 'Unknown'
+        $advisoryPilot.claimEvidence[0].outcome = 'Unknown'
+        [IO.File]::WriteAllText(
+            $advisoryResultPath,
+            ($advisoryResponse | ConvertTo-Json -Depth 10),
+            [Text.UTF8Encoding]::new($false))
+        $advisoryResult.bytes = [int64](Get-Item $advisoryResultPath).Length
+        if (-not (Test-Report $advisoryUnknown)) {
+            throw 'Documented advisory Unknown outcome was rejected.'
+        }
+    } finally {
+        [IO.File]::WriteAllText(
+            $advisoryResultPath,
+            $advisoryOriginalResult,
+            [Text.UTF8Encoding]::new($false))
+    }
+    Require-PilotReceiptRejection 'failed-response' 'effect-one' 'Failed'
+    Require-PilotReceiptRejection 'strict-refuted' 'mixed-one' 'Refuted'
+    Require-PilotReceiptRejection 'strict-unknown' 'mixed-one' 'Unknown'
+
     $ledger.reviews[0].disposition = 'FalsePositive'; Write-Ledger $ledger
     Complete-Review
     $reviewed = Get-Content $reviewedPath -Raw | ConvertFrom-Json

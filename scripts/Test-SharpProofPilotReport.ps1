@@ -159,6 +159,9 @@ function Test-SharpProofPilotReport {
             [int64](Get-Item -LiteralPath $resultPath).Length -ne [int64]$resultEvidence[0].bytes) { return $false }
         try { $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json -ErrorAction Stop }
         catch { return $false }
+        if ($response -isnot [pscustomobject] -or
+            @($response.PSObject.Properties.Name) -cnotcontains 'runStatus' -or
+            [string]$response.runStatus -cne 'Complete') { return $false }
         $manifestClaims = @($response.manifest.claims)
         $claimResults = @($response.claimResults)
         $actual = @(ConvertTo-SharpProofPilotClaimEvidence `
@@ -173,6 +176,10 @@ function Test-SharpProofPilotReport {
                 [string]$reported[$index].outcome -cne [string]$actual[$index].outcome) { return $false }
         }
         $kinds = @($actual.kind | Select-Object -Unique)
+        if ($expectedPilot.category -eq 'mixed-strict' -and
+            @($actual | Where-Object { [string]$_.outcome -cne 'Proven' }).Count -ne 0) {
+            return $false
+        }
         if (($expectedPilot.category -eq 'effect-heavy' -and $kinds -cnotcontains 'Effect') -or
             ($expectedPilot.category -eq 'contract-heavy' -and $kinds -cnotcontains 'Postcondition') -or
             ($expectedPilot.category -eq 'mixed-strict' -and
