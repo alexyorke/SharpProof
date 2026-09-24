@@ -191,6 +191,58 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     [Test]
+    public void SourceRebindingRejectsReturnAttributeRelocationToInvocation()
+    {
+        const string source =
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "#if NEVER\n" +
+            "  [return: Positive()]\n" +
+            "#endif\n" +
+            "  [return /* target */: Positive(), InRange(1, 2)]\n" +
+            "  internal static int Value() { SideFxOp(); return 1; }\n" +
+            "  private const string Fake = \"[return: SideFxOp()]\";\n" +
+            "  private static void SideFxOp() {}\n" +
+            "}\n";
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "ReturnAttributeRebinding-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(path, source, new UTF8Encoding(false));
+        var compilation = CSharpCompilation.Create(
+            "ReturnAttributeRebindingTest",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                path)],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        var artifact = CreateArtifact(compilation);
+        var claim = artifact.Manifest.Claims.First();
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+        Assert.That(
+            artifact.Manifest.Claims.Select(static item => item.Evidence),
+            Is.All.EqualTo(WorkerClaimEvidence.ReturnAttribute));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        var span = "SideFxOp()";
+        MoveClaimAndReseal(artifact, claim,
+            source.LastIndexOf(span, StringComparison.Ordinal), span.Length);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+
+        MoveClaimAndReseal(artifact, claim,
+            source.IndexOf(span, StringComparison.Ordinal), span.Length);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
     public void SourceRebindingSkipsTreesWithoutAFile()
     {
         var artifact = CreateOnDiskContractArtifact(out _);
@@ -546,6 +598,40 @@ public sealed class CompilerSourceLocationAuthorityTests
             authority.SourceTreeSha256,
             authority.SourceLineMapSha256,
             compilation);
+    }
+
+    private static void MoveClaimAndReseal(
+        CompilerManifestArtifact artifact,
+        WorkerClaimManifestEntry claim,
+        int start,
+        int length)
+    {
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        Assert.That(
+            CompilerSourceLocationAuthority.TryMap(
+                tree.LineMap,
+                start,
+                out var mappedPath,
+                out var mappedLine,
+                out var mappedColumn),
+            Is.True);
+        claim.Location = new WorkerSourceLocation
+        {
+            Path = mappedPath,
+            Start = start,
+            Length = length,
+            Line = mappedLine + 1,
+            Column = mappedColumn + 1
+        };
+        artifact.LocationAuthorities.Single(authority =>
+                authority.OwnerKind == CompilerSourceLocationOwnerKind.Claim &&
+                authority.OwnerId == claim.ClaimId)
+            .Location = CompilerSourceLocationAuthority.CopyLocation(
+                claim.Location);
+        artifact.Manifest.Hash =
+            WorkerProtocolJson.ComputeManifestHash(artifact.Manifest);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
     }
 
     private static CompilerManifestArtifact CreateArtifact(string source)

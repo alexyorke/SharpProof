@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
@@ -65,7 +66,8 @@ internal static class CompilerSourceRebinding
                         WorkerClaimEvidence.DirectClause or
                         WorkerClaimEvidence.CompanionClause =>
                             IsEnsuresInvocation(span),
-                        WorkerClaimEvidence.ReturnAttribute or
+                        WorkerClaimEvidence.ReturnAttribute =>
+                            IsAttribute(span, text, authority.Location),
                         WorkerClaimEvidence.Attribute => IsAttribute(span),
                         _ => false
                     };
@@ -247,14 +249,80 @@ internal static class CompilerSourceRebinding
         return false;
     }
 
-    private static bool IsAttribute(string span)
+    private static bool IsAttribute(
+        string span,
+        string? source = null,
+        WorkerSourceLocation? location = null)
     {
-        return span.Length != 0 &&
+        var validShape = span.Length != 0 &&
             (char.IsLetter(span[0]) || span[0] is '_' or '@') &&
             (IsIdentifierPart(span[span.Length - 1]) ||
                 span[span.Length - 1] == ')');
-    }
+        if (!validShape)
+        {
+            return false;
+        }
+        if (source == null)
+        {
+            return location == null;
+        }
+        if (location == null)
+        {
+            return false;
+        }
 
+        var locationStart = location.Start;
+        if (locationStart < 0 || location.Length <= 0 ||
+            location.Length > source.Length - locationStart ||
+            !source.AsSpan(locationStart, location.Length)
+                .SequenceEqual(span.AsSpan()))
+        {
+            return false;
+        }
+        var locationEnd = locationStart + location.Length;
+
+        const string nonCodePattern =
+            @"(?<raw>""{3,})[\s\S]*?\k<raw>|" +
+            @"//[^\r\n\u0085\u2028\u2029]*|/\*[\s\S]*?\*/|" +
+            @"(?:\$@|@\$|@|\$)?""(?:""""|\\.|[^""\\])*""|" +
+            @"'(?:\\.|[^'\\])*'";
+        const string attributeName =
+            @"@?[\p{L}_][\p{L}\p{Nd}_]*(?:\s*(?:\.|::)\s*@?[\p{L}_][\p{L}\p{Nd}_]*)*";
+        const string arguments =
+            @"\((?:[^()]|(?<nested>\()|(?<-nested>\)))*(?(nested)(?!))\)";
+        var attribute = attributeName + @"(?:\s*" + arguments + @")?";
+        var precedingAttributes =
+            @"\[\s*return\b\s*:\s*(?:" + attribute + @"\s*,\s*)*$";
+        var followingAttribute =
+            @"^\s*(?:" + arguments + @")?\s*(?:,|\])";
+        const RegexOptions options =
+            RegexOptions.CultureInvariant | RegexOptions.Singleline;
+        var timeout = TimeSpan.FromSeconds(1);
+
+        try
+        {
+            var code = Regex.Replace(
+                source,
+                nonCodePattern,
+                match => new string(' ', match.Length),
+                options,
+                timeout);
+            return Regex.IsMatch(
+                    code.Substring(0, locationStart),
+                    precedingAttributes,
+                    options,
+                    timeout) &&
+                Regex.IsMatch(
+                    code.Substring(locationEnd),
+                    followingAttribute,
+                    options,
+                    timeout);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+    }
     private static bool IsDeclaration(string span)
     {
         return span.Length != 0 && span[span.Length - 1] is '}' or ';';
