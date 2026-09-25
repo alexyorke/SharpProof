@@ -104,6 +104,11 @@ internal static class LanguageSubsetGate
                 continue;
             }
 
+            if (operation is INameOfOperation)
+            {
+                continue;
+            }
+
             var children = operation.ChildOperations;
             foreach (var child in children.Reverse())
             {

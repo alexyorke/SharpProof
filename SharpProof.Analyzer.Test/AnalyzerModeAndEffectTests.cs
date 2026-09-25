@@ -786,6 +786,81 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task NameOfOperandsAreCompileTimeOnlyAndUnsupportedOperationsStillAbstain()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Plain {
+                public static int Member { get; }
+            }
+
+            public static class Fixture {
+                [EnforcePure]
+                public static string TypeName() => nameof(Plain);
+
+                [EnforcePure]
+                public static string GenericTypeName() =>
+                    nameof(System.Collections.Generic.List<int>);
+
+                [EnforcePure]
+                public static string QualifiedTypeName() => nameof(System.Math);
+
+                [EnforcePure]
+                public static string ParameterName(int value) => nameof(value);
+
+                [EnforcePure]
+                public static string MemberName() => nameof(Plain.Member);
+
+                [EnforcePure]
+                public static object UnsupportedDynamicMember(dynamic value) =>
+                    value.Member;
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 1);
+            var unsupportedDynamicDiagnostic = diagnostics.SingleOrDefault(
+                diagnostic => diagnostic
+                    .GetMessage(CultureInfo.InvariantCulture)
+                    .Contains("UnsupportedCallable", StringComparison.Ordinal));
+            Assert.That(
+                unsupportedDynamicDiagnostic,
+                Is.Not.Null);
+            Assert.That(
+                unsupportedDynamicDiagnostic?
+                    .GetMessage(CultureInfo.InvariantCulture) ?? string.Empty,
+                Does.Contain("UnsupportedCallable"));
+            foreach (var callable in new[] {
+                "TypeName",
+                "GenericTypeName",
+                "QualifiedTypeName",
+                "ParameterName",
+                "MemberName"
+            })
+            {
+                Assert.That(factory.OutcomeCounts[callable], Is.EqualTo(1));
+                Assert.That(
+                    factory.Outcomes[callable],
+                    Is.EqualTo(AnalyzerSemanticOutcome.Proven),
+                    callable);
+            }
+            Assert.That(
+                factory.OutcomeCounts["UnsupportedDynamicMember"],
+                Is.EqualTo(1));
+            Assert.That(
+                factory.Outcomes["UnsupportedDynamicMember"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+        }
+    }
+
+    [Test]
     public async Task ComputedPropertySetterPreconditionsDoNotUseAnOperandAsTheStoredValue()
     {
         var factory = new RecordingSessionFactory();
