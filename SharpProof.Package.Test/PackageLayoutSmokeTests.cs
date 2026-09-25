@@ -1468,14 +1468,14 @@ public sealed class PackageLayoutSmokeTests
             }
             """,
             "effects",
-            "SP0047");
+            "SP0052");
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
 
         var build = await BuildAnalyzerConsumerAsync(workspace);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(build.ExitCode, Is.Zero, build.Output);
-            Assert.That(build.Output, Does.Contain("SP0047"));
+            Assert.That(build.Output, Does.Contain("SP0052").And.Not.Contain("SP0047"));
             Assert.That(
                 build.Output,
                 Does.Contain("'ReadString'")

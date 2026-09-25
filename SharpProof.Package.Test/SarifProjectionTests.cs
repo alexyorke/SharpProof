@@ -104,6 +104,121 @@ public sealed class SarifProjectionTests
     }
 
     [Test]
+    public void AbsolutePathsInsideSourceRootAreRelativeAndOutsidePathsStayAbsolute()
+    {
+        const string projectDirectory = "/workspace/consumer project";
+        (string CallableId, string ClaimId, string Path)[] sources =
+        [
+            ("Consumer.Subject.Root()", "claim-root", projectDirectory),
+            ("Consumer.Subject.Inside()", "claim-inside",
+                projectDirectory + "/src/Foo #?.cs"),
+            ("Consumer.Subject.Sibling()", "claim-sibling",
+                projectDirectory + "-backup/Foo.cs"),
+            ("Consumer.Subject.Outside()", "claim-outside",
+                "/opt/external/Foo.cs")
+        ];
+        var locations = sources.Select(static source =>
+            new WorkerSourceLocation
+            {
+                Path = source.Path,
+                Start = 0,
+                Length = 1,
+                Line = 1,
+                Column = 1
+            }).ToArray();
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [.. sources.Select((source, index) =>
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = source.CallableId,
+                    Location = locations[index],
+                    ClaimIds = [source.ClaimId]
+                })],
+            Claims = [.. sources.Select((source, index) =>
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = source.ClaimId,
+                    CallableId = source.CallableId,
+                    Ordinal = index,
+                    Kind = WorkerClaimKind.Postcondition,
+                    Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = locations[index]
+                })]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            ClaimResults = [.. sources.Select(static source =>
+                new WorkerClaimResult
+                {
+                    ClaimId = source.ClaimId,
+                    Outcome = WorkerClaimOutcome.Proven,
+                    Reason = WorkerClaimReason.None
+                })],
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "1.0.0-test"
+                }
+            }
+        };
+
+        using var document = JsonDocument.Parse(
+            SarifProjection.Serialize(
+                new WorkerVerifyRequest(),
+                response,
+                projectDirectory));
+        var run = document.RootElement.GetProperty("runs")[0];
+        var results = run.GetProperty("results");
+        var sourceRoot = run.GetProperty("originalUriBaseIds")
+            .GetProperty("%SRCROOT%")
+            .GetProperty("uri")
+            .GetString();
+
+        JsonElement ArtifactLocationFor(string claimId)
+        {
+            var result = results.EnumerateArray().Single(candidate =>
+                candidate.GetProperty("partialFingerprints")
+                    .GetProperty("sharpProofSemanticId/v1")
+                    .GetString() == claimId);
+            return result.GetProperty("locations")[0]
+                .GetProperty("physicalLocation")
+                .GetProperty("artifactLocation");
+        }
+
+        var rootLocation = ArtifactLocationFor("claim-root");
+        Assert.That(rootLocation.GetProperty("uri").GetString(), Is.EqualTo("."));
+        Assert.That(
+            rootLocation.GetProperty("uriBaseId").GetString(),
+            Is.EqualTo("%SRCROOT%"));
+
+        var insideLocation = ArtifactLocationFor("claim-inside");
+        Assert.That(
+            insideLocation.GetProperty("uri").GetString(),
+            Is.EqualTo("src/Foo%20%23%3F.cs"));
+        Assert.That(
+            insideLocation.GetProperty("uriBaseId").GetString(),
+            Is.EqualTo("%SRCROOT%"));
+
+        Assert.That(
+            ArtifactLocationFor("claim-sibling").GetProperty("uri").GetString(),
+            Is.EqualTo("file:///workspace/consumer%20project-backup/Foo.cs"));
+        Assert.That(
+            ArtifactLocationFor("claim-outside").GetProperty("uri").GetString(),
+            Is.EqualTo("file:///opt/external/Foo.cs"));
+        Assert.That(
+            ArtifactLocationFor("claim-sibling").TryGetProperty(
+                "uriBaseId", out _),
+            Is.False);
+        Assert.That(sourceRoot, Is.EqualTo("file:///workspace/consumer%20project/"));
+    }
+
+    [Test]
     public void ImplementationIlProofMakesRuntimeBinaryAssumptionVisible()
     {
         const string projectDirectory = "/workspace/consumer";

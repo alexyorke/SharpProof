@@ -28,15 +28,17 @@ internal static class SarifProjection
         var callables = manifest.Callables.ToDictionary(
             static callable => callable.CallableId, StringComparer.Ordinal);
         var results = claimResults
-            .Select(result => ClaimResult(request, result, claims[result.ClaimId]))
+            .Select(result => ClaimResult(
+                request, result, claims[result.ClaimId], projectDirectory))
             .ToList();
         results.AddRange(callableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
-            .Select(result => IncompleteResult(request, result, callables[result.CallableId])));
+            .Select(result => IncompleteResult(
+                request, result, callables[result.CallableId], projectDirectory)));
         results.AddRange(callableResults
             .Where(static result => result.Assumptions.Any(IsPolicyAssumption))
             .Select(result => AssumptionResult(
-                request, result, callables[result.CallableId])));
+                request, result, callables[result.CallableId], projectDirectory)));
         var notifications = errors.Select(
             static error => Notification(error.Code, error.Message)).ToList();
 
@@ -87,7 +89,7 @@ internal static class SarifProjection
 
     private static object ClaimResult(
         WorkerVerifyRequest request, WorkerClaimResult result,
-        WorkerClaimManifestEntry claim)
+        WorkerClaimManifestEntry claim, string projectDirectory)
     {
         var outcome = result.Outcome;
         var reasonValue = result.Reason;
@@ -128,12 +130,12 @@ internal static class SarifProjection
             {
                 claim,
                 result
-            });
+            }, projectDirectory);
     }
 
     private static object IncompleteResult(
         WorkerVerifyRequest request, WorkerCallableResult result,
-        WorkerCallableManifestEntry callable)
+        WorkerCallableManifestEntry callable, string projectDirectory)
     {
         var callableId = result.CallableId;
         var reason = result.Reason;
@@ -149,12 +151,12 @@ internal static class SarifProjection
             {
                 callable,
                 result
-            });
+            }, projectDirectory);
     }
 
     private static object AssumptionResult(
         WorkerVerifyRequest request, WorkerCallableResult result,
-        WorkerCallableManifestEntry callable)
+        WorkerCallableManifestEntry callable, string projectDirectory)
     {
         var assumptions = result.Assumptions
             .Where(IsPolicyAssumption)
@@ -172,7 +174,7 @@ internal static class SarifProjection
             {
                 callable,
                 assumptions
-            });
+            }, projectDirectory);
     }
 
     private static bool IsPolicyAssumption(
@@ -197,7 +199,8 @@ internal static class SarifProjection
 
     private static object Result(
         string ruleId, string kind, string level, string message,
-        WorkerSourceLocation location, string semanticId, object properties)
+        WorkerSourceLocation location, string semanticId, object properties,
+        string projectDirectory)
     {
         return new
         {
@@ -209,7 +212,8 @@ internal static class SarifProjection
                 text = message
             },
             locations = new[] { new { physicalLocation = new {
-                artifactLocation = ArtifactLocation(location.Path),
+                artifactLocation = ArtifactLocation(
+                    location.Path, projectDirectory),
                 region = new {
                     startLine = location.Line, startColumn = location.Column
                 }
@@ -239,8 +243,19 @@ internal static class SarifProjection
         };
     }
 
-    private static object ArtifactLocation(string path)
+    private static object ArtifactLocation(
+        string path, string projectDirectory)
     {
+        if (TryRelativePathUnderProjectRoot(
+                path, projectDirectory, out var relativePath))
+        {
+            return new
+            {
+                uri = EscapePath(relativePath),
+                uriBaseId = SourceRootUriBaseId
+            };
+        }
+
         return TryAbsolutePathUri(path, out var uri)
             ? new { uri }
             : new
@@ -248,6 +263,79 @@ internal static class SarifProjection
                 uri = EscapePath(path),
                 uriBaseId = SourceRootUriBaseId
             };
+    }
+
+    private static bool TryRelativePathUnderProjectRoot(
+        string path, string projectDirectory, out string relativePath)
+    {
+        var windowsPath = IsWindowsDriveAbsolute(path);
+        if (windowsPath != IsWindowsDriveAbsolute(projectDirectory) ||
+            !windowsPath &&
+            (!IsUnixAbsolute(path) || !IsUnixAbsolute(projectDirectory)))
+        {
+            relativePath = string.Empty;
+            return false;
+        }
+
+        var comparison = windowsPath
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var normalizedPath = NormalizeAbsolutePath(path, windowsPath);
+        var normalizedRoot = NormalizeAbsolutePath(
+            projectDirectory, windowsPath);
+        if (string.Equals(normalizedPath, normalizedRoot, comparison))
+        {
+            relativePath = ".";
+            return true;
+        }
+
+        var rootPrefix = normalizedRoot.EndsWith('/')
+            ? normalizedRoot
+            : normalizedRoot + "/";
+        if (!normalizedPath.StartsWith(rootPrefix, comparison))
+        {
+            relativePath = string.Empty;
+            return false;
+        }
+
+        relativePath = normalizedPath[rootPrefix.Length..];
+        return true;
+    }
+
+    private static bool IsUnixAbsolute(string path)
+    {
+        return path.Length != 0 && path[0] == '/';
+    }
+
+    private static string NormalizeAbsolutePath(
+        string path, bool windowsPath)
+    {
+        var normalized = path.Replace('\\', '/');
+        var segments = normalized[(windowsPath ? 2 : 1)..].Split(
+            '/', StringSplitOptions.RemoveEmptyEntries);
+        var reducedSegments = new List<string>(segments.Length);
+        foreach (var segment in segments)
+        {
+            if (segment == ".")
+            {
+                continue;
+            }
+
+            if (segment == "..")
+            {
+                if (reducedSegments.Count != 0)
+                {
+                    reducedSegments.RemoveAt(reducedSegments.Count - 1);
+                }
+
+                continue;
+            }
+
+            reducedSegments.Add(segment);
+        }
+
+        var prefix = windowsPath ? normalized[..2] + "/" : "/";
+        return prefix + string.Join("/", reducedSegments);
     }
 
     private static string DirectoryUri(string path)
