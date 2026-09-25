@@ -281,14 +281,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         OperationAnalysisContext context,
         KnownSymbols symbols)
     {
-        AnalyzeSemanticString(context);
+        AnalyzeSemanticString(context, symbols);
         if (IsStringAddition(context.Operation))
         {
             AnalyzeCSharpExpressionText(context, context.Operation, symbols);
         }
     }
 
-    private static void AnalyzeSemanticString(OperationAnalysisContext context)
+    private static void AnalyzeSemanticString(
+        OperationAnalysisContext context,
+        KnownSymbols symbols)
     {
         if (context.Operation is not IBinaryOperation
             {
@@ -300,6 +302,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
         var literalResolver = new SemanticLiteralResolver(
             binary,
+            symbols,
             context.CancellationToken);
         var literal = literalResolver.Resolve(binary.LeftOperand) ??
             literalResolver.Resolve(binary.RightOperand);
@@ -321,14 +324,34 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var isObjectEquals =
             method.ContainingType.SpecialType == SpecialType.System_Object &&
             method.Name == "Equals";
-        if (method.ReturnType.SpecialType != SpecialType.System_Boolean ||
-            !isStringPredicate && !isObjectEquals)
+        var isEqualityComparerEquals =
+            method.Name == "Equals" &&
+            symbols.ImplementsGenericInterface(
+                invocation.Instance?.Type ?? method.ContainingType,
+                "IEqualityComparer`1");
+        var isCollectionMembership =
+            IsCollectionMembershipInvocation(invocation, symbols);
+        var isSpanSequenceEqual =
+            method.Name == "SequenceEqual" &&
+            IsSameType(method.ContainingType, symbols.MemoryExtensions);
+        var isStringOrdinalComparison =
+            IsSameType(method.ContainingType, symbols[KnownType.String]) &&
+            (method.Name.StartsWith("Compare", StringComparison.Ordinal) ||
+             method.Name is "IndexOf" or "LastIndexOf") &&
+            method.ReturnType.SpecialType == SpecialType.System_Int32 &&
+            IsUsedInComparison(invocation);
+        var isBooleanComparison =
+            method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+            (isStringPredicate || isObjectEquals || isEqualityComparerEquals ||
+             isCollectionMembership || isSpanSequenceEqual);
+        if (!isBooleanComparison && !isStringOrdinalComparison)
         {
             return;
         }
 
         var literalResolver = new SemanticLiteralResolver(
             invocation,
+            symbols,
             context.CancellationToken);
         var literal = invocation.Instance == null
             ? null
@@ -340,6 +363,84 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, invocation.Syntax.GetLocation(), literal);
         }
+    }
+
+    private static bool IsCollectionMembershipInvocation(
+        IInvocationOperation invocation,
+        KnownSymbols symbols)
+    {
+        var method = invocation.TargetMethod;
+        var receiverType = invocation.Instance?.Type ??
+            invocation.Arguments.FirstOrDefault()?.Value.Type;
+        if (method.Name is "ContainsKey" or "TryGetValue")
+        {
+            return symbols.ImplementsGenericInterface(
+                    receiverType,
+                    "IDictionary`2") ||
+                symbols.ImplementsGenericInterface(
+                    receiverType,
+                    "IReadOnlyDictionary`2");
+        }
+
+        if (method.Name != "Contains")
+        {
+            return false;
+        }
+
+        return symbols.ImplementsGenericInterface(
+                receiverType,
+                "ICollection`1") ||
+            symbols.ImplementsGenericInterface(receiverType, "ISet`1") ||
+            symbols.ImplementsGenericInterface(
+                receiverType,
+                "IReadOnlySet`1") ||
+            IsSameType(method.ContainingType, symbols.Enumerable) &&
+            symbols.ImplementsGenericInterface(
+                receiverType,
+                "IEnumerable`1");
+    }
+
+    private static bool IsUsedInComparison(IOperation operation)
+    {
+        var parent = operation.Parent;
+        while (parent is IParenthesizedOperation or
+               IConversionOperation { OperatorMethod: null })
+        {
+            parent = parent.Parent;
+        }
+
+        return parent is IBinaryOperation
+        {
+            OperatorKind: BinaryOperatorKind.Equals or
+                BinaryOperatorKind.NotEquals or
+                BinaryOperatorKind.LessThan or
+                BinaryOperatorKind.LessThanOrEqual or
+                BinaryOperatorKind.GreaterThan or
+                BinaryOperatorKind.GreaterThanOrEqual
+        };
+    }
+
+    private static IOperation? GetStringAsSpanSource(
+        IInvocationOperation invocation,
+        KnownSymbols symbols)
+    {
+        var method = invocation.TargetMethod.ReducedFrom ??
+            invocation.TargetMethod;
+        if (method.Name != "AsSpan" ||
+            !IsSameType(method.ContainingType, symbols.MemoryExtensions))
+        {
+            return null;
+        }
+
+        if (invocation.Instance?.Type?.SpecialType == SpecialType.System_String)
+        {
+            return invocation.Instance;
+        }
+
+        return invocation.Arguments
+            .Select(static argument => argument.Value)
+            .FirstOrDefault(static argument =>
+                argument.Type?.SpecialType == SpecialType.System_String);
     }
 
     private static void AnalyzeSemanticPatternControlFlow(
@@ -580,15 +681,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private sealed class SemanticLiteralResolver
     {
         private readonly CancellationToken _cancellationToken;
+        private readonly KnownSymbols _symbols;
         private readonly Lazy<Dictionary<ILocalSymbol, List<IOperation>>> _assignments;
         private readonly Dictionary<ILocalSymbol, string> _literalCache =
             new(SymbolEqualityComparer.Default);
 
         internal SemanticLiteralResolver(
             IOperation operation,
+            KnownSymbols symbols,
             CancellationToken cancellationToken)
         {
             _cancellationToken = cancellationToken;
+            _symbols = symbols;
             _assignments = new(() => IndexAssignments(operation, cancellationToken));
         }
 
@@ -651,6 +755,15 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     return Resolve(conversion.Operand, visitedLocals);
                 case IParenthesizedOperation parenthesized:
                     return Resolve(parenthesized.Operand, visitedLocals);
+                case IInvocationOperation invocation:
+                    var stringSpanSource = GetStringAsSpanSource(
+                        invocation,
+                        _symbols);
+                    if (stringSpanSource != null)
+                    {
+                        return Resolve(stringSpanSource, visitedLocals);
+                    }
+                    break;
             }
             if (operation is not ILocalReferenceOperation localReference ||
                 !visitedLocals.Add(localReference.Local))
@@ -1460,6 +1573,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     internal sealed class KnownSymbols
     {
         private readonly ImmutableArray<INamedTypeSymbol?> _types;
+        private readonly ImmutableArray<INamedTypeSymbol?> _comparisonInterfaces;
 
         internal KnownSymbols(Compilation compilation)
         {
@@ -1473,6 +1587,25 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             _types = [.. types];
             StringBuilder = compilation.GetTypeByMetadataName(
                 "System.Text.StringBuilder");
+            _comparisonInterfaces = [
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.IEqualityComparer`1"),
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.ICollection`1"),
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.ISet`1"),
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.IReadOnlySet`1"),
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.IDictionary`2"),
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.IReadOnlyDictionary`2"),
+                compilation.GetTypeByMetadataName(
+                    "System.Collections.Generic.IEnumerable`1")];
+            MemoryExtensions = compilation.GetTypeByMetadataName(
+                "System.MemoryExtensions");
+            Enumerable = compilation.GetTypeByMetadataName(
+                "System.Linq.Enumerable");
 
             var task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
             TaskOfInt32 = task?.Construct(compilation.GetSpecialType(SpecialType.System_Int32));
@@ -1497,6 +1630,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             get;
         }
+        internal INamedTypeSymbol? MemoryExtensions
+        {
+            get;
+        }
+        internal INamedTypeSymbol? Enumerable
+        {
+            get;
+        }
         internal INamedTypeSymbol? TaskOfInt32
         {
             get;
@@ -1508,6 +1649,33 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         internal IMethodSymbol? WorkerVerifyAsync
         {
             get;
+        }
+
+        internal bool ImplementsGenericInterface(
+            ITypeSymbol? type,
+            string metadataName)
+        {
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            foreach (var candidate in _comparisonInterfaces)
+            {
+                if (candidate?.MetadataName != metadataName)
+                {
+                    continue;
+                }
+
+                if (IsSameType(namedType, candidate) ||
+                    namedType.AllInterfaces.Any(interfaceType =>
+                        IsSameType(interfaceType, candidate)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

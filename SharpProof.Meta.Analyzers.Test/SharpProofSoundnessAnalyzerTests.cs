@@ -35,9 +35,15 @@ public sealed class SharpProofSoundnessAnalyzerTests
         var operation = compilation.GetSemanticModel(tree).GetOperation(returned)!;
         var type = typeof(SharpProofSoundnessAnalyzer).GetNestedType(
             "SemanticLiteralResolver", BindingFlags.NonPublic)!;
+        var symbolsType = typeof(SharpProofSoundnessAnalyzer).GetNestedType(
+            "KnownSymbols", BindingFlags.NonPublic)!;
+        var symbols = Activator.CreateInstance(
+            symbolsType,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null, args: [compilation], culture: null)!;
         var resolver = Activator.CreateInstance(
             type, BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null, args: [operation, CancellationToken.None], culture: null)!;
+            binder: null, args: [operation, symbols, CancellationToken.None], culture: null)!;
         var assignments = type.GetField(
             "_assignments", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(resolver)!;
@@ -1402,6 +1408,105 @@ public sealed class SharpProofSoundnessAnalyzerTests
             diagnostics.Count(static diagnostic =>
                 diagnostic.Id == "SPMETA004"),
             Is.EqualTo(5));
+    }
+
+    [Test]
+    public async Task ReportsSemanticStringControlFlowAcrossComparersAndCollections()
+    {
+        const string source =
+            """
+            using System;
+            using System.Collections.Generic;
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool StringComparerEquals(string reason) =>
+                    StringComparer.Ordinal.Equals(reason, "ir.string_comparer");
+
+                internal static bool EqualityComparerEquals(string reason) =>
+                    EqualityComparer<string>.Default.Equals(reason, "ir_equality_comparer");
+
+                internal static bool CompareOrdinal(string reason) =>
+                    string.CompareOrdinal(reason, "ir.compare_ordinal") == 0;
+
+                internal static bool Compare(string reason) =>
+                    string.Compare(reason, "ir.compare", StringComparison.Ordinal) == 0;
+
+                internal static bool CompareTo(string reason) =>
+                    reason.CompareTo("ir.compare_to") == 0;
+
+                internal static bool IndexOf(string reason) =>
+                    reason.IndexOf("ir.", StringComparison.Ordinal) >= 0;
+
+                internal static bool LastIndexOf(string reason) =>
+                    reason.LastIndexOf("ir_", StringComparison.Ordinal) >= 0;
+
+                internal static bool DictionaryContainsKey(
+                    Dictionary<string, int> dictionary) =>
+                    dictionary.ContainsKey("ir.dictionary_key");
+
+                internal static bool SetContains(HashSet<string> set) =>
+                    set.Contains("ir.set_item");
+
+                internal static bool ListContains(List<string> values) =>
+                    values.Contains("ir.list_item");
+
+                internal static bool DictionaryTryGetValue(
+                    Dictionary<string, int> dictionary) =>
+                    dictionary.TryGetValue("ir.try_get_value", out _);
+
+                internal static bool SpanSequenceEqual(string reason) =>
+                    reason.AsSpan().SequenceEqual("ir.span_sequence".AsSpan());
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(12));
+    }
+
+    [Test]
+    public async Task DoesNotTreatSemanticLookingDiagnosticOrLogTextAsComparison()
+    {
+        const string source =
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Diagnostics;
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool OrdinaryComparison(
+                    string reason,
+                    Dictionary<string, int> dictionary,
+                    HashSet<string> set) =>
+                    reason == "ordinary" ||
+                    StringComparer.Ordinal.Equals(reason, "ordinary") ||
+                    EqualityComparer<string>.Default.Equals(reason, "ordinary") ||
+                    string.CompareOrdinal(reason, "ordinary") == 0 ||
+                    reason.IndexOf("ordinary", StringComparison.Ordinal) >= 0 ||
+                    dictionary.ContainsKey("ordinary") ||
+                    set.Contains("ordinary") ||
+                    dictionary.TryGetValue("ordinary", out _) ||
+                    reason.AsSpan().SequenceEqual("ordinary".AsSpan());
+
+                internal static string DiagnosticMessage() =>
+                    string.Format("Unsupported reason: {0}", "ir.unsupported");
+
+                internal static void LogSemanticLookingText() =>
+                    Trace.WriteLine(string.Format(
+                        "Unrecognized value: {0}",
+                        "ir_unrecognized"));
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Any(static diagnostic =>
+                diagnostic.Id == "SPMETA004"),
+            Is.False);
     }
 
     [Test]
