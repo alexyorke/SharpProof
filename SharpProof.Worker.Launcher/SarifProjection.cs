@@ -93,6 +93,9 @@ internal static class SarifProjection
         var reasonValue = result.Reason;
         var effectWitness = result.EffectWitness;
         var reason = reasonValue == WorkerClaimReason.None ? string.Empty : " (" + reasonValue + ")";
+        var vacuity = result.Vacuity == WorkerVacuityKind.None
+            ? string.Empty
+            : " [vacuous: " + result.Vacuity + "]";
         var implementationIlAssumption = result.ProofCore.Any(
             static item => item.StartsWith(
                 "il-summary:", StringComparison.Ordinal))
@@ -105,6 +108,8 @@ internal static class SarifProjection
                 ":" + effectWitness.Location.Column + "]";
         var presentation = outcome switch
         {
+            WorkerClaimOutcome.Proven when result.Vacuity != WorkerVacuityKind.None =>
+                (Kind: "review", Level: "none"),
             WorkerClaimOutcome.Proven => (Kind: "pass", Level: "none"),
             WorkerClaimOutcome.Refuted => (Kind: "fail", Level: "error"),
             WorkerClaimOutcome.Unknown => UnknownPresentation(request.VerifyPolicy),
@@ -116,7 +121,7 @@ internal static class SarifProjection
             presentation.Level,
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId +
-                implementationIlAssumption + reason + witness,
+                implementationIlAssumption + reason + vacuity + witness,
             effectWitness?.Location ?? claim.Location,
             result.ClaimId,
             new

@@ -496,8 +496,11 @@ internal static class Program
             var result = response.ClaimResults[index];
             var claim = response.Manifest.Claims[index];
             var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
+            var vacuity = result.Vacuity == WorkerVacuityKind.None
+                ? string.Empty
+                : " [vacuous: " + result.Vacuity + "]";
             Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
-                LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason);
+                LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason + vacuity);
             if (result.Outcome == WorkerClaimOutcome.Refuted)
             {
                 ReportRefutedClaim(claim, result);

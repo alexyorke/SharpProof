@@ -1615,6 +1615,138 @@ public sealed class LauncherArgumentTests
     }
 
     [TestCase(
+        WorkerVacuityKind.ContradictoryPreconditions,
+        "review", "none")]
+    [TestCase(
+        WorkerVacuityKind.NoModeledNormalReturn,
+        "review", "none")]
+    [TestCase(WorkerVacuityKind.None, "pass", "none")]
+    [NonParallelizable]
+    public void ProvenVacuityIsVisibleInConsoleAndSarif(
+        WorkerVacuityKind vacuity,
+        string expectedSarifKind,
+        string expectedSarifLevel)
+    {
+        var expectedVacuityText = vacuity == WorkerVacuityKind.None
+            ? string.Empty
+            : "[vacuous: " + vacuity + "]";
+        var request = CreateValidRequest();
+        var manifest = CreateSarifManifest();
+        manifest.Callables = [manifest.Callables[0]];
+        manifest.Claims = [manifest.Claims[0]];
+        manifest.Callables[0].Assumptions = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var claim = manifest.Claims.Single();
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = ValidInputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [new WorkerCallableResult
+            {
+                CallableId = claim.CallableId,
+                Coverage = WorkerCallableCoverage.Complete,
+                Reason = WorkerCallableCoverageReason.None
+            }],
+            ClaimResults = [new WorkerClaimResult
+            {
+                ClaimId = claim.ClaimId,
+                Outcome = WorkerClaimOutcome.Proven,
+                Reason = WorkerClaimReason.None,
+                Vacuity = vacuity,
+                ProofCore = vacuity switch
+                {
+                    WorkerVacuityKind.ContradictoryPreconditions => ["requires:0"],
+                    WorkerVacuityKind.NoModeledNormalReturn => ["body:normal-completion"],
+                    _ => []
+                }
+            }],
+            Summary = new WorkerVerificationSummary
+            {
+                CallableCount = 1,
+                ClaimCount = 1,
+                OutcomeCounts = [new WorkerClaimOutcomeCount
+                {
+                    Outcome = WorkerClaimOutcome.Proven,
+                    Count = 1
+                }],
+                ReasonCounts = [new WorkerClaimReasonCount
+                {
+                    Reason = WorkerClaimReason.None,
+                    Count = 1
+                }],
+                CacheStatus = WorkerCacheStatus.Disabled,
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "launcher-test",
+                    ApiSpecVersion = "launcher-test"
+                }
+            }
+        };
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+        using var temporary = new TempDirectory(
+            "sharpproof-vacuity-presentation-",
+            TestContext.CurrentContext.WorkDirectory);
+        var path = Path.Combine(temporary.FullName, "response.json");
+        File.WriteAllText(path, WorkerProtocolJson.SerializeResponse(response));
+
+        var originalOutput = Console.Out;
+        var originalError = Console.Error;
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var expectedConsoleLine =
+            "SharpProof Proven C.M Postcondition claim claim-1" +
+            (expectedVacuityText.Length == 0
+                ? string.Empty
+                : " " + expectedVacuityText);
+        var validResponse = false;
+        var exitCode = -1;
+        try
+        {
+            Console.SetOut(output);
+            Console.SetError(error);
+            exitCode = Program.ValidateAndReport(
+                path,
+                request,
+                null,
+                null,
+                null,
+                out validResponse,
+                out _);
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+            Console.SetError(originalError);
+        }
+
+        using var sarif = JsonDocument.Parse(
+            SarifProjection.Serialize(request, response, SarifProjectDirectory));
+        var result = sarif.RootElement.GetProperty("runs")[0]
+            .GetProperty("results")[0];
+        var message = result.GetProperty("message").GetProperty("text").GetString();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(validResponse, Is.True, error.ToString());
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(output.ToString(), Does.Contain(expectedConsoleLine));
+            JsonAssert.Equal(result, "kind", expectedSarifKind);
+            JsonAssert.Equal(result, "level", expectedSarifLevel);
+            if (expectedVacuityText.Length == 0)
+            {
+                Assert.That(message, Does.Not.Contain("vacuous:"));
+            }
+            else
+            {
+                Assert.That(message, Does.Contain(expectedVacuityText));
+            }
+        }
+    }
+
+    [TestCase(
         WorkerClaimOutcome.Proven, WorkerVerifyPolicy.Advisory,
         "pass", "none")]
     [TestCase(
