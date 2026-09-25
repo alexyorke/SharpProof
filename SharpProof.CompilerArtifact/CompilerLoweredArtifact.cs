@@ -535,7 +535,13 @@ internal static class CompilerLoweredArtifact
             }
 
             var variable = Variable(row.Variable);
-            IrVarId? current = row.CurrentStateVariable < 0 ? null : Variable(row.CurrentStateVariable);
+            IrVarId? current = row.CurrentStateVariable switch
+            {
+                -1 => null,
+                >= 0 => Variable(row.CurrentStateVariable),
+                _ => throw new InvalidDataException(
+                    "A lowered canonical variable is invalid.")
+            };
             CompilerIntegerInterval? interval = row.Minimum.HasValue
                 ? new CompilerIntegerInterval(row.Minimum.Value, row.Maximum!.Value) : null;
             return new CompilerCanonicalVariable(row.Role, row.Ordinal, variable, current, interval, row.ModelLabel);

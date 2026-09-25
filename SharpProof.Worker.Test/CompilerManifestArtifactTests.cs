@@ -2148,6 +2148,37 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void CurrentStateVariableAcceptsOnlyCanonicalMinusOneSentinel()
+    {
+        var valid = CreateContractArtifact();
+        var parameter = valid.Callables.Single().Variables
+            .Single(static item => item.Role == CompilerVariableRole.Parameter);
+        Assert.That(parameter.CurrentStateVariable, Is.EqualTo(-1));
+
+        var validJson = CompilerManifestArtifactJson.Serialize(valid);
+        var validRoundTrip = CompilerManifestArtifactJson.Deserialize(validJson);
+        var decoded = CompilerManifestArtifactJson.DecodeCallables(validRoundTrip).Single();
+        Assert.That(decoded.Variables
+            .Single(static item => item.Role == CompilerVariableRole.Parameter)
+            .CurrentStateVariable, Is.Null);
+
+        foreach (var invalidSentinel in new[] { -2, int.MinValue })
+        {
+            var resealed = CloneArtifact(valid);
+            resealed.Callables.Single().Variables
+                .Single(static item => item.Role == CompilerVariableRole.Parameter)
+                .CurrentStateVariable = invalidSentinel;
+            resealed.FeatureScopeSha256 =
+                CompilerFeatureScopeFingerprint.ComputeSha256(resealed);
+            var resealedJson = CompilerManifestArtifactJson.SerializeValidated(resealed);
+
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(resealedJson)),
+                $"currentStateVariable={invalidSentinel} must be rejected");
+        }
+    }
+
+    [Test]
     public void ProgramParameterBindingsFailClosed()
     {
         const string source =
