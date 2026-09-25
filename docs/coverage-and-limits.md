@@ -85,10 +85,13 @@ support.
 | `Contract.Old(value)` | Valid only inside `Ensures`; substitutes the entry-state value. Nested or otherwise invalid uses fail closed. A direct runtime call throws. |
 
 The compiler elides `Requires`, `Ensures`, and `Assume` calls unless
-`SHARPPROOF_CONTRACTS` is defined. SharpProof binds their compiler operations;
-it does not parse free-form contract strings. Enabled analysis rejects that
-reserved symbol through both package configuration and the final compiler
-compilation, including source-local directives and generated syntax trees.
+`SHARPPROOF_CONTRACTS` is defined. With the symbol active, the clause methods
+still do not check their conditions, and direct `Result`/`Old` calls throw;
+there is no runtime-checking mode. The symbol is reserved and package builds
+reject it in project constants for every profile, including `off`. When the
+analyzer is active, SP0025 also reports effective source-local and generated
+definitions. SharpProof binds compiler operations; it does not parse
+free-form contract strings.
 
 ### Closed attributes
 

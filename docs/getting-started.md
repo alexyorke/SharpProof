@@ -83,10 +83,11 @@ The public API also includes closed NotNull, Positive, and InRange attributes,
 effect contracts, and compiler-bound ContractFor companions. See
 [Supported public API](public-api.md) for exact signatures and trust rules.
 
-Do not define SHARPPROOF_CONTRACTS in a build analyzed by SharpProof. The
-conditional contract methods are intended to disappear from the emitted
-program; enabling the runtime-contract symbol is rejected when it would make
-the compiler artifact unsound.
+Do not define SHARPPROOF_CONTRACTS in any build, including
+`SharpProofProfile=off`. The symbol emits contract calls without checking
+their conditions, and direct `Contract.Result`/`Contract.Old` calls throw.
+Package builds reject it in project constants in every profile; source-local
+definitions are reported as SP0025 when the analyzer is active.
 
 ## Enable strict verification
 

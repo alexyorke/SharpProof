@@ -11,11 +11,13 @@ application API.
 
 `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume` are direct,
 contiguous prologue clauses. They are compiler-elided unless
-`SHARPPROOF_CONTRACTS` is defined. `Contract.Result<T>()` and
-`Contract.Old<T>(T)` are expressions for use inside postconditions; executing
-either placeholder directly throws. SharpProof analysis rejects the reserved
-conditional symbol so a proof cannot silently assume compiler-elided ghost
-expressions that execute in the emitted program.
+`SHARPPROOF_CONTRACTS` is defined. That symbol is reserved and unsupported in
+every SharpProof profile: it emits calls to clause methods whose bodies do not
+check conditions, while direct `Contract.Result<T>()` and `Contract.Old<T>(T)`
+calls throw. SharpProof provides no runtime contract-checking mode. Package
+builds reject the symbol in project constants even when
+`SharpProofProfile=off`; active analyzer builds also report SP0025 for an
+effective source-local or generated definition.
 
 Analyzer-side binding requires the referenced API assembly's exact
 name/version identity and embedded payload SHA-256 to match the analyzer

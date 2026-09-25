@@ -112,9 +112,10 @@ contain documented breaking changes.
 
 ### Security
 
-- Enabled analysis rejects `SHARPPROOF_CONTRACTS` from project constants,
-  source directives, and generated trees so compiler-elided ghost expressions
-  cannot execute in a supposedly verified runtime body.
+- Package builds reject `SHARPPROOF_CONTRACTS` in project constants under every
+  profile; active analyzers report source-local and generated definitions as
+  SP0025. The reserved symbol emits contract calls without checking conditions,
+  and direct `Result`/`Old` calls throw.
 - SAT models must exactly match the requested scalar model closure and pass
   independent replay before SharpProof emits `Refuted`.
 - Compiler-only effect violation candidates cannot become `Refuted` without

@@ -22,7 +22,7 @@ internal static class FinalCompilationCollector
                 return;
             }
 
-            if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
+            if (ContractRuntimePolicy.IsReservedSymbolDefined(
                     context.Compilation,
                     context.CancellationToken))
             {

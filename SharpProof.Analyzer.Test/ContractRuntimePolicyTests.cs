@@ -24,7 +24,7 @@ public sealed class ContractRuntimePolicyTests
         """;
 
     [Test]
-    public async Task ParseOptionSymbolDisablesAnalysisWithVisibleConfigurationDiagnostic()
+    public async Task ParseOptionSymbolReportsReservedContractRuntimeConfiguration()
     {
         var compilation = CreateCompilation(SelectedSource);
         var tree = compilation.SyntaxTrees.Single();
@@ -36,11 +36,11 @@ public sealed class ContractRuntimePolicyTests
         var diagnostics = await Analyze(
             compilation.ReplaceSyntaxTree(tree, enabled));
 
-        AssertRuntimeEvaluationRejected(diagnostics);
+        AssertReservedSymbolRejected(diagnostics);
     }
 
     [Test]
-    public async Task SourceAndGeneratedDefinitionsDisableAnalysis()
+    public async Task SourceAndGeneratedDefinitionsReportReservedSymbol()
     {
         var baseCompilation = CreateCompilation(SelectedSource);
         var sourceDefined = CreateCompilation(
@@ -59,8 +59,8 @@ public sealed class ContractRuntimePolicyTests
         var sourceDiagnostics = await Analyze(sourceDefined);
         var generatedDiagnostics = await Analyze(generatedDefined);
 
-        AssertRuntimeEvaluationRejected(sourceDiagnostics);
-        AssertRuntimeEvaluationRejected(generatedDiagnostics);
+        AssertReservedSymbolRejected(sourceDiagnostics);
+        AssertReservedSymbolRejected(generatedDiagnostics);
     }
 
     [Test]
@@ -94,7 +94,7 @@ public sealed class ContractRuntimePolicyTests
             features: "effects");
     }
 
-    private static void AssertRuntimeEvaluationRejected(
+    private static void AssertReservedSymbolRejected(
         ImmutableArray<Diagnostic> diagnostics)
     {
         using (Assert.EnterMultipleScope())
@@ -104,7 +104,8 @@ public sealed class ContractRuntimePolicyTests
                 diagnostics.Single().GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture),
                 Does.Contain(Contract.ConditionalSymbol)
-                    .And.Contain("runtime evaluation"));
+                    .And.Contain("do not check conditions")
+                    .And.Contain("Result/Old throw when executed"));
         }
     }
 }

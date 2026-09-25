@@ -132,10 +132,11 @@ Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.
 
 SharpProof also reports SP0025 and disables analysis when the reserved
-`SHARPPROOF_CONTRACTS` preprocessor symbol is active. That symbol changes ghost
-contract calls into runtime calls, so continuing analysis would make the
-verified body differ from the emitted program. Package builds reject an exact
-`DefineConstants` entry before compilation; compiler validation also covers
+`SHARPPROOF_CONTRACTS` preprocessor symbol is active. The symbol emits ghost
+clause calls without checking their conditions, and direct `Contract.Result`
+or `Contract.Old` calls throw; there is no runtime-checking mode. Package
+builds reject an exact `DefineConstants` entry in every profile, including
+`off`. When the analyzer is active, compiler validation also reports
 source-local directives and generated trees.
 
 <a id="sp0027"></a>

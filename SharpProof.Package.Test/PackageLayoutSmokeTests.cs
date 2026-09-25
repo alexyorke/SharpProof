@@ -506,7 +506,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             runtimeContracts.Output,
             Does.Contain(
-                "SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts"));
+                "SHARPPROOF_CONTRACTS is reserved and unsupported in every SharpProof profile"));
         var disabledRuntimeContracts = await RunDotNetAsync(
             workspace.ConsumerDirectory,
             "msbuild",
@@ -517,8 +517,12 @@ public sealed class PackageLayoutSmokeTests
             "--nologo");
         Assert.That(
             disabledRuntimeContracts.ExitCode,
-            Is.Zero,
+            Is.Not.Zero,
             disabledRuntimeContracts.Output);
+        Assert.That(
+            disabledRuntimeContracts.Output,
+            Does.Contain(
+                "SHARPPROOF_CONTRACTS is reserved and unsupported in every SharpProof profile"));
 
         var disabledItems = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
@@ -603,6 +607,82 @@ public sealed class PackageLayoutSmokeTests
             strict.Output,
             Does.Contain(
                 "requires the matching SharpProof.Verifier package"));
+    }
+
+    [Test]
+    public async Task ProfileOffContractsSymbolIsRejectedBeforeConsumerCompilation()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(
+            feed.Version,
+            PackagedProductFeed.PortablePackageId,
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Requires(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static int Ensures(int value) {
+                    Contract.Ensures(value < 0);
+                    return value;
+                }
+                public static int Increment(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value + 1);
+                    return value + 1;
+                }
+            }
+            public static class Program {
+                public static void Main() {
+                    System.Console.WriteLine(
+                        "requires=" + Subject.Requires(-5));
+                    System.Console.WriteLine(
+                        "ensures=" + Subject.Ensures(5));
+                    System.Console.WriteLine(Subject.Increment(1));
+                }
+            }
+            """,
+            "all",
+            "SP0045");
+
+        var consumerProject = XDocument.Load(workspace.ConsumerProject);
+        var consumerProperties = consumerProject.Root!
+            .Elements("PropertyGroup")
+            .Single();
+        consumerProperties.SetElementValue("SharpProofProfile", "off");
+        consumerProperties.SetElementValue(
+            "DefineConstants",
+            "$(DefineConstants);SHARPPROOF_CONTRACTS");
+        consumerProject.Save(workspace.ConsumerProject);
+
+        var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:OutputType=Exe",
+            "-p:UseAppHost=false");
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(
+            build.Output,
+            Does.Contain(
+                "SHARPPROOF_CONTRACTS is reserved and unsupported in every SharpProof profile")
+                .And.Not.Contain("Contract.Result<T>() is valid only inside Contract.Ensures(...)"));
+        Assert.That(
+            File.Exists(Path.Combine(
+                workspace.ConsumerDirectory,
+                "bin",
+                "Release",
+                "net8.0",
+                "Consumer.dll")),
+            Is.False);
     }
 
     [Test]

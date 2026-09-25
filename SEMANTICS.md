@@ -173,7 +173,10 @@ Compiler-elided `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume`
 calls do not evaluate their arguments. A direct runtime invocation of
 `Contract.Result<T>()` or `Contract.Old<T>(...)` is invalid and may allocate and
 throw `InvalidOperationException`; their effect specs describe that direct-call
-behavior.
+behavior. Defining `SHARPPROOF_CONTRACTS` emits calls to clause methods that do
+not check conditions, so the symbol is reserved and unsupported in every
+profile; package builds reject it in project constants, and active analyzers
+report source-local or generated definitions as SP0025.
 
 Contract clauses and annotations are evidence only when their symbols resolve
 to the `SharpProof.Attributes` assembly identity and built-DLL SHA-256 payload

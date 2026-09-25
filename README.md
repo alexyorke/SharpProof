@@ -84,9 +84,11 @@ The upper bound makes the checked increment safe. The worker supports checked
 
 Contract.Requires, Contract.Ensures, and Contract.Assume are direct,
 contiguous prologue clauses. They are compiler-elided unless
-SHARPPROOF_CONTRACTS is defined; the analyzer rejects that runtime-contract
-symbol when it would make a proof unsound. The supported attributes and clause
-shape are listed in the [public API reference](docs/public-api.md).
+SHARPPROOF_CONTRACTS is defined. That reserved symbol is unsupported in every
+profile: it emits calls that do not check contract conditions, and direct
+Contract.Result/Contract.Old calls throw. Package builds reject the project
+constant even when SharpProofProfile is off. The supported attributes and
+clause shape are listed in the [public API reference](docs/public-api.md).
 
 ## Strict container verification
 

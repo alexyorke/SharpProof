@@ -72,7 +72,7 @@ internal sealed partial class SharpProofAnalyzerEngine
                         unreadableContractApi)));
         }
 
-        if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
+        if (ContractRuntimePolicy.IsReservedSymbolDefined(
                 context.Compilation,
                 context.CancellationToken))
         {
