@@ -2409,6 +2409,53 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task CustomEventAccessorsAreRejectedWithAnAnalyzedControl()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public sealed class Fixture {
+                private Action _handlers = static () => { };
+
+                public event Action Changed {
+                    [EnforcePure]
+                    add { _handlers += value; }
+                    [EnforcePure]
+                    remove { }
+                }
+
+                [EnforcePure]
+                public static void EmptyControl() { }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 2);
+            Assert.That(
+                diagnostics.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.All.Contains("UnsupportedCallable"));
+            Assert.That(factory.OutcomeCounts["add_Changed"], Is.EqualTo(1));
+            Assert.That(factory.OutcomeCounts["remove_Changed"], Is.EqualTo(1));
+            Assert.That(
+                factory.Outcomes["add_Changed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+            Assert.That(
+                factory.Outcomes["remove_Changed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+            Assert.That(
+                factory.Outcomes["EmptyControl"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
     public async Task ConcurrentAutoAccessorRunsReconcileExactlyOnce()
     {
         var runs = await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>

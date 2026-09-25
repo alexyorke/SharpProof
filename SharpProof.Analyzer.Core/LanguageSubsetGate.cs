@@ -157,8 +157,6 @@ internal static class LanguageSubsetGate
             MethodKind.StaticConstructor or
             MethodKind.PropertyGet or
             MethodKind.PropertySet or
-            MethodKind.EventAdd or
-            MethodKind.EventRemove or
             MethodKind.ExplicitInterfaceImplementation;
     }
 
