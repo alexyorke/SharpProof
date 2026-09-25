@@ -17,7 +17,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
 {
     private static readonly ConditionalWeakTable<
         Compilation,
-        Lazy<ImmutableHashSet<INamedTypeSymbol>>>
+        ImmutableHashSet<INamedTypeSymbol>>
         CompanionTypes = new();
     private readonly Compilation _compilation;
     private readonly bool _includeSourceCompanions;
@@ -49,6 +49,8 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         var identity =
             ContractApiIdentityResolver.ForCompilation(compilation);
         _contract = identity.Contract;
+        var contractFor = identity.ResolveAttribute(
+            ContractApiMetadata.ContractFor);
         _notNull = identity.ResolveAttribute(
             ContractApiMetadata.NotNull);
         _positive = identity.ResolveAttribute(
@@ -56,19 +58,13 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         _inRange = identity.ResolveAttribute(
             ContractApiMetadata.InRange);
         _typesWithCompanions =
-            CompanionTypes.GetValue(
-                compilation,
-                value => new(
-                    () => FindTypesWithCompanions(
+            new(() => CompanionTypes.GetValue(
+                    compilation,
+                    value => FindTypesWithCompanions(
                         value,
-                        ContractApiIdentityResolver
-                            .ForCompilation(value)
-                            .ResolveAttribute(
-                                ContractApiMetadata
-                                    .ContractFor),
-                        cancellationToken),
-                    LazyThreadSafetyMode
-                        .ExecutionAndPublication));
+                        contractFor,
+                        cancellationToken)),
+                LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public bool IsNotProven(
