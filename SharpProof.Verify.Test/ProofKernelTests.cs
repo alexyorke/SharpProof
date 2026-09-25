@@ -308,6 +308,17 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public void AggregateCancellationPropagatesInsteadOfBecomingSemanticUnknown()
+    {
+        var fixture = CreateFixture();
+        Func<Task> action = () => new ProofKernel(
+                new AggregateCancellationBackend())
+            .VerifyAsync(fixture.Query);
+
+        Assert.ThrowsAsync<AggregateException>(action);
+    }
+
+    [Test]
     public async Task MalformedUnsatCoreCannotCreateAProof()
     {
         var fixture = CreateFixture();
@@ -388,6 +399,19 @@ public sealed class ProofKernelTests
 
             return Task.FromException<BackendCheckResult>(
                 new InvalidOperationException("Asynchronous backend failure."));
+        }
+    }
+
+    private sealed class AggregateCancellationBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromException<BackendCheckResult>(
+                new AggregateException(
+                    new TaskCanceledException("Backend task cancellation.")));
         }
     }
 

@@ -974,6 +974,70 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsAggregateCancellationCatchesButAllowsWholeAggregateRethrows()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading.Tasks;
+            using LookalikeAggregateException = Fake.AggregateException;
+            namespace Fake {
+                sealed class AggregateException : Exception { }
+            }
+            namespace SharpProof.Verify {
+            sealed class DerivedAggregateException : System.AggregateException { }
+            static class C {
+                static void EmptyAggregateCatch() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (System.AggregateException) { }
+                }
+                static void DerivedAggregateCatch() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (DerivedAggregateException) { }
+                }
+                static void BareRethrow() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (System.AggregateException) { throw; }
+                }
+                static void CaughtRethrow() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (System.AggregateException caught) { throw caught; }
+                }
+                static void AggregateFilterDoesNotExcludeWrappedCancellation() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (System.AggregateException caught)
+                        when (((Exception)caught) is not OperationCanceledException) { }
+                }
+                static void PriorDirectCancellationCatchDoesNotHandleAggregate() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (OperationCanceledException) { throw; }
+                    catch (System.AggregateException) { }
+                }
+                static void OneInnerExceptionDoesNotProveForwarding() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (System.AggregateException caught) {
+                        if (caught.InnerException is OperationCanceledException cancellation)
+                            throw cancellation;
+                    }
+                }
+                static void Lookalike() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (LookalikeAggregateException) { }
+                }
+            }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(5),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
+    }
+
+    [Test]
     public async Task RejectsRethrowDeferredUntilAfterCleanupOrDivergence()
     {
         const string source =
@@ -1078,7 +1142,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 static void ExcludedType() {
                     try { }
                     catch (Exception exception)
-                        when (exception is not OperationCanceledException) { }
+                        when (exception is not
+                            (OperationCanceledException or AggregateException)) { }
                 }
                 static void Never() {
                     try { }
@@ -1097,22 +1162,26 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 static void ParenthesizedExclusion() {
                     try { }
                     catch (Exception exception)
-                        when ((exception is not OperationCanceledException)) { }
+                        when ((exception is not
+                            (OperationCanceledException or AggregateException))) { }
                 }
                 static void ParenthesizedPatternExclusion() {
                     try { }
                     catch (Exception exception)
-                        when (exception is (not OperationCanceledException)) { }
+                        when (exception is
+                            (not (OperationCanceledException or AggregateException))) { }
                 }
                 static void ExhaustiveEarlierFilter() {
                     try { }
                     catch (OperationCanceledException) when (true) { throw; }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
                 static void ExhaustiveEarlierTypePattern() {
                     try { }
                     catch (Exception exception)
                         when (exception is OperationCanceledException) { throw; }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
             }
@@ -1127,11 +1196,11 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [TestCase("caught is ArgumentException")]
-    [TestCase("!(caught is OperationCanceledException)")]
+    [TestCase("caught is not (OperationCanceledException or AggregateException)")]
     [TestCase("caught is null")]
     [TestCase("!(caught is not null)")]
-    [TestCase("caught is not (OperationCanceledException or ArgumentException)")]
-    [TestCase("caught is not OperationCanceledException && condition")]
+    [TestCase("caught is not (OperationCanceledException or AggregateException or ArgumentException)")]
+    [TestCase("caught is not (OperationCanceledException or AggregateException) && condition")]
     [TestCase("caught is ArgumentException || caught is InvalidOperationException")]
     public async Task AllowsComposedFiltersThatExcludeCancellation(string filter)
     {
@@ -1186,9 +1255,9 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase("caught is not null")]
     [TestCase("caught is not ArgumentException")]
     [TestCase("!(caught is ArgumentException)")]
-    [TestCase("caught is OperationCanceledException || condition")]
+    [TestCase("caught is (OperationCanceledException or AggregateException) || condition")]
     [TestCase(
-        "caught is OperationCanceledException && caught is not ArgumentException")]
+        "caught is (OperationCanceledException or AggregateException) && caught is not ArgumentException")]
     public async Task AllowsLaterCatchAfterExhaustiveCancellationFilter(
         string filter)
     {
@@ -2226,6 +2295,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 {
                     try { }
                     catch when (include) { throw; }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2235,6 +2305,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     try { }
                     catch (Exception caught)
                         when (other is OperationCanceledException) { throw; }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2248,6 +2319,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     {
                         throw;
                     }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2260,6 +2332,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     {
                         throw;
                     }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2272,6 +2345,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     {
                         throw;
                     }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2284,6 +2358,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     {
                         throw;
                     }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2303,6 +2378,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     {
                         throw;
                     }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2314,6 +2390,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     {
                         throw;
                     }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
 
@@ -2328,7 +2405,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 {
                     try { }
                     catch (Exception caught)
-                        when (caught is (not OperationCanceledException)) { }
+                        when (caught is
+                            (not (OperationCanceledException or AggregateException))) { }
                 }
 
                 static void DoesNotExcludeCancellation()
@@ -2944,6 +3022,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 static void BroadCatchAfterCancellationRethrow() {
                     try { }
                     catch (OperationCanceledException cancellation) { throw (cancellation); }
+                    catch (AggregateException) { throw; }
                     catch (Exception) { }
                 }
             }

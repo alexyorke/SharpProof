@@ -20,21 +20,32 @@ internal static class CancellationBoundaryAnalyzer
         var clause = (CatchClauseSyntax)context.Node;
         var cancellationType =
             symbols[SharpProofSoundnessAnalyzer.KnownType.OperationCanceledException];
+        var aggregateExceptionType =
+            symbols[SharpProofSoundnessAnalyzer.KnownType.AggregateException];
         var caughtType = clause.Declaration?.Type == null
             ? null
             : context.SemanticModel
                 .GetTypeInfo(clause.Declaration.Type, context.CancellationToken)
                 .Type;
-        if (!CatchesCancellation(clause, caughtType, cancellationType) ||
-            CancellationHandledEarlier(clause, cancellationType, context) ||
-            FilterExcludesCancellation(
-                clause, caughtType, cancellationType, context) ||
+        var canSwallowCancellation = CatchesExceptionType(
+                clause, caughtType, cancellationType) &&
+            !CancellationHandledEarlier(clause, cancellationType, context) &&
+            !FilterExcludesCancellation(
+                clause, caughtType, cancellationType, context);
+        var canSwallowAggregateCancellation = CatchesExceptionType(
+                clause, caughtType, aggregateExceptionType) &&
+            !CancellationHandledEarlier(
+                clause, aggregateExceptionType, context) &&
+            !FilterExcludesCancellation(
+                clause, caughtType, aggregateExceptionType, context);
+        if ((!canSwallowCancellation && !canSwallowAggregateCancellation) ||
             RethrowsCancellationImmediately(clause, context) ||
-            IsAuditedCancellationBoundary(
-                clause,
-                context,
-                context.ContainingSymbol,
-                symbols))
+            (!canSwallowAggregateCancellation &&
+             IsAuditedCancellationBoundary(
+                 clause,
+                 context,
+                 context.ContainingSymbol,
+                 symbols)))
         {
             return;
         }
@@ -101,15 +112,15 @@ internal static class CancellationBoundaryAnalyzer
             outcome == CancellationFilterOutcome.ReturnsTrue;
     }
 
-    private static bool CatchesCancellation(
+    private static bool CatchesExceptionType(
         CatchClauseSyntax clause,
         ITypeSymbol? caughtType,
-        INamedTypeSymbol? cancellationType)
+        INamedTypeSymbol? possibleType)
     {
-        return cancellationType != null &&
-            (clause.Declaration == null ||
-             IsOrDerivesFrom(caughtType, cancellationType) ||
-             IsOrDerivesFrom(cancellationType, caughtType));
+        return clause.Declaration == null ||
+            (possibleType != null &&
+             (IsOrDerivesFrom(caughtType, possibleType) ||
+              IsOrDerivesFrom(possibleType, caughtType)));
     }
 
     private static bool FilterExcludesCancellation(
