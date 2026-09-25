@@ -37,10 +37,10 @@ internal static class CompilerSourceRebinding
                 continue;
             }
 
+            var tree = artifact.Compilation.SyntaxTrees[
+                authority.SourceTreeOrdinal];
             if (!texts.TryGetValue(authority.SourceTreeOrdinal, out var text))
             {
-                var tree =
-                    artifact.Compilation.SyntaxTrees[authority.SourceTreeOrdinal];
                 text = File.Exists(tree.Path)
                     ? ReadTree(tree, cancellationToken)
                     : null;
@@ -67,7 +67,11 @@ internal static class CompilerSourceRebinding
                         WorkerClaimEvidence.CompanionClause =>
                             IsEnsuresInvocation(span),
                         WorkerClaimEvidence.ReturnAttribute =>
-                            IsAttribute(span, text, authority.Location),
+                            IsAttribute(
+                                span,
+                                text,
+                                authority.Location,
+                                tree),
                         WorkerClaimEvidence.Attribute => IsAttribute(span),
                         _ => false
                     };
@@ -252,7 +256,8 @@ internal static class CompilerSourceRebinding
     private static bool IsAttribute(
         string span,
         string? source = null,
-        WorkerSourceLocation? location = null)
+        WorkerSourceLocation? location = null,
+        CompilerSyntaxTreeSnapshot? tree = null)
     {
         var validShape = span.Length != 0 &&
             (char.IsLetter(span[0]) || span[0] is '_' or '@') &&
@@ -301,13 +306,28 @@ internal static class CompilerSourceRebinding
 
         try
         {
+            var maskedRanges = new List<(int Start, int End)>();
             var code = Regex.Replace(
                 source,
                 nonCodePattern,
-                match => new string(' ', match.Length),
+                match =>
+                {
+                    maskedRanges.Add((
+                        match.Index,
+                        match.Index + match.Length));
+                    return new string(' ', match.Length);
+                },
                 options,
                 timeout);
-            return Regex.IsMatch(
+            return tree != null &&
+                IsActiveSourceSpan(
+                    source,
+                    code,
+                    maskedRanges,
+                    locationStart,
+                    locationEnd,
+                    tree) &&
+                Regex.IsMatch(
                     code.Substring(0, locationStart),
                     precedingAttributes,
                     options,
@@ -323,6 +343,591 @@ internal static class CompilerSourceRebinding
             return false;
         }
     }
+
+    private static bool IsActiveSourceSpan(
+        string source,
+        string code,
+        List<(int Start, int End)> maskedRanges,
+        int locationStart,
+        int locationEnd,
+        CompilerSyntaxTreeSnapshot tree)
+    {
+        if (tree.PreprocessorSymbols is null ||
+            tree.EffectivePreprocessorSymbols is null)
+        {
+            return false;
+        }
+
+        var symbols = new HashSet<string>(
+            tree.PreprocessorSymbols,
+            StringComparer.Ordinal);
+        var conditions = new List<(
+            bool ParentActive,
+            bool BranchTaken,
+            bool SeenElse)>();
+        var active = true;
+        var foundActiveSource = false;
+        var activeSegmentStart = 0;
+        var lineStart = 0;
+        while (lineStart < source.Length && lineStart < locationEnd)
+        {
+            var lineEnd = lineStart;
+            while (lineEnd < source.Length &&
+                source[lineEnd] is not (
+                    '\r' or '\n' or '\u0085' or '\u2028' or '\u2029'))
+            {
+                lineEnd++;
+            }
+
+            var nextLine = lineEnd;
+            if (nextLine < source.Length)
+            {
+                var firstTerminator = source[nextLine++];
+                if (firstTerminator == '\r' && nextLine < source.Length &&
+                    source[nextLine] == '\n')
+                {
+                    nextLine++;
+                }
+            }
+
+            if (nextLine == lineStart)
+            {
+                return false;
+            }
+
+            var rawLine = source.Substring(lineStart, lineEnd - lineStart);
+            var codeLine = code.Substring(lineStart, lineEnd - lineStart);
+            var hasRawDirective = TryGetDirective(
+                rawLine,
+                out var rawName,
+                out _);
+            var hasCodeDirective = TryGetDirective(
+                codeLine,
+                out var codeName,
+                out var body);
+
+            if (active && hasRawDirective && !hasCodeDirective &&
+                IsControlDirective(rawName))
+            {
+                var hashOffset = rawLine.IndexOf('#');
+                if (hashOffset < 0 || !IsMaskedAt(
+                    maskedRanges,
+                    lineStart + hashOffset,
+                    activeSegmentStart))
+                {
+                    // A directive-shaped line hidden outside a lexically
+                    // masked active-source span is ambiguous. It may be real
+                    // text masked across a disabled branch.
+                    return false;
+                }
+            }
+
+            var isDirective = active
+                ? hasCodeDirective
+                : hasRawDirective;
+            var directiveName = active ? codeName : rawName;
+            var targetOverlapsLine = locationStart < nextLine &&
+                locationEnd > lineStart;
+            if (targetOverlapsLine)
+            {
+                if (isDirective || !active)
+                {
+                    return false;
+                }
+
+                foundActiveSource = true;
+            }
+
+            var wasActive = active;
+            if (isDirective &&
+                !ApplyDirective(
+                    directiveName,
+                    body,
+                    wasActive,
+                    symbols,
+                    conditions,
+                    ref active))
+            {
+                return false;
+            }
+
+            if (isDirective && IsControlDirective(directiveName))
+            {
+                activeSegmentStart = nextLine;
+            }
+
+            lineStart = nextLine;
+        }
+
+        return foundActiveSource &&
+            symbols.SetEquals(tree.EffectivePreprocessorSymbols);
+    }
+
+    private static bool ApplyDirective(
+        string name,
+        string body,
+        bool wasActive,
+        HashSet<string> symbols,
+        List<(bool ParentActive, bool BranchTaken, bool SeenElse)> conditions,
+        ref bool active)
+    {
+        switch (name)
+        {
+            case "if":
+                {
+                    var condition = false;
+                    if (wasActive && !TryEvaluatePreprocessorExpression(
+                        body,
+                        symbols,
+                        out condition))
+                    {
+                        return false;
+                    }
+
+                conditions.Add((wasActive, condition, SeenElse: false));
+                    active = wasActive && condition;
+                    return true;
+                }
+            case "elif":
+                {
+                    if (conditions.Count == 0)
+                    {
+                        return false;
+                    }
+
+                    var index = conditions.Count - 1;
+                    var condition = conditions[index];
+                    if (condition.SeenElse)
+                    {
+                        return false;
+                    }
+
+                    var selected = false;
+                    if (condition.ParentActive && !condition.BranchTaken &&
+                        !TryEvaluatePreprocessorExpression(
+                            body,
+                            symbols,
+                            out selected))
+                    {
+                        return false;
+                    }
+
+                    condition.BranchTaken |= selected;
+                    conditions[index] = condition;
+                    active = condition.ParentActive && selected;
+                    return true;
+                }
+            case "else":
+                {
+                    if (conditions.Count == 0)
+                    {
+                        return false;
+                    }
+
+                    var index = conditions.Count - 1;
+                    var condition = conditions[index];
+                    if (condition.SeenElse)
+                    {
+                        return false;
+                    }
+
+                    active = condition.ParentActive &&
+                        !condition.BranchTaken;
+                    condition.BranchTaken = true;
+                    condition.SeenElse = true;
+                    conditions[index] = condition;
+                    return true;
+                }
+            case "endif":
+                if (conditions.Count == 0)
+                {
+                    return false;
+                }
+
+                active = conditions[conditions.Count - 1].ParentActive;
+                conditions.RemoveAt(conditions.Count - 1);
+                return true;
+            case "define":
+                return !wasActive || TryUpdateSymbol(body, symbols, add: true);
+            case "undef":
+                return !wasActive || TryUpdateSymbol(body, symbols, add: false);
+            case "region":
+            case "endregion":
+            case "error":
+            case "warning":
+            case "line":
+            case "pragma":
+            case "nullable":
+            case "r":
+            case "load":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryGetDirective(
+        string line,
+        out string name,
+        out string body)
+    {
+        name = string.Empty;
+        body = string.Empty;
+        var index = 0;
+        while (index < line.Length && char.IsWhiteSpace(line[index]))
+        {
+            index++;
+        }
+
+        if (index == line.Length || line[index++] != '#')
+        {
+            return false;
+        }
+
+        while (index < line.Length && char.IsWhiteSpace(line[index]))
+        {
+            index++;
+        }
+
+        var nameStart = index;
+        while (index < line.Length &&
+            (char.IsLetter(line[index]) || line[index] == '_'))
+        {
+            index++;
+        }
+
+        if (index == nameStart)
+        {
+            return false;
+        }
+
+        name = line.Substring(nameStart, index - nameStart);
+        body = line.Substring(index).Trim();
+        return true;
+    }
+
+    private static bool IsControlDirective(string name)
+    {
+        return name is "if" or "elif" or "else" or "endif" or
+            "define" or "undef";
+    }
+
+    private static bool IsMaskedAt(
+        List<(int Start, int End)> maskedRanges,
+        int position,
+        int activeSegmentStart)
+    {
+        foreach (var (start, end) in maskedRanges)
+        {
+            if (start > position)
+            {
+                return false;
+            }
+            if (position < end)
+            {
+                return start >= activeSegmentStart;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryUpdateSymbol(
+        string body,
+        HashSet<string> symbols,
+        bool add)
+    {
+        if (!TryReadPreprocessorIdentifier(body, out var symbol, out var end))
+        {
+            return false;
+        }
+
+        while (end < body.Length && char.IsWhiteSpace(body[end]))
+        {
+            end++;
+        }
+        if (end != body.Length)
+        {
+            return false;
+        }
+
+        if (add)
+        {
+            symbols.Add(symbol);
+        }
+        else
+        {
+            symbols.Remove(symbol);
+        }
+
+        return true;
+    }
+
+    private static bool TryReadPreprocessorIdentifier(
+        string source,
+        out string identifier,
+        out int end)
+    {
+        identifier = string.Empty;
+        end = 0;
+        while (end < source.Length && char.IsWhiteSpace(source[end]))
+        {
+            end++;
+        }
+
+        var start = end;
+        if (end >= source.Length ||
+            !(char.IsLetter(source[end]) || source[end] == '_'))
+        {
+            return false;
+        }
+
+        end++;
+        while (end < source.Length &&
+            (char.IsLetterOrDigit(source[end]) || source[end] == '_'))
+        {
+            end++;
+        }
+
+        identifier = source.Substring(start, end - start);
+        return true;
+    }
+
+    private static bool TryEvaluatePreprocessorExpression(
+        string expression,
+        HashSet<string> symbols,
+        out bool value)
+    {
+        var parser = new PreprocessorExpressionParser(expression, symbols);
+        return parser.TryParse(out value);
+    }
+
+    private struct PreprocessorCondition
+    {
+        internal PreprocessorCondition(
+            bool parentActive,
+            bool branchTaken,
+            bool seenElse)
+        {
+            ParentActive = parentActive;
+            BranchTaken = branchTaken;
+            SeenElse = seenElse;
+        }
+
+        internal bool ParentActive { get; }
+        internal bool BranchTaken { get; set; }
+        internal bool SeenElse { get; set; }
+    }
+
+    private readonly struct MaskedSourceRange
+    {
+        internal MaskedSourceRange(int start, int length)
+        {
+            Start = start;
+            End = start + length;
+        }
+
+        internal int Start { get; }
+        internal int End { get; }
+    }
+
+    private ref struct PreprocessorExpressionParser
+    {
+        private readonly ReadOnlySpan<char> _expression;
+        private readonly HashSet<string> _symbols;
+        private int _position;
+        private int _depth;
+
+        internal PreprocessorExpressionParser(
+            string expression,
+            HashSet<string> symbols)
+        {
+            _expression = expression.AsSpan();
+            _symbols = symbols;
+            _position = 0;
+            _depth = 0;
+        }
+
+        internal bool TryParse(out bool value)
+        {
+            value = false;
+            if (!ParseOr(out value))
+            {
+                return false;
+            }
+
+            SkipWhitespace();
+            return _position == _expression.Length;
+        }
+
+        private bool ParseOr(out bool value)
+        {
+            if (!ParseAnd(out value))
+            {
+                return false;
+            }
+
+            while (TryConsume("||"))
+            {
+                if (!ParseAnd(out var right))
+                {
+                    return false;
+                }
+                value |= right;
+            }
+            return true;
+        }
+
+        private bool ParseAnd(out bool value)
+        {
+            if (!ParseEquality(out value))
+            {
+                return false;
+            }
+
+            while (TryConsume("&&"))
+            {
+                if (!ParseEquality(out var right))
+                {
+                    return false;
+                }
+                value &= right;
+            }
+            return true;
+        }
+
+        private bool ParseEquality(out bool value)
+        {
+            if (!ParseUnary(out value))
+            {
+                return false;
+            }
+
+            while (true)
+            {
+                if (TryConsume("=="))
+                {
+                    if (!ParseUnary(out var right))
+                    {
+                        return false;
+                    }
+                    value = value == right;
+                }
+                else if (TryConsume("!="))
+                {
+                    if (!ParseUnary(out var right))
+                    {
+                        return false;
+                    }
+                    value = value != right;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+
+        private bool ParseUnary(out bool value)
+        {
+            SkipWhitespace();
+            if (++_depth > 64)
+            {
+                value = false;
+                return false;
+            }
+
+            try
+            {
+                if (TryConsume("!"))
+                {
+                    if (!ParseUnary(out value))
+                    {
+                        return false;
+                    }
+                    value = !value;
+                    return true;
+                }
+
+                if (TryConsume("("))
+                {
+                    if (!ParseOr(out value) || !TryConsume(")"))
+                    {
+                        return false;
+                    }
+                    return true;
+                }
+
+                if (!TryReadPreprocessorIdentifier(
+                    _expression,
+                    ref _position,
+                    out var identifier))
+                {
+                    value = false;
+                    return false;
+                }
+
+                value = identifier switch
+                {
+                    "true" => true,
+                    "false" => false,
+                    _ => _symbols.Contains(identifier)
+                };
+                return true;
+            }
+            finally
+            {
+                _depth--;
+            }
+        }
+
+        private bool TryConsume(string token)
+        {
+            SkipWhitespace();
+            if (_expression.Slice(_position).StartsWith(
+                token.AsSpan(),
+                StringComparison.Ordinal))
+            {
+                _position += token.Length;
+                return true;
+            }
+            return false;
+        }
+
+        private void SkipWhitespace()
+        {
+            while (_position < _expression.Length &&
+                char.IsWhiteSpace(_expression[_position]))
+            {
+                _position++;
+            }
+        }
+
+        private static bool TryReadPreprocessorIdentifier(
+            ReadOnlySpan<char> source,
+            ref int position,
+            out string identifier)
+        {
+            identifier = string.Empty;
+            if (position >= source.Length ||
+                !(char.IsLetter(source[position]) || source[position] == '_'))
+            {
+                return false;
+            }
+
+            var start = position++;
+            while (position < source.Length &&
+                (char.IsLetterOrDigit(source[position]) ||
+                 source[position] == '_'))
+            {
+                position++;
+            }
+
+            identifier = source.Slice(start, position - start).ToString();
+            return true;
+        }
+    }
+
     private static bool IsDeclaration(string span)
     {
         return span.Length != 0 && span[span.Length - 1] is '}' or ';';

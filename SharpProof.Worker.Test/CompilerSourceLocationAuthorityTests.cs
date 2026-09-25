@@ -234,6 +234,8 @@ public sealed class CompilerSourceLocationAuthorityTests
     public void SourceRebindingRejectsReturnAttributeRelocationToInvocation()
     {
         const string source =
+            "#define LOCAL\n" +
+            "#undef REMOVED\n" +
             "using SharpProof.Attributes;\n" +
             "internal static class Subject {\n" +
             "#if NEVER\n" +
@@ -279,6 +281,152 @@ public sealed class CompilerSourceLocationAuthorityTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
         Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+
+        var disabledAttribute = "Positive()";
+        MoveClaimAndReseal(artifact, claim,
+            source.IndexOf(disabledAttribute, StringComparison.Ordinal),
+            disabledAttribute.Length);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+
+        MoveClaimAndReseal(artifact, claim,
+            source.LastIndexOf(disabledAttribute, StringComparison.Ordinal),
+            disabledAttribute.Length);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingTracksNestedAndElifReturnAttributeBranches()
+    {
+        const string source =
+            "#define LOCAL\n" +
+            "#undef REMOVED\n" +
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "#if LOCAL && OUTER && !DISABLED\n" +
+            "  #if INNER\n" +
+            "    [return: Positive()]\n" +
+            "  #elif ALT == true\n" +
+            "    [return: Positive()]\n" +
+            "  #else\n" +
+            "    [return: Positive()]\n" +
+            "  #endif\n" +
+            "#else\n" +
+            "  [return: Positive()]\n" +
+            "#endif\n" +
+            "  internal static int Value() { return 1; }\n" +
+            "}\n";
+        string[][] symbolSets =
+        [
+            ["OUTER", "INNER"],
+            ["OUTER", "ALT"],
+            ["OUTER"],
+            []
+        ];
+        const string attributeText = "Positive()";
+
+        foreach (var symbols in symbolSets)
+        {
+            var path = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "ConditionalReturnAttribute-" +
+                    Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(path, source, new UTF8Encoding(false));
+            var compilation = CSharpCompilation.Create(
+                "ConditionalReturnAttributeTest",
+                [CSharpSyntaxTree.ParseText(
+                    source,
+                    new CSharpParseOptions(
+                        LanguageVersion.CSharp12,
+                        preprocessorSymbols: symbols),
+                    path)],
+                TestMetadataReferences.WithSharpProof,
+                TestCompilation.CreateOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            var artifact = CreateArtifact(compilation);
+            var claim = artifact.Manifest.Claims.Single();
+            var activeStart = claim.Location.Start;
+            var inactiveStart = -1;
+            var searchStart = 0;
+            while (searchStart < source.Length)
+            {
+                var candidate = source.IndexOf(
+                    attributeText,
+                    searchStart,
+                    StringComparison.Ordinal);
+                if (candidate < 0)
+                {
+                    break;
+                }
+                if (candidate != activeStart)
+                {
+                    inactiveStart = candidate;
+                    break;
+                }
+                searchStart = candidate + attributeText.Length;
+            }
+
+            Assert.That(inactiveStart, Is.GreaterThanOrEqualTo(0));
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerSourceRebinding.Validate(artifact)));
+
+            MoveClaimAndReseal(
+                artifact,
+                claim,
+                inactiveStart,
+                attributeText.Length);
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerSourceRebinding.Validate(artifact)));
+
+            MoveClaimAndReseal(
+                artifact,
+                claim,
+                activeStart,
+                attributeText.Length);
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerSourceRebinding.Validate(artifact)));
+        }
+    }
+
+    [Test]
+    public void SourceRebindingAcceptsReturnAttributeAfterMultilineNonCodeText()
+    {
+        const string source =
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "  private const string Example = \"\"\"\n" +
+            "    #if NEVER\n" +
+            "    #endif\n" +
+            "  \"\"\";\n" +
+            "  /*\n" +
+            "  #if NEVER\n" +
+            "  */\n" +
+            "  [return: Positive()]\n" +
+            "  internal static int Value() { return 1; }\n" +
+            "}\n";
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "MultilineNonCodeReturnAttribute-" +
+                Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(path, source, new UTF8Encoding(false));
+        var compilation = CSharpCompilation.Create(
+            "MultilineNonCodeReturnAttributeTest",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                path)],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        var artifact = CreateArtifact(compilation);
+
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.DoesNotThrow((Action)(() =>
             CompilerSourceRebinding.Validate(artifact)));
     }
 
