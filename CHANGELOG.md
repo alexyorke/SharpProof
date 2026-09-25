@@ -44,6 +44,9 @@ contain documented breaking changes.
 
 ### Changed
 
+- A complete body summary that exceeds a declared `[EffectContract]` now emits
+  warning SP0052; SP0047 remains reserved for incomplete effect-contract
+  analysis.
 - The verifier consumes the final compiler compilation artifact instead of
   reconstructing a compilation from source files.
 - Protocol version 9 and cache schema 11 distinguish undefined

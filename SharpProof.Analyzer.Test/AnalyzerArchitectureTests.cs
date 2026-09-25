@@ -257,7 +257,7 @@ public sealed class AnalyzerArchitectureTests
             Assert.That(
                 unshipped.Keys,
                 Is.EquivalentTo(descriptors.Keys));
-            Assert.That(unshipped, Has.Count.EqualTo(13));
+            Assert.That(unshipped, Has.Count.EqualTo(14));
         }
         foreach (var descriptor in descriptors.Values)
         {

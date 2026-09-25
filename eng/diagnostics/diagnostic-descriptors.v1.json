@@ -164,6 +164,18 @@
           "description": "Reports that the contract API assembly could not be read or attested, which silently disables all contract analysis.",
           "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0050",
           "customTags": ["CompilationEnd"]
+        },
+        {
+          "symbol": "EffectContractNotProvenRule",
+          "id": "SP0052",
+          "title": "Effect Contract Not Proven",
+          "messageFormat": "Method '{0}' is marked [EffectContract], but the effect contract does not cover its complete body summary: {1}",
+          "category": "Contracts",
+          "defaultSeverity": "Warning",
+          "isEnabledByDefault": true,
+          "description": "Reports a complete method body whose may-effect summary exceeds its declared [EffectContract].",
+          "helpLinkUri": "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0052",
+          "customTags": []
         }
       ]
     },

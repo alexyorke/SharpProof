@@ -15,3 +15,4 @@ SP0046 | ExceptionFlow | Info | Reports exception contracts that could not be ve
 SP0047 | Verification | Info | Reports selected methods outside the supported analyzer subset.
 SP0049 | Infrastructure | Error | Reports failure to emit the selected final compiler manifest.
 SP0050 | Infrastructure | Error | Reports a referenced contract API assembly that could not be read to verify its payload.
+SP0052 | Contracts | Warning | Reports a complete body summary that exceeds its declared `[EffectContract]`.

@@ -3102,6 +3102,9 @@ public sealed class AnalyzerModeAndEffectTests
             []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertMessageContains(
+            diagnostics[0],
+            "could not completely analyze selected method");
     }
 
     [Test]
@@ -3208,15 +3211,17 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0052", "SP0052");
             Assert.That(
                 diagnostics.Select(diagnostic =>
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
                 Is.EqualTo((string[])[
-                    "SharpProof could not completely analyze selected method " +
-                    "'UndeclaredStringRead': EffectContractDoesNotCoverBodySummary",
-                    "SharpProof could not completely analyze selected method " +
-                    "'UndeclaredArrayRead': EffectContractDoesNotCoverBodySummary"
+                    "Method 'UndeclaredStringRead' is marked [EffectContract], " +
+                    "but the effect contract does not cover its complete body " +
+                    "summary: EffectContractDoesNotCoverBodySummary",
+                    "Method 'UndeclaredArrayRead' is marked [EffectContract], " +
+                    "but the effect contract does not cover its complete body " +
+                    "summary: EffectContractDoesNotCoverBodySummary"
                 ]));
             Assert.That(
                 factory.Outcomes["UndeclaredStringRead"],
@@ -3333,7 +3338,7 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
-    public async Task CompleteSourceEffectContractReportsAnUncoveredStateWrite()
+    public async Task CompleteSourceEffectContractReportsAnUnprovenContract()
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -3352,8 +3357,12 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
-        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "EffectContractDoesNotCoverBodySummary");
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0052");
+        Assert.That(diagnostics[0].Severity, Is.EqualTo(DiagnosticSeverity.Warning));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("EffectContract")
+                .And.Contain("does not cover its complete body summary"));
         Assert.That(
             factory.Outcomes["Write"],
             Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -3660,7 +3669,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0052", "SP0052");
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "EffectContractDoesNotCoverBodySummary");
             Assert.That(
                 factory.Outcomes["AllocateOnly"],
@@ -3969,12 +3978,12 @@ public sealed class AnalyzerModeAndEffectTests
     public void AdvisoryDescriptorsUseProductionDefaults()
     {
         var descriptors = GeneratedDiagnosticDescriptors.SupportedDiagnostics;
-        // SP0050 joins SP0049 as an infrastructure error: both report that
-        // SharpProof could not do its job, which is not an advisory finding
-        // about the user's code.
+        // SP0050 joins SP0049 as an infrastructure error. SP0052 is a warning
+        // because a complete body summary does not satisfy its declared
+        // effect contract.
         var informational = descriptors.Where(static descriptor =>
             descriptor.Id is not
-                ("SP0024" or "SP0025" or "SP0027" or "SP0049" or "SP0050"));
+                ("SP0024" or "SP0025" or "SP0027" or "SP0049" or "SP0050" or "SP0052"));
 
         Assert.That(
             informational.Select(static descriptor => descriptor.DefaultSeverity),
@@ -3984,6 +3993,10 @@ public sealed class AnalyzerModeAndEffectTests
             Is.All.True);
         Assert.That(
             descriptors.Single(static descriptor => descriptor.Id == "SP0027")
+                .DefaultSeverity,
+            Is.EqualTo(DiagnosticSeverity.Warning));
+        Assert.That(
+            descriptors.Single(static descriptor => descriptor.Id == "SP0052")
                 .DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Warning));
         Assert.That(

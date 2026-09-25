@@ -153,6 +153,17 @@ internal static class GeneratedDiagnosticDescriptors
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0050",
         customTags: ["CompilationEnd"]);
 
+    internal static readonly DiagnosticDescriptor EffectContractNotProvenRule = new(
+        id: "SP0052",
+        title: "Effect Contract Not Proven",
+        messageFormat: "Method '{0}' is marked [EffectContract], but the effect contract does not cover its complete body summary: {1}",
+        category: "Contracts",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Reports a complete method body whose may-effect summary exceeds its declared [EffectContract].",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0052",
+        customTags: []);
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         PurityNotVerifiedRule,
         AllocationInZeroAllocationMethodRule,
@@ -166,6 +177,7 @@ internal static class GeneratedDiagnosticDescriptors
         ExceptionContractNotVerifiedRule,
         SelectedAnalysisIncompleteRule,
         CompilerManifestFailureRule,
-        ContractApiUnverifiableRule
+        ContractApiUnverifiableRule,
+        EffectContractNotProvenRule
     ];
 }

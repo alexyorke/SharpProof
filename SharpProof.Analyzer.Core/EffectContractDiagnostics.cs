@@ -276,7 +276,9 @@ internal static class EffectContractDiagnostics
                     EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing) &&
                   EffectContractMappings.Covers(summary, contract.Summary),
             !bodyless || contract.Kind == EffectContractResolutionKind.Valid
-                ? GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule
+                ? !bodyless && declaredComplete
+                    ? GeneratedDiagnosticDescriptors.EffectContractNotProvenRule
+                    : GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule
                 : null,
             includeDiagnosticPayload
                 ? new object[] {

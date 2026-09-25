@@ -19,8 +19,9 @@ feature groups:
 
 `SharpProofProfile` is `advisory`, `strict`, or `off`.
 `SharpProofFeatures` is `effects`, `contracts`, or `all`. Main feature
-diagnostics are enabled `Info` diagnostics by default, except SP0027 is a
-Warning. Configure their effective severities with normal Roslyn settings:
+diagnostics are enabled `Info` diagnostics by default, except SP0027 and
+SP0052, which are Warnings. Configure their effective severities with normal
+Roslyn settings:
 
 The selected feature value is compiler-visible, enters the closed verifier
 artifact, and filters its manifest. Contract-only artifacts ignore effect-only
@@ -32,6 +33,7 @@ dotnet_diagnostic.SP0016.severity = suggestion
 dotnet_diagnostic.SP0045.severity = suggestion
 dotnet_diagnostic.SP0046.severity = suggestion
 dotnet_diagnostic.SP0027.severity = warning
+dotnet_diagnostic.SP0052.severity = warning
 ```
 
 `SP0024` and `SP0025` are errors. The `SPCF` rules are errors once
@@ -58,6 +60,7 @@ replayed claim counterexample produces the verifier-launcher diagnostic SP0051.
 | `SP0049` | Container verification compiler manifest | Error, on | On artifact failure |
 | `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
 | `SP0051` | Replayed claim counterexample | Error, on | On refutation |
+| `SP0052` | Complete `[EffectContract]` body summary exceeds declaration | Warning, on | Yes |
 
 `SharpProofFeatures=all` enables both feature pipelines. The former
 `SharpProofMode` and `all-experimental` compatibility inputs are removed.
@@ -291,6 +294,16 @@ claim. The verifier launcher reports SP0051 with the claim's source location
 and replay details, and the build fails. This is a semantic refutation, not an
 incomplete-analysis or infrastructure diagnostic.
 
+<a id="sp0052"></a>
+## SP0052 - effect contract not proven
+
+SP0052 is a warning for a complete method-body summary that is not covered by
+its declared `[EffectContract]`. It means SharpProof could analyze the body,
+but the declared effect set does not account for the resulting summary. It
+does not claim an independently replayed counterexample; SP0051 is reserved
+for those witnesses. When the body or contract is incomplete, SharpProof keeps
+SP0047's incomplete-analysis diagnostic instead.
+
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor validation diagnostics
 
@@ -405,6 +418,8 @@ its executable method bodies.
   evaluates to false.
 - SP0047 is explicit incomplete analysis, SP0048 is explicit user/trusted
   evidence, SP0049 is a compilation-collection infrastructure failure, and
-  SP0051 is an independently replayed counterexample; none is a proof outcome.
+  SP0051 is an independently replayed counterexample; SP0052 reports a
+  complete effect summary that does not prove its declaration. None is a proof
+  outcome.
 - Worker `Unknown` reasons are protocol records, not Roslyn diagnostics. See
   [Typed abstention reasons](unknown-reasons.md).

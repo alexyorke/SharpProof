@@ -171,7 +171,9 @@ silence is not a proof.
 The most common diagnostics are SP0027 for a concrete precondition violation,
 SP0047 for an explicitly selected unsupported callable, SP0048 for assumptions
 or trusted evidence, SP0049 for compiler-artifact collection failure, and SP0051
-for a replayed claim counterexample. The
+for a replayed claim counterexample. A complete body summary that exceeds its
+declared `[EffectContract]` produces warning SP0052; genuinely incomplete
+analysis remains SP0047. The
 [diagnostic reference](diagnostic-examples.md) contains the full catalog and
 configuration examples.
 

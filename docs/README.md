@@ -11,7 +11,7 @@ jobs; they are not interchangeable sources of truth.
 | [Getting started](getting-started.md) | New package users and CI authors | Task-oriented package setup, profile selection, strict verification, samples, and the first repository checks |
 | [Coverage and limits](coverage-and-limits.md) | Users and contributors | Authoritative inventory of the currently implemented analyzer, worker, language, contract, and API-spec surface |
 | [Supported public API](public-api.md) | Library authors | Supported contract types, package boundary, and XML-documentation guarantee |
-| [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, SP0049, and SP0051 diagnostics, defaults, policies, and examples |
+| [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, SP0049, SP0051, and SP0052 diagnostics, defaults, policies, and examples |
 | [Package-backed samples](../samples/README.md) | Evaluators and CI owners | Passing, diagnostic, mixed-outcome, strict-library, and host-rejection examples against packed artifacts |
 | [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
 | [Preview support boundary](preview-support.md) | Build and release owners | Normative container host, path, concurrency, and trusted-filesystem boundary |
