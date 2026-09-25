@@ -46,6 +46,10 @@ public static class FrameworkTypeMetadataNames
     public const string ReferenceAssemblyAttribute = "System.Runtime.CompilerServices.ReferenceAssemblyAttribute";
     public const string SwitchExpressionException =
         "System.Runtime.CompilerServices.SwitchExpressionException";
+    public const string Task = "System.Threading.Tasks.Task";
+    public const string TaskOfT = "System.Threading.Tasks.Task`1";
+    public const string ValueTask = "System.Threading.Tasks.ValueTask";
+    public const string ValueTaskOfT = "System.Threading.Tasks.ValueTask`1";
     public const string TypeInitializationException =
         "System.TypeInitializationException";
 }

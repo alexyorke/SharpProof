@@ -332,6 +332,19 @@ Mutation-bearing value arguments are not recomputed from post-mutation state,
 and expanded `params` calls are incomplete until the synthesized array and its
 allocation are represented explicitly.
 
+At source call sites, a direct call to an `async` method returning the exact
+BCL `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>` type does not import the
+callee's body exceptions when the result is returned, ignored, discarded, or
+stored in a local that is never read. A possible task allocation is retained;
+all other callee effects, including writes and possible nontermination, remain
+conservative may-effects. Synchronous type initialization remains part of the
+call. Await, `.Result`, `.Wait()`, and nested uses retain the callee summary.
+Iterator body effects are omitted only when the created sequence is ignored,
+discarded, or stored in an unread local. A returned, escaped, or consumed
+sequence retains the source summary, so enumeration paths do not lose its
+effects. These call-site projections do not expand the supported selected-body
+subset or model arbitrary task or iterator propagation.
+
 ## Analyzer activation and language boundary
 
 Analyzer behavior is selected through the compilation-global

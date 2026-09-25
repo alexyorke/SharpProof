@@ -557,6 +557,11 @@ public sealed class EffectAnalysisSession
                     out var initialization))
             {
                 var initializationSummary = initialization.LocalSummary;
+                var deferredInvocations =
+                    new DeferredInvocationEffectPolicy(
+                        _compilation,
+                        method,
+                        ApiSpecs);
                 foreach (var call in OrderCalls(initialization.Calls))
                 {
                     var target = HasSameContainingType(method, call.Target)
@@ -567,6 +572,7 @@ public sealed class EffectAnalysisSession
                         call,
                         target,
                         nodes,
+                        deferredInvocations,
                         wrapTypeInitializationFailures: true);
                 }
                 summary = EffectSummaryDomain.Instance.Join(
@@ -599,6 +605,10 @@ public sealed class EffectAnalysisSession
 
             computeDepth++;
             var summary = node.LocalSummary;
+            var deferredInvocations = new DeferredInvocationEffectPolicy(
+                _compilation,
+                method,
+                ApiSpecs);
             foreach (var call in OrderCalls(node.Calls))
             {
                 var target =
@@ -607,7 +617,12 @@ public sealed class EffectAnalysisSession
                     HasSameContainingType(method, call.Target)
                         ? ComputeBody(call.Target)
                         : Compute(call.Target);
-                summary = JoinSummaryCall(summary, call, target, nodes: nodes);
+                summary = JoinSummaryCall(
+                    summary,
+                    call,
+                    target,
+                    nodes,
+                    deferredInvocations);
             }
 
             computeDepth--;
@@ -649,6 +664,7 @@ public sealed class EffectAnalysisSession
         EffectCallSite call,
         EffectSummary target,
         IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
+        DeferredInvocationEffectPolicy deferredInvocations,
         bool wrapTypeInitializationFailures = false)
     {
         target = PrepareDivergingDisposeTarget(call, target, nodes);
@@ -657,6 +673,7 @@ public sealed class EffectAnalysisSession
             call.Receiver,
             call.WriteReceiver,
             call.Arguments);
+        remapped = deferredInvocations.Project(call, remapped);
         if (wrapTypeInitializationFailures)
         {
             remapped = WrapTypeInitializationFailures(remapped);
