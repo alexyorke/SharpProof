@@ -70,14 +70,17 @@ using SharpProof.Attributes;
 
 public static class Calculator
 {
-    public static int Increment(int value)
+    public static long Increment(long value)
     {
-        Contract.Requires(value >= 0);
-        Contract.Ensures(Contract.Result<int>() > value);
-        return value + 1;
+        Contract.Requires(value >= 0 && value < long.MaxValue);
+        Contract.Ensures(Contract.Result<long>() > value);
+        return checked(value + 1);
     }
 }
 ```
+
+The upper bound makes the checked increment safe. The worker supports checked
+`long` arithmetic; `int` arithmetic is outside its current proof subset.
 
 Contract.Requires, Contract.Ensures, and Contract.Assume are direct,
 contiguous prologue clauses. They are compiler-elided unless

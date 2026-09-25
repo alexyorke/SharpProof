@@ -1451,6 +1451,71 @@ public sealed class WorkerMsBuildIntegrationTests
                 "SharpProofProfile=strict requires SharpProofVerify=true"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReadmeMinimalContractProvesUnderStrictWorkerVerification(
+        bool checkOverflowUnderflow)
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            ReadReadmeMinimalContract(),
+            ("SharpProofProfile", "strict"),
+            ("SharpProofFeatures", "all"),
+            ("SharpProofVerifyPolicy", "require-proven"),
+            ("SharpProofAssumptionPolicy", "error"),
+            ("CheckForOverflowUnderflow",
+                checkOverflowUnderflow ? "true" : "false"));
+
+        var build = await project.BuildAsync(verify: true);
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var claim = response.ClaimResults.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Zero, build.Output);
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public async Task UnsupportedIntIncrementControlRemainsUnknown()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            """
+            using SharpProof.Attributes;
+
+            public static class Calculator
+            {
+                public static int Increment(int value)
+                {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() > value);
+                    return value + 1;
+                }
+            }
+            """,
+            ("SharpProofProfile", "strict"),
+            ("SharpProofFeatures", "all"),
+            ("SharpProofVerifyPolicy", "require-proven"),
+            ("SharpProofAssumptionPolicy", "error"));
+
+        var build = await project.BuildAsync(verify: true);
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var claim = response.ClaimResults.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                claim.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
     [Test]
     public async Task ProjectBodyConfigurationRejectsRetiredMode()
     {
@@ -3678,6 +3743,35 @@ public sealed class WorkerMsBuildIntegrationTests
             }
         }
         """;
+
+    private static string ReadReadmeMinimalContract()
+    {
+        var readme = File.ReadAllText(Path.Combine(
+            TestRepository.FindRoot(),
+            "README.md"));
+        const string heading = "## A minimal contract";
+        const string fence = "```csharp";
+        var headingStart = readme.IndexOf(
+            heading,
+            StringComparison.Ordinal);
+        var fenceStart = headingStart < 0
+            ? -1
+            : readme.IndexOf(
+                fence,
+                headingStart + heading.Length,
+                StringComparison.Ordinal);
+        var sourceStart = fenceStart < 0 ? -1 : fenceStart + fence.Length;
+        var sourceEnd = sourceStart < 0
+            ? -1
+            : readme.IndexOf("```", sourceStart, StringComparison.Ordinal);
+        if (headingStart < 0 || fenceStart < 0 || sourceEnd < 0)
+        {
+            throw new InvalidDataException(
+                "README minimal-contract C# fence was not found.");
+        }
+
+        return readme[sourceStart..sourceEnd].Trim('\r', '\n');
+    }
 
     private static async Task<BuildResult> BuildOkAsync(
         Task<BuildResult> resultTask)
