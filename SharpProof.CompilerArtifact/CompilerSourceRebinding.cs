@@ -116,7 +116,19 @@ internal static class CompilerSourceRebinding
                 cancellationToken);
         }
 
-        var text = Decode(bytes, tree.Encoding);
+        string text;
+        try
+        {
+            text = Decode(bytes, tree.Encoding);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or NotSupportedException)
+        {
+            throw new InvalidDataException(
+                $"Compiler source tree '{tree.Path}' could not be decoded using encoding '{tree.Encoding}'.",
+                exception);
+        }
+
         if (text.Length != tree.TextLength ||
             !string.Equals(
                 WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(text)),
@@ -157,11 +169,21 @@ internal static class CompilerSourceRebinding
                 bytes, 2, bytes.Length - 2);
         }
 
-        var encoding = string.IsNullOrEmpty(encodingName) ||
-            string.Equals(encodingName, "utf-8", StringComparison.OrdinalIgnoreCase)
-            ? new UTF8Encoding(false, true)
-            : Encoding.GetEncoding(encodingName);
-        return encoding.GetString(bytes);
+        if (string.IsNullOrEmpty(encodingName) ||
+            string.Equals(encodingName, "utf-8", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                return new UTF8Encoding(false, true).GetString(bytes);
+            }
+            catch (DecoderFallbackException)
+            {
+                // Roslyn's source-file fallback replaces invalid UTF-8 bytes.
+                return new UTF8Encoding(false, false).GetString(bytes);
+            }
+        }
+
+        return Encoding.GetEncoding(encodingName).GetString(bytes);
     }
 
     private static bool HasPrefix(byte[] bytes, params byte[] prefix)

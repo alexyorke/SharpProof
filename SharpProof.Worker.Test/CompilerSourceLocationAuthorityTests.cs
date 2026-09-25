@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
@@ -165,6 +166,129 @@ public sealed class CompilerSourceLocationAuthorityTests
         Assert.DoesNotThrow((Action)(() => CompilerSourceRebinding.Validate(artifact)));
         File.AppendAllText(path, "// changed", Encoding.GetEncoding(encodingName));
         Assert.Throws<InvalidDataException>((Action)(() => CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingAcceptsWindows1252AndRejectsAppendedText()
+    {
+        var encoding = CodePagesEncodingProvider.Instance.GetEncoding(1252)!;
+        const string source =
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "  internal static int Identity(int value) {\n" +
+            "    Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "    return value;\n" +
+            "  }\n" +
+            "}\n" +
+            "// cp1252 comment: é\n";
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "Windows1252Rebinding-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllBytes(path, encoding.GetBytes(source));
+        var tree = CSharpSyntaxTree.ParseText(
+            SourceText.From(source, encoding),
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            path);
+        var compilation = CSharpCompilation.Create(
+            "Windows1252RebindingTest",
+            [tree],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        var artifact = CreateArtifact(compilation);
+
+        Assert.That(tree.Encoding?.WebName, Is.EqualTo("windows-1252"));
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+
+        using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write))
+        {
+            var appended = encoding.GetBytes("// changed\n");
+            stream.Write(appended);
+        }
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingAcceptsInvalidUtf8FallbackAndRejectsAppendedText()
+    {
+        const string prefix =
+            "using SharpProof.Attributes;\n" +
+            "internal static class Subject {\n" +
+            "  internal static int Identity(int value) {\n" +
+            "    Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "    return value;\n" +
+            "  }\n" +
+            "}\n" +
+            "// invalid UTF-8 comment byte: ";
+        const string suffix = "\n";
+        var prefixBytes = Encoding.ASCII.GetBytes(prefix);
+        var suffixBytes = Encoding.ASCII.GetBytes(suffix);
+        var bytes = new byte[prefixBytes.Length + 1 + suffixBytes.Length];
+        prefixBytes.CopyTo(bytes, 0);
+        bytes[prefixBytes.Length] = 0xE9;
+        suffixBytes.CopyTo(bytes, prefixBytes.Length + 1);
+        var lenientUtf8 = new UTF8Encoding(false, false);
+        using var sourceStream = new MemoryStream(bytes, writable: false);
+        var sourceText = SourceText.From(sourceStream, lenientUtf8);
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "InvalidUtf8Rebinding-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllBytes(path, bytes);
+        var tree = CSharpSyntaxTree.ParseText(
+            sourceText,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            path);
+        var compilation = CSharpCompilation.Create(
+            "InvalidUtf8RebindingTest",
+            [tree],
+            TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        var artifact = CreateArtifact(compilation);
+
+        Assert.That(tree.Encoding?.WebName, Is.EqualTo("utf-8"));
+        Assert.That(sourceText.ToString(), Does.Contain('\uFFFD'));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+
+        using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write))
+        {
+            var appended = Encoding.UTF8.GetBytes("// changed\n");
+            stream.Write(appended);
+        }
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
+    [Test]
+    public void SourceRebindingWrapsUnknownEncodingWithTreeContext()
+    {
+        var artifact = CreateOnDiskContractArtifact(out _);
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        tree.Encoding = "not-a-real-encoding";
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)))!;
+
+        Assert.That(exception.Message, Does.Contain(tree.Path));
+        Assert.That(exception.Message, Does.Contain(tree.Encoding));
+    }
+
+    [Test]
+    public void SourceRebindingWrapsMalformedBomUtf8WithTreeContext()
+    {
+        var artifact = CreateOnDiskContractArtifact(out _);
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        File.WriteAllBytes(tree.Path, [0xEF, 0xBB, 0xBF, 0xE9]);
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)))!;
+
+        Assert.That(exception.Message, Does.Contain(tree.Path));
+        Assert.That(exception.Message, Does.Contain(tree.Encoding));
     }
 
     [TestCase("Ensures /* comment ( */ ")]
