@@ -1,3 +1,5 @@
+using SharpProof.Host;
+
 namespace SharpProof.BuildTasks;
 
 internal static class Program
@@ -7,6 +9,13 @@ internal static class Program
 
     private static int Main(string[] arguments)
     {
+        if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
+        {
+            Console.Error.WriteLine(
+                "The SharpProof verifier supervisor refused unsafe runtime environment variable " +
+                variable + ".");
+            return LinuxProcessControlConstants.EnvironmentFailureExitCode;
+        }
         if (arguments.Length < 2)
         {
             return 2;

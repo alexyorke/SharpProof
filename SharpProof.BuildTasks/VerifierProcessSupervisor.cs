@@ -208,6 +208,9 @@ internal static partial class VerifierProcessSupervisor
                 CreateNoWindow = true
             }
         };
+        TrustedChildEnvironment.Apply(
+            process.StartInfo,
+            command[0]);
         foreach (var argument in command.Skip(1))
         {
             process.StartInfo.ArgumentList.Add(argument);

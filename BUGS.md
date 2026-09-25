@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and B65 Z3 payload integrity findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **42 findings**: 0 P0, 0 P1, 4 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B74 release-resume, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and the B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. B73 now rejects return-attribute spans rebound to calls or string literals, but remains active because inactive preprocessor text is not distinguished from active source. Proposed fixes for the other findings have not been implemented. The active backlog contains **41 findings**: 0 P0, 0 P1, 3 P2, and 38 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,54 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P2 - Medium
-
-### B66. Worker and launcher inherit the build environment, so `DOTNET_STARTUP_HOOKS` and similar variables bypass the authenticated runtime closure
-
-**Confidence: Confirmed by running the real worker with an injected startup hook.**
-
-- **Location:** `SharpProof.Host/LinuxWorkerProcess.cs:53-70` (the
-  `ProcessStartInfo` for the worker copies the launcher's whole environment);
-  `SharpProof.Worker.Launcher/Program.cs:270-290` (`RunWorker` starts
-  `dotnet <worker.dll>`); `SharpProof.BuildTasks/RunVerifier.cs:171` and
-  `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:90` and `:204` (the
-  launcher and supervisor also inherit MSBuild's environment). Neither
-  `SharpProof.Worker` nor `SharpProof.Worker.Launcher` sets
-  `<StartupHookSupport>false</StartupHookSupport>`.
-- **Defect:** the launcher authenticates the worker's managed runtime
-  closure (it stages it, hashes it, and refuses to run if it "changed before
-  launch"), and the input hash and published versions bind that identity.
-  The .NET host, however, also honors environment variables that load or
-  replace code without touching those files: `DOTNET_STARTUP_HOOKS`,
-  `DOTNET_ADDITIONAL_DEPS`, `DOTNET_SHARED_STORE`, `DOTNET_ROOT`/
-  `DOTNET_ROLL_FORWARD` (which runtime runs the worker), `LD_PRELOAD`, and
-  `LD_LIBRARY_PATH` (which native `libz3` is loaded if resolution falls back).
-  None of them is cleared or recorded.
-- **Observed boundary:** a trivial `InjectedHook.dll` whose
-  `StartupHook.Initialize` writes to stderr, with
-  `DOTNET_STARTUP_HOOKS=<path>` set, printed
-  `INJECTED CODE RUNNING IN PROCESS ...\dotnet.exe ...\SharpProof.Worker.dll verify
-  --request x --result y` before the worker's own usage message, running
-  `SharpProof.Worker.dll` built from HEAD (on Windows; the host behavior is
-  the same on Linux).
-- **Impact:** any environment variable set in the build (by a CI step, a
-  shell profile, or a compromised build tool) can run arbitrary code inside
-  the worker and rewrite verdicts to `Proven`. The result still carries the
-  authenticated worker binary hash and passes launcher validation. This
-  sidesteps exactly the integrity property the closure snapshot is meant to
-  provide. It is a local-environment trust issue rather than a remote
-  attack, so it is filed as P2.
-- **Proposed fix:** set `<StartupHookSupport>false</StartupHookSupport>` in
-  both executables. Start the worker and launcher with an explicit minimal
-  environment: clear `startInfo.Environment`, then copy an allowlist
-  (`PATH`, `HOME`, `TMPDIR`, `SHARPPROOF_CONTAINER*`, `SHARPPROOF_NATIVE_ROOT`,
-  and `DOTNET_CLI_TELEMETRY_OPTOUT`), and set `DOTNET_ROOT` to the validated
-  host directory. Fail closed if `LD_PRELOAD` or `DOTNET_STARTUP_HOOKS` are
-  present in the launcher's own process.
-- **Proposed regression:** a launcher test that sets `DOTNET_STARTUP_HOOKS`
-  and `DOTNET_ADDITIONAL_DEPS` to a marker assembly and asserts that the
-  worker does not load it (the marker file is not created) and that the
-  verdicts are unchanged, plus a test that the child environment contains
-  only allowlisted keys.
 
 ### B72. A contract in a top-level program makes the launcher reject the whole project
 

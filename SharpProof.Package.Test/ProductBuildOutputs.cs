@@ -2,6 +2,14 @@ namespace SharpProof.Package.Test;
 
 internal static class ProductBuildOutputs
 {
+    internal static string RuntimeAssemblyPath(string project)
+    {
+        return AssemblyPath(
+            project,
+            "net9.0",
+            project + ".dll");
+    }
+
     internal static string AttributesAssemblyPath()
     {
         return AssemblyPath(

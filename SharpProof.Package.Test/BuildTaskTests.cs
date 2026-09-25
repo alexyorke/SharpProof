@@ -982,6 +982,12 @@ public sealed class BuildTaskTests
         {
             var trusted = RunVerifier.ResolveDotNetHost("dotnet");
             Assert.That(
+                LinuxPathIdentity.AreSameExistingFile(
+                    trusted,
+                    Environment.ProcessPath ?? string.Empty),
+                Is.True,
+                "The current process image is the verifier host authority.");
+            Assert.That(
                 Assert.Throws<InvalidOperationException>(
                     (Action)(() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
                 Does.Contain("direct dotnet muxer"));
@@ -995,16 +1001,20 @@ public sealed class BuildTaskTests
                 "PATH",
                 "relative" + Path.PathSeparator + ".");
             Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
-                Does.Contain("resolve a trusted dotnet muxer"));
+                RunVerifier.ResolveDotNetHost("dotnet"),
+                Is.EqualTo(trusted),
+                "Host resolution must not depend on the mutable PATH.");
 
             var wrongName = Path.Combine(directory.FullName, "not-dotnet");
             File.WriteAllText(wrongName, string.Empty);
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", wrongName);
             Assert.That(
+                RunVerifier.ResolveDotNetHost("dotnet"),
+                Is.EqualTo(trusted),
+                "DOTNET_HOST_PATH must not select a runtime executable.");
+            Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost(wrongName)))!.Message,
                 Does.Contain("direct dotnet muxer"));
 
             var incompleteDirectory = Directory.CreateDirectory(
@@ -1014,8 +1024,12 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", incomplete);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost(incomplete)))!.Message,
                 Does.Contain("complete dotnet installation"));
+            Assert.That(
+                RunVerifier.ResolveDotNetHost("dotnet"),
+                Is.EqualTo(trusted),
+                "DOTNET_HOST_PATH must not replace the executing host authority.");
 
             var alternateDirectory = Directory.CreateDirectory(
                 Path.Combine(directory.FullName, "alternate"));

@@ -637,7 +637,7 @@ try {
             -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
             -BucketCount $packageLayoutBucketCount)
         $fixtureClasses = @(
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|VerifierProcessSupervisorBug202Tests|DependencyAuditScriptTests|LauncherArgumentTests|RefutedContractDiagnosticTests',
+            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|VerifierProcessSupervisorBug202Tests|DependencyAuditScriptTests|LauncherArgumentTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
             'FinalCompilationProbeTests',
             'LinuxWorkerProcessContainmentTests',
             'ReleasePublicationScriptTests')

@@ -21,6 +21,13 @@ internal static class Program
 
     internal static async Task<int> Main(string[] args)
     {
+        if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
+        {
+            Console.Error.WriteLine(
+                "SharpProof launcher refused unsafe runtime environment variable " +
+                variable + ".");
+            return 125;
+        }
         return await RunMain(
             args,
             static path => WorkerBinaryIdentity.ComputeSha256(
@@ -282,8 +289,9 @@ internal static class Program
         var finalLimit = TimeSpan.FromMilliseconds(checked(
             request.Budgets.ProjectWallTimeMilliseconds +
             arguments.TerminationGraceMilliseconds));
-        using var process = LinuxWorkerProcess.Start(
-            ResolveDotNetHostPath(projectDirectory),
+        var dotNetHostPath = ResolveDotNetHostPath(projectDirectory);
+        using var process = LinuxWorkerProcess.StartDotNet(
+            dotNetHostPath,
             [workerPath, WorkerInvocationArguments.Command,
                 WorkerInvocationArguments.RequestOption, arguments.RequestPath,
                 WorkerInvocationArguments.ResultOption, arguments.ResultPath,

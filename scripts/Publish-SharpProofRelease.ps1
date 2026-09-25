@@ -183,8 +183,8 @@ function Get-ValidatedRelease {
         -Path $manifestPath `
         -DocumentType ReleaseManifest
     if ((Get-RequiredProperty $manifest 'schemaVersion' 'Release manifest') -ne
-            3) {
-        throw 'Release manifest must use schema 3.'
+            4) {
+        throw 'Release manifest must use schema 4.'
     }
     $version = [string](Get-RequiredProperty `
         $manifest `

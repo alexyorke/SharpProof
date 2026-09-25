@@ -492,6 +492,55 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task InheritedStartupHookCannotRunInsideWorker()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        using var temporary = new TempDirectory("sharp-worker-hook-");
+        var hookDirectory = Path.Combine(
+            temporary.FullName,
+            "SharpProof.Worker");
+        Directory.CreateDirectory(hookDirectory);
+        var markerPath = Path.Combine(
+            hookDirectory,
+            "startup-hook-loaded");
+        var originalStartupHooks = Environment.GetEnvironmentVariable(
+            "DOTNET_STARTUP_HOOKS");
+        var originalTemporaryDirectory = Environment.GetEnvironmentVariable(
+            "TMPDIR");
+        BuildResult build;
+        try
+        {
+            Environment.SetEnvironmentVariable(
+                "DOTNET_STARTUP_HOOKS",
+                typeof(global::StartupHook).Assembly.Location);
+            Environment.SetEnvironmentVariable("TMPDIR", hookDirectory);
+            build = await BuildOkAsync(project.BuildAsync(verify: true));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                "DOTNET_STARTUP_HOOKS",
+                originalStartupHooks);
+            Environment.SetEnvironmentVariable(
+                "TMPDIR",
+                originalTemporaryDirectory);
+        }
+
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.Output, Does.Contain("SharpProof Proven"));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(
+                File.Exists(markerPath),
+                Is.False,
+                "The worker must not load startup hooks inherited from the build environment.");
+        }
+    }
+
+    [Test]
     public async Task RelationalSpecificationPackIsExplicitAndPackaged()
     {
         RequireContainerWorker();

@@ -8,6 +8,13 @@ internal static class Program
 {
     internal static async Task<int> Main(string[] args)
     {
+        if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
+        {
+            Console.Error.WriteLine(
+                "The SharpProof worker refused unsafe runtime environment variable " +
+                variable + ".");
+            return LinuxProcessControlConstants.EnvironmentFailureExitCode;
+        }
         if (!TryParseArguments(
                 args,
                 out var requestPath,

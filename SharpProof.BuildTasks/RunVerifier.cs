@@ -179,6 +179,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     CreateNoWindow = true
                 }
             };
+            TrustedChildEnvironment.Apply(
+                process.StartInfo,
+                resolvedExecutable);
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             process.StartInfo.ArgumentList.Add(
                 supervisorAssembly);
@@ -1253,10 +1256,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 "SharpProof verifier host must name the direct dotnet muxer.");
         }
 
-        var disclosedHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        var trusted = !string.IsNullOrWhiteSpace(disclosedHost)
-            ? ValidateDotNetInstallation(disclosedHost)
-            : ValidateDotNetInstallation(ResolveDotNetFromPath());
+        var currentHost = Environment.ProcessPath ??
+            throw new InvalidOperationException(
+                "SharpProof verifier could not identify its current dotnet muxer.");
+        var trusted = ValidateDotNetInstallation(currentHost);
         if (string.Equals(
                 executable,
                 "dotnet",
@@ -1298,30 +1301,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         Armed,
         ExitedBeforeArmed,
         NotReady
-    }
-
-    private static string ResolveDotNetFromPath()
-    {
-        foreach (var value in (Environment.GetEnvironmentVariable("PATH") ??
-                     string.Empty).Split(
-                     [Path.PathSeparator],
-                     StringSplitOptions.RemoveEmptyEntries))
-        {
-            var directory = value.Trim().Trim('"');
-            if (string.IsNullOrWhiteSpace(directory) ||
-                directory == "." ||
-                !Path.IsPathRooted(directory))
-            {
-                continue;
-            }
-            var candidate = Path.Combine(directory, "dotnet");
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-        throw new InvalidOperationException(
-            "SharpProof could not resolve a trusted dotnet muxer from PATH.");
     }
 
     private static string ValidateDotNetInstallation(string candidate)
