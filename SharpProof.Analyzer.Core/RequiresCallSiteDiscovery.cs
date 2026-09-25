@@ -130,6 +130,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
+        var blockPrefixCompletionIndices = new Dictionary<
+            BlockSyntax,
+            BlockPrefixCompletionIndex>(
+            ReferenceComparer<BlockSyntax>.Instance);
         var reachableInitializerSites = GetReachableInitializerSites(
             operationFacts);
         var delegateTargets = GetDirectDelegateTargets(operationRoot!);
@@ -179,7 +183,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 var syntacticReplayable = HasReplayablePrefix(
                     operation,
                     operationFacts,
-                    flowResult);
+                    flowResult,
+                    blockPrefixCompletionIndices);
 
                 var hasFlowState =
                     flowResult?.TryGetState(operation, out _) == true;
@@ -224,7 +229,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             operation,
                             call,
                             operationFacts,
-                            flowResult),
+                            flowResult,
+                            blockPrefixCompletionIndices),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status,
                         cancellationToken);
@@ -267,7 +273,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 !HasReplayablePrefix(
                     operation,
                     operationFacts,
-                    flowResult))
+                    flowResult,
+                    blockPrefixCompletionIndices))
             {
                 continue;
             }
@@ -287,7 +294,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             operation,
                             call,
                             operationFacts,
-                            flowResult),
+                            flowResult,
+                            blockPrefixCompletionIndices),
                         flow: null,
                         flowAnalysis.Status,
                         cancellationToken));
@@ -357,7 +365,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         operation,
                         call,
                         operationFacts,
-                        flowResult),
+                        flowResult,
+                        blockPrefixCompletionIndices),
                         flow: null,
                         flowAnalysis.Status,
                         cancellationToken);
@@ -602,7 +611,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private bool HasReplayablePrefix(
         IOperation callSite,
         DefiniteOperationFacts operationFacts,
-        ManagedFlowResult? flowResult = null)
+        ManagedFlowResult? flowResult,
+        Dictionary<BlockSyntax, BlockPrefixCompletionIndex>
+            blockPrefixCompletionIndices)
     {
         if (declaration is EqualsValueClauseSyntax equalsValue)
         {
@@ -654,22 +665,103 @@ internal sealed partial class RequiresCallSiteDiscovery(
             directNode = parent;
         }
 
-        return directNode is StatementSyntax directStatement &&
-               ReferenceEquals(directStatement.Parent, block) &&
-               block.Statements
-                   .TakeWhile(candidate => !ReferenceEquals(
-                       candidate,
-                       directStatement))
-                   .All(prior =>
-                       prior is EmptyStatementSyntax or
-                           LocalFunctionStatementSyntax ||
-                       ReachesNextStatement(
-                           semanticModel.GetOperation(
-                               prior,
-                               cancellationToken),
-                           operationFacts,
-                           flowResult,
-                           callSite));
+        if (directNode is not StatementSyntax directStatement ||
+            !ReferenceEquals(directStatement.Parent, block))
+        {
+            return false;
+        }
+
+        if (!blockPrefixCompletionIndices.TryGetValue(
+                block,
+                out var prefixCompletionIndex))
+        {
+            prefixCompletionIndex = new BlockPrefixCompletionIndex(
+                this,
+                block,
+                operationFacts,
+                flowResult,
+                semanticModel,
+                cancellationToken);
+            blockPrefixCompletionIndices.Add(
+                block,
+                prefixCompletionIndex);
+        }
+
+        return prefixCompletionIndex.CanReplayBefore(
+            directStatement,
+            callSite);
+    }
+
+    private sealed class BlockPrefixCompletionIndex
+    {
+        private readonly RequiresCallSiteDiscovery _owner;
+        private readonly BlockSyntax _block;
+        private readonly DefiniteOperationFacts _operationFacts;
+        private readonly ManagedFlowResult? _flowResult;
+        private readonly SemanticModel _semanticModel;
+        private readonly CancellationToken _cancellationToken;
+        private readonly Dictionary<StatementSyntax, int> _statementIndices =
+            new(ReferenceComparer<StatementSyntax>.Instance);
+        private int _computedPrefixLength;
+        private int _firstNonCompletingStatement = -1;
+
+        internal BlockPrefixCompletionIndex(
+            RequiresCallSiteDiscovery owner,
+            BlockSyntax block,
+            DefiniteOperationFacts operationFacts,
+            ManagedFlowResult? flowResult,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            _owner = owner;
+            _block = block;
+            _operationFacts = operationFacts;
+            _flowResult = flowResult;
+            _semanticModel = semanticModel;
+            _cancellationToken = cancellationToken;
+            for (var index = 0; index < block.Statements.Count; index++)
+            {
+                _statementIndices.Add(block.Statements[index], index);
+            }
+        }
+
+        internal bool CanReplayBefore(
+            StatementSyntax statement,
+            IOperation fallbackFlowOrigin)
+        {
+            if (!_statementIndices.TryGetValue(statement, out var statementIndex))
+            {
+                return false;
+            }
+
+            while (_computedPrefixLength < statementIndex &&
+                   _firstNonCompletingStatement < 0)
+            {
+                var prior = _block.Statements[_computedPrefixLength];
+                var completes = prior is EmptyStatementSyntax or
+                    LocalFunctionStatementSyntax;
+                if (!completes)
+                {
+                    var priorOperation = _semanticModel.GetOperation(
+                        prior,
+                        _cancellationToken);
+                    completes = _owner.ReachesNextStatement(
+                        priorOperation,
+                        _operationFacts,
+                        _flowResult,
+                        priorOperation ?? fallbackFlowOrigin);
+                }
+
+                if (!completes)
+                {
+                    _firstNonCompletingStatement = _computedPrefixLength;
+                }
+                _computedPrefixLength++;
+            }
+
+            return _firstNonCompletingStatement < 0 ||
+                statementIndex <= _firstNonCompletingStatement;
+        }
     }
 
     private bool ReachesNextStatement(
@@ -848,7 +940,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation operation,
         RequiresCallTarget call,
         DefiniteOperationFacts operationFacts,
-        ManagedFlowResult? flowResult)
+        ManagedFlowResult? flowResult,
+        Dictionary<BlockSyntax, BlockPrefixCompletionIndex>
+            blockPrefixCompletionIndices)
     {
         if (operation is IUsingOperation or IUsingDeclarationOperation)
         {
@@ -877,7 +971,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         return HasReplayablePrefix(
             operation,
             operationFacts,
-            flowResult);
+            flowResult,
+            blockPrefixCompletionIndices);
     }
 
     private static bool CanCoalesceGetterComplete(

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -497,6 +498,62 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(candidates, Is.Not.Null);
         Assert.That(candidates!.Value, Has.Length.EqualTo(1));
         Assert.That(candidates.Value[0].CanReplay, Is.False);
+    }
+
+    [Test]
+    public async Task SequentialCallPrefixAnalysisScalesWithinSmallMultiple()
+    {
+        _ = await AnalyzeSequentialCalls(64);
+
+        var baseline = await AnalyzeSequentialCalls(500);
+        var large = await AnalyzeSequentialCalls(4000);
+        var maximumLargeDuration = baseline.Elapsed * 10 +
+            TimeSpan.FromSeconds(1);
+
+        await TestContext.Progress.WriteLineAsync(
+            $"Sequential contracted calls: 500={baseline.Elapsed.TotalMilliseconds:F0}ms, " +
+            $"4000={large.Elapsed.TotalMilliseconds:F0}ms, " +
+            $"limit={maximumLargeDuration.TotalMilliseconds:F0}ms.");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(baseline.Diagnostics, Is.Empty);
+            Assert.That(large.Diagnostics, Is.Empty);
+            Assert.That(
+                large.Elapsed,
+                Is.LessThanOrEqualTo(maximumLargeDuration),
+                $"The 4000-call analysis took {large.Elapsed.TotalMilliseconds:F0}ms " +
+                $"versus {baseline.Elapsed.TotalMilliseconds:F0}ms for 500 calls.");
+        }
+    }
+
+    [Test]
+    public void PotentiallyNonCompletingPrefixStillBlocksReplay()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Call(bool x) {
+                    if (x) throw new System.InvalidOperationException();
+                    return Positive(-1);
+                }
+            }
+            """,
+            []);
+        var candidates = Discover<MethodDeclarationSyntax>(
+            compilation,
+            static method => method.Identifier.ValueText == "Call");
+
+        Assert.That(candidates, Is.Not.Null);
+        var candidate = candidates!.Value.Single(static candidate =>
+            candidate.TargetMethod.Name == "Positive");
+        Assert.That(candidate.CanReplay, Is.False);
     }
 
     [Test]
@@ -1666,6 +1723,37 @@ public sealed class RequiresCallSiteDiscoveryTests
             : declarations.Single(select);
         return CreateDiscovery(compilation, declaration)
             .Get(callerContracts: null);
+    }
+
+    private static async Task<(TimeSpan Elapsed, ImmutableArray<Diagnostic> Diagnostics)>
+        AnalyzeSequentialCalls(int count)
+    {
+        var calls = string.Join(
+            Environment.NewLine,
+            Enumerable.Repeat("        Positive(1);", count));
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static void Call() {
+            {{calls}}
+                }
+            }
+            """,
+            ["SP0027"]);
+
+        var stopwatch = Stopwatch.StartNew();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+        stopwatch.Stop();
+        return (stopwatch.Elapsed, diagnostics);
     }
 
     private static RequiresCallSiteDiscovery CreateDiscovery(
