@@ -438,6 +438,16 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
+        if (method.MethodKind == MethodKind.AnonymousFunction &&
+            session.Configuration.ContractsEnabled)
+        {
+            ReportAnonymousRequiresPlacement(
+                method,
+                session.GetContractClauses(method).Clauses,
+                session,
+                context.ReportDiagnostic);
+        }
+
         EffectContractDiagnostics.ValidateArguments(
             method,
             session,
@@ -830,6 +840,14 @@ internal static partial class AnalyzerFeaturePipeline
             session.GetContractIntrinsicViolations(inventory);
         ReportInvalidIntrinsics(intrinsicViolations, session, reportDiagnostic);
         ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
+        if (method.MethodKind == MethodKind.AnonymousFunction)
+        {
+            ReportAnonymousRequiresPlacement(
+                method,
+                inventory.Clauses,
+                session,
+                reportDiagnostic);
+        }
         foreach (var owner in GetNestedOwners(inventory, session.Compilation))
         {
             ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
@@ -837,6 +855,34 @@ internal static partial class AnalyzerFeaturePipeline
         return inventory.HasRejectedContractApiUsage ||
             inventory.HasPlacementErrors ||
             !intrinsicViolations.IsDefaultOrEmpty;
+    }
+
+    private static void ReportAnonymousRequiresPlacement(
+        IMethodSymbol method,
+        ImmutableArray<ContractClauseOccurrence> clauses,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        if (method.MethodKind != MethodKind.AnonymousFunction ||
+            !session.TryBeginAnonymousRequiresPlacementAnalysis(method))
+        {
+            return;
+        }
+
+        foreach (var clause in clauses)
+        {
+            if (clause.Kind != BoundContractKind.Requires ||
+                clause.Placement != ContractClausePlacement.ValidPrologue)
+            {
+                continue;
+            }
+
+            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                "Contract.Requires",
+                "<placement>",
+                "preconditions inside lambda and anonymous methods cannot be enforced at delegate invocation sites",
+                clause.Location));
+        }
     }
 
     private static bool TryRecordRejectedContractAbstention(

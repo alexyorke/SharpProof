@@ -17,6 +17,123 @@ public sealed class NestedRequiresCallSiteTests
         """;
 
     [Test]
+    public async Task LocalFunctionRequiresAreCheckedAtDirectCalls()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static int Outer() {
+                    int Local(int value) {
+                        Contract.Requires(value > 0);
+                        return value;
+                    }
+
+                    return Local(-1);
+                }
+
+                public static int StaticOuter() {
+                    static int StaticLocal(int value) {
+                        Contract.Requires(value > 0);
+                        return value;
+                    }
+
+                    return StaticLocal(-1);
+                }
+
+                public static int AssignedOuter() {
+                    int Local(int value) {
+                        Contract.Requires(value > 0);
+                        return value;
+                    }
+
+                    int z = -1;
+                    return Local(z);
+                }
+
+                public static int SafeOuter() {
+                    int Local(int value) {
+                        Contract.Requires(value > 0);
+                        return value;
+                    }
+
+                    return Local(1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(
+            source,
+            enabledIds: ["SP0027"]);
+
+        AssertRequiresAt(
+            diagnostics,
+            source,
+            unordered: false,
+            "Local(-1)", "StaticLocal(-1)", "Local(z)");
+    }
+
+    [Test]
+    public async Task LambdaRequiresReportsPlacement()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static int Outer() {
+                    Func<int, int> local = value => {
+                        Contract.Requires(value > 0);
+                        Contract.Requires(value < 10);
+                        return value;
+                    };
+                    Func<int, int> anonymous = delegate(int value) {
+                        Contract.Requires(value > 0);
+                        return value;
+                    };
+                    return local(-1) + anonymous(-1);
+                }
+            }
+            """,
+            enabledIds: ["SP0024"]);
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 3);
+    }
+
+    [Test]
+    public async Task CapturedLocalFunctionPreconditionRemainsUnknown()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await Analyze(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static int Outer(int captured) {
+                    int Local(int value) {
+                        Contract.Requires(value > captured);
+                        return value;
+                    }
+
+                    return Local(0);
+                }
+            }
+            """,
+            factory,
+            ["SP0027"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(
+                factory.GetNamedOutcome("Outer"),
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task BlockAndExpressionBodiedLocalFunctionsAreAnalyzed()
     {
         var diagnostics = await Analyze(

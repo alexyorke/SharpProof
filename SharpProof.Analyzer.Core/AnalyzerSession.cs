@@ -54,6 +54,9 @@ internal sealed class AnalyzerSession
         _executableAnalyses =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _anonymousRequiresPlacementAnalyses =
+            new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _selectedSemicolonAccessors =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
@@ -207,6 +210,14 @@ internal sealed class AnalyzerSession
     {
         return _executableAnalyses.TryAdd(
             EffectAnalysisSession.NormalizeMethod(method),
+            0);
+    }
+
+    internal bool TryBeginAnonymousRequiresPlacementAnalysis(
+        IMethodSymbol method)
+    {
+        return _anonymousRequiresPlacementAnalyses.TryAdd(
+            ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
     }
 

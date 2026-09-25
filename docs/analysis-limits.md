@@ -211,10 +211,13 @@ callable.
 
 The portable call-site precondition pass is narrower than worker execution but
 does traverse executable local-function, lambda, and anonymous-method child
-CFGs. It analyzes each nested body once with its own scalar flow state and
-keeps its outcome separate from the containing method. Captured entry values
-that cannot be established remain unknown. Quoted expression-tree lambdas are
-not treated as executing delegates.
+CFGs. Direct local-function invocations bind and replay that local function's
+`Contract.Requires` clauses. It analyzes each nested body once with its own
+scalar flow state and keeps its outcome separate from the containing method.
+Captured entry values that cannot be established remain unknown. A
+`Contract.Requires` inside a lambda or anonymous method reports `SP0024`
+because delegate invocation cannot bind the clause. Quoted expression-tree
+lambdas are not treated as executing delegates.
 
 ## Acceptance-only thresholds
 

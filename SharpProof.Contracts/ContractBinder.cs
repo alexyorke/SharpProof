@@ -146,6 +146,7 @@ public sealed class ContractBinder
                 MethodKind.PropertySet or
                 MethodKind.EventAdd or
                 MethodKind.EventRemove or
+                MethodKind.LocalFunction or
                 MethodKind.ExplicitInterfaceImplementation or
                 MethodKind.UserDefinedOperator or
                 MethodKind.Conversion))
