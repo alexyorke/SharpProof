@@ -43,7 +43,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "System.Runtime.CompilerServices.RuntimeHelpers",
         "System.Activator", "System.Reflection.ConstructorInfo",
         "System.Runtime.Serialization.FormatterServices", "System.Type",
-        "System.Text.Json.JsonSerializer"
+        "System.Text.Json.JsonSerializer", "SharpProof.Ir.IrFactory",
+        "SharpProof.Ir.IrValue", "SharpProof.Ir.IrUnsupportedInfo",
+        "SharpProof.Ir.IrExceptionInfo"
     ];
 
     private static readonly ImmutableDictionary<KnownType, ImmutableHashSet<string>> ForbiddenMethods =
@@ -127,8 +129,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(
                 c => AnalyzeInterpolatedString(c, symbols),
                 OperationKind.InterpolatedString);
-            startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
-            startContext.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
+            startContext.RegisterSymbolAction(
+                c => AnalyzeField(c, symbols),
+                SymbolKind.Field);
+            startContext.RegisterSymbolAction(
+                c => AnalyzeProperty(c, symbols),
+                SymbolKind.Property);
             startContext.RegisterSymbolAction(AnalyzeEvent, SymbolKind.Event);
             startContext.RegisterSyntaxNodeAction(
                 c => CancellationBoundaryAnalyzer.AnalyzeCatchClause(c, symbols),
@@ -1274,16 +1280,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 : null;
     }
 
-    private static void AnalyzeField(SymbolAnalysisContext context)
+    private static void AnalyzeField(
+        SymbolAnalysisContext context,
+        KnownSymbols symbols)
     {
         var field = (IFieldSymbol)context.Symbol;
         if (field.ContainingType?.Name == "OperationSupportCatalogData")
         {
             return;
         }
-        if (field.Type.SpecialType == SpecialType.System_String &&
-            field.ContainingType?.Name is not ("IrUnsupportedInfo" or "IrExceptionInfo") &&
-            IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir"))
+        if (IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir") &&
+            ContainsStringCapableStorage(field.Type) &&
+            !IsApprovedIrStringMember(field, symbols))
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
         }
@@ -1303,7 +1311,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void AnalyzeProperty(SymbolAnalysisContext context)
+    private static void AnalyzeProperty(
+        SymbolAnalysisContext context,
+        KnownSymbols symbols)
     {
         var property = (IPropertySymbol)context.Symbol;
         // Abstract (including static abstract interface) accessors have no
@@ -1316,10 +1326,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var isAutoProperty = IsAutoProperty(
             property,
             context.CancellationToken);
-        if (property.Type.SpecialType == SpecialType.System_String &&
-            property.ContainingType?.Name is not ("IrUnsupportedInfo" or "IrExceptionInfo") &&
-            IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir") &&
-            isAutoProperty)
+        if (IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir") &&
+            isAutoProperty &&
+            ContainsStringCapableStorage(property.Type) &&
+            !IsApprovedIrStringMember(property, symbols))
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, property.Locations.FirstOrDefault(), property.Name);
         }
@@ -1916,6 +1926,128 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             IsExactNamespace(type.ContainingNamespace, containingNamespace);
     }
 
+    private static bool ContainsStringCapableStorage(ITypeSymbol? type)
+    {
+        if (type == null)
+        {
+            return false;
+        }
+
+        if (type.SpecialType is SpecialType.System_String or
+            SpecialType.System_Char or
+            SpecialType.System_Object ||
+            type.TypeKind == TypeKind.Dynamic)
+        {
+            return true;
+        }
+
+        if (type is ITypeParameterSymbol typeParameter)
+        {
+            return !typeParameter.HasValueTypeConstraint &&
+                !typeParameter.HasUnmanagedTypeConstraint;
+        }
+
+        if (type is IArrayTypeSymbol arrayType)
+        {
+            return ContainsStringCapableStorage(arrayType.ElementType);
+        }
+
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        return namedType.IsTupleType &&
+                namedType.TupleElements.Any(static element =>
+                    ContainsStringCapableStorage(element.Type)) ||
+            namedType.TypeArguments.Any(ContainsStringCapableStorage) ||
+            ContainsStringCapableStorage(namedType.ContainingType);
+    }
+
+    private static bool IsApprovedIrStringMember(
+        ISymbol member,
+        KnownSymbols symbols)
+    {
+        return IsApprovedIrMember(
+                member,
+                symbols[KnownType.IrFactory],
+                "_stringIds",
+                "IrFactory.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols[KnownType.IrFactory],
+                "_strings",
+                "IrFactory.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols[KnownType.IrFactory],
+                "_gate",
+                "IrFactory.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols.IrExternalIdentityBucketKey,
+                "_comparer",
+                "IrFactory.cs") ||
+            // InternExternalIdentity rejects a runtime string before either
+            // generic cache member can receive the identity value.
+            IsApprovedIrMember(
+                member,
+                symbols.IrExternalIdentityBucket,
+                "Entries",
+                "IrFactory.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols.IrExternalIdentityEntry,
+                "Value",
+                "IrFactory.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols[KnownType.IrValue],
+                "Payload",
+                "IrModel.generated.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols[KnownType.IrUnsupportedInfo],
+                "Detail",
+                "IrModel.generated.cs") ||
+            IsApprovedIrMember(
+                member,
+                symbols[KnownType.IrExceptionInfo],
+                "Detail",
+                "IrModel.generated.cs");
+    }
+
+    private static bool IsApprovedIrMember(
+        ISymbol member,
+        INamedTypeSymbol? expectedContainingType,
+        string expectedName,
+        string expectedFileName)
+    {
+        if (expectedContainingType == null ||
+            member.Name != expectedName ||
+            member.ContainingAssembly?.Name != "SharpProof.Ir")
+        {
+            return false;
+        }
+
+        var expectedMember = expectedContainingType.GetMembers(expectedName)
+            .SingleOrDefault(candidate => candidate.Kind == member.Kind);
+        if (expectedMember == null ||
+            !SymbolEqualityComparer.Default.Equals(member, expectedMember))
+        {
+            return false;
+        }
+
+        var syntaxReferences = member.DeclaringSyntaxReferences;
+        return syntaxReferences.Length > 0 &&
+            syntaxReferences.All(reference =>
+                reference.SyntaxTree.FilePath
+                    .Replace('\\', '/')
+                    .EndsWith(
+                        $"SharpProof.Ir/{expectedFileName}",
+                        StringComparison.Ordinal));
+    }
+
     private static bool IsAutoProperty(
         IPropertySymbol property,
         CancellationToken cancellationToken)
@@ -2026,7 +2158,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         WorkerClaimReason, WorkerCallableCoverageReason, WorkerVerifyRequest,
         WorkerVerifyResponse, WorkerResultAssembler, WorkerRunStatus,
         RuntimeHelpers, Activator, ConstructorInfo, FormatterServices, Type,
-        JsonSerializer
+        JsonSerializer, IrFactory, IrValue, IrUnsupportedInfo, IrExceptionInfo
     }
 
     internal sealed class KnownSymbols
@@ -2044,6 +2176,17 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
             types[(int)KnownType.String] = compilation.GetSpecialType(SpecialType.System_String);
             _types = [.. types];
+            var irFactory = this[KnownType.IrFactory];
+            IrExternalIdentityBucketKey = irFactory?
+                .GetTypeMembers("ExternalIdentityBucketKey").SingleOrDefault();
+            IrExternalIdentityBucket = irFactory?
+                .GetTypeMembers().SingleOrDefault(static nestedType =>
+                    nestedType.Name == "ExternalIdentityBucket" &&
+                    nestedType.Arity == 1);
+            IrExternalIdentityEntry = irFactory?
+                .GetTypeMembers().SingleOrDefault(static nestedType =>
+                    nestedType.Name == "ExternalIdentityEntry" &&
+                    nestedType.Arity == 1);
             StringBuilder = compilation.GetTypeByMetadataName(
                 "System.Text.StringBuilder");
             _comparisonInterfaces = [
@@ -2094,6 +2237,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             get;
         }
         internal INamedTypeSymbol? Enumerable
+        {
+            get;
+        }
+        internal INamedTypeSymbol? IrExternalIdentityBucketKey
+        {
+            get;
+        }
+        internal INamedTypeSymbol? IrExternalIdentityBucket
+        {
+            get;
+        }
+        internal INamedTypeSymbol? IrExternalIdentityEntry
         {
             get;
         }

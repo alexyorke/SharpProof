@@ -1417,6 +1417,210 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsNestedStringCapableFieldShapesInIr()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            namespace SharpProof.Ir;
+            sealed class Outer<T> {
+                internal sealed class Inner<U> { }
+            }
+            sealed class C {
+                internal string Name = "";
+                internal string[] Names = [];
+                internal ImmutableArray<string> Keys;
+                internal List<string> Parts = [];
+                internal (string A, int B) Pair;
+                internal KeyValuePair<string, int> Kvp;
+                internal Outer<string>.Inner<int> Nested;
+                internal object Boxed = "";
+                internal char[] Chars = [];
+                internal IReadOnlyDictionary<string, int> Map =
+                    new Dictionary<string, int>();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(10));
+    }
+
+    [Test]
+    public async Task RejectsNestedStringCapableAutoPropertyShapesInIr()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            namespace SharpProof.Ir;
+            sealed class Outer<T> {
+                internal sealed class Inner<U> { }
+            }
+            sealed class C {
+                internal string Name { get; } = "";
+                internal string[] Names { get; } = [];
+                internal ImmutableArray<string> Keys { get; } = [];
+                internal List<string> Parts { get; } = [];
+                internal (string A, int B) Pair { get; }
+                internal KeyValuePair<string, int> Kvp { get; }
+                internal Outer<string>.Inner<int> Nested { get; }
+                internal object Boxed { get; } = "";
+                internal char[] Chars { get; } = [];
+                internal IReadOnlyDictionary<string, int> Map { get; } =
+                    new Dictionary<string, int>();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(10));
+    }
+
+    [Test]
+    public async Task AllowsOnlyExactIrFactoryInternFields()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Ir;
+            sealed class IrFactory {
+                private readonly object _gate = new();
+                private readonly Dictionary<string, int> _stringIds = new();
+                private readonly List<string> _strings = [];
+                private readonly struct ExternalIdentityBucketKey {
+                    private readonly object _comparer;
+                }
+                private sealed class ExternalIdentityEntry<T> {
+                    internal T Value { get; }
+                }
+                private sealed class ExternalIdentityBucket<T> {
+                    internal List<ExternalIdentityEntry<T>> Entries { get; } = [];
+                }
+                internal void Touch() { _ = _gate; _ = _stringIds; _ = _strings; }
+            }
+            """;
+
+        var diagnostics = await AnalyzeCore(
+            source,
+            "SharpProof.Ir",
+            "SharpProof.Ir/IrFactory.cs");
+
+        Assert.That(
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.Empty);
+    }
+
+    [Test]
+    public async Task AllowsExactGeneratedIrDiagnosticDetailMembers()
+    {
+        const string source =
+            """
+            namespace SharpProof.Ir;
+            public sealed class IrUnsupportedInfo {
+                public string Detail { get; }
+            }
+            public sealed class IrExceptionInfo {
+                public string Detail { get; }
+            }
+            public sealed class IrValue {
+                internal object? Payload { get; }
+            }
+            """;
+
+        var diagnostics = await AnalyzeCore(
+            source,
+            "SharpProof.Ir",
+            "SharpProof.Ir/IrModel.generated.cs");
+
+        Assert.That(
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.Empty);
+    }
+
+    [Test]
+    public async Task SameFullyQualifiedIrAllowlistTypesInUntrustedSourceAreNotAuthorized()
+    {
+        const string source =
+            """
+            namespace SharpProof.Ir;
+            sealed class IrUnsupportedInfo {
+                internal string Detail = "";
+            }
+            sealed class IrExceptionInfo {
+                internal string Detail = "";
+            }
+            sealed class IrFactory {
+                internal System.Collections.Generic.List<string> _strings = [];
+                internal System.Collections.Generic.Dictionary<string, int> _stringIds = new();
+            }
+            """;
+
+        var diagnostics = await AnalyzeCore(
+            source,
+            "MetaAnalyzerTest",
+            "UntrustedIrTypes.cs");
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
+    public async Task TreatsReferenceCapableTypeParametersAsStringCapable()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Ir;
+            sealed class Generic<T> {
+                internal T Direct = default!;
+                internal List<T> Wrapped = [];
+            }
+            sealed class ValueGeneric<T> where T : struct {
+                internal T Direct;
+                internal List<T> Wrapped = [];
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task SameNameIrAllowlistTypesDoNotAuthorizeStringMembers()
+    {
+        const string source =
+            """
+            namespace SharpProof.Ir.Fake;
+            sealed class IrUnsupportedInfo {
+                internal string Detail = "";
+            }
+            sealed class IrExceptionInfo {
+                internal string Detail = "";
+            }
+            sealed class IrFactory {
+                internal System.Collections.Generic.List<string> _strings = [];
+                internal System.Collections.Generic.Dictionary<string, int> _stringIds = new();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
     public async Task ReportsSemanticStringControlFlowInCatchFiltersAndSwitchGuards()
     {
         const string source =
