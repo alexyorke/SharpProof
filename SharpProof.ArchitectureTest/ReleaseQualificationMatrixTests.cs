@@ -222,6 +222,7 @@ public sealed partial class ReleaseQualificationMatrixTests
                          "SharpProof.ReleaseBundle.ps1",
                          "Test-SharpProofPilotReport.ps1",
                          "SharpProof.ReleaseJson.ps1",
+                         "Resolve-SharpProofContainedPath.ps1",
                          "SharpProof.PackageIdentity.psm1"
                      })
         {
@@ -427,11 +428,16 @@ public sealed partial class ReleaseQualificationMatrixTests
             Path.Combine(sourceRoot, "scripts", "SharpProof.ReleaseBundle.ps1"),
             Path.Combine(scripts.FullName, "SharpProof.ReleaseBundle.ps1"));
         File.Copy(
+            Path.Combine(sourceRoot, "scripts", "Resolve-SharpProofContainedPath.ps1"),
+            Path.Combine(scripts.FullName, "Resolve-SharpProofContainedPath.ps1"));
+        File.Copy(
             Path.Combine(sourceRoot, "scripts", "SharpProof.ReleaseJson.ps1"),
             Path.Combine(scripts.FullName, "SharpProof.ReleaseJson.ps1"));
         await File.WriteAllTextAsync(
             Path.Combine(scripts.FullName, "Test-SharpProofPilotReport.ps1"),
-            "function Test-SharpProofPilotReport { return $true }\n");
+            "function Test-SharpProofPilotReport { return $true }\n" +
+            "function Get-SharpProofPilotReviewLedgerSummary { " +
+            "return [pscustomobject]@{ falsePositiveCounts = @{} } }\n");
         await ArchitectureGitRepository.InitializeAsync(
             fixture.FullName,
             "fixture@example.invalid",
@@ -448,13 +454,27 @@ public sealed partial class ReleaseQualificationMatrixTests
             "-m",
             "fixture");
         var evidence = Path.Combine(fixture.FullName, "pilots.json");
+        var ledgerPath = Path.Combine(fixture.FullName, "review-ledger.json");
         var packages = CreatePackageArtifacts();
+        var ledgerBytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            schemaVersion = 2,
+            commit = "fixture",
+            packageArtifacts = packages,
+            reviews = Array.Empty<object>()
+        });
+#pragma warning disable CA1308 // Serialized SHA-256 evidence uses lowercase hex.
+        var ledgerSha256 = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(ledgerBytes)).ToLowerInvariant();
+#pragma warning restore CA1308
+        await File.WriteAllBytesAsync(ledgerPath, ledgerBytes);
 
         async Task<int> WriteAsync(string reviewStatus)
         {
             await File.WriteAllTextAsync(evidence, JsonSerializer.Serialize(new
             {
                 reviewStatus,
+                reviewLedgerSha256 = ledgerSha256,
                 packageArtifacts = packages,
                 pilots = Array.Empty<object>()
             }));
@@ -464,7 +484,8 @@ public sealed partial class ReleaseQualificationMatrixTests
                 Path.Combine(
                     scripts.FullName,
                     "Write-SharpProofQualificationReceipt.ps1"),
-                "-Gate", "pilots", "-EvidencePath", evidence);
+                "-Gate", "pilots", "-EvidencePath", evidence,
+                "-PilotReviewLedgerPath", ledgerPath);
         }
 
         using (Assert.EnterMultipleScope())

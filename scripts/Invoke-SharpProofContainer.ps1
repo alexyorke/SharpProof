@@ -622,7 +622,8 @@ switch ($Command) {
         & (Join-Path $repositoryRoot `
             'scripts/Write-SharpProofQualificationReceipt.ps1') `
             -Gate pilots `
-            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json')
+            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json') `
+            -PilotReviewLedgerPath (Join-Path $repositoryRoot 'artifacts/pilots/review-ledger.json')
     }
     'release-tag' {
         & (Join-Path $repositoryRoot `

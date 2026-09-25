@@ -280,7 +280,6 @@ foreach ($pilot in $catalog.pilots) {
         ForEach-Object {
             [pscustomobject]@{ reason = $_.Name; count = $_.Count }
         })
-    $diagnosticText = Get-Content -LiteralPath $buildLog -Raw
     $negativeProbePassed = $null
     if ([string]$pilot.category -eq 'contract-heavy') {
         $negativeArtifactDirectory = Join-Path $runRoot "negative/$($pilot.id)"
@@ -309,17 +308,13 @@ foreach ($pilot in $catalog.pilots) {
         if (-not $negativeProbePassed) {
             throw "Pilot '$($pilot.id)' did not reject its contract probe."
         }
-        $diagnosticText += "`n" + $negativeText
     }
-    $diagnosticIds = @($diagnosticText.Split("`n") |
-        ForEach-Object { $_.TrimEnd("`r") } |
-        Where-Object { $_ -match ':\s+(?:info|warning|error)\s+(SP[0-9]{4}):' } |
-        Select-Object -Unique |
-        ForEach-Object {
-            [regex]::Match(
-                $_,
-                ':\s+(?:info|warning|error)\s+(SP[0-9]{4}):').Groups[1].Value
-        })
+    $sarifSnapshotPath = @($evidenceFiles | Where-Object {
+            [IO.Path]::GetFileName($_) -ceq 'result.sarif'
+        } | Select-Object -First 1)[0]
+    $sarif = Get-Content -LiteralPath $sarifSnapshotPath -Raw |
+        ConvertFrom-Json -ErrorAction Stop
+    $diagnostics = @(Get-SharpProofPilotDiagnosticsFromSarif $sarif)
     $results += [pscustomobject]@{
         id = [string]$pilot.id
         project = [string]$pilot.project
@@ -332,8 +327,7 @@ foreach ($pilot in $catalog.pilots) {
         outcomes = @($claims | Group-Object outcome | Sort-Object Name |
             ForEach-Object { [pscustomobject]@{ outcome = $_.Name; count = $_.Count } })
         unknownReasons = $unknownReasons
-        diagnostics = @($diagnosticIds | Group-Object | Sort-Object Name |
-            ForEach-Object { [pscustomobject]@{ id = $_.Name; count = $_.Count } })
+        diagnostics = $diagnostics
         elapsedMilliseconds = [long]$build.elapsedMilliseconds
         observedPeakWorkingSetBytes = [long]$build.observedPeakWorkingSetBytes
         falsePositiveReports = $null
@@ -380,7 +374,7 @@ if (@($results | Where-Object {
 }
 
 $report = [ordered]@{
-    schemaVersion = 5
+    schemaVersion = 6
     reviewStatus = 'Unreviewed'
     runId = $runId
     runStartedUtc = $qualificationStartedUtc.ToString('O')

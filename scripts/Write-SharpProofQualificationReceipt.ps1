@@ -9,6 +9,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$EvidencePath,
 
+    [string]$PilotReviewLedgerPath,
+
     [string]$ReceiptDirectory = 'artifacts/release-qualification/qualification-receipts'
 )
 
@@ -113,6 +115,37 @@ finally {
     $evidenceDocument.Dispose()
 }
 $evidence = $evidenceText | ConvertFrom-Json -ErrorAction Stop
+$pilotReviewLedgerEvidence = $null
+if ($Gate -eq 'pilots') {
+    . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+    if ([string]::IsNullOrWhiteSpace($PilotReviewLedgerPath)) {
+        throw 'Pilot receipts require the reviewed ledger file.'
+    }
+    $resolvedLedger = Resolve-SharpProofContainedPath -Root $repositoryRoot `
+        -Path $PilotReviewLedgerPath -ParameterName 'PilotReviewLedgerPath'
+    $ledgerBytes = [IO.File]::ReadAllBytes($resolvedLedger)
+    $ledgerSha256 = [BitConverter]::ToString(
+        [Security.Cryptography.SHA256]::HashData($ledgerBytes)).Replace('-', '').ToLowerInvariant()
+    if ([string]$evidence.reviewLedgerSha256 -cne $ledgerSha256) {
+        throw 'The reviewed pilot report is not bound to this review ledger.'
+    }
+    $ledgerText = [Text.UTF8Encoding]::new($false, $true).GetString($ledgerBytes)
+    $ledger = $ledgerText | ConvertFrom-Json -ErrorAction Stop
+    $reviewSummary = Get-SharpProofPilotReviewLedgerSummary `
+        -Report $evidence -Ledger $ledger
+    foreach ($pilot in @($evidence.pilots)) {
+        if ([int]$pilot.falsePositiveReports -ne
+            [int]($reviewSummary.falsePositiveCounts[[string]$pilot.id] ?? 0)) {
+            throw 'The reviewed pilot false-positive counts do not match the ledger.'
+        }
+    }
+    $pilotReviewLedgerEvidence = [ordered]@{
+        path = [IO.Path]::GetRelativePath(
+            $repositoryRoot, $resolvedLedger).Replace('\', '/')
+        bytes = [int64]$ledgerBytes.LongLength
+        sha256 = $ledgerSha256
+    }
+}
 $packageArtifacts = @()
 if ($Gate -in @(
         'package-consumers', 'pilots', 'portable-linux',
@@ -214,6 +247,7 @@ if ($packageArtifacts.Count -ne 0) {
     $receipt.packageArtifacts = $packageArtifacts
 }
 if ($Gate -eq 'pilots') {
+    $receipt.pilotReviewLedger = $pilotReviewLedgerEvidence
     $receipt.pilotEvidence = @($evidence.pilots | Sort-Object id | ForEach-Object {
             [ordered]@{ id = [string]$_.id; evidence = @($_.evidence) }
         })

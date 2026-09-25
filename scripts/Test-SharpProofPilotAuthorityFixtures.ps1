@@ -22,6 +22,35 @@ $projections = @($producer.FindAll({
         $node.Operator -eq [Management.Automation.Language.TokenKind]::PlusEquals
 }, $true))
 if ($projections.Count -ne 1) { throw 'Expected one pilot result projection.' }
+$diagnosticAssignments = @($producer.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -ceq '$diagnostics'
+}, $true))
+if ($diagnosticAssignments.Count -ne 1 -or
+    $diagnosticAssignments[0].Right.Extent.Text -notmatch
+        'Get-SharpProofPilotDiagnosticsFromSarif\s+\$sarif') {
+    throw 'Pilot diagnostics must be projected from the captured SARIF document.'
+}
+$producerSarif = [pscustomobject]@{
+    version = '2.1.0'
+    runs = @([pscustomobject]@{
+        results = @(1..3 | ForEach-Object {
+            [pscustomobject]@{ ruleId = 'SP0001' }
+        })
+    })
+}
+$sarif = $producerSarif
+$diagnostics = @()
+. ([scriptblock]::Create('$diagnostics = ' +
+    $diagnosticAssignments[0].Right.Extent.Text))
+if (@($diagnostics).Count -ne 1 -or
+    [string]$diagnostics[0].id -cne 'SP0001' -or
+    [int]$diagnostics[0].count -ne 3) {
+    throw 'Pilot diagnostics projection did not preserve SARIF occurrence counts.'
+}
+$diagnostics = $null
+$sarif = $null
 $runRootAssignments = @($producer.FindAll({
     param($node)
     $node -is [Management.Automation.Language.AssignmentStatementAst] -and
@@ -44,6 +73,9 @@ $projectionEvidenceDirectory = Join-Path $projectionRoot 'evidence'
 foreach ($fileName in @('request.json','result.json','compiler-manifest.json','result.sarif')) {
     [IO.File]::WriteAllText((Join-Path $projectionEvidenceDirectory $fileName), '{}')
 }
+[IO.File]::WriteAllText(
+    (Join-Path $projectionEvidenceDirectory 'result.sarif'),
+    '{"version":"2.1.0","runs":[{"results":[]}]}')
 & {
     $pilot = [pscustomobject]@{
         id='projection'; project='Projection.csproj'; category='contract-heavy'
@@ -53,7 +85,7 @@ foreach ($fileName in @('request.json','result.json','compiler-manifest.json','r
     $claims = @([pscustomobject]@{ outcome='Proven' })
     $claimEvidence = @()
     $unknownReasons = @()
-    $diagnosticIds = @()
+    $diagnostics = @()
     $build = [pscustomobject]@{
         elapsedMilliseconds=1; observedPeakWorkingSetBytes=0
     }
@@ -191,8 +223,25 @@ try {
             ([ordered]@{ requestHash=('0' * 64); runStatus='Complete'; manifest=[ordered]@{ claims=$manifestClaims }; claimResults=$claimResults } |
                 ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
         $sarifPath = Join-Path $evidenceDirectory 'result.sarif'
+        $sarifResults = @()
+        if ($row.id -ceq 'effect-one') {
+            $sarifResults = @(1..3 | ForEach-Object {
+                [ordered]@{
+                    ruleId = 'SP0001'
+                    level = 'warning'
+                    message = [ordered]@{ text = "Occurrence $_" }
+                }
+            })
+        }
+        $sarifDocument = [ordered]@{
+            version = '2.1.0'
+            runs = @([ordered]@{
+                tool = [ordered]@{ driver = [ordered]@{ name = 'SharpProof' } }
+                results = $sarifResults
+            })
+        }
         [IO.File]::WriteAllText($sarifPath,
-            '{"version":"2.1.0","runs":[{}]}',
+            ($sarifDocument | ConvertTo-Json -Depth 10 -Compress),
             [Text.UTF8Encoding]::new($false))
         $evidence = @(
             [pscustomobject]@{ kind='request'; path="artifacts/pilots/runs/$('1' * 32)/$($row.id)/evidence/request.json" },
@@ -214,13 +263,15 @@ try {
             claimEvidence=@($manifestClaims | ForEach-Object {
                     [pscustomobject]@{ claimId=$_.claimId; kind=$_.kind; outcome='Proven' }
                 })
-            diagnostics=@()
+            diagnostics=if ($row.id -ceq 'effect-one') {
+                @([pscustomobject]@{ id='SP0001'; count=3 })
+            } else { @() }
             falsePositiveReports=$null
             evidence=$evidence
         }
     })
     $report = [pscustomobject]@{
-        schemaVersion=5; reviewStatus='Unreviewed'; runId=('1' * 32); commit=$commit; packageVersion=$version; pilotCount=5
+        schemaVersion=6; reviewStatus='Unreviewed'; runId=('1' * 32); commit=$commit; packageVersion=$version; pilotCount=5
         packageArtifacts=$artifacts
         pilots=$reportPilots
     }
@@ -234,6 +285,16 @@ try {
     }
     if (-not (Test-Report $report)) { throw 'Canonical pilot report failed.' }
     $canonicalReport = Copy-Json $report
+    $changed = Copy-Json $canonicalReport
+    $changed.pilots[0].diagnostics[0].count = 2
+    if (Test-Report $changed) {
+        throw 'A diagnostic occurrence count that disagreed with SARIF was accepted.'
+    }
+    $changed = Copy-Json $canonicalReport
+    $changed.pilots[0].diagnostics[0].id = 'SP0002'
+    if (Test-Report $changed) {
+        throw 'A diagnostic ID that disagreed with SARIF was accepted.'
+    }
     foreach ($kind in @('request','result','compilerManifest','sarif')) {
         $pilot = $canonicalReport.pilots[0]
         $evidence = @($pilot.evidence | Where-Object kind -CEQ $kind)[0]
@@ -279,9 +340,6 @@ try {
     } finally {
         [IO.File]::WriteAllBytes($requestPath, $originalRequest)
     }
-    $canonicalReport.pilots[0].diagnostics = @(
-        [pscustomobject]@{ id='SP0001'; count=2 }
-    )
     $sourcePath = Join-Path $fixture 'report.json'
     [IO.File]::WriteAllText(
         $sourcePath,
@@ -442,6 +500,7 @@ try {
             'SharpProof.ReleaseBundle.ps1',
             'SharpProof.ReleaseJson.ps1',
             'Test-SharpProofPilotReport.ps1',
+            'Resolve-SharpProofContainedPath.ps1',
             'SharpProof.PackageIdentity.psm1')) {
         Copy-Item (Join-Path $PSScriptRoot $scriptName) `
             (Join-Path $receiptScripts $scriptName)
@@ -451,6 +510,7 @@ try {
     $receiptPath = Join-Path $receiptDirectory 'pilots.json'
     function Write-PilotReceipt([string]$EvidencePath) {
         & $receiptWriter -Gate pilots -EvidencePath $EvidencePath `
+            -PilotReviewLedgerPath $ledgerPath `
             -ReceiptDirectory $receiptDirectory
     }
     Write-PilotReceipt $reviewedPath
@@ -459,10 +519,51 @@ try {
     if ([string]$receipt.status -cne 'passed' -or
         [string]$receipt.commit -cne $commit -or
         [string]$receipt.evidence.sha256 -cne $reviewedHash -or
+        [string]$receipt.pilotReviewLedger.sha256 -cne [string]$reviewed.reviewLedgerSha256 -or
         @($receipt.pilotEvidence).Count -ne 5 -or
         (@($receipt.pilotEvidence.id | Sort-Object) -join '|') -cne
             (@($reviewed.pilots.id | Sort-Object) -join '|')) {
         throw 'Canonical reviewed pilot evidence did not produce an authoritative receipt.'
+    }
+
+    $forgedReviewed = Copy-Json $reviewed
+    $forgedReviewed.PSObject.Properties.Remove('reviewLedgerSha256')
+    $forgedReviewedPath = Join-Path $fixture 'forged-reviewed-report.json'
+    [IO.File]::WriteAllText(
+        $forgedReviewedPath,
+        ($forgedReviewed | ConvertTo-Json -Depth 20) + "`n",
+        [Text.UTF8Encoding]::new($false))
+    if (Test-Path -LiteralPath $receiptPath) {
+        Remove-Item -LiteralPath $receiptPath -Force
+    }
+    Require-Failure { Write-PilotReceipt $forgedReviewedPath } missing-reviewed-ledger-binding
+    if (Test-Path -LiteralPath $receiptPath) {
+        throw 'Receipt writer published a reviewed report without ledger binding.'
+    }
+
+    $ledgerBytesBeforeTamper = [IO.File]::ReadAllBytes($ledgerPath)
+    try {
+        $tamperedLedger = $ledger | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+        $tamperedLedger.reviews[0].disposition = 'FalsePositive'
+        Write-Ledger $tamperedLedger
+        Require-Failure { Write-PilotReceipt $reviewedPath } changed-reviewed-ledger
+        if (Test-Path -LiteralPath $receiptPath) {
+            throw 'Receipt writer published a reviewed report with a changed ledger.'
+        }
+        $tamperedReport = Copy-Json $reviewed
+        $tamperedReport.reviewLedgerSha256 = (Get-FileHash `
+            -LiteralPath $ledgerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $tamperedReportPath = Join-Path $fixture 'tampered-ledger-report.json'
+        [IO.File]::WriteAllText(
+            $tamperedReportPath,
+            ($tamperedReport | ConvertTo-Json -Depth 20) + "`n",
+            [Text.UTF8Encoding]::new($false))
+        Require-Failure { Write-PilotReceipt $tamperedReportPath } ledger-result-mismatch
+        if (Test-Path -LiteralPath $receiptPath) {
+            throw 'Receipt writer accepted a resealed ledger with a different review result.'
+        }
+    } finally {
+        [IO.File]::WriteAllBytes($ledgerPath, $ledgerBytesBeforeTamper)
     }
 
     function Require-PilotReceiptRejection(
@@ -537,11 +638,22 @@ try {
     Require-PilotReceiptRejection 'strict-refuted' 'mixed-one' 'Refuted'
     Require-PilotReceiptRejection 'strict-unknown' 'mixed-one' 'Unknown'
 
-    $ledger.reviews[0].disposition = 'FalsePositive'; Write-Ledger $ledger
+    $diagnosticReview = @($ledger.reviews | Where-Object {
+            [string]$_.pilotId -ceq 'effect-one' -and
+            [string]$_.kind -ceq 'Diagnostic' -and
+            [string]$_.id -ceq 'SP0001'
+        })[0]
+    $diagnosticReview.disposition = 'FalsePositive'; Write-Ledger $ledger
     Complete-Review
     $reviewed = Get-Content $reviewedPath -Raw | ConvertFrom-Json
-    if ([int]$reviewed.pilots[0].falsePositiveReports -ne 1) {
-        throw 'False-positive disposition was not derived.'
+    if ([int]$reviewed.pilots[0].falsePositiveReports -ne 3) {
+        throw 'False-positive occurrence count was not derived from SARIF.'
+    }
+    Write-PilotReceipt $reviewedPath
+    $falsePositiveReceipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
+    if ([string]$falsePositiveReceipt.pilotReviewLedger.sha256 -cne
+        [string]$reviewed.reviewLedgerSha256) {
+        throw 'The occurrence-counted false-positive review did not qualify with its bound ledger.'
     }
     $ledger.reviews = @($ledger.reviews | Select-Object -Skip 1); Write-Ledger $ledger
     Require-Failure { Complete-Review } incomplete-review

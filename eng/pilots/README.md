@@ -14,8 +14,12 @@ Run:
 ```
 
 The report binds the Git commit and package version and records build status,
-diagnostic counts, typed Unknown reasons, wall time, observed process-tree peak
-working set, false-positive review count, and setup friction. An advisory
+diagnostic occurrence counts from the captured SARIF, typed Unknown reasons,
+wall time, observed process-tree peak working set, false-positive occurrence
+count, and setup friction. Each ledger row reviews one diagnostic ID; marking
+it false positive counts every SARIF occurrence for that ID. The reviewed
+report records the ledger SHA-256, and the pilots receipt revalidates the
+complete ledger and its false-positive totals against that binding. An advisory
 Unknown caused by a documented unsupported external callee is a reviewed
 limitation, not a false proof or a release defect. The strict pilot must finish
 with every selected claim proven.

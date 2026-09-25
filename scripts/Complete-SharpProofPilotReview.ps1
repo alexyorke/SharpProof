@@ -13,22 +13,6 @@ $repositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 
-function Get-Property($Value, [string]$Name) {
-    if ($null -eq $Value) { return $null }
-    $property = $Value.PSObject.Properties[$Name]
-    if ($null -eq $property) { return $null }
-    return $property.Value
-}
-
-function Require-ExactProperties($Value, [string[]]$Names, [string]$Label) {
-    if ($null -eq $Value) { throw "$Label is missing." }
-    $actual = @($Value.PSObject.Properties.Name | Sort-Object)
-    $expected = @($Names | Sort-Object)
-    if (($actual -join '|') -cne ($expected -join '|')) {
-        throw "$Label has an invalid property set."
-    }
-}
-
 $sourcePath = Resolve-SharpProofContainedPath -Root $repositoryRoot `
     -Path $SourceReportPath -ParameterName 'SourceReportPath'
 $ledgerPath = Resolve-SharpProofContainedPath -Root $repositoryRoot `
@@ -46,70 +30,21 @@ if (-not (Test-SharpProofPilotReport -Report $source `
     throw 'The source pilot report is not valid unreviewed evidence.'
 }
 
-Require-ExactProperties $ledger `
-    @('schemaVersion','commit','packageArtifacts','reviews') `
-    'Review ledger'
-if ([int](Get-Property $ledger 'schemaVersion') -ne 2 -or
-    [string](Get-Property $ledger 'commit') -cne [string]$source.commit) {
-    throw 'The review ledger is stale or has the wrong identity.'
-}
-
-$sourcePackages = @($source.packageArtifacts | Sort-Object fileName)
-$ledgerPackages = @((Get-Property $ledger 'packageArtifacts') | Sort-Object fileName)
-if ($sourcePackages.Count -ne 6 -or $ledgerPackages.Count -ne 6) {
-    throw 'The review ledger must bind the exact six packages.'
-}
-for ($index = 0; $index -lt 6; $index++) {
-    foreach ($name in @('fileName','packageId','version','repositoryCommit','bytes','sha256')) {
-        if ([string](Get-Property $sourcePackages[$index] $name) -cne
-            [string](Get-Property $ledgerPackages[$index] $name)) {
-            throw 'The review ledger package identities do not match the source report.'
-        }
-    }
-}
-
-$expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-foreach ($pilot in @($source.pilots)) {
-    $pilotId = [string]$pilot.id
-    foreach ($claim in @($pilot.claimEvidence | Where-Object { $null -ne $_ })) {
-        $key = "$pilotId|Claim|$([string]$claim.claimId)"
-        if (-not $expected.Add($key)) { throw 'Duplicate source claim identity.' }
-    }
-    $diagnostics = @((Get-Property $pilot 'diagnostics') |
-        Where-Object { $null -ne $_ })
-    foreach ($diagnostic in $diagnostics) {
-        $id = [string](Get-Property $diagnostic 'id')
-        if ($id -cnotmatch '^SP[0-9]{4}$') { throw 'Invalid source diagnostic identity.' }
-        $key = "$pilotId|Diagnostic|$id"
-        if (-not $expected.Add($key)) { throw 'Duplicate source diagnostic identity.' }
-    }
-}
-
-$reviews = @((Get-Property $ledger 'reviews') | Where-Object { $null -ne $_ })
-$seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-$falsePositives = @{}
-foreach ($review in $reviews) {
-    Require-ExactProperties $review @('pilotId','kind','id','disposition') 'Review row'
-    $pilotId = [string](Get-Property $review 'pilotId')
-    $kind = [string](Get-Property $review 'kind')
-    $id = [string](Get-Property $review 'id')
-    $disposition = [string](Get-Property $review 'disposition')
-    $key = "$pilotId|$kind|$id"
-    if (-not $expected.Contains($key) -or -not $seen.Add($key) -or
-        @('TruePositive','FalsePositive') -cnotcontains $disposition) {
-        throw 'The review ledger contains an unknown, duplicate, or contradictory row.'
-    }
-    if ($disposition -ceq 'FalsePositive') {
-        $falsePositives[$pilotId] = 1 + [int]($falsePositives[$pilotId] ?? 0)
-    }
-}
-if ($seen.Count -ne $expected.Count) {
-    throw 'The review ledger is incomplete.'
-}
+$reviewSummary = Get-SharpProofPilotReviewLedgerSummary `
+    -Report $source -Ledger $ledger
+$ledgerSha256 = [BitConverter]::ToString(
+    [Security.Cryptography.SHA256]::HashData($ledgerBytes)).Replace('-', '').ToLowerInvariant()
 
 $source.reviewStatus = 'Reviewed'
+$source | Add-Member -NotePropertyName reviewLedgerSha256 `
+    -NotePropertyValue $ledgerSha256 -Force
 foreach ($pilot in @($source.pilots)) {
-    $pilot.falsePositiveReports = [int]($falsePositives[[string]$pilot.id] ?? 0)
+    $pilot.falsePositiveReports = [int]($reviewSummary.falsePositiveCounts[[string]$pilot.id] ?? 0)
+}
+if (-not (Test-SharpProofPilotReport -Report $source `
+        -ExpectedCommit ([string]$source.commit) -RepositoryRoot $repositoryRoot `
+        -CatalogPath $CatalogPath)) {
+    throw 'The reviewed pilot report failed validation.'
 }
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resolvedOutput)) | Out-Null
 [IO.File]::WriteAllText(

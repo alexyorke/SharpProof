@@ -41,6 +41,161 @@ function ConvertTo-SharpProofPilotClaimEvidence {
         } | Sort-Object claimId)
 }
 
+function Get-SharpProofPilotDiagnosticsFromSarif {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)]$Sarif)
+
+    if ($Sarif -isnot [pscustomobject] -or
+        [string]$Sarif.version -cne '2.1.0' -or
+        @($Sarif.runs).Count -eq 0) {
+        throw 'Pilot SARIF is not a nonempty SARIF 2.1.0 document.'
+    }
+
+    $counts = [Collections.Generic.SortedDictionary[string, int]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($run in @($Sarif.runs)) {
+        if ($run -isnot [pscustomobject]) {
+            throw 'Pilot SARIF contains an invalid run.'
+        }
+        $resultsProperty = $run.PSObject.Properties['results']
+        if ($null -eq $resultsProperty) { continue }
+        $tool = $run.PSObject.Properties['tool']
+        $driver = if ($null -ne $tool -and $null -ne $tool.Value) {
+            $tool.Value.PSObject.Properties['driver']
+        } else { $null }
+        $rulesProperty = if ($null -ne $driver -and $null -ne $driver.Value) {
+            $driver.Value.PSObject.Properties['rules']
+        } else { $null }
+        $rules = if ($null -ne $rulesProperty) { @($rulesProperty.Value) } else { @() }
+        foreach ($result in @($resultsProperty.Value | Where-Object { $null -ne $_ })) {
+            if ($result -isnot [pscustomobject]) {
+                throw 'Pilot SARIF contains an invalid result.'
+            }
+            $ruleIdProperty = $result.PSObject.Properties['ruleId']
+            $ruleId = if ($null -ne $ruleIdProperty) {
+                [string]$ruleIdProperty.Value
+            } else { '' }
+            if ([string]::IsNullOrWhiteSpace($ruleId)) {
+                $ruleIndexProperty = $result.PSObject.Properties['ruleIndex']
+                $ruleIndex = -1
+                if ($null -eq $ruleIndexProperty -or
+                    -not [int]::TryParse([string]$ruleIndexProperty.Value, [ref]$ruleIndex) -or
+                    $ruleIndex -lt 0 -or $ruleIndex -ge $rules.Count -or
+                    $null -eq $rules[$ruleIndex] -or
+                    $null -eq $rules[$ruleIndex].PSObject.Properties['id']) {
+                    throw 'Pilot SARIF result has no resolvable rule ID.'
+                }
+                $ruleId = [string]$rules[$ruleIndex].id
+            }
+            if ($ruleId.StartsWith('SP', [StringComparison]::Ordinal) -and
+                $ruleId -cnotmatch '^SP[0-9]{4}$') {
+                throw 'Pilot SARIF contains a malformed SharpProof diagnostic ID.'
+            }
+            if ($ruleId -cnotmatch '^SP[0-9]{4}$') { continue }
+            if (-not $counts.ContainsKey($ruleId)) { $counts.Add($ruleId, 0) }
+            $counts[$ruleId] = [int]$counts[$ruleId] + 1
+        }
+    }
+
+    return @($counts.GetEnumerator() | ForEach-Object {
+        [pscustomobject]@{ id = [string]$_.Key; count = [int]$_.Value }
+    })
+}
+
+function Get-SharpProofPilotReviewLedgerSummary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]$Report,
+        [Parameter(Mandatory = $true)]$Ledger
+    )
+
+    function Require-ExactProperties($Value, [string[]]$Names, [string]$Label) {
+        if ($null -eq $Value) { throw "$Label is missing." }
+        $actual = @($Value.PSObject.Properties.Name | Sort-Object)
+        $expected = @($Names | Sort-Object)
+        if (($actual -join '|') -cne ($expected -join '|')) {
+            throw "$Label has an invalid property set."
+        }
+    }
+
+    Require-ExactProperties $Ledger `
+        @('schemaVersion','commit','packageArtifacts','reviews') 'Review ledger'
+    if ([int]$Ledger.schemaVersion -ne 2 -or
+        [string]$Ledger.commit -cne [string]$Report.commit) {
+        throw 'The review ledger is stale or has the wrong identity.'
+    }
+
+    $sourcePackages = @($Report.packageArtifacts | Sort-Object fileName)
+    $ledgerPackages = @($Ledger.packageArtifacts | Sort-Object fileName)
+    if ($sourcePackages.Count -ne 6 -or $ledgerPackages.Count -ne 6) {
+        throw 'The review ledger must bind the exact six packages.'
+    }
+    for ($index = 0; $index -lt 6; $index++) {
+        Require-ExactProperties $ledgerPackages[$index] `
+            @('bytes','fileName','packageId','repositoryCommit','sha256','version') `
+            'Review ledger package'
+        foreach ($name in @('fileName','packageId','version','repositoryCommit','bytes','sha256')) {
+            if ([string]$sourcePackages[$index].$name -cne
+                [string]$ledgerPackages[$index].$name) {
+                throw 'The review ledger package identities do not match the report.'
+            }
+        }
+    }
+
+    $expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $diagnosticCounts = @{}
+    foreach ($pilot in @($Report.pilots)) {
+        $pilotId = [string]$pilot.id
+        foreach ($claim in @($pilot.claimEvidence | Where-Object { $null -ne $_ })) {
+            $claimId = [string]$claim.claimId
+            if ([string]::IsNullOrWhiteSpace($pilotId) -or
+                [string]::IsNullOrWhiteSpace($claimId) -or
+                $pilotId.Contains('|') -or $claimId.Contains('|')) {
+                throw 'The report contains an invalid review identity.'
+            }
+            if (-not $expected.Add("$pilotId|Claim|$claimId")) {
+                throw 'The report contains a duplicate claim identity.'
+            }
+        }
+        foreach ($diagnostic in @($pilot.diagnostics | Where-Object { $null -ne $_ })) {
+            $id = [string]$diagnostic.id
+            $key = "$pilotId|Diagnostic|$id"
+            if ($id -cnotmatch '^SP[0-9]{4}$' -or
+                [int]$diagnostic.count -le 0 -or
+                -not $expected.Add($key)) {
+                throw 'The report contains an invalid or duplicate diagnostic identity.'
+            }
+            $diagnosticCounts[$key] = [int]$diagnostic.count
+        }
+    }
+
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $falsePositives = @{}
+    foreach ($review in @($Ledger.reviews | Where-Object { $null -ne $_ })) {
+        Require-ExactProperties $review @('disposition','id','kind','pilotId') 'Review row'
+        $pilotId = [string]$review.pilotId
+        $kind = [string]$review.kind
+        $id = [string]$review.id
+        $key = "$pilotId|$kind|$id"
+        $disposition = [string]$review.disposition
+        if (-not $expected.Contains($key) -or -not $seen.Add($key) -or
+            @('TruePositive','FalsePositive') -cnotcontains $disposition) {
+            throw 'The review ledger contains an unknown, duplicate, or contradictory row.'
+        }
+        if ($disposition -ceq 'FalsePositive') {
+            $count = if ($kind -ceq 'Diagnostic') {
+                [int]$diagnosticCounts[$key]
+            } else { 1 }
+            $falsePositives[$pilotId] = $count + [int]($falsePositives[$pilotId] ?? 0)
+        }
+    }
+    if ($seen.Count -ne $expected.Count) {
+        throw 'The review ledger is incomplete.'
+    }
+
+    return [pscustomobject]@{ falsePositiveCounts = $falsePositives }
+}
+
 function Test-SharpProofPilotReport {
     [CmdletBinding()]
     param(
@@ -97,8 +252,14 @@ function Test-SharpProofPilotReport {
     }
     catch { return $false }
 
-    if ([int]$Report.schemaVersion -ne 5 -or
+    $ledgerHashProperty = $Report.PSObject.Properties['reviewLedgerSha256']
+    if ([int]$Report.schemaVersion -ne 6 -or
         @('Unreviewed', 'Reviewed') -cnotcontains [string]$Report.reviewStatus -or
+        ([string]$Report.reviewStatus -ceq 'Reviewed' -and
+            ($null -eq $ledgerHashProperty -or
+                [string]$ledgerHashProperty.Value -cnotmatch '^[0-9a-f]{64}$')) -or
+        ([string]$Report.reviewStatus -ceq 'Unreviewed' -and
+            $null -ne $ledgerHashProperty -and $null -ne $ledgerHashProperty.Value) -or
         [string]$Report.runId -cnotmatch '^[0-9a-f]{32}$' -or
         [string]$Report.commit -cne $ExpectedCommit -or
         [int]$Report.pilotCount -ne 5 -or @($Report.pilots).Count -ne 5 -or
@@ -238,6 +399,19 @@ function Test-SharpProofPilotReport {
             [string]$response.runStatus -cne 'Complete' -or
             [string]$sarif.version -cne '2.1.0' -or
             @($sarif.runs).Count -eq 0) { return $false }
+        try {
+            $actualDiagnostics = @(Get-SharpProofPilotDiagnosticsFromSarif $sarif)
+        } catch { return $false }
+        $reportedDiagnostics = @($pilot.diagnostics | Where-Object { $null -ne $_ })
+        if ($actualDiagnostics.Count -ne $reportedDiagnostics.Count) { return $false }
+        for ($index = 0; $index -lt $actualDiagnostics.Count; $index++) {
+            $diagnostic = $reportedDiagnostics[$index]
+            if ((@($diagnostic.PSObject.Properties.Name | Sort-Object) -join '|') -cne 'count|id' -or
+                [string]$diagnostic.id -cne [string]$actualDiagnostics[$index].id -or
+                [int]$diagnostic.count -ne [int]$actualDiagnostics[$index].count) {
+                return $false
+            }
+        }
         $manifestClaims = @($compilerManifest.manifest.claims)
         $resultManifestClaims = @($response.manifest.claims)
         $claimResults = @($response.claimResults)
