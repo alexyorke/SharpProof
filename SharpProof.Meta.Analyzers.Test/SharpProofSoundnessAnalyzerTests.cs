@@ -436,6 +436,80 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsNonCacheableWritesThroughNamedDictionaryAndConcurrentDictionaryStorage()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using System.Collections.Concurrent;
+            using System.Collections.Generic;
+            using System.Runtime.CompilerServices;
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, TimedOut, Failed, Proven, Refuted }
+            sealed class AnswerBox {
+                internal AnswerBox(Answer answer) => Value = answer;
+                internal Answer Value { get; }
+            }
+            sealed class AnswerCache {
+                internal void Add<T>(string key, T answer) { }
+            }
+            sealed class C {
+                private readonly ConcurrentDictionary<string, Answer> _cache = new();
+                private readonly Dictionary<string, Answer> _memo = new();
+                private Dictionary<string, Answer> _propertyMemo { get; } = new();
+                private readonly AnswerCache _memoCache = new();
+                private static readonly Dictionary<string, Answer> s_answers = new();
+                private static readonly ConditionalWeakTable<object, AnswerBox> s_weakAnswers = new();
+                private static Lazy<Answer> s_delayedAnswer = new(() => Answer.Proven);
+                private Answer _memoAnswer;
+                private Answer CachedAnswer { get; set; }
+
+                void M() {
+                    _cache["indexer"] = Answer.Unknown;
+                    _cache.TryAdd("try-add", Answer.TimedOut);
+                    _cache.GetOrAdd("get-or-add", _ => Answer.Failed);
+                    _memo.Add("add", Answer.Unknown);
+                    _memo["indexer"] = Answer.TimedOut;
+                    _propertyMemo.Add("property", Answer.Unknown);
+                    s_answers.Add("static", Answer.Failed);
+                    s_weakAnswers.Add(new object(), new AnswerBox(Answer.Unknown));
+                    s_delayedAnswer = new Lazy<Answer>(() => Answer.Failed);
+                    _memoAnswer = Answer.Unknown;
+                    CachedAnswer = Answer.Failed;
+
+                    _cache.TryAdd("proven", Answer.Proven);
+                    _memo.Add("refuted", Answer.Refuted);
+                    _propertyMemo["safe"] = Answer.Proven;
+                }
+
+                void PerRequest() {
+                    var requestValues = new Dictionary<string, Answer>();
+                    requestValues.Add("request", Answer.Unknown);
+                }
+
+                void StorePerRequest<T>(T answer) {
+                    var _cache = new Dictionary<string, T>();
+                    _cache.Add("request", answer);
+                }
+
+                void CallPerRequest() => StorePerRequest(Answer.Unknown);
+
+                void StoreThroughShadow<T>(T answer) {
+                    var _memoCache = new Dictionary<string, T>();
+                    _memoCache.Add("request", answer);
+                }
+
+                void CallThroughShadow() => StoreThroughShadow(Answer.Unknown);
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(11));
+    }
+
+    [Test]
     public async Task SemanticCacheTryUpdateIgnoresComparisonArgument()
     {
         var diagnostics = await Analyze(

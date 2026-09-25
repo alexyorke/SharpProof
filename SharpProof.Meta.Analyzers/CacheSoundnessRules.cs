@@ -130,7 +130,7 @@ internal static class CacheSoundnessRules
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!WriteMethods.Contains(
                         GetInvokedName(invocation.Expression) ?? string.Empty) ||
-                    !IsSyntacticCacheReceiver(invocation.Expression, method) ||
+                    !IsSyntacticCacheReceiver(invocation.Expression, method, declaration) ||
                     !invocation.ArgumentList.Arguments.Any(argument =>
                         IsForwardedParameter(
                             argument.Expression,
@@ -188,9 +188,43 @@ internal static class CacheSoundnessRules
             candidate.Parameters[2].Name != argument.NameColon.Name.Identifier.ValueText);
     }
 
-    private static bool IsSyntacticCacheReceiver(ExpressionSyntax expression, IMethodSymbol method)
+    private static bool IsSyntacticCacheReceiver(
+        ExpressionSyntax expression,
+        IMethodSymbol method,
+        SyntaxNode declaration)
     {
-        return IsCacheType(GetSyntacticReceiverType(expression, method));
+        var member = expression as MemberAccessExpressionSyntax;
+        var receiver = member == null ? null : UnwrapSyntax(member.Expression);
+        var name = receiver switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            MemberAccessExpressionSyntax
+            { Expression: ThisExpressionSyntax, Name: { } memberName } =>
+                memberName.Identifier.ValueText,
+            _ => null
+        };
+        if (name != null &&
+            receiver is IdentifierNameSyntax &&
+            HasLocalNamed(declaration, name))
+        {
+            return false;
+        }
+
+        if (IsCacheType(GetSyntacticReceiverType(expression, method)))
+        {
+            return true;
+        }
+
+        if (name == null ||
+            receiver is IdentifierNameSyntax &&
+            method.Parameters.Any(parameter =>
+                string.Equals(parameter.Name, name, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        return method.ContainingType.GetMembers(name)
+            .Any(IsCacheStorageMember);
     }
 
     private static ITypeSymbol? GetSyntacticReceiverType(ExpressionSyntax expression, IMethodSymbol method)
@@ -293,6 +327,46 @@ internal static class CacheSoundnessRules
             argument.Value,
             root,
             new LocalResolution(cancellationToken, compilation));
+    }
+
+    private static bool IsNonCacheableLazyFactory(
+        IObjectCreationOperation creation,
+        IOperation root,
+        LocalResolution resolving)
+    {
+        if (creation.Type is not INamedTypeSymbol
+            {
+                Name: "Lazy",
+                TypeArguments.Length: 1
+            } lazyType ||
+            !SharpProofSoundnessAnalyzer.IsExactNamespace(
+                lazyType.ContainingNamespace,
+                "System") ||
+            !IsSemanticAnswerType(lazyType.TypeArguments[0]))
+        {
+            return false;
+        }
+
+        foreach (var argument in creation.Arguments)
+        {
+            resolving.CancellationToken.ThrowIfCancellationRequested();
+            var factoryType = argument.Parameter?.Type ?? argument.Value.Type;
+            if (factoryType is INamedTypeSymbol
+                {
+                    TypeKind: TypeKind.Delegate,
+                    DelegateInvokeMethod: { } invoke
+                } &&
+                IsSemanticAnswerType(invoke.ReturnType) &&
+                IsNonCacheableValueFactory(
+                    argument.Value,
+                    root,
+                    resolving))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsNonCacheableValueFactory(
@@ -444,16 +518,20 @@ internal static class CacheSoundnessRules
         var resolving = new LocalResolution(cancellationToken);
         return target switch
         {
-            IPropertyReferenceOperation property => IsCacheReceiver(
-                property.Instance,
-                property.Property.ContainingType,
-                root,
-                resolving),
-            IFieldReferenceOperation field => IsCacheReceiver(
-                field.Instance,
-                field.Field.ContainingType,
-                root,
-                resolving),
+            IPropertyReferenceOperation property =>
+                IsCacheStorageMember(property.Property) ||
+                IsCacheReceiver(
+                    property.Instance,
+                    property.Property.ContainingType,
+                    root,
+                    resolving),
+            IFieldReferenceOperation field =>
+                IsCacheStorageMember(field.Field) ||
+                IsCacheReceiver(
+                    field.Instance,
+                    field.Field.ContainingType,
+                    root,
+                    resolving),
             _ => false
         };
     }
@@ -467,6 +545,128 @@ internal static class CacheSoundnessRules
     private static bool IsCacheType(ITypeSymbol? type)
     {
         return type?.Name.IndexOf("Cache", StringComparison.Ordinal) >= 0;
+    }
+
+    private static bool IsCacheName(string name)
+    {
+        return name.IndexOf("cache", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("memo", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool IsCacheStorageMember(ISymbol member)
+    {
+        if (member is not IFieldSymbol &&
+            member is not IPropertySymbol { IsIndexer: false })
+        {
+            return false;
+        }
+
+        if (IsCacheName(member.Name))
+        {
+            return true;
+        }
+
+        var type = member switch
+        {
+            IFieldSymbol field => field.Type,
+            IPropertySymbol { IsIndexer: false } property => property.Type,
+            _ => null
+        };
+        if (IsCacheType(type))
+        {
+            return true;
+        }
+
+        var isPersistentMember = member switch
+        {
+            IFieldSymbol field => field.IsStatic,
+            IPropertySymbol property => property.IsStatic,
+            _ => false
+        } || IsCacheType(member.ContainingType);
+
+        return isPersistentMember && IsPersistentCacheCollectionType(type);
+    }
+
+    private static bool HasLocalNamed(SyntaxNode declaration, string name)
+    {
+        return declaration.DescendantNodes()
+            .Where(node => !IsInsideNestedCallable(node, declaration))
+            .Any(node => node switch
+            {
+                VariableDeclaratorSyntax variable =>
+                    string.Equals(
+                        variable.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                ForEachStatementSyntax forEach =>
+                    string.Equals(
+                        forEach.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                CatchDeclarationSyntax catchDeclaration =>
+                    string.Equals(
+                        catchDeclaration.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                SingleVariableDesignationSyntax designation =>
+                    string.Equals(
+                        designation.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                FromClauseSyntax fromClause =>
+                    string.Equals(
+                        fromClause.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                LetClauseSyntax letClause =>
+                    string.Equals(
+                        letClause.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                JoinClauseSyntax joinClause =>
+                    string.Equals(
+                        joinClause.Identifier.ValueText,
+                        name,
+                        StringComparison.Ordinal),
+                _ => false
+            });
+    }
+
+    private static bool IsPersistentCacheCollectionType(ITypeSymbol? type)
+    {
+        for (var current = type as INamedTypeSymbol;
+             current != null;
+             current = current.BaseType)
+        {
+            var original = current.OriginalDefinition;
+            if ((original.MetadataName == "Dictionary`2" &&
+                 SharpProofSoundnessAnalyzer.IsExactNamespace(
+                     original.ContainingNamespace,
+                     "System",
+                     "Collections",
+                     "Generic")) ||
+                (original.MetadataName == "ConcurrentDictionary`2" &&
+                 SharpProofSoundnessAnalyzer.IsExactNamespace(
+                     original.ContainingNamespace,
+                     "System",
+                     "Collections",
+                     "Concurrent")) ||
+                (original.MetadataName == "ConditionalWeakTable`2" &&
+                 SharpProofSoundnessAnalyzer.IsExactNamespace(
+                     original.ContainingNamespace,
+                     "System",
+                     "Runtime",
+                     "CompilerServices")) ||
+                (original.MetadataName == "Lazy`1" &&
+                 SharpProofSoundnessAnalyzer.IsExactNamespace(
+                     original.ContainingNamespace,
+                     "System")))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsGuardedCacheableResponse(
@@ -580,6 +780,14 @@ internal static class CacheSoundnessRules
             return true;
         }
 
+        if (operation is IFieldReferenceOperation field &&
+            IsCacheStorageMember(field.Field) ||
+            operation is IPropertyReferenceOperation property &&
+            IsCacheStorageMember(property.Property))
+        {
+            return true;
+        }
+
         return operation switch
         {
             ILocalReferenceOperation local =>
@@ -687,6 +895,7 @@ internal static class CacheSoundnessRules
             IObjectCreationOperation creation =>
                 (IsSemanticAnswerType(creation.Type) &&
                  IsNonCacheableName(creation.Type?.Name)) ||
+                IsNonCacheableLazyFactory(creation, root, resolving) ||
                 creation.Arguments.Any(argument => Recurse(argument.Value)),
             ILocalReferenceOperation local => ResolveLocal(
                 local,
@@ -1412,6 +1621,13 @@ internal static class CacheSoundnessRules
         Compilation? compilation,
         CancellationToken cancellationToken)
     {
+        if (returnType != null &&
+            returnType.SpecialType != SpecialType.None &&
+            returnType.SpecialType != SpecialType.System_Object)
+        {
+            return false;
+        }
+
         var names = ImmutableArray.CreateBuilder<string>();
         var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
         foreach (var target in GetPossibleDispatchTargets(
