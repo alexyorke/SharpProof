@@ -39,7 +39,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "SharpProof.Worker.Protocol.WorkerVerifyResponse",
         "SharpProof.Worker.Protocol.WorkerResultAssembler",
         "SharpProof.Worker.Protocol.WorkerRunStatus",
-        "System.Runtime.CompilerServices.RuntimeHelpers"
+        "System.Runtime.CompilerServices.RuntimeHelpers",
+        "System.Activator", "System.Reflection.ConstructorInfo",
+        "System.Runtime.Serialization.FormatterServices", "System.Type",
+        "System.Text.Json.JsonSerializer"
     ];
 
     private static readonly ImmutableDictionary<KnownType, ImmutableHashSet<string>> ForbiddenMethods =
@@ -73,7 +76,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "GetSpeculativeSymbolInfo",
                 "GetSpeculativeTypeInfo",
                 "GetSpeculativeAliasInfo"),
-            [KnownType.RuntimeHelpers] = Names("GetUninitializedObject")
+            [KnownType.RuntimeHelpers] = Names("GetUninitializedObject"),
+            [KnownType.Activator] = Names("CreateInstance"),
+            [KnownType.FormatterServices] = Names(
+                "GetUninitializedObject",
+                "GetSafeUninitializedObject")
         }.ToImmutableDictionary();
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
@@ -141,11 +148,25 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         var invocation = (IInvocationOperation)context.Operation;
         var method = invocation.TargetMethod.OriginalDefinition;
-        if (IsForbidden(method, invocation.Instance?.Type ?? method.ContainingType, context.ContainingSymbol, symbols))
+        var reflectiveTargetTypes = GetReflectiveTargetTypes(
+            invocation,
+            symbols,
+            context.CancellationToken);
+        if (IsForbidden(
+                method,
+                invocation.Instance?.Type ?? method.ContainingType,
+                context.ContainingSymbol,
+                symbols,
+                reflectiveTargetTypes))
         {
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
         }
 
+        AnalyzeReflectiveConstruction(
+            context,
+            reflectiveTargetTypes,
+            invocation.Syntax.GetLocation(),
+            symbols);
         AnalyzeSemanticStringInvocation(context, invocation, symbols);
         if (IsCSharpExpressionTextProducer(invocation, symbols))
         {
@@ -158,14 +179,22 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         var methodReference = (IMethodReferenceOperation)context.Operation;
         var method = methodReference.Method.OriginalDefinition;
+        var reflectiveTargetTypes = GetReflectiveTargetTypes(methodReference, symbols);
         if (IsForbidden(
                 method,
                 methodReference.Instance?.Type ?? method.ContainingType,
                 context.ContainingSymbol,
-                symbols))
+                symbols,
+                reflectiveTargetTypes))
         {
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, methodReference.Syntax.GetLocation(), method.Name);
         }
+
+        AnalyzeReflectiveConstruction(
+            context,
+            reflectiveTargetTypes,
+            methodReference.Syntax.GetLocation(),
+            symbols);
     }
 
     private static void AnalyzeDynamicInvocation(OperationAnalysisContext context)
@@ -181,7 +210,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         IMethodSymbol method,
         ITypeSymbol? receiverType,
         ISymbol containingSymbol,
-        KnownSymbols symbols)
+        KnownSymbols symbols,
+        ImmutableArray<ITypeSymbol> reflectiveTargetTypes)
     {
         if (method.Name.StartsWith("Parse", StringComparison.Ordinal) &&
             IsAnyType(
@@ -195,10 +225,24 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
         foreach (var entry in ForbiddenMethods)
         {
-            if (IsSameType(method.ContainingType, symbols[entry.Key]) && entry.Value.Contains(method.Name))
+            if (!IsSameType(method.ContainingType, symbols[entry.Key]) ||
+                !entry.Value.Contains(method.Name))
             {
-                return true;
+                continue;
             }
+
+            if (entry.Key is KnownType.Activator or
+                KnownType.FormatterServices or
+                KnownType.RuntimeHelpers)
+            {
+                return IsForbiddenReflectiveFactory(
+                    entry.Key,
+                    containingSymbol,
+                    symbols,
+                    reflectiveTargetTypes);
+            }
+
+            return true;
         }
 
         if (method.Name == "GetSemanticModel" &&
@@ -220,6 +264,399 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                receiverType?.AllInterfaces.Any(value => IsSameType(value, symbols[KnownType.Symbol])) == true;
     }
 
+    private static bool IsForbiddenReflectiveFactory(
+        KnownType apiType,
+        ISymbol containingSymbol,
+        KnownSymbols symbols,
+        ImmutableArray<ITypeSymbol> reflectiveTargetTypes)
+    {
+        if (apiType is KnownType.FormatterServices or KnownType.RuntimeHelpers)
+        {
+            return true;
+        }
+
+        var targetTypes = reflectiveTargetTypes;
+        var protectedTargets = targetTypes
+            .Where(type => IsTrustedConstructionType(type, symbols))
+            .ToArray();
+        if (apiType == KnownType.Activator && protectedTargets.Length == 0)
+        {
+            return false;
+        }
+
+        if (protectedTargets.Length == 0)
+        {
+            return true;
+        }
+
+        var containingType = containingSymbol.ContainingType;
+        return protectedTargets.Any(type =>
+            !IsAllowedTrustedConstructionOwner(type, containingType, symbols));
+    }
+
+    private static void AnalyzeReflectiveConstruction(
+        OperationAnalysisContext context,
+        ImmutableArray<ITypeSymbol> targetTypes,
+        Location location,
+        KnownSymbols symbols)
+    {
+        var containingType = context.ContainingSymbol.ContainingType;
+        foreach (var targetType in targetTypes)
+        {
+            AnalyzeTrustedConstruction(
+                context,
+                targetType,
+                location,
+                containingType,
+                symbols);
+        }
+    }
+
+    private static ImmutableArray<ITypeSymbol> GetReflectiveTargetTypes(
+        IInvocationOperation invocation,
+        KnownSymbols symbols,
+        CancellationToken cancellationToken)
+    {
+        var method = invocation.TargetMethod;
+        var isActivatorFactory =
+            IsSameType(method.ContainingType, symbols[KnownType.Activator]) &&
+            method.Name == "CreateInstance";
+        var isUninitializedFactory =
+            IsAnyType(
+                method.ContainingType,
+                symbols,
+                KnownType.RuntimeHelpers,
+                KnownType.FormatterServices) &&
+            method.Name is "GetUninitializedObject" or
+                "GetSafeUninitializedObject";
+        var isConstructorInvoke =
+            IsSameType(
+                method.ContainingType,
+                symbols[KnownType.ConstructorInfo]) &&
+            method.Name == "Invoke";
+        var isJsonDeserialize =
+            IsSameType(method.ContainingType, symbols[KnownType.JsonSerializer]) &&
+            method.Name == "Deserialize";
+        if (!isActivatorFactory && !isUninitializedFactory &&
+            !isConstructorInvoke && !isJsonDeserialize)
+        {
+            return [];
+        }
+
+        var targetTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        if (method.IsGenericMethod)
+        {
+            foreach (var typeArgument in method.TypeArguments)
+            {
+                targetTypes.Add(typeArgument);
+            }
+        }
+
+        if (isConstructorInvoke && invocation.Instance != null)
+        {
+            foreach (var typeOf in invocation.Instance.DescendantsAndSelf()
+                         .OfType<ITypeOfOperation>())
+            {
+                targetTypes.Add(typeOf.TypeOperand);
+            }
+        }
+        else
+        {
+            Dictionary<ILocalSymbol, List<IOperation>>? priorTypeAssignments = null;
+            foreach (var argument in invocation.Arguments)
+            {
+                if (!IsSameType(
+                        argument.Parameter?.Type,
+                        symbols[KnownType.Type]))
+                {
+                    continue;
+                }
+
+                priorTypeAssignments ??= GetPriorTypeAssignments(
+                    invocation,
+                    symbols,
+                    cancellationToken);
+                AddTypeTargetsFromOperand(
+                    argument.Value,
+                    priorTypeAssignments,
+                    targetTypes,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    cancellationToken);
+            }
+        }
+
+        return [.. targetTypes];
+    }
+
+    private static ImmutableArray<ITypeSymbol> GetReflectiveTargetTypes(
+        IMethodReferenceOperation methodReference,
+        KnownSymbols symbols)
+    {
+        var method = methodReference.Method;
+        if (!IsSameType(method.ContainingType, symbols[KnownType.Activator]) ||
+            method.Name != "CreateInstance" ||
+            !method.IsGenericMethod)
+        {
+            return [];
+        }
+
+        return [.. method.TypeArguments];
+    }
+
+    private static Dictionary<ILocalSymbol, List<IOperation>> GetPriorTypeAssignments(
+        IInvocationOperation invocation,
+        KnownSymbols symbols,
+        CancellationToken cancellationToken)
+    {
+        var assignments = new Dictionary<ILocalSymbol, List<IOperation>>(
+            SymbolEqualityComparer.Default);
+        var root = GetCallableOperationRoot(invocation);
+        foreach (var candidate in CallableOperations(root, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidate.Syntax.SyntaxTree != invocation.Syntax.SyntaxTree ||
+                candidate.Syntax.SpanStart >= invocation.Syntax.SpanStart)
+            {
+                continue;
+            }
+
+            switch (candidate)
+            {
+                case IVariableDeclaratorOperation declaration
+                    when IsSameType(declaration.Symbol.Type, symbols[KnownType.Type]) &&
+                         declaration.Initializer?.Value is { } initializer:
+                    AddTypeAssignment(assignments, declaration.Symbol, initializer);
+                    break;
+                case ISimpleAssignmentOperation
+                {
+                    Target: ILocalReferenceOperation target,
+                    Value: { } value
+                } when IsSameType(target.Local.Type, symbols[KnownType.Type]):
+                    AddTypeAssignment(assignments, target.Local, value);
+                    break;
+            }
+        }
+
+        return assignments;
+    }
+
+    private static IOperation GetCallableOperationRoot(IOperation operation)
+    {
+        for (var current = operation; current != null; current = current.Parent)
+        {
+            if (current is IMethodBodyOperation or
+                IConstructorBodyOperation or
+                IAnonymousFunctionOperation or
+                ILocalFunctionOperation)
+            {
+                return current;
+            }
+        }
+
+        var root = operation;
+        while (root.Parent != null)
+        {
+            root = root.Parent;
+        }
+
+        return root;
+    }
+
+    private static IEnumerable<IOperation> CallableOperations(
+        IOperation root,
+        CancellationToken cancellationToken)
+    {
+        var pending = new Stack<IOperation>();
+        pending.Push(root);
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
+            if (!ReferenceEquals(current, root) &&
+                current is IMethodBodyOperation or
+                    IConstructorBodyOperation or
+                    IAnonymousFunctionOperation or
+                    ILocalFunctionOperation)
+            {
+                continue;
+            }
+
+            yield return current;
+            foreach (var child in current.ChildOperations.Reverse())
+            {
+                pending.Push(child);
+            }
+        }
+    }
+
+    private static void AddTypeAssignment(
+        Dictionary<ILocalSymbol, List<IOperation>> assignments,
+        ILocalSymbol local,
+        IOperation value)
+    {
+        if (!assignments.TryGetValue(local, out var values))
+        {
+            values = [];
+            assignments.Add(local, values);
+        }
+
+        values.Add(value);
+    }
+
+    private static void AddTypeTargetsFromOperand(
+        IOperation operation,
+        Dictionary<ILocalSymbol, List<IOperation>> assignments,
+        HashSet<ITypeSymbol> targetTypes,
+        HashSet<ILocalSymbol> visitedLocals,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        while (operation is IConversionOperation or IParenthesizedOperation)
+        {
+            operation = operation switch
+            {
+                IConversionOperation conversion => conversion.Operand,
+                IParenthesizedOperation parenthesized => parenthesized.Operand,
+                _ => operation
+            };
+        }
+
+        switch (operation)
+        {
+            case ITypeOfOperation typeOf:
+                targetTypes.Add(typeOf.TypeOperand);
+                break;
+            case IConditionalOperation conditional:
+                if (conditional.WhenTrue is { } whenTrue)
+                {
+                    AddTypeTargetsFromOperand(
+                        whenTrue,
+                        assignments,
+                        targetTypes,
+                        visitedLocals,
+                        cancellationToken);
+                }
+
+                if (conditional.WhenFalse is { } whenFalse)
+                {
+                    AddTypeTargetsFromOperand(
+                        whenFalse,
+                        assignments,
+                        targetTypes,
+                        visitedLocals,
+                        cancellationToken);
+                }
+                break;
+            case ILocalReferenceOperation localReference
+                when visitedLocals.Add(localReference.Local):
+                try
+                {
+                    if (assignments.TryGetValue(localReference.Local, out var values))
+                    {
+                        foreach (var value in values)
+                        {
+                            AddTypeTargetsFromOperand(
+                                value,
+                                assignments,
+                                targetTypes,
+                                visitedLocals,
+                                cancellationToken);
+                        }
+                    }
+                }
+                finally
+                {
+                    visitedLocals.Remove(localReference.Local);
+                }
+                break;
+        }
+    }
+
+    private static void AnalyzeTrustedConstruction(
+        OperationAnalysisContext context,
+        ITypeSymbol? targetType,
+        Location location,
+        ITypeSymbol? containingType,
+        KnownSymbols symbols)
+    {
+        if (IsSameType(targetType, symbols[KnownType.Assumption]) &&
+            !IsAllowedTrustedConstructionOwner(targetType, containingType, symbols))
+        {
+            Report(context, MetaDiagnosticDescriptors.AssumptionConstruction, location);
+        }
+
+        if (IsSameType(targetType, symbols[KnownType.EffectSummary]) &&
+            !IsAllowedTrustedConstructionOwner(targetType, containingType, symbols))
+        {
+            Report(context, MetaDiagnosticDescriptors.EffectSummaryConstruction, location);
+        }
+
+        if (IsAnyType(
+                targetType,
+                symbols,
+                KnownType.ProvenOutcome,
+                KnownType.RefutedOutcome,
+                KnownType.ValidatedModel) &&
+            !IsAllowedTrustedConstructionOwner(targetType, containingType, symbols))
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.ProofOutcomeConstruction,
+                location,
+                targetType?.Name ?? string.Empty);
+        }
+    }
+
+    private static bool IsTrustedConstructionType(
+        ITypeSymbol? targetType,
+        KnownSymbols symbols)
+    {
+        return IsAnyType(
+                targetType,
+                symbols,
+                KnownType.Assumption,
+                KnownType.EffectSummary,
+                KnownType.ProvenOutcome,
+                KnownType.RefutedOutcome,
+                KnownType.ValidatedModel);
+    }
+
+    private static bool IsAllowedTrustedConstructionOwner(
+        ITypeSymbol? targetType,
+        ITypeSymbol? containingType,
+        KnownSymbols symbols)
+    {
+        if (IsSameType(targetType, symbols[KnownType.Assumption]))
+        {
+            return IsAnyType(
+                containingType,
+                symbols,
+                KnownType.ProofKernel,
+                KnownType.CallableVerifier,
+                KnownType.CallableEvidenceBuilder,
+                KnownType.PostconditionObligationBuilder);
+        }
+
+        if (IsSameType(targetType, symbols[KnownType.EffectSummary]))
+        {
+            return IsAnyType(
+                containingType,
+                symbols,
+                KnownType.EffectSummary,
+                KnownType.EffectSummaryDomain,
+                KnownType.EffectSummaryOperations,
+                KnownType.ExternalEffectResolver);
+        }
+
+        return IsAnyType(
+            targetType,
+            symbols,
+            KnownType.ProvenOutcome,
+            KnownType.RefutedOutcome,
+            KnownType.ValidatedModel) &&
+            IsSameType(containingType, symbols[KnownType.ProofKernel]);
+    }
+
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, KnownSymbols symbols)
     {
         var creation = (IObjectCreationOperation)context.Operation;
@@ -237,39 +674,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
         }
 
-        if (IsSameType(creation.Type, symbols[KnownType.Assumption]) &&
-            !IsAnyType(
-                containingType,
-                symbols,
-                KnownType.ProofKernel,
-                KnownType.CallableVerifier,
-                KnownType.CallableEvidenceBuilder,
-                KnownType.PostconditionObligationBuilder))
-        {
-            Report(context, MetaDiagnosticDescriptors.AssumptionConstruction, creation.Syntax.GetLocation());
-        }
-
-        if (IsSameType(creation.Type, symbols[KnownType.EffectSummary]) &&
-            !IsAnyType(
-                containingType,
-                symbols,
-                KnownType.EffectSummary,
-                KnownType.EffectSummaryDomain,
-                KnownType.EffectSummaryOperations,
-                KnownType.ExternalEffectResolver))
-        {
-            Report(context, MetaDiagnosticDescriptors.EffectSummaryConstruction, creation.Syntax.GetLocation());
-        }
-
-        if (IsAnyType(creation.Type, symbols, KnownType.ProvenOutcome, KnownType.RefutedOutcome, KnownType.ValidatedModel) &&
-            !IsSameType(containingType, symbols[KnownType.ProofKernel]))
-        {
-            Report(
-                context,
-                MetaDiagnosticDescriptors.ProofOutcomeConstruction,
-                creation.Syntax.GetLocation(),
-                creation.Type?.Name ?? string.Empty);
-        }
+        AnalyzeTrustedConstruction(
+            context,
+            creation.Type,
+            creation.Syntax.GetLocation(),
+            containingType,
+            symbols);
     }
 
     private static bool IsAnyType(ITypeSymbol? actual, KnownSymbols symbols, params KnownType[] expected)
@@ -1567,7 +1977,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         CallableVerificationPolicy, CallableVerificationResult,
         WorkerClaimReason, WorkerCallableCoverageReason, WorkerVerifyRequest,
         WorkerVerifyResponse, WorkerResultAssembler, WorkerRunStatus,
-        RuntimeHelpers
+        RuntimeHelpers, Activator, ConstructorInfo, FormatterServices, Type,
+        JsonSerializer
     }
 
     internal sealed class KnownSymbols

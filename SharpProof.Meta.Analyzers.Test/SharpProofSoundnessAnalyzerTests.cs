@@ -2543,6 +2543,239 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsReflectiveTrustedConstructionOutsideAllowlistedOwners()
+    {
+        const string source =
+            """
+            using System;
+            using System.Reflection;
+            using System.Runtime.CompilerServices;
+            using System.Runtime.Serialization;
+            using System.Text.Json;
+            namespace SharpProof.Verify {
+                public sealed class Assumption { public Assumption() { } }
+                public sealed class ProvenOutcome { public ProvenOutcome() { } }
+                public sealed class RefutedOutcome { public RefutedOutcome() { } }
+                public sealed class ValidatedModel { public ValidatedModel() { } }
+                public sealed class ProofKernel {
+                    static object ViaGenericActivator() =>
+                        Activator.CreateInstance<ProvenOutcome>()!;
+                    static object ViaConstructorInfo() =>
+                        typeof(RefutedOutcome).GetConstructor(Type.EmptyTypes)!.Invoke(null)!;
+                    static object ViaSerializer() =>
+                        JsonSerializer.Deserialize<ValidatedModel>("{}")!;
+                    static object ViaFormatterServices() =>
+                        FormatterServices.GetUninitializedObject(typeof(ProvenOutcome));
+                    static object ViaRuntimeHelpers() =>
+                        RuntimeHelpers.GetUninitializedObject(typeof(ValidatedModel));
+                    static object ViaGenericFactoryReference() {
+                        Func<ProvenOutcome> factory =
+                            Activator.CreateInstance<ProvenOutcome>;
+                        return factory();
+                    }
+                }
+            }
+            namespace SharpProof.Effects {
+                public sealed class EffectSummary { public EffectSummary() { } }
+                public sealed class EffectSummaryDomain {
+                    static object ViaSerializer() =>
+                        JsonSerializer.Deserialize<EffectSummary>("{}")!;
+                    static object ViaActivator() =>
+                        Activator.CreateInstance<EffectSummary>()!;
+                }
+            }
+            namespace SharpProof.Worker {
+                public sealed class CallableVerifier {
+                    static object ViaActivator() =>
+                        Activator.CreateInstance<SharpProof.Verify.Assumption>()!;
+                }
+            }
+            namespace SharpProof.Worker.ConsumerNamespace {
+                sealed class Consumer {
+                    object ViaActivatorType() =>
+                        Activator.CreateInstance(typeof(SharpProof.Verify.ProvenOutcome))!;
+                    object ViaActivatorGeneric() =>
+                        Activator.CreateInstance<SharpProof.Verify.RefutedOutcome>()!;
+                    object ViaTypeLocal() {
+                        Type outcomeType = typeof(SharpProof.Verify.ProvenOutcome);
+                        return Activator.CreateInstance(outcomeType)!;
+                    }
+                    object ViaReassignedTypeLocal() {
+                        Type outcomeType = typeof(object);
+                        outcomeType = typeof(SharpProof.Verify.RefutedOutcome);
+                        return Activator.CreateInstance(outcomeType)!;
+                    }
+                    object ViaTypeLocalMethodReference() {
+                        Func<SharpProof.Verify.ProvenOutcome> factory =
+                            Activator.CreateInstance<SharpProof.Verify.ProvenOutcome>;
+                        return factory();
+                    }
+                    object ViaPostCallTypeAssignment() {
+                        Type outcomeType = typeof(object);
+                        var result = Activator.CreateInstance(outcomeType)!;
+                        outcomeType = typeof(SharpProof.Verify.ProvenOutcome);
+                        return result;
+                    }
+                    object ViaConstructorInfo() =>
+                        typeof(SharpProof.Verify.ValidatedModel)
+                            .GetConstructor(Type.EmptyTypes)!.Invoke(null)!;
+                    object ViaFormatterServices() =>
+                        FormatterServices.GetUninitializedObject(typeof(SharpProof.Verify.ProvenOutcome));
+                    object ViaRuntimeHelpers() =>
+                        RuntimeHelpers.GetUninitializedObject(typeof(SharpProof.Verify.RefutedOutcome));
+                    object ViaGenericSerializer() =>
+                        JsonSerializer.Deserialize<SharpProof.Effects.EffectSummary>("{}")!;
+                    object ViaTypeSerializer() =>
+                        JsonSerializer.Deserialize("{}", typeof(SharpProof.Verify.Assumption))!;
+                    object ViaAssumptionActivator() =>
+                        Activator.CreateInstance<SharpProof.Verify.Assumption>()!;
+                    object ViaEffectSummaryActivator() =>
+                        Activator.CreateInstance<SharpProof.Effects.EffectSummary>()!;
+                    object ViaUnrelatedActivator() => Activator.CreateInstance(typeof(object))!;
+                    object ViaUnrelatedGenericActivator() => Activator.CreateInstance<Unrelated>()!;
+                    object ViaUnrelatedTypeLocal() {
+                        Type unrelatedType = typeof(object);
+                        return Activator.CreateInstance(unrelatedType)!;
+                    }
+                    int ViaUnrelatedSerializer() => JsonSerializer.Deserialize<int>("1");
+                    private sealed class Unrelated { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA011"),
+            Is.EqualTo(8));
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA007"),
+            Is.EqualTo(2));
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA008"),
+            Is.EqualTo(2));
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(11));
+        Assert.That(
+            diagnostics
+                .Where(static diagnostic => diagnostic.Id == "SPMETA001")
+                .Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EquivalentTo([
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'CreateInstance' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'GetUninitializedObject' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'GetUninitializedObject' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'GetUninitializedObject' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'GetUninitializedObject' is forbidden in " +
+                "soundness-critical SharpProof layers"
+            ]));
+    }
+
+    [Test]
+    public async Task AllowsReflectiveConstructionInsideProofKernelAndUnrelatedActivatorTargets()
+    {
+        const string source =
+            """
+            using System;
+            using System.Reflection;
+            using System.Runtime.CompilerServices;
+            using System.Runtime.Serialization;
+            using System.Text.Json;
+            namespace SharpProof.Verify {
+                public sealed class ProvenOutcome { public ProvenOutcome() { } }
+                public sealed class RefutedOutcome { public RefutedOutcome() { } }
+                public sealed class ValidatedModel { public ValidatedModel() { } }
+                public sealed class ProofKernel {
+                    static object ViaActivator() =>
+                        Activator.CreateInstance<ProvenOutcome>()!;
+                    static object ViaConstructorInfo() =>
+                        typeof(RefutedOutcome).GetConstructor(Type.EmptyTypes)!.Invoke(null)!;
+                    static object ViaSerializer() =>
+                        JsonSerializer.Deserialize<ValidatedModel>("{}")!;
+                    static object ViaFormatterServices() =>
+                        FormatterServices.GetUninitializedObject(typeof(ProvenOutcome));
+                    static object ViaRuntimeHelpers() =>
+                        RuntimeHelpers.GetUninitializedObject(typeof(ValidatedModel));
+                    static object ViaGenericFactoryReference() {
+                        Func<ProvenOutcome> factory =
+                            Activator.CreateInstance<ProvenOutcome>;
+                        return factory();
+                    }
+                }
+            }
+            namespace SharpProof.Verify {
+                public sealed class Assumption { public Assumption() { } }
+            }
+            namespace SharpProof.Effects {
+                public sealed class EffectSummary { public EffectSummary() { } }
+                public sealed class EffectSummaryDomain {
+                    static object ViaSerializer() =>
+                        JsonSerializer.Deserialize<EffectSummary>("{}")!;
+                }
+            }
+            namespace SharpProof.Worker {
+                public sealed class CallableVerifier {
+                    static object ViaActivator() =>
+                        Activator.CreateInstance<SharpProof.Verify.Assumption>()!;
+                }
+                sealed class Consumer {
+                    object UnrelatedTypeOf() => Activator.CreateInstance(typeof(object))!;
+                    object UnrelatedGeneric() => Activator.CreateInstance<Unrelated>()!;
+                    object UnrelatedTypeLocal() {
+                        Type unrelatedType = typeof(object);
+                        return Activator.CreateInstance(unrelatedType)!;
+                    }
+                    object UnrelatedGenericFactoryReference() {
+                        Func<object> factory = Activator.CreateInstance<object>;
+                        return factory();
+                    }
+                    int UnrelatedDeserialize() => JsonSerializer.Deserialize<int>("1");
+                    private sealed class Unrelated { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(2));
+        Assert.That(
+            diagnostics
+                .Where(static diagnostic => diagnostic.Id == "SPMETA001")
+                .Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EquivalentTo([
+                "API 'GetUninitializedObject' is forbidden in " +
+                "soundness-critical SharpProof layers",
+                "API 'GetUninitializedObject' is forbidden in " +
+                "soundness-critical SharpProof layers"
+            ]));
+        Assert.That(
+            diagnostics.Any(static diagnostic =>
+                diagnostic.Id is "SPMETA007" or "SPMETA008" or "SPMETA011"),
+            Is.False);
+    }
+
+    [Test]
     public async Task RejectsDisplayStringsRegardlessOfProductionNamespace()
     {
         const string source =
