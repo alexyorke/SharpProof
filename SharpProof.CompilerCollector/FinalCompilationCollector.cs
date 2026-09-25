@@ -45,6 +45,10 @@ internal static class FinalCompilationCollector
         {
             throw;
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
 #pragma warning disable CA1031
         catch (Exception exception)
             when (!context.CancellationToken.IsCancellationRequested)

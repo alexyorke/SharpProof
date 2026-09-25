@@ -484,7 +484,7 @@ internal static class CompilerSourceRebinding
                         return false;
                     }
 
-                conditions.Add((wasActive, condition, SeenElse: false));
+                    conditions.Add((wasActive, condition, SeenElse: false));
                     active = wasActive && condition;
                     return true;
                 }

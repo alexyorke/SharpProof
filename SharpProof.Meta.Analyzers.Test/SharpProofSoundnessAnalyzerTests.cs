@@ -1013,6 +1013,12 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     catch (OperationCanceledException) { throw; }
                     catch (System.AggregateException) { }
                 }
+                static void AggregateRethrowPrecedesFilteredFallback() {
+                    try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
+                    catch (System.AggregateException) { throw; }
+                    catch (Exception exception)
+                        when (exception is not OperationCanceledException) { }
+                }
                 static void OneInnerExceptionDoesNotProveForwarding() {
                     try { Task.Run(static () => throw new OperationCanceledException()).Wait(); }
                     catch (System.AggregateException caught) {

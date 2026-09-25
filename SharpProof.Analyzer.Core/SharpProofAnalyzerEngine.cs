@@ -686,6 +686,10 @@ internal sealed partial class SharpProofAnalyzerEngine
                 }
             }
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (
             exception is not OperationCanceledException)
         {

@@ -58,6 +58,10 @@ internal sealed class AnalyzerConfiguration
                 ParseFeatures(featuresAliases.Found ? featuresAliases.Value : "all"),
                 invalidConfigurationValues);
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return new(

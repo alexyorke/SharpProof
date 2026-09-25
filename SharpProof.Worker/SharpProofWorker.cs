@@ -181,6 +181,10 @@ public sealed class SharpProofWorker : IDisposable
                     snapshot.CompilerManifest,
                     projectBoundary.Token);
             }
+            catch (AggregateException)
+            {
+                throw;
+            }
             catch (Exception exception) when (exception is not OutOfMemoryException and
                 not StackOverflowException and not OperationCanceledException)
             {
@@ -603,6 +607,10 @@ public sealed class SharpProofWorker : IDisposable
             lanes = [.. created];
             return LaneCreationResult.Success;
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (exception is not OutOfMemoryException and
             not StackOverflowException and not OperationCanceledException)
         {
@@ -692,6 +700,10 @@ public sealed class SharpProofWorker : IDisposable
                     replacementOwner = null;
                     return LaneRenewalResult.Success;
                 }
+                catch (AggregateException)
+                {
+                    throw;
+                }
                 catch (Exception exception) when (exception is not OutOfMemoryException and
                     not StackOverflowException and not OperationCanceledException)
                 {
@@ -729,6 +741,10 @@ public sealed class SharpProofWorker : IDisposable
             try
             {
                 ownedBackend.Dispose();
+            }
+            catch (AggregateException)
+            {
+                throw;
             }
             catch (Exception exception) when (exception is not OutOfMemoryException and
                 not StackOverflowException and not OperationCanceledException)

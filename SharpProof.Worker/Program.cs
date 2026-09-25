@@ -105,6 +105,10 @@ internal static class Program
                     Message = "The worker was canceled before producing manifest-bound evidence."
                 }])).ConfigureAwait(false);
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (exception is not
             OutOfMemoryException and not StackOverflowException)
         {

@@ -150,6 +150,10 @@ internal static class Program
         {
             throw;
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         // Matches the worker's own discipline (Worker/Program.cs): ordinary
         // failures are caught so the launcher leaves a fail-closed result, while
         // cancellation and process-fatal exceptions remain observable.
@@ -716,6 +720,10 @@ internal static class Program
                 PublishMember(member);
             }
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (
             exception is not OperationCanceledException)
         {
@@ -810,6 +818,10 @@ internal static class Program
                 InvalidatePublication(members);
             }
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (
             exception is not OutOfMemoryException and
             not StackOverflowException and
@@ -860,6 +872,10 @@ internal static class Program
         try
         {
             InvalidatePublication(members);
+        }
+        catch (AggregateException)
+        {
+            throw;
         }
         catch (Exception exception) when (
             exception is not OutOfMemoryException and

@@ -63,6 +63,10 @@ internal static class CallableVerificationPolicy
             return Unknown(target, WorkerClaimReason.InfrastructureFailure,
                 WorkerCallableCoverageReason.InfrastructureFailure);
         }
+        catch (AggregateException)
+        {
+            throw;
+        }
         catch (Exception exception) when (
             exception is not OutOfMemoryException and not StackOverflowException)
         {

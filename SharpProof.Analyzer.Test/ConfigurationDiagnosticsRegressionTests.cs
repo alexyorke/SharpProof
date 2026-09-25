@@ -1,7 +1,9 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -9,6 +11,38 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class ConfigurationDiagnosticsRegressionTests
 {
+    [Test]
+    public void GlobalOptionsRethrowsAggregateCancellation()
+    {
+        var provider = new AggregateCancellationOptionsProvider(
+            failGlobalOptions: true);
+
+        Assert.Throws<AggregateException>(
+            (Action)(() => AnalyzerConfiguration.FromOptions(provider)));
+    }
+
+    [Test]
+    public void TreeOptionsRethrowAggregateCancellation()
+    {
+        var tree = CSharpSyntaxTree.ParseText("class Fixture { }");
+        var compilation = CSharpCompilation.Create(
+            "ConfigurationFixture",
+            [tree],
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var options = new AnalyzerOptions(
+            [],
+            new AggregateCancellationOptionsProvider(failTreeOptions: true));
+
+        Assert.Throws<AggregateException>(
+            (Action)(() => _ =
+                SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
+                    compilation,
+                    options,
+                    AnalyzerConfiguration.AdvisoryAll,
+                    CancellationToken.None)));
+    }
+
     [TestCase("sharpproof_features", "invalid")]
     [TestCase("sharpproof_features", "contracts")]
     [TestCase("sharpproof_profile", "strict")]
@@ -81,6 +115,33 @@ public sealed class ConfigurationDiagnosticsRegressionTests
         public override AnalyzerConfigOptions GetOptions(AdditionalText _)
         {
             return tree;
+        }
+    }
+
+    private sealed class AggregateCancellationOptionsProvider(
+        bool failGlobalOptions = false,
+        bool failTreeOptions = false) : AnalyzerConfigOptionsProvider
+    {
+        private static readonly AnalyzerConfigOptions Empty =
+            new DictionaryAnalyzerConfigOptions();
+
+        public override AnalyzerConfigOptions GlobalOptions =>
+            failGlobalOptions
+                ? throw new AggregateException(
+                    new OperationCanceledException())
+                : Empty;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return failTreeOptions
+                ? throw new AggregateException(
+                    new OperationCanceledException())
+                : Empty;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            return Empty;
         }
     }
 }
