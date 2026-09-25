@@ -157,9 +157,6 @@ internal sealed partial class OperationEffectScanner
             allowDirectWitnesses: false);
     }
 
-    internal ImmutableArray<EffectDirectWitness> DirectWitnesses =>
-        _directWitnesses.ToImmutable();
-
     internal EffectSummary Scan(IOperation operation)
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
@@ -172,7 +169,8 @@ internal sealed partial class OperationEffectScanner
 
         try
         {
-            return Scan(operation, EffectAccess.Read);
+            return IncludeHandlerReachabilityCompleteness(
+                Scan(operation, EffectAccess.Read));
         }
         finally
         {
@@ -181,23 +179,6 @@ internal sealed partial class OperationEffectScanner
                 _directOperation = null;
             }
         }
-    }
-
-    internal EffectSummary ScanUsingDisposalEffects(IOperation root)
-    {
-        var operations = ReferenceEquals(root, _root)
-            ? _operations
-            : default;
-        return new UsingDisposalEffectResolver(
-            _session.Compilation,
-            _method,
-            _callResolver,
-            _abstractFlow,
-            _conversionOwnership.ClassifyRegion,
-            _completionEvaluator.CanCompleteNormally,
-            _completionEvaluator.CanMethodCompleteNormally,
-            _handlerReachability.CanMethodThrow,
-            _handlerReachability.CanExitAbruptly).Scan(root, operations);
     }
 
     private EffectSummary Scan(

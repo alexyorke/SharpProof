@@ -2,6 +2,40 @@ namespace SharpProof.Effects;
 
 internal sealed partial class OperationEffectScanner
 {
+    internal ImmutableArray<EffectDirectWitness> DirectWitnesses =>
+        _handlerReachability.AnalysisIncomplete
+            ? []
+            : _directWitnesses.ToImmutable();
+
+    internal EffectSummary ScanUsingDisposalEffects(IOperation root)
+    {
+        var operations = ReferenceEquals(root, _root)
+            ? _operations
+            : default;
+        return IncludeHandlerReachabilityCompleteness(
+            new UsingDisposalEffectResolver(
+                _session.Compilation,
+                _method,
+                _callResolver,
+                _abstractFlow,
+                _conversionOwnership.ClassifyRegion,
+                _completionEvaluator.CanCompleteNormally,
+                _completionEvaluator.CanMethodCompleteNormally,
+                _handlerReachability.CanMethodThrow,
+                _handlerReachability.CanExitAbruptly).Scan(root, operations));
+    }
+
+    private EffectSummary IncludeHandlerReachabilityCompleteness(
+        EffectSummary summary)
+    {
+        return _handlerReachability.AnalysisIncomplete
+            ? EffectSummaryOperations.Join(
+                summary,
+                EffectSummaryOperations.IncompleteAnalysis(
+                    EffectAnalysisIncompleteReason.OperationBudgetExceeded))
+            : summary;
+    }
+
     internal EffectSummary ScanLexicalControlEffects(IOperation root)
     {
         var result = EffectSummary.Empty;
@@ -75,7 +109,7 @@ internal sealed partial class OperationEffectScanner
             };
             result = EffectSummaryDomain.Instance.Join(result, lexical);
         }
-        return result;
+        return IncludeHandlerReachabilityCompleteness(result);
     }
 
     private bool TryGetPatternAllocation(

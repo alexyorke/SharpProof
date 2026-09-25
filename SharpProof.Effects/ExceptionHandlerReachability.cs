@@ -22,6 +22,8 @@ internal sealed class ExceptionHandlerReachability(
     Func<IMethodSymbol, bool> isKnownNonThrowing,
     Func<IOperation, bool> isConditionallyElided)
 {
+    private const int MaximumNestedTryDepth = 64;
+
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
     private readonly Dictionary<IOperation, PotentialExceptions>
         _potentialExceptionsCache = new();
@@ -46,6 +48,7 @@ internal sealed class ExceptionHandlerReachability(
     private readonly Dictionary<
         ICoalesceAssignmentOperation,
         (bool Completes, bool IsNonNull)> _coalesceAssignmentTargetFactsCache = new();
+    private bool _analysisIncomplete;
     private readonly INamedTypeSymbol? _exceptionType =
         compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
@@ -72,6 +75,8 @@ internal sealed class ExceptionHandlerReachability(
         var reachability = GetReachability(target);
         return inFilter ? reachability.Filter : reachability.Handler;
     }
+
+    internal bool AnalysisIncomplete => _analysisIncomplete;
 
     private CatchReachability GetReachability(CatchClauseSyntax target)
     {
@@ -127,6 +132,11 @@ internal sealed class ExceptionHandlerReachability(
         TraversalContext traversal,
         bool keepEscaping)
     {
+        if (!CanTraverseNestedTry(traversal))
+        {
+            return UnknownPotential;
+        }
+
         var known = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(
             SymbolEqualityComparer.Default);
         var unknown = false;
@@ -2030,15 +2040,20 @@ internal sealed class ExceptionHandlerReachability(
         ITryOperation nestedTry,
         TraversalContext traversal)
     {
+        if (!CanTraverseNestedTry(traversal))
+        {
+            return UnknownPotential;
+        }
         if (nestedTry.Syntax is not TryStatementSyntax syntax)
         {
             return UnknownPotential;
         }
+        var nestedTraversal = traversal.NextNestedTry;
         var model = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(compilation, syntax.SyntaxTree);
         var body = GetPotentialExceptions(
             nestedTry.Body,
-            traversal,
+            nestedTraversal,
             keepEscaping: false);
         var escapingBody = FromThrowSet(
             EffectExceptionFlow.KeepEscapingThroughTry(
@@ -2070,14 +2085,14 @@ internal sealed class ExceptionHandlerReachability(
                 result,
                 GetPotentialExceptions(
                     catchOperation.Handler,
-                    traversal,
+                    nestedTraversal,
                     keepEscaping: false));
             finallyReachable |= canCompleteNormally(
                 catchOperation.Handler) ||
                 CanExitAbruptly(
                     catchOperation.Handler,
                     catchOperation.Handler,
-                    traversal);
+                    nestedTraversal);
         }
         if (nestedTry.Finally is not { } finallyOperation ||
             !finallyReachable)
@@ -2086,7 +2101,7 @@ internal sealed class ExceptionHandlerReachability(
         }
         var finallyExceptions = GetPotentialExceptions(
             finallyOperation,
-            traversal,
+            nestedTraversal,
             keepEscaping: false);
         return canCompleteNormally(finallyOperation)
             ? Union(result, finallyExceptions)
@@ -2434,8 +2449,10 @@ internal sealed class ExceptionHandlerReachability(
         IOperation scope,
         int depth)
     {
-        if (depth > 256)
+        if (depth >= MaximumNestedTryDepth ||
+            !HasSufficientExecutionStack())
         {
+            _analysisIncomplete = true;
             return true;
         }
         if (!ReferenceEquals(operation, root) &&
@@ -3585,20 +3602,51 @@ internal sealed class ExceptionHandlerReachability(
         bool Filter,
         bool Handler);
 
+    private bool CanTraverseNestedTry(TraversalContext traversal)
+    {
+        if (traversal.NestedTryDepth < MaximumNestedTryDepth &&
+            HasSufficientExecutionStack())
+        {
+            return true;
+        }
+
+        _analysisIncomplete = true;
+        return false;
+    }
+
+    private static bool HasSufficientExecutionStack()
+    {
+        try
+        {
+            System.Runtime.CompilerServices.RuntimeHelpers
+                .EnsureSufficientExecutionStack();
+            return true;
+        }
+        catch (InsufficientExecutionStackException)
+        {
+            return false;
+        }
+    }
+
     private readonly record struct PotentialExceptions(
         ImmutableHashSet<INamedTypeSymbol> Known,
         bool Unknown);
 
     private readonly record struct TraversalContext(
         HashSet<IMethodSymbol> ActiveMethods,
-        int Depth)
+        int Depth,
+        int NestedTryDepth)
     {
         public static TraversalContext Create()
         {
-            return new(new(SymbolEqualityComparer.Default), 0);
+            return new(new(SymbolEqualityComparer.Default), 0, 0);
         }
 
-        public TraversalContext Next => new(ActiveMethods, Depth + 1);
+        public TraversalContext Next =>
+            new(ActiveMethods, Depth + 1, NestedTryDepth);
+
+        public TraversalContext NextNestedTry =>
+            new(ActiveMethods, Depth, NestedTryDepth + 1);
     }
 
     private sealed record SwitchCaseReachability(

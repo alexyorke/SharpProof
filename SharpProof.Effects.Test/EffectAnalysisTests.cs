@@ -7644,15 +7644,27 @@ public sealed class EffectAnalysisTests
         AssertKinds("Synchronize", "managed-allocation", "synchronization-lock");
         AssertKinds("EnterMonitor", "synchronization-call");
         AssertKinds("Conditional");
-        AssertKinds("Multiple");
+        // A direct witness establishes one guaranteed entry effect; later
+        // statements cannot invalidate the first unconditional field write.
+        AssertKinds("Multiple", "direct-field-write");
 
         var frameworkThrow = Witnesses("Throw");
+        var multipleWitness = Witnesses("Multiple").Single();
+        var firstMultipleWrite = Method(compilation, "Multiple")
+            .DeclaringSyntaxReferences.Single()
+            .GetSyntax()
+            .DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax>()
+            .First();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(frameworkThrow[0].ExceptionType?.MetadataName,
                 Is.EqualTo(nameof(InvalidOperationException)));
             Assert.That(Witnesses("VolatileRead")[1].Capabilities,
                 Is.EqualTo(EffectContractCapabilityKind.Synchronization));
+            Assert.That(
+                multipleWitness.Origin.Syntax.Span,
+                Is.EqualTo(firstMultipleWrite.Left.Span));
             Assert.That(Witnesses("Synchronize")[0].Effects,
                 Is.EqualTo(EffectContractKind.Allocates));
             Assert.That(
