@@ -3915,6 +3915,25 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 internal static string ValueOnly() => $"{Fragment}";
                 internal static string FormatDecoy(int value) =>
                     $"{value: is not null}";
+                internal static string OrdinaryFormat(string value, int number) =>
+                    string.Format("Name: {0}, value: {1}", value, number);
+                internal static string OrdinaryJoin(string first, string second) =>
+                    string.Join(", ", first, second);
+                internal static string OrdinaryBuilder(string value) =>
+                    new System.Text.StringBuilder()
+                        .Append("Value: ")
+                        .Append(value)
+                        .ToString();
+                internal static string OrdinaryAppendFormat(string value) =>
+                    new System.Text.StringBuilder()
+                        .AppendFormat("Value: {0}", value)
+                        .ToString();
+                internal static string OrdinaryInsert(string value) =>
+                    new System.Text.StringBuilder("Value: ")
+                        .Insert(0, value)
+                        .ToString();
+                internal static string OrdinaryReplace(string value) =>
+                    "name".Replace("n", value);
             }
             """,
             "SPMETA009")
@@ -4118,6 +4137,71 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     string.Concat("(", name, ") is not null");
             }
             """).SetName("StringConcatExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string first, string second) =>
+                    string.Format("{0} == {1}", first, second);
+            }
+            """).SetName("StringFormatExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string first, string second) =>
+                    string.Format("{0} => {1}", first, second);
+            }
+            """).SetName("StringFormatArrowExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string first, string second) =>
+                    string.Join(" == ", first, second);
+            }
+            """).SetName("StringJoinExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            using System.Text;
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string first, string second) =>
+                    new StringBuilder()
+                        .Append(first)
+                        .Append(" == ")
+                        .Append(second)
+                        .ToString();
+            }
+            """).SetName("StringBuilderAppendChainExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            using System.Text;
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string first, string second) =>
+                    new StringBuilder()
+                        .AppendFormat("{0} == {1}", first, second)
+                        .ToString();
+            }
+            """).SetName("StringBuilderAppendFormatExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            using System.Text;
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string value) =>
+                    new StringBuilder().Insert(0, " == ").Append(value).ToString();
+            }
+            """).SetName("StringBuilderInsertExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string value) =>
+                    "x == y".Replace("x", value);
+            }
+            """).SetName("StringReplaceExpressionTextIsRejected");
         yield return new TestCaseData(
             """
             namespace SharpProof.Frontend;

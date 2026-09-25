@@ -110,12 +110,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 OperationKind.CoalesceAssignment,
                 OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
-            startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterOperationAction(
-                AnalyzeCSharpCompoundAssignment,
+                c => AnalyzeBinaryOperation(c, symbols),
+                OperationKind.BinaryOperator);
+            startContext.RegisterOperationAction(
+                c => AnalyzeCSharpCompoundAssignment(c, symbols),
                 OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(
-                AnalyzeInterpolatedString,
+                c => AnalyzeInterpolatedString(c, symbols),
                 OperationKind.InterpolatedString);
             startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
             startContext.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
@@ -145,9 +147,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         AnalyzeSemanticStringInvocation(context, invocation, symbols);
-        if (IsStringConcat(invocation))
+        if (IsCSharpExpressionTextProducer(invocation, symbols))
         {
-            AnalyzeCSharpExpressionText(context, invocation);
+            AnalyzeCSharpExpressionText(context, invocation, symbols);
         }
         CacheSoundnessRules.AnalyzeWrite(context, invocation);
     }
@@ -275,12 +277,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return expected.Any(type => IsSameType(actual, symbols[type]));
     }
 
-    private static void AnalyzeBinaryOperation(OperationAnalysisContext context)
+    private static void AnalyzeBinaryOperation(
+        OperationAnalysisContext context,
+        KnownSymbols symbols)
     {
         AnalyzeSemanticString(context);
         if (IsStringAddition(context.Operation))
         {
-            AnalyzeCSharpExpressionText(context, context.Operation);
+            AnalyzeCSharpExpressionText(context, context.Operation, symbols);
         }
     }
 
@@ -368,25 +372,28 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     }
 
     private static void AnalyzeCSharpCompoundAssignment(
-        OperationAnalysisContext context)
+        OperationAnalysisContext context,
+        KnownSymbols symbols)
     {
         if (IsStringAddition(context.Operation))
         {
-            AnalyzeCSharpExpressionText(context, context.Operation);
+            AnalyzeCSharpExpressionText(context, context.Operation, symbols);
         }
     }
 
     private static void AnalyzeCSharpExpressionText(
         OperationAnalysisContext context,
-        IOperation operation)
+        IOperation operation,
+        KnownSymbols symbols)
     {
-        if (IsNestedCSharpExpressionConstruction(operation))
+        if (IsNestedCSharpExpressionConstruction(operation, symbols))
         {
             return;
         }
 
         var fragment = GetCSharpExpressionFragment(
             operation,
+            symbols,
             context.CancellationToken);
         if (fragment != null)
         {
@@ -399,7 +406,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     }
 
     private static void AnalyzeInterpolatedString(
-        OperationAnalysisContext context)
+        OperationAnalysisContext context,
+        KnownSymbols symbols)
     {
         var interpolated = (IInterpolatedStringOperation)context.Operation;
         if (!interpolated.Parts.Any(static part =>
@@ -417,6 +425,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
             var fragment = GetCSharpExpressionFragment(
                 text.Text,
+                symbols,
                 context.CancellationToken);
             if (fragment != null)
             {
@@ -432,12 +441,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static string? GetCSharpExpressionFragment(
         IOperation operation,
+        KnownSymbols symbols,
         CancellationToken cancellationToken)
     {
         var shape = new StringBuilder();
         AppendCSharpExpressionShape(
             operation,
             shape,
+            symbols,
             cancellationToken);
         var value = shape.ToString();
         return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
@@ -446,6 +457,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AppendCSharpExpressionShape(
         IOperation operation,
         StringBuilder shape,
+        KnownSymbols symbols,
         CancellationToken cancellationToken)
     {
         var pending = new Stack<IOperation>();
@@ -474,7 +486,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     pending.Push(assignment.Value);
                     break;
                 case IInvocationOperation invocation when
-                    IsStringConcat(invocation):
+                    IsCSharpExpressionTextProducer(invocation, symbols):
                     var arguments = invocation.Arguments.OrderBy(
                             static argument =>
                                 argument.Parameter?.Ordinal ?? int.MaxValue)
@@ -485,10 +497,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     {
                         pending.Push(arguments[index].Value);
                     }
+                    if (invocation.Instance != null)
+                    {
+                        pending.Push(invocation.Instance);
+                    }
                     break;
                 case IParenthesizedOperation or
                     IConversionOperation { OperatorMethod: null }:
-                    pending.Push(OperationUnwrapping.Unwrap(current, cancellationToken)!);
+                    pending.Push(OperationUnwrapping.Unwrap(
+                        current,
+                        cancellationToken)!);
                     break;
                 default:
                     shape.Append('\0');
@@ -498,7 +516,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     }
 
     private static bool IsNestedCSharpExpressionConstruction(
-        IOperation operation)
+        IOperation operation,
+        KnownSymbols symbols)
     {
         var parent = operation.Parent;
         while (parent is IParenthesizedOperation or
@@ -510,7 +529,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
         return IsStringAddition(parent) ||
             parent is IInvocationOperation invocation &&
-            IsStringConcat(invocation);
+            IsCSharpExpressionTextProducer(invocation, symbols);
     }
 
     private static bool IsStringAddition(IOperation? operation)
@@ -535,6 +554,27 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             Name: nameof(string.Concat),
             ContainingType.SpecialType: SpecialType.System_String
         };
+    }
+
+    private static bool IsCSharpExpressionTextProducer(
+        IInvocationOperation invocation,
+        KnownSymbols symbols)
+    {
+        var method = invocation.TargetMethod;
+        if (IsStringConcat(invocation))
+        {
+            return true;
+        }
+
+        if (method.ContainingType.SpecialType == SpecialType.System_String)
+        {
+            return method.Name is nameof(string.Format) or
+                nameof(string.Join) or
+                nameof(string.Replace);
+        }
+
+        return IsSameType(method.ContainingType, symbols.StringBuilder) &&
+            method.Name is ("Append" or "AppendFormat" or "Insert");
     }
 
     private sealed class SemanticLiteralResolver
@@ -1431,6 +1471,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
             types[(int)KnownType.String] = compilation.GetSpecialType(SpecialType.System_String);
             _types = [.. types];
+            StringBuilder = compilation.GetTypeByMetadataName(
+                "System.Text.StringBuilder");
 
             var task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
             TaskOfInt32 = task?.Construct(compilation.GetSpecialType(SpecialType.System_Int32));
@@ -1451,6 +1493,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         internal INamedTypeSymbol? this[KnownType type] => _types[(int)type];
+        internal INamedTypeSymbol? StringBuilder
+        {
+            get;
+        }
         internal INamedTypeSymbol? TaskOfInt32
         {
             get;
