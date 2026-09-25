@@ -457,12 +457,24 @@ internal static class EffectContractDiagnostics
         ]);
     }
 
-    private static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
+    internal static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
     {
         return string.Join(",", types
-            .Select(CompilerExceptionTypeIdentity.Encode)
+            .Select(FormatExceptionType)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
+    }
+
+    private static string FormatExceptionType(INamedTypeSymbol type)
+    {
+        if (type.TypeKind == TypeKind.Error ||
+            string.IsNullOrEmpty(
+                DocumentationCommentId.CreateReferenceId(type)))
+        {
+            return "<error-type>";
+        }
+
+        return CompilerExceptionTypeIdentity.Encode(type);
     }
 
     private static string FormatDiagnosticTypes(

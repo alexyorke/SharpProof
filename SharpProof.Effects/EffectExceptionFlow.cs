@@ -19,6 +19,11 @@ internal static class EffectExceptionFlow
             return EffectThrowSet.Unknown;
         }
 
+        if (HasUnencodableExceptionType(thrown))
+        {
+            return EffectThrowSet.Unknown;
+        }
+
         if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == true)
         {
             return session.ResolveExceptionSet(
@@ -35,6 +40,48 @@ internal static class EffectExceptionFlow
         return exceptions.Union(
             session.ResolveExceptionSet(
                 FrameworkTypeMetadataNames.NullReferenceException));
+    }
+
+    internal static EffectSummary CreateThrowSummary(
+        IThrowOperation thrown,
+        EffectThrowSet exceptions)
+    {
+        return EffectSummaryOperations.Throw(
+            exceptions,
+            !exceptions.IsEmpty && HasUnencodableExceptionType(thrown)
+                ? EffectUncertainty.UnsupportedOperation
+                : EffectUncertainty.None);
+    }
+
+    internal static EffectSummary CreateExceptionConstructionThrowSummary(
+        EffectSummary construction,
+        IThrowOperation thrown,
+        EffectThrowSet exceptions)
+    {
+        return EffectSummaryOperations.ExceptionConstructionThrow(
+            construction,
+            exceptions,
+            !exceptions.IsEmpty && HasUnencodableExceptionType(thrown)
+                ? EffectUncertainty.UnsupportedOperation
+                : EffectUncertainty.None);
+    }
+
+    private static bool HasUnencodableExceptionType(IThrowOperation thrown)
+    {
+        var exception = thrown.Exception;
+        while (exception is IConversionOperation
+            { IsImplicit: true, OperatorMethod: null } conversion)
+        {
+            exception = conversion.Operand;
+        }
+
+        if (exception?.Type is not INamedTypeSymbol named)
+        {
+            return false;
+        }
+
+        return named.TypeKind == TypeKind.Error ||
+            DocumentationCommentId.CreateReferenceId(named) is not { Length: > 0 };
     }
 
     internal static EffectSummary KeepEscaping(

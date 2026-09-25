@@ -47,7 +47,9 @@ internal static class EffectSummaryOperations
         return Create(allocation: allocation);
     }
 
-    internal static EffectSummary Throw(EffectThrowSet exceptions)
+    internal static EffectSummary Throw(
+        EffectThrowSet exceptions,
+        EffectUncertainty uncertainty = EffectUncertainty.None)
     {
         return Create(
             allocation: exceptions.IsEmpty
@@ -55,7 +57,9 @@ internal static class EffectSummaryOperations
                 : EffectAllocationKind.Managed,
             throws: exceptions,
             completeness: exceptions.IncludesUnknown
-            ? EffectCompleteness.Incomplete : EffectCompleteness.Complete);
+                ? EffectCompleteness.Incomplete
+                : EffectCompleteness.Complete,
+            uncertainty: uncertainty);
     }
 
     internal static EffectSummary WithThrows(EffectSummary summary, EffectThrowSet exceptions)
@@ -73,11 +77,12 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary ExceptionConstructionThrow(
         EffectSummary construction,
-        EffectThrowSet exceptions)
+        EffectThrowSet exceptions,
+        EffectUncertainty uncertainty = EffectUncertainty.None)
     {
         var sequence = Domain.Join(
             construction,
-            Throw(exceptions));
+            Throw(exceptions, uncertainty));
         return new EffectSummary(
             sequence.Reads,
             sequence.Writes,

@@ -93,10 +93,12 @@ internal sealed partial class OperationEffectScanner
                         ? ScanUnmodeledExternalExceptionThrow(thrown)
                         : IsExternalExceptionConstructionWithoutSpec(
                             thrown.Exception)
-                            ? EffectSummaryOperations.ExceptionConstructionThrow(
+                            ? EffectExceptionFlow.CreateExceptionConstructionThrowSummary(
                                 EffectSummary.Empty,
+                                thrown,
                                 ResolveThrownException(thrown))
-                        : EffectSummaryOperations.Throw(
+                        : EffectExceptionFlow.CreateThrowSummary(
+                            thrown,
                             ResolveThrownException(thrown)),
                     thrown, _session.Compilation),
                 ISwitchExpressionOperation switchExpression

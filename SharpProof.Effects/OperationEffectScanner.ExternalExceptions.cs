@@ -11,7 +11,8 @@ internal sealed partial class OperationEffectScanner
                 thrown.Exception,
                 out var creation))
         {
-            return EffectSummaryOperations.Throw(
+            return EffectExceptionFlow.CreateThrowSummary(
+                thrown,
                 ResolveThrownException(thrown));
         }
 
@@ -25,8 +26,9 @@ internal sealed partial class OperationEffectScanner
             return result.Summary;
         }
 
-        return EffectSummaryOperations.ExceptionConstructionThrow(
+        return EffectExceptionFlow.CreateExceptionConstructionThrowSummary(
             result.Summary,
+            thrown,
             result.CompletesNormally
                 ? ResolveThrownException(thrown)
                 : EffectThrowSet.Empty);
