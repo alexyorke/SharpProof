@@ -3239,6 +3239,231 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task CheckedSelfMutatingArithmeticUsesPreOperationIntervals()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static int PostfixIncrement() {
+                    int value = 0;
+                    checked { value++; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int PrefixIncrement() {
+                    int value = 0;
+                    checked { ++value; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int Decrement() {
+                    int value = 5;
+                    checked { value--; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int CompoundIncrement() {
+                    int value = 0;
+                    checked { value += 1; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int IncrementNearMaximum() {
+                    int value = int.MaxValue - 1;
+                    checked { value++; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int CompoundNearMaximum() {
+                    int value = int.MaxValue - 1;
+                    checked { value += 1; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int UncheckedIncrement(int value) {
+                    unchecked { value++; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int IncrementAtMaximum() {
+                    int value = int.MaxValue;
+                    checked { value++; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int CompoundAtMaximum() {
+                    int value = int.MaxValue;
+                    checked { value += 1; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int DecrementAtMinimum() {
+                    int value = int.MinValue;
+                    checked { value--; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int CompoundAtMinimum() {
+                    int value = int.MinValue;
+                    checked { value -= 1; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int IncrementUnknown(int value) {
+                    checked { value++; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int CompoundWithMutatingRightSide(int value) {
+                    checked { value += (value = int.MaxValue); }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int CompoundWithCapturedRefTarget(bool branch) {
+                    int safe = 0;
+                    int maximum = int.MaxValue;
+                    checked { (branch ? ref safe : ref maximum) += 1; }
+                    return safe;
+                }
+
+                [DoesNotThrow]
+                public static int BranchingCompound(bool branch) {
+                    int value = 0;
+                    checked {
+                        value += branch ? int.MaxValue : int.MaxValue;
+                        value += 1;
+                    }
+                    return value;
+                }
+            }
+            """,
+            ["SP0046"]);
+        compilation = compilation.WithOptions(
+            compilation.Options.WithOverflowChecks(true));
+        Assert.That(
+            compilation.GetDiagnostics().Where(diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error),
+            Is.Empty);
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(
+                diagnostics,
+                "SP0046",
+                "SP0046",
+                "SP0046",
+                "SP0046",
+                "SP0046",
+                "SP0046",
+                "SP0046",
+                "SP0046");
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Is.EqualTo((string[])[
+                    "Method 'IncrementAtMaximum' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException",
+                    "Method 'CompoundAtMaximum' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException",
+                    "Method 'DecrementAtMinimum' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException",
+                    "Method 'CompoundAtMinimum' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException",
+                    "Method 'IncrementUnknown' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException",
+                    "Method 'CompoundWithMutatingRightSide' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException",
+                    "Method 'CompoundWithCapturedRefTarget' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: " +
+                    "ExceptionSetUnknown: UnsupportedOperation",
+                    "Method 'BranchingCompound' is marked [DoesNotThrow], " +
+                    "but its exception behavior could not be verified: may-effect " +
+                    "summary includes disallowed exceptions: " +
+                    "System.OverflowException"
+                ]));
+            Assert.That(
+                factory.Outcomes["PostfixIncrement"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["PrefixIncrement"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["Decrement"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["CompoundIncrement"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["IncrementNearMaximum"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["CompoundNearMaximum"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["UncheckedIncrement"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["IncrementAtMaximum"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["CompoundAtMaximum"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["DecrementAtMinimum"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["CompoundAtMinimum"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["IncrementUnknown"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["CompoundWithMutatingRightSide"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["CompoundWithCapturedRefTarget"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["BranchingCompound"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task BudgetIncompleteManagedFlowCannotProveSelectedEffectContracts()
     {
         var padding = string.Concat(

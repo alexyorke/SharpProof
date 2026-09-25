@@ -1364,6 +1364,24 @@ internal sealed class ManagedAbstractFlow
 
                     type = binary.Type;
                     break;
+                case ICompoundAssignmentOperation compound when
+                    compound.OperatorMethod == null &&
+                    compound.InConversion.MethodSymbol == null &&
+                    compound.OutConversion.MethodSymbol == null &&
+                    !compound.IsLifted &&
+                    compound.OperatorKind is
+                        BinaryOperatorKind.Add or
+                        BinaryOperatorKind.Subtract or
+                        BinaryOperatorKind.Multiply:
+                    if (!EvaluateCore(compound.Target, state).TryGetInteger(out var target) ||
+                        !EvaluateCore(compound.Value, state).TryGetInteger(out var value) ||
+                        !TryArithmetic(compound.OperatorKind, target, value, out interval))
+                    {
+                        return false;
+                    }
+
+                    type = compound.Type;
+                    break;
                 case IUnaryOperation { OperatorKind: UnaryOperatorKind.Minus } unary:
                     if (!EvaluateCore(unary.Operand, state).TryGetInteger(out var operand) ||
                         !TryNegate(operand, out interval))
@@ -1373,7 +1391,9 @@ internal sealed class ManagedAbstractFlow
 
                     type = unary.Type;
                     break;
-                case IIncrementOrDecrementOperation increment:
+                case IIncrementOrDecrementOperation increment when
+                    increment.OperatorMethod == null &&
+                    !increment.IsLifted:
                     if (!TryIncrement(increment, state, out interval))
                     {
                         return false;
@@ -2180,6 +2200,29 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow, IMethodSymbol?
             return true;
         }
 
+        if (operation is IIncrementOrDecrementOperation increment)
+        {
+            return increment.OperatorMethod == null &&
+                !increment.IsLifted &&
+                !HasMutation(increment.Target) &&
+                TryGetScalarMutationTargetState(
+                    increment.Target, out var incrementState) &&
+                flow.ProvesNoOverflow(increment, incrementState, method);
+        }
+
+        if (operation is ICompoundAssignmentOperation compound)
+        {
+            return compound.OperatorMethod == null &&
+                !compound.IsLifted &&
+                compound.InConversion.MethodSymbol == null &&
+                compound.OutConversion.MethodSymbol == null &&
+                !HasMutation(compound.Target) &&
+                !HasMutation(compound.Value) &&
+                TryGetScalarMutationTargetState(
+                    compound.Target, out var compoundState) &&
+                flow.ProvesNoOverflow(compound, compoundState, method);
+        }
+
         if (HasMutation(operation))
         {
             return false;
@@ -2193,6 +2236,41 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow, IMethodSymbol?
         return operation is IConversionOperation conversionOperation &&
             TryGetState(conversionOperation.Operand, out state) &&
             flow.ProvesNoOverflow(conversionOperation, state, method);
+    }
+
+    private bool TryGetScalarMutationTargetState(
+        IOperation target,
+        out ManagedFlowState state)
+    {
+        state = null!;
+        target = DefiniteOperationFacts.UnwrapHarmlessValue(target);
+        if (target is IFlowCaptureReferenceOperation)
+        {
+            // A CFG capture in the assignment's left-hand side snapshots the
+            // scalar target before the RHS is evaluated. Use that snapshot's
+            // state, but only when the capture resolves to ordinary local or
+            // parameter storage. Ref locals and complex locations remain
+            // unknown because this domain does not model their aliasing.
+            var resolvedTarget = ResolveCoalesceAssignmentTarget(target);
+            return IsTrackableScalarStorage(resolvedTarget) &&
+                TryGetState(target, out state);
+        }
+
+        return IsTrackableScalarStorage(target) &&
+            TryGetState(target, out state);
+    }
+
+    private static bool IsTrackableScalarStorage(IOperation target)
+    {
+        target = DefiniteOperationFacts.UnwrapHarmlessValue(target);
+        return target switch
+        {
+            ILocalReferenceOperation local =>
+                local.Local.RefKind == RefKind.None,
+            IParameterReferenceOperation parameter =>
+                parameter.Parameter.RefKind == RefKind.None,
+            _ => false
+        };
     }
 
     private static bool IsRangePreservingNumericConversion(
