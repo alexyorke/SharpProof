@@ -186,6 +186,86 @@ public sealed class ApiSpecValidationTests
     }
 
     [Test]
+    public void NormalCompletionMustBeBooleanTotalAndIndependentOfResult()
+    {
+        var source = Declaration(
+            "normal-completion-result",
+            IrTypeKind.Boolean,
+            SpecNullness.Unknown,
+            SpecCardinality.NotApplicable,
+            [],
+            parameterTypes: [IrTypeKind.Integer]);
+        var resultReference = new SpecVariableDeclaration(
+            SpecVariableRole.Result,
+            -1,
+            IrTypeKind.Boolean);
+        var invalid = source with
+        {
+            Facets = source.Facets with
+            {
+                Throws = source.Facets.Throws with
+                {
+                    Behavior = SpecThrowBehavior.MayThrow,
+                    ExceptionMetadataNames = ["System.Exception"],
+                    NormalCompletion = resultReference
+                }
+            }
+        };
+
+        Assert.That(
+            () => ApiSpecTable.Create([invalid]),
+            Throws.ArgumentException.With.Message.Contains(
+                "cannot reference the result"));
+
+        var nonBoolean = source with
+        {
+            Facets = source.Facets with
+            {
+                Throws = source.Facets.Throws with
+                {
+                    Behavior = SpecThrowBehavior.MayThrow,
+                    ExceptionMetadataNames = ["System.Exception"],
+                    NormalCompletion = new SpecIntegerDeclaration(1)
+                }
+            }
+        };
+        Assert.That(
+            () => ApiSpecTable.Create([nonBoolean]),
+            Throws.ArgumentException.With.Message.Contains(
+                "must be boolean"));
+
+        var parameter = new SpecVariableDeclaration(
+            SpecVariableRole.Parameter,
+            0,
+            IrTypeKind.Integer);
+        var partial = new SpecBinaryDeclaration(
+            IrBinaryOperator.Equal,
+            new SpecBinaryDeclaration(
+                IrBinaryOperator.Divide,
+                parameter,
+                new SpecIntegerDeclaration(0),
+                IrTypeKind.Integer),
+            new SpecIntegerDeclaration(0),
+            IrTypeKind.Boolean);
+        var nonTotal = source with
+        {
+            Facets = source.Facets with
+            {
+                Throws = source.Facets.Throws with
+                {
+                    Behavior = SpecThrowBehavior.MayThrow,
+                    ExceptionMetadataNames = ["System.Exception"],
+                    NormalCompletion = partial
+                }
+            }
+        };
+        Assert.That(
+            () => ApiSpecTable.Create([nonTotal]),
+            Throws.ArgumentException.With.Message.Contains(
+                "must be total"));
+    }
+
+    [Test]
     public void EveryDefinedEffectFlagIsAcceptedForACompatibleTarget()
     {
         var effects = Enum.GetValues<SpecEffect>()

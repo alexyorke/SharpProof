@@ -18,14 +18,20 @@ public enum SpecInstantiationFailureKind
 
 public sealed partial class SpecInstantiationResult
 {
-    internal static SpecInstantiationResult Succeeded(ImmutableArray<IrTerm> postconditions)
+    internal static SpecInstantiationResult Succeeded(
+        ImmutableArray<IrTerm> postconditions,
+        IrTerm? normalCompletionCondition)
     {
-        return new(SpecInstantiationStatus.Succeeded, postconditions, null);
+        return new(
+            SpecInstantiationStatus.Succeeded,
+            postconditions,
+            normalCompletionCondition,
+            null);
     }
 
     internal static SpecInstantiationResult Failed(SpecInstantiationFailure failure)
     {
-        return new(SpecInstantiationStatus.Failed, [], failure);
+        return new(SpecInstantiationStatus.Failed, [], null, failure);
     }
 }
 
@@ -70,6 +76,18 @@ public static partial class ApiSpecInstantiator
         }
         var instantiation = new Instantiation(factory, substitutions,
             template.VariablesBySlot);
+        IrTerm? normalCompletionCondition = null;
+        if (template.Facets.Throws.NormalCompletion is { } declaredCompletion)
+        {
+            var completion = instantiation.Term(declaredCompletion);
+            if (completion.Failure != null)
+            {
+                return SpecInstantiationResult.Failed(completion.Failure);
+            }
+
+            normalCompletionCondition = completion.Term;
+        }
+
         var postconditions = ImmutableArray.CreateBuilder<IrTerm>(template.Postconditions.Length);
         foreach (var postcondition in template.Postconditions)
         {
@@ -81,7 +99,9 @@ public static partial class ApiSpecInstantiator
 
             postconditions.Add(result.Term!);
         }
-        return SpecInstantiationResult.Succeeded(postconditions.MoveToImmutable());
+        return SpecInstantiationResult.Succeeded(
+            postconditions.MoveToImmutable(),
+            normalCompletionCondition);
     }
 
     private static bool BelongsToFactory(IrFactory factory, IrTerm term)

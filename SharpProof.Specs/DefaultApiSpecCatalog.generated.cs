@@ -86,7 +86,19 @@ public sealed record SpecEvidence(SpecEvidenceKind Kind, string Source);
 public sealed record SpecEffectFacet(SpecEffect Effects, SpecEvidence Evidence);
 public sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEvidence Evidence);
 public sealed record SpecThrowFacet(
-    SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames, SpecEvidence Evidence);
+    SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames,
+    SpecEvidence Evidence)
+{
+    public SpecTermDeclaration? NormalCompletion { get; init; }
+
+    public SpecThrowFacet(
+        SpecThrowBehavior behavior, ImmutableArray<string> exceptionMetadataNames,
+        SpecEvidence evidence, SpecTermDeclaration? normalCompletion)
+        : this(behavior, exceptionMetadataNames, evidence)
+    {
+        NormalCompletion = normalCompletion;
+    }
+}
 public sealed record SpecTerminationFacet(
     SpecTerminationBehavior Behavior, SpecEvidence Evidence);
 public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence);
@@ -201,7 +213,7 @@ public sealed class ApiSpecTemplate
 public sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "5";
+    public const string DefaultTableVersion = "6";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -357,7 +369,7 @@ public sealed partial class ApiSpecTable
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.None, evidenceObserved),
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
-                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.OverflowException"], evidenceDocumented),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.OverflowException"], evidenceDocumented, (new SpecBinaryDeclaration(IrBinaryOperator.NotEqual, new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Integer), new SpecIntegerDeclaration(-2147483648), IrTypeKind.Boolean))),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
                     null),

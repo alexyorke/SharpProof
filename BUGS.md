@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-25. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B5 congruence interval normalization, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B21 Linux process-stat truncation and delimiter validation, B22 run-stable release-workflow artifact naming, B23 SPMETA002 nested mutable static-state coverage, B24 cancellation-safe companion cache, B25 null/blank lowered callable ID rejection, B26 canonical lowered-variable absent-state sentinel, B27 solver-incompleteness classification, B28 vacuity presentation, B29 stable SP0027 source-clause messages, B30 launcher timeout attribution, B31 first-statement effect refutation replay, B32 event-accessor callable-kind alignment, B35 nameof operand traversal, B36 SPMETA009 formatting API coverage, B37 SPMETA004 comparison-boundary coverage, B38 reflective trusted-object construction coverage, B39 SPMETA010 semantic cache-write coverage, B40 changed-line block-comment coverage guard, B43 SPMETA005 descriptor-catalog ownership, B44 recursive SPMETA006 IR string-capable member detection, B45 code-page and invalid-UTF8 source rebinding, B46 local-function call-site precondition coverage, B48 linear call-site precondition prefix completion, B50 nested-try exception-handler stack exhaustion, B51 strict-proof README example, B52 nullable and generic NotNull contracts, B53 nested SP0027 call-site replay, B57 pilot diagnostic occurrence and review-ledger binding, B67 suppression claim omission, B72 top-level source rebinding, B73 return-attribute active-source rebinding, B74 release-resume, B75 AggregateException cancellation forwarding, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B20 SARIF assumption-result kind and level consistency, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, B60 numeric-conversion interval preservation, and the B56 case-sensitive PowerShell path and preprocessor-symbol handling, B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **7 findings**: 0 P0, 0 P1, 0 P2, and 7 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-25. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B5 congruence interval normalization, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B21 Linux process-stat truncation and delimiter validation, B22 run-stable release-workflow artifact naming, B23 SPMETA002 nested mutable static-state coverage, B24 cancellation-safe companion cache, B25 null/blank lowered callable ID rejection, B26 canonical lowered-variable absent-state sentinel, B27 solver-incompleteness classification, B28 vacuity presentation, B29 stable SP0027 source-clause messages, B30 launcher timeout attribution, B31 first-statement effect refutation replay, B32 event-accessor callable-kind alignment, B35 nameof operand traversal, B36 SPMETA009 formatting API coverage, B37 SPMETA004 comparison-boundary coverage, B38 reflective trusted-object construction coverage, B39 SPMETA010 semantic cache-write coverage, B40 changed-line block-comment coverage guard, B43 SPMETA005 descriptor-catalog ownership, B44 recursive SPMETA006 IR string-capable member detection, B45 code-page and invalid-UTF8 source rebinding, B46 local-function call-site precondition coverage, B48 linear call-site precondition prefix completion, B50 nested-try exception-handler stack exhaustion, B51 strict-proof README example, B52 nullable and generic NotNull contracts, B53 nested SP0027 call-site replay, B57 pilot diagnostic occurrence and review-ledger binding, B67 suppression claim omission, B72 top-level source rebinding, B73 return-attribute active-source rebinding, B74 release-resume, B75 AggregateException cancellation forwarding, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B20 SARIF assumption-result kind and level consistency, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, B60 numeric-conversion interval preservation, B62 Math.Abs normal-completion support, and the B56 case-sensitive PowerShell path and preprocessor-symbol handling, B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **6 findings**: 0 P0, 0 P1, 0 P2, and 6 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -217,48 +217,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P3 - Low
-
-### B62. The only BCL postcondition that may throw (`Math.Abs(int)`) can never be used
-
-**Confidence: Confirmed by running the collector and worker; the design intent is confirmed by existing tests.**
-
-- **Location:** the `bcl.math.abs.int32` row in
-  `SharpProof.Specs/DefaultApiSpecCatalog.json` (throws `MayThrow(OverflowException)`,
-  postcondition `Result >= 0`, and no completion condition). It is rendered
-  in `docs/api-spec-catalog.generated.md` and advertised in
-  `docs/coverage-and-limits.md` ("Result is non-negative on normal return").
-  The rejection is pinned by the tests
-  `MayThrowApiSpecWithoutCompletionConditionIsUnsupported`
-  (`SharpProof.Worker.Test/WorkerTests.cs`) and
-  `MayThrowSpecCallWithoutCompletionConditionIsRejected`
-  (`SharpProof.Worker.Test/CompilerCallableLowererTests.cs`).
-- **Defect:** the lowerer refuses any spec call that may throw unless the
-  spec also states *when* the call completes normally, and the catalog
-  schema and this row give no such condition. The only BCL entry with both
-  a documented postcondition and a possible exception is therefore
-  permanently unusable, while the docs present its postcondition as
-  available to the worker.
-- **Observed boundary:** with the collector and in-process worker (runtime
-  references, and again with the `Microsoft.NETCore.App.Ref` 9.0.20
-  reference pack), `return Math.Abs(x);` under `Ensures(Result >= 0)`,
-  `Ensures(Result > 0)` and `Ensures(Result != int.MinValue)` all ended as
-  `Unknown(UnsupportedBody)`. `Math.Max` has no postcondition and was also
-  `UnsupportedBody`, apart from the opt-in `dotnet.scalar` pack that the
-  worker tests use.
-- **Impact:** no user contract can ever be proven through `Math.Abs`, and
-  the documentation misleads readers about what the worker can use. This is
-  a precision and documentation defect, not a soundness defect.
-- **Proposed fix:** add an optional `completion` term to spec rows (for this
-  row, `Parameter[0] != int.MinValue`), validate it in
-  `ApiSpecTermValidator`, and have the lowerer emit it as the call's
-  normal-completion condition, so the postcondition is assumed only on
-  normal return. Until then, mark the row's postcondition as "not usable by
-  the worker" in the generated catalog doc and in
-  `docs/coverage-and-limits.md`.
-- **Proposed regression:** once completion conditions exist, change the two
-  tests above to expect `Proven` for `Ensures(Result >= 0)` and `Refuted`
-  for `Ensures(Result > 0)` (model `x = 0`), plus a check that
-  `Ensures(Result != int.MinValue)` is `Proven`, not vacuously refuted.
 
 ### B63. Defining `SHARPPROOF_CONTRACTS` checks nothing and makes every `Contract.Result`/`Old` postcondition throw
 

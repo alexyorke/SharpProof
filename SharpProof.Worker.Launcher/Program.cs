@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -18,6 +19,27 @@ internal static class Program
     // the build task can preserve the source location and claim-specific code.
     private const string RefutedContractDiagnosticCode =
         VerifierDiagnosticCodes.RefutedContract;
+
+    private static IrValue? ReplayRegisteredSpecCall(
+        CompilerCallablePreparation target,
+        IrCallInstruction call,
+        IrValue? receiver,
+        ImmutableArray<IrValue> arguments)
+    {
+        if (target.Body is not { } body ||
+            !body.SpecCalls.TryGetValue(call.Id, out var prepared))
+        {
+            return null;
+        }
+
+        return ApiSpecReplayCallHost.TryInvoke(
+            target.Factory,
+            prepared.CallIdentity,
+            prepared.WitnessIdentifier,
+            call,
+            receiver,
+            arguments);
+    }
 
     internal static async Task<int> Main(string[] args)
     {
@@ -91,7 +113,8 @@ internal static class Program
                 runtimeSnapshot,
                 workerVersion.ProductVersion);
             responseAuthority = new CompilerResponseEvidenceAuthority(
-                CompilerManifestArtifactJson.DecodeCallables(artifact));
+                CompilerManifestArtifactJson.DecodeCallables(artifact),
+                ReplayRegisteredSpecCall);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {

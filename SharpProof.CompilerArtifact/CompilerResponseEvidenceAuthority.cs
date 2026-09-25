@@ -15,6 +15,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
     IWorkerResponseEvidenceAuthority
 {
     private readonly ImmutableArray<CompilerCallablePreparation> _targets;
+    private readonly Func<CompilerCallablePreparation, IrCallInstruction,
+        IrValue?, ImmutableArray<IrValue>, IrValue?>? _replayCallHost;
 
     private sealed class AssumptionShape
     {
@@ -168,7 +170,9 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     internal CompilerResponseEvidenceAuthority(
-        ImmutableArray<CompilerCallablePreparation> targets)
+        ImmutableArray<CompilerCallablePreparation> targets,
+        Func<CompilerCallablePreparation, IrCallInstruction, IrValue?,
+            ImmutableArray<IrValue>, IrValue?>? replayCallHost = null)
     {
         if (targets.IsDefault || targets.Any(static target => target == null))
         {
@@ -178,6 +182,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         }
 
         _targets = targets;
+        _replayCallHost = replayCallHost;
     }
 
     public IEnumerable<string> Validate(WorkerVerifyResponse response,
@@ -235,7 +240,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
             errors);
     }
 
-    private static void ValidateClaim(
+    private void ValidateClaim(
         CompilerCallablePreparation target,
         TargetClaimIndex claimIndex,
         WorkerClaimResult result,
@@ -501,7 +506,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         }
     }
 
-    private static void ValidatePostconditionClaim(
+    private void ValidatePostconditionClaim(
         CompilerCallablePreparation target,
         TargetClaimIndex claimIndex,
         WorkerClaimResult result,
@@ -718,7 +723,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         return true;
     }
 
-    private static bool TryReplayPostcondition(
+    private bool TryReplayPostcondition(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
         out ImmutableDictionary<IrVarId, IrValue> model,
@@ -770,7 +775,12 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 model,
                 ensures[ordinal].Condition,
                 rejectUnexpectedReturnValue: false,
-                cancellationToken) == CompilerCallableReplayStatus.Refuted;
+                cancellationToken,
+                _replayCallHost == null
+                    ? null
+                    : (call, receiver, arguments) => _replayCallHost(
+                        target, call, receiver, arguments)) ==
+                CompilerCallableReplayStatus.Refuted;
         }
         catch (Exception exception) when (
             exception is ArgumentException or InvalidOperationException or
@@ -797,7 +807,9 @@ internal static class CompilerCallablePostconditionReplay
         ImmutableDictionary<IrVarId, IrValue> model,
         IrTerm postcondition,
         bool rejectUnexpectedReturnValue,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>,
+            IrValue?>? callHost = null)
     {
         if (target.Body is not { } body)
         {
@@ -839,6 +851,7 @@ internal static class CompilerCallablePostconditionReplay
                 program,
                 initial.ToImmutable(),
                 (int)maximumSteps,
+                callHost,
                 cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned)
             {

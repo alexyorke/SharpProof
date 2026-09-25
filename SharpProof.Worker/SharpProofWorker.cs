@@ -195,7 +195,9 @@ public sealed class SharpProofWorker : IDisposable
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
             var manifest = snapshot.CompilerManifest.Manifest;
-            var responseAuthority = new CompilerResponseEvidenceAuthority(targets);
+            var responseAuthority = new CompilerResponseEvidenceAuthority(
+                targets,
+                CallableCounterexampleReplayer.ReplayRegisteredSpecCall);
             WorkerVerifyResponse Assemble(WorkerRunStatus status, WorkerRunFailureReason reason,
                 IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
                 WorkerCacheStatus resultCacheStatus, IEnumerable<WorkerProtocolError>? errors = null)

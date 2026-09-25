@@ -304,17 +304,20 @@
             "parameters": [
               {"type": "SpecInstantiationStatus", "name": "status"},
               {"type": "ImmutableArray<IrTerm>", "name": "postconditions"},
+              {"type": "IrTerm?", "name": "normalCompletionCondition"},
               {"type": "SpecInstantiationFailure?", "name": "failure"}
             ],
             "assignments": [
               {"property": "Status", "parameter": "status"},
               {"property": "Postconditions", "parameter": "postconditions"},
+              {"property": "NormalCompletionCondition", "parameter": "normalCompletionCondition"},
               {"property": "Failure", "parameter": "failure"}
             ]
           },
           "properties": [
             {"accessibility": "public", "type": "SpecInstantiationStatus", "name": "Status"},
             {"accessibility": "public", "type": "ImmutableArray<IrTerm>", "name": "Postconditions"},
+            {"accessibility": "public", "type": "IrTerm?", "name": "NormalCompletionCondition"},
             {"accessibility": "public", "type": "SpecInstantiationFailure?", "name": "Failure"}
           ]
         }

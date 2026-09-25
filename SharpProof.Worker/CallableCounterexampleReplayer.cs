@@ -18,7 +18,9 @@ internal static partial class CallableCounterexampleReplayer
                 model,
                 preparedEnsures[claimOrdinal].Condition,
                 rejectUnexpectedReturnValue: true,
-                cancellationToken) switch
+                cancellationToken,
+                (call, receiver, arguments) => ReplayRegisteredSpecCall(
+                    target, call, receiver, arguments)) switch
             {
                 CompilerCallableReplayStatus.Refuted => WorkerClaimReason.None,
                 CompilerCallableReplayStatus.PostconditionUndefined =>
@@ -33,5 +35,26 @@ internal static partial class CallableCounterexampleReplayer
         {
             return WorkerClaimReason.CounterexampleReplayFailed;
         }
+    }
+
+    internal static IrValue? ReplayRegisteredSpecCall(
+        CompilerCallablePreparation target,
+        IrCallInstruction call,
+        IrValue? receiver,
+        ImmutableArray<IrValue> arguments)
+    {
+        if (target.Body is not { } body ||
+            !body.SpecCalls.TryGetValue(call.Id, out var prepared))
+        {
+            return null;
+        }
+
+        return ApiSpecReplayCallHost.TryInvoke(
+            target.Factory,
+            prepared.CallIdentity,
+            prepared.WitnessIdentifier,
+            call,
+            receiver,
+            arguments);
     }
 }

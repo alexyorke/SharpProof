@@ -35,6 +35,57 @@ public sealed class ApiSpecContentDigestTests
         }
     }
 
+    [Test]
+    public void NormalCompletionConditionIsHashed()
+    {
+        var evidence = new SpecEvidence(
+            SpecEvidenceKind.Documented,
+            "normal-completion-test");
+        var target = new ApiSpecTarget(
+            "normal-completion-test",
+            "M:Missing.NormalCompletion.Run",
+            "Missing.NormalCompletion",
+            SpecTargetMemberKind.Method,
+            "Run",
+            true,
+            0,
+            null,
+            [],
+            IrTypeKind.Integer,
+            [new ApiSpecAssemblyIdentity("Missing", string.Empty)]);
+        ApiSpecTable Create(SpecTermDeclaration completion)
+        {
+            return ApiSpecTable.Create([
+                new ApiSpecDeclaration(
+                    target,
+                    new ApiSpecFacets(
+                        new SpecEffectFacet(SpecEffect.None, evidence),
+                        new SpecAllocationFacet(
+                            SpecAllocationBehavior.None,
+                            evidence),
+                        new SpecThrowFacet(
+                            SpecThrowBehavior.MayThrow,
+                            ["System.Exception"],
+                            evidence,
+                            completion),
+                        new SpecNullnessFacet(
+                            SpecNullness.NotApplicable,
+                            evidence),
+                        new SpecCardinalityFacet(
+                            SpecCardinality.NotApplicable,
+                            null,
+                            evidence)),
+                    [])
+            ]);
+        }
+        var alwaysComplete = Create(new SpecBooleanDeclaration(true));
+        var sometimesComplete = Create(new SpecBooleanDeclaration(false));
+
+        Assert.That(
+            alwaysComplete.ContentSha256,
+            Is.Not.EqualTo(sometimesComplete.ContentSha256));
+    }
+
     private static ApiSpecTable CreateTable(
         ImmutableArray<string> exceptionMetadataNames)
     {

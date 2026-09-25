@@ -14,7 +14,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         ["id", "version", "methods"];
 
     private const string ExpectedContentSha256 =
-        "99589726efc26a52bc1853d50f50ac90701d8327e8985cba5925fd19251a09ca";
+        "d461c0fb34f0dacc84a04ae483a82c0f047a25d62e5096a1f9627cc8700862b6";
 
     [Test]
     public void GeneratedCatalogPreservesEveryReviewedWitness()
@@ -623,6 +623,24 @@ public sealed class DefaultApiSpecCatalogGenerationTests
                 Is.EqualTo(
                     Evidence(throws.GetProperty("evidence"), evidence)),
                 witness);
+            if (throws.TryGetProperty("normalCompletion", out var expectedCompletion))
+            {
+                Assert.That(
+                    actual.Throws.NormalCompletion,
+                    Is.Not.Null,
+                    witness);
+                Assert.That(
+                    Describe(actual.Throws.NormalCompletion!),
+                    Is.EqualTo(Describe(expectedCompletion)),
+                    witness + " normal-completion condition");
+            }
+            else
+            {
+                Assert.That(
+                    actual.Throws.NormalCompletion,
+                    Is.Null,
+                    witness);
+            }
             Assert.That(
                 actual.Nullness.Result,
                 Is.EqualTo(

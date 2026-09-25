@@ -347,7 +347,7 @@ internal sealed class CompilerCallableLowerer
 
         var targetType = _factory.GetVariableInfo(call.Target!.Value).Type;
         if (!_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
-            resolved.Template.Facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow ||
+            !HasSupportedThrowSemantics(resolved.Template.Facets.Throws) ||
             !TryAdmitSpecCallEffects(invocation, call, resolved.Template, out var consumesMemoryHavoc) ||
             !resolved.Template.Result.HasValue ||
             !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
@@ -364,6 +364,13 @@ internal sealed class CompilerCallableLowerer
         prepared = new CompilerPreparedSpecCall(
             call.Id, callIdentity, resolved.Template.Target.WitnessIdentifier, consumesMemoryHavoc);
         return true;
+    }
+
+    internal static bool HasSupportedThrowSemantics(SpecThrowFacet throws)
+    {
+        return throws.Behavior == SpecThrowBehavior.DoesNotThrow ||
+            throws.Behavior == SpecThrowBehavior.MayThrow &&
+            throws.NormalCompletion != null;
     }
 
     private bool TryPrepareSummaryCall(

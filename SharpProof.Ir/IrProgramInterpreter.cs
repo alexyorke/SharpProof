@@ -18,6 +18,17 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000,
         CancellationToken cancellationToken = default)
     {
+        return Execute(
+            program, initialValues, maximumSteps, callHost: null,
+            cancellationToken);
+    }
+
+    internal IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        int maximumSteps,
+        Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(program, nameof(program));
 
@@ -144,15 +155,18 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             ? "Concrete execution requires a memory host for load."
                             : "Concrete execution requires a memory host for store.");
                     case IrCallInstruction call:
-                        var callOperands = EvaluateCallOperands(
-                            call.Receiver, call.Arguments, storedValue: null, values,
-                            "The call receiver is null.", cancellationToken);
-                        if (callOperands != null)
                         {
-                            return FromEvaluation(callOperands, call, values, steps);
-                        }
+                            var callResult = IrProgramCallHostExecution.Execute(
+                                _factory, _terms, call, values, callHost,
+                                cancellationToken);
+                            if (callResult.Status != IrEvaluationStatus.Value)
+                            {
+                                return FromEvaluation(callResult, call, values, steps);
+                            }
 
-                        return Unsupported(call, values, steps, "Concrete execution requires a call host.");
+                            values[call.Target!.Value] = callResult.Value!;
+                            break;
+                        }
                     default:
                         return Unsupported(instruction, values, steps, "Unknown program instruction.");
                 }

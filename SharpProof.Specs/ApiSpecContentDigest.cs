@@ -5,7 +5,7 @@ internal static class ApiSpecContentDigest
     internal static string Compute(ImmutableArray<ApiSpecTemplate> templates)
     {
         using var hash = new CanonicalHashWriter();
-        hash.Add("api-spec-content-v2").Add(templates.Length);
+        hash.Add("api-spec-content-v3").Add(templates.Length);
         foreach (var template in templates)
         {
             var target = template.Target;
@@ -54,6 +54,18 @@ internal static class ApiSpecContentDigest
             foreach (var exception in exceptionMetadataNames)
             {
                 hash.Add(exception);
+            }
+            if (facets.Throws.NormalCompletion == null)
+            {
+                hash.Add("normal-completion").Add((string?)null);
+            }
+            else
+            {
+                hash.Add("normal-completion");
+                Add(
+                    hash,
+                    facets.Throws.NormalCompletion,
+                    template.VariablesBySlot);
             }
 
             hash.Add(facets.Nullness.Result)

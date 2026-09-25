@@ -959,7 +959,19 @@ $source.Add('public sealed record SpecEvidence(SpecEvidenceKind Kind, string Sou
 $source.Add('public sealed record SpecEffectFacet(SpecEffect Effects, SpecEvidence Evidence);')
 $source.Add('public sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEvidence Evidence);')
 $source.Add('public sealed record SpecThrowFacet(')
-$source.Add('    SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames, SpecEvidence Evidence);')
+$source.Add('    SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames,')
+$source.Add('    SpecEvidence Evidence)')
+$source.Add('{')
+$source.Add('    public SpecTermDeclaration? NormalCompletion { get; init; }')
+$source.Add('')
+$source.Add('    public SpecThrowFacet(')
+$source.Add('        SpecThrowBehavior behavior, ImmutableArray<string> exceptionMetadataNames,')
+$source.Add('        SpecEvidence evidence, SpecTermDeclaration? normalCompletion)')
+$source.Add('        : this(behavior, exceptionMetadataNames, evidence)')
+$source.Add('    {')
+$source.Add('        NormalCompletion = normalCompletion;')
+$source.Add('    }')
+$source.Add('}')
 $source.Add('public sealed record SpecTerminationFacet(')
 $source.Add('    SpecTerminationBehavior Behavior, SpecEvidence Evidence);')
 $source.Add('public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence);')
@@ -1183,6 +1195,15 @@ foreach ($declaration in $declarations) {
     $throwEvidence = Get-EvidenceVariable `
         -Reference $facets.throws.evidence `
         -Context "$context.facets.throws.evidence"
+    $normalCompletionTerm = Get-OptionalProperty $facets.throws 'normalCompletion'
+    $normalCompletion = if ($null -eq $normalCompletionTerm) {
+        'null'
+    }
+    else {
+        '(' + (Format-Term `
+            -Term $normalCompletionTerm `
+            -Context "$context.facets.throws.normalCompletion") + ')'
+    }
     $nullness = Format-EnumValue `
         -Value $facets.nullness.result `
         -Type 'SpecNullness' `
@@ -1249,9 +1270,13 @@ foreach ($declaration in $declarations) {
     $source.Add(
         '                    new SpecAllocationFacet(' +
         "$allocation, $allocationEvidence),")
+    $throwFacetArguments = "$throws, $exceptionNames, $throwEvidence"
+    if ($null -ne $normalCompletionTerm) {
+        $throwFacetArguments += ", $normalCompletion"
+    }
     $source.Add(
         '                    new SpecThrowFacet(' +
-        "$throws, $exceptionNames, $throwEvidence),")
+        "$throwFacetArguments),")
     $source.Add(
         '                    new SpecNullnessFacet(' +
         "$nullness, $nullnessEvidence),")
@@ -1557,12 +1582,21 @@ foreach ($declaration in $declarations) {
             (Format-EvidenceDocumentation $terminationFacet.evidence) +
             ']'
     }
+    $normalCompletionTerm = Get-OptionalProperty $facets.throws 'normalCompletion'
+    $normalCompletionText = if ($null -eq $normalCompletionTerm) {
+        ''
+    }
+    else {
+        '; normal completion when ' +
+            (Format-TermDocumentation $normalCompletionTerm)
+    }
     $facetText = (
         "effects=$effectValues [" +
         (Format-EvidenceDocumentation $facets.effects.evidence) +
         "]; allocation=$($facets.allocation.behavior) [" +
         (Format-EvidenceDocumentation $facets.allocation.evidence) +
-        "]; throws=$($facets.throws.behavior)($exceptions) [" +
+        "]; throws=$($facets.throws.behavior)($exceptions)" +
+        $normalCompletionText + ' [' +
         (Format-EvidenceDocumentation $facets.throws.evidence) +
         "]; nullness=$($facets.nullness.result) [" +
         (Format-EvidenceDocumentation $facets.nullness.evidence) +

@@ -6,6 +6,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
 using SharpProof.Ir;
+using SharpProof.Specs;
 using SharpProof.Summaries;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -181,7 +182,65 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public void MayThrowSpecCallWithoutCompletionConditionIsRejected()
+    public void NullableValueGetterRemainsUnsupported()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int NullableValue(int? value) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return value.Value;
+                }
+            }
+            """,
+            "NullableValue");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
+    public void SpecCallThrowSemanticsRequireNormalCompletionForMayThrowRows()
+    {
+        var evidence = new SpecEvidence(
+            SpecEvidenceKind.Documented, "focused-test");
+        var doesNotThrow = new SpecThrowFacet(
+            SpecThrowBehavior.DoesNotThrow, [], evidence);
+        var missingCompletion = new SpecThrowFacet(
+            SpecThrowBehavior.MayThrow,
+            ["System.InvalidOperationException"],
+            evidence);
+        var withCompletion = new SpecThrowFacet(
+            SpecThrowBehavior.MayThrow,
+            ["System.InvalidOperationException"],
+            evidence,
+            new SpecBooleanDeclaration(true));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                CompilerCallableLowerer.HasSupportedThrowSemantics(
+                    doesNotThrow),
+                Is.True);
+            Assert.That(
+                CompilerCallableLowerer.HasSupportedThrowSemantics(
+                    missingCompletion),
+                Is.False);
+            Assert.That(
+                CompilerCallableLowerer.HasSupportedThrowSemantics(
+                    withCompletion),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void MathAbsMayThrowSpecCallHasAValidatedNormalCompletionCondition()
     {
         var preparation = Prepare(
             """
@@ -195,13 +254,13 @@ public sealed class CompilerCallableLowererTests
             """,
             "Absolute");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(preparation.IsSuccess, Is.False);
-            Assert.That(
-                preparation.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-        }
+        Assert.That(
+            preparation.IsSuccess,
+            Is.True,
+            preparation.FailureReason.ToString());
+        Assert.That(
+            preparation.Body!.SpecCalls.Values.Single().WitnessIdentifier,
+            Is.EqualTo("bcl.math.abs.int32"));
     }
 
     [Test]

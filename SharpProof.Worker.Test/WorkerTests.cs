@@ -2634,16 +2634,26 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task MayThrowApiSpecWithoutCompletionConditionIsUnsupported()
+    public async Task MathAbsPostconditionsApplyOnlyToNormalCompletion()
     {
         using var project = TestProject.Create(
             """
             using System;
             using SharpProof.Attributes;
             public static class Subject {
-                public static int Absolute(int value) {
+                public static int NonNegative(int value) {
                     Contract.Ensures(
                         Contract.Result<int>() >= 0);
+                    return Math.Abs(value);
+                }
+                public static int Positive(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() > 0);
+                    return Math.Abs(value);
+                }
+                public static int NotMinimum(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() != int.MinValue);
                     return Math.Abs(value);
                 }
             }
@@ -2654,12 +2664,46 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = AssertClaimVerdict(
-            response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
-        Assert.That(record.ProofCore, Is.Empty);
-        Assert.That(record.Model, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(3));
+        WorkerClaimResult For(string methodName)
+        {
+            var matching = response.ClaimResults.Where(result =>
+                    GetCallableId(response, result).Contains(
+                        "." + methodName + "(",
+                        StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(
+                matching,
+                Has.Length.EqualTo(1),
+                string.Join(", ", response.ClaimResults.Select(result =>
+                    GetCallableId(response, result))));
+            return matching[0];
+        }
+
+        var nonNegative = For("NonNegative");
+        var positive = For("Positive");
+        var notMinimum = For("NotMinimum");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                nonNegative.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven),
+                nonNegative.Reason.ToString());
+            Assert.That(
+                positive.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted),
+                positive.Reason.ToString());
+            Assert.That(
+                notMinimum.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven),
+                notMinimum.Reason.ToString());
+        }
+        if (positive.Outcome == WorkerClaimOutcome.Refuted)
+        {
+            Assert.That(
+                positive.Model.Single(value => value.Variable == "parameter:0").Value,
+                Is.EqualTo("0"));
+        }
     }
 
     [Test]

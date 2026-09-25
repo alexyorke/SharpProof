@@ -126,6 +126,36 @@ public sealed partial class ApiSpecTable
         var facets = NormalizeFacets(
             declaration.Facets,
             declaration.Target);
+        var normalCompletion = facets.Throws.NormalCompletion;
+        if (normalCompletion != null)
+        {
+            if (facets.Throws.Behavior != SpecThrowBehavior.MayThrow)
+            {
+                throw new ArgumentException(
+                    "Normal-completion conditions apply only to MayThrow specifications.",
+                    nameof(declaration));
+            }
+
+            var completion = ApiSpecTermValidator.Validate(
+                normalCompletion,
+                bySlot,
+                facets,
+                allowResult: false);
+            if (completion.Type != IrTypeKind.Boolean)
+            {
+                throw new ArgumentException(
+                    "Normal-completion conditions must be boolean.",
+                    nameof(declaration));
+            }
+
+            if (!completion.IsTotal)
+            {
+                throw new ArgumentException(
+                    "Normal-completion conditions must be total.",
+                    nameof(declaration));
+            }
+        }
+
         var postconditions = declaration.Postconditions.Select(postcondition =>
         {
             if (postcondition == null)

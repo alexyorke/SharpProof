@@ -283,7 +283,38 @@ public sealed class ApiSpecTests
             Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Failed));
             Assert.That(result.Failure!.Kind, Is.EqualTo(SpecInstantiationFailureKind.MissingSubstitution));
             Assert.That(result.Postconditions, Is.Empty);
+            Assert.That(result.NormalCompletionCondition, Is.Null);
         }
+    }
+
+    [Test]
+    public void MathAbsNormalCompletionConditionInstantiatesFromItsArgument()
+    {
+        var template = ApiSpecTable.Default.Templates.Single(
+            static row => row.Target.WitnessIdentifier == "bcl.math.abs.int32");
+        var factory = new IrFactory();
+        var parameter = factory.CreateVariable("input", factory.IntegerType);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters.Single()] = factory.Variable(parameter),
+                [template.Result!.Value] = factory.Variable(result)
+            });
+
+        Assert.That(
+            instantiated.Status,
+            Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        Assert.That(instantiated.NormalCompletionCondition, Is.Not.Null);
+        Assert.That(
+            instantiated.NormalCompletionCondition!.Type,
+            Is.EqualTo(factory.BooleanType));
+        Assert.That(
+            new IrPrinter(factory).Print(
+                instantiated.NormalCompletionCondition),
+            Does.Contain("!= -2147483648"));
     }
 
     [Test]

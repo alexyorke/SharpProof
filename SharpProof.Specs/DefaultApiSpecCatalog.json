@@ -2,7 +2,7 @@
   "schema": "SharpProof.ApiSpecCatalog",
   "schemaVersion": 2,
   "tableIdentity": "SharpProof.ApiSpec.Default",
-  "tableVersion": "5",
+  "tableVersion": "6",
   "assemblySets": [
     {
       "id": "framework",
@@ -530,6 +530,22 @@
           "exceptionMetadataNames": [
             "System.OverflowException"
           ],
+          "normalCompletion": {
+            "kind": "binary",
+            "operator": "NotEqual",
+            "type": "Boolean",
+            "left": {
+              "kind": "variable",
+              "role": "Parameter",
+              "ordinal": 0,
+              "type": "Integer"
+            },
+            "right": {
+              "kind": "integer",
+              "value": -2147483648,
+              "type": "Integer"
+            }
+          },
           "evidence": "documented"
         },
         "nullness": {

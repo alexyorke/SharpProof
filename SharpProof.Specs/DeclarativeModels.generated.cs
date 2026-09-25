@@ -12,15 +12,18 @@ public sealed partial class SpecInstantiationResult
     private SpecInstantiationResult(
         SpecInstantiationStatus status,
         ImmutableArray<IrTerm> postconditions,
+        IrTerm? normalCompletionCondition,
         SpecInstantiationFailure? failure
     )
     {
         Status = status;
         Postconditions = postconditions;
+        NormalCompletionCondition = normalCompletionCondition;
         Failure = failure;
     }
     public SpecInstantiationStatus Status { get; }
     public ImmutableArray<IrTerm> Postconditions { get; }
+    public IrTerm? NormalCompletionCondition { get; }
     public SpecInstantiationFailure? Failure { get; }
 }
 

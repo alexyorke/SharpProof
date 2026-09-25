@@ -12,9 +12,11 @@ internal static class ApiSpecTermValidator
     internal static TermFacts Validate(
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        bool allowResult = true)
     {
-        var facts = new ValidationContext(variables, facets).Validate(declaration, depth: 1);
+        var facts = new ValidationContext(variables, facets, allowResult)
+            .Validate(declaration, depth: 1);
         ValidateExpansion(declaration);
         return facts;
     }
@@ -84,7 +86,8 @@ internal static class ApiSpecTermValidator
 
     private sealed class ValidationContext(
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        bool allowResult)
     {
         private readonly Dictionary<SpecTermDeclaration, TermFacts> _validated =
             new(DeclarationReferenceComparer.Instance);
@@ -131,6 +134,13 @@ internal static class ApiSpecTermValidator
                     {
                         throw new ArgumentException(
                             "The spec variable declaration has the wrong type.",
+                            nameof(declaration));
+                    }
+
+                    if (!allowResult && info.Role == SpecVariableRole.Result)
+                    {
+                        throw new ArgumentException(
+                            "Normal-completion conditions cannot reference the result.",
                             nameof(declaration));
                     }
 

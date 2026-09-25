@@ -136,7 +136,7 @@ facets; an exact fact in one facet does not make an unknown facet exact.
 | `bcl.string.length` - `System.String.Length` getter | Reads receiver state | None | Does not throw | Result equals receiver length |
 | `bcl.string.concat.string-string` - `System.String.Concat(string, string)` | None | May allocate | Does not throw | Non-null string |
 | `bcl.list.add` - `List<T>.Add(T)` | Writes receiver state | May allocate | Unknown | None |
-| `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` | Result is non-negative on normal return |
+| `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` when the argument is `int.MinValue` | On normal return, the result is non-negative; the worker models normal completion only when the argument differs from `int.MinValue` |
 | `bcl.math.max.int32-int32` - `Math.Max(int, int)` | None | None | Does not throw | - |
 | `bcl.math.min.int32-int32` - `Math.Min(int, int)` | None | None | Does not throw | - |
 | `bcl.nullable.has-value` - `Nullable<T>.HasValue` | Reads receiver state | None | Does not throw | - |

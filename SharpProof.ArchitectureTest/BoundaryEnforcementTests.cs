@@ -108,7 +108,11 @@ public sealed class BoundaryEnforcementTests
             "SharpProof.Worker.Launcher"
         ]),
         ("SharpProof.Smt", ["SharpProof.Smt.Test"]),
-        ("SharpProof.Specs", ["SharpProof.CompilerCollector"]),
+        ("SharpProof.Specs", [
+            "SharpProof.CompilerCollector",
+            "SharpProof.Worker",
+            "SharpProof.Worker.Launcher"
+        ]),
         ("SharpProof.Verify", [
             "SharpProof.Fuzz",
             "SharpProof.Smt.Test",

@@ -356,9 +356,20 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             IrTerm guard)
         {
             if (!call.Target.HasValue ||
-                !ApiSpecTable.Default.TryGetByWitnessIdentifier(prepared.WitnessIdentifier, out var template) ||
+                !ApiSpecTable.Default.TryGetByWitnessIdentifier(
+                    prepared.WitnessIdentifier,
+                    out var template))
+            {
+                return null;
+            }
+
+            var throws = template.Facets.Throws;
+            if (
                 template.Target.DocumentationCommentId != prepared.CallIdentity ||
                 !template.Result.HasValue ||
+                throws.Behavior != SpecThrowBehavior.DoesNotThrow &&
+                !(throws.Behavior == SpecThrowBehavior.MayThrow &&
+                  throws.NormalCompletion != null) ||
                 prepared.ConsumesMemoryHavoc != (template.Facets.Effects.Effects != SpecEffect.None))
             {
                 return null;
@@ -415,9 +426,29 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             }
 
             var instantiated = ApiSpecInstantiator.InstantiatePostconditions(template, inputs.Factory, substitutions);
-            if (instantiated.Status != SpecInstantiationStatus.Succeeded)
+            if (instantiated.Status != SpecInstantiationStatus.Succeeded ||
+                (template.Facets.Throws.NormalCompletion == null) !=
+                (instantiated.NormalCompletionCondition == null))
             {
                 return null;
+            }
+
+            var normalCompletionGuard = guard;
+            if (instantiated.NormalCompletionCondition is { } normalCompletion)
+            {
+                if (!Supported(normalCompletion) || !Spend())
+                {
+                    return null;
+                }
+
+                normalCompletionGuard = inputs.Factory.Binary(
+                    IrBinaryOperator.AndAlso,
+                    guard,
+                    normalCompletion);
+                if (!Supported(normalCompletionGuard))
+                {
+                    return null;
+                }
             }
 
             var projectionMap = !hasProjection
@@ -440,8 +471,14 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             }
 
             _assumptions.AddRange(predicates.Select(predicate => new GuardedBodySpecAssumption(
-                template.Id, template.Target.WitnessIdentifier, guard, predicate)));
-            return new SpecApplication(result, guard, prepared.ConsumesMemoryHavoc);
+                template.Id,
+                template.Target.WitnessIdentifier,
+                normalCompletionGuard,
+                predicate)));
+            return new SpecApplication(
+                result,
+                normalCompletionGuard,
+                prepared.ConsumesMemoryHavoc);
         }
 
         private SpecApplication? ApplySummary(

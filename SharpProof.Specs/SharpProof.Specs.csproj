@@ -9,5 +9,7 @@
   <ItemGroup>
     <Compile Remove="Polyfills\NotNullAttribute.cs" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
   </ItemGroup>
 </Project>
