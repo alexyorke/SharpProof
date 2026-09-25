@@ -166,6 +166,7 @@ $architectureFixtures = @(
     'FuzzRunnerEvidenceProcessSafetyTests',
     'GeneratedCodeAnalysisConfigurationTests',
     'GeneratedFileHelperTests',
+    'LoopScriptCaseSensitivityTests',
     'NativeTestBootstrapTests',
     'OpenCodePluginDependencyTests',
     'PackageDependencyAuthorityTests',

@@ -223,8 +223,22 @@ function New-SharpProofCSharpParseOptions {
         $PreprocessorSymbols |
             ForEach-Object { [string]$_ } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Sort-Object -Unique)
-    return [Microsoft.CodeAnalysis.CSharp.CSharpParseOptions]::Default.
-        WithLanguageVersion($version).
-        WithPreprocessorSymbols($symbols)
+            Sort-Object -Unique -CaseSensitive)
+    $parseOptions =
+        [Microsoft.CodeAnalysis.CSharp.CSharpParseOptions]::Default.
+            WithLanguageVersion($version)
+    $withSymbols = [Microsoft.CodeAnalysis.CSharp.CSharpParseOptions].
+        GetMethods() |
+        Where-Object {
+            $_.Name -eq 'WithPreprocessorSymbols' -and
+            $_.GetParameters().Count -eq 1 -and
+            $_.GetParameters()[0].ParameterType -eq [string[]]
+        } |
+        Select-Object -First 1
+    if ($null -eq $withSymbols) {
+        throw 'Roslyn did not expose the string-array preprocessor-symbol overload.'
+    }
+    $arguments = [object[]]::new(1)
+    $arguments[0] = [string[]]$symbols
+    return $withSymbols.Invoke($parseOptions, $arguments)
 }

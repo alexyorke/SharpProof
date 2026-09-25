@@ -178,7 +178,7 @@ try {
     $untrackedPaths = @(Get-GitUntrackedPaths)
     $packagePaths = @(Get-GitUntrackedPaths -IgnoredPackages)
     $sourcePaths = @($untrackedPaths + $packagePaths)
-    $sourcePaths = @($sourcePaths | Sort-Object -Unique)
+    $sourcePaths = @($sourcePaths | Sort-Object -Unique -CaseSensitive)
     $manifest = [IO.File]::Open(
         $sourceManifest,
         [IO.FileMode]::CreateNew,
@@ -233,11 +233,13 @@ try {
     $verificationPaths = @(
         Get-GitUntrackedPaths
         Get-GitUntrackedPaths -IgnoredPackages)
-    $verificationUntracked = @($verificationPaths | Sort-Object -Unique)
+    $verificationUntracked = @(
+        $verificationPaths | Sort-Object -Unique -CaseSensitive)
     if ($verificationHead -cne $head -or
         @(Compare-Object `
             -ReferenceObject $sourcePaths `
             -DifferenceObject $verificationUntracked `
+            -CaseSensitive `
             -SyncWindow 0).Count -ne 0 -or
         -not (Test-ExactFileBytes `
             -LeftPath $sourcePatch `
