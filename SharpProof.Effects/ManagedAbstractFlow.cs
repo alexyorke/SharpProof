@@ -1836,6 +1836,10 @@ internal sealed class ManagedAbstractFlow
 
     private sealed class FlowDomain : CanonicalAbstractDomain<ManagedFlowState>
     {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "SharpProof.Soundness",
+            "SPMETA002",
+            Justification = "ManagedFlowState.FlowDomain has no mutable instance state.")]
         internal static FlowDomain Instance { get; } = new();
         public override ManagedFlowState Bottom => ManagedFlowState.Bottom;
         public override ManagedFlowState Top => ManagedFlowState.Top;

@@ -2,7 +2,7 @@ namespace SharpProof.Effects;
 
 internal static class EffectSummaryOperations
 {
-    private static readonly EffectSummaryDomain Domain = EffectSummaryDomain.Instance;
+    private static EffectSummaryDomain Domain => EffectSummaryDomain.Instance;
 
     internal static EffectSummary Join(params EffectSummary[] summaries)
     {

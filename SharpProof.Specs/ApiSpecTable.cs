@@ -8,6 +8,10 @@ public sealed partial class ApiSpecTable
             .Aggregate(
                 SpecEffect.None,
                 static (all, value) => all | value);
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA002",
+        Justification = "Every reference uses Interlocked.Increment(ref s_nextScope).")]
     private static long s_nextScope;
     private readonly ImmutableDictionary<string, ApiSpecTemplate> _byWitness;
     private readonly long _scope;

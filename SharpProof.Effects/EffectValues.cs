@@ -68,7 +68,7 @@ internal sealed class EffectDirectWitness(
 
 internal static class EffectDirectEventKinds
 {
-    internal static readonly (EffectDirectEventKind Event, string WireName)[] WireNames =
+    internal static readonly ImmutableArray<(EffectDirectEventKind Event, string WireName)> WireNames =
         EffectContractMappingCatalog.DirectEvents;
     private static readonly ImmutableDictionary<string, EffectDirectEventKind>
         EventsByWireName = WireNames.ToImmutableDictionary(
@@ -117,6 +117,10 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
     }
 
     public static EffectThrowSet Empty => default;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA002",
+        Justification = "Unknown throw-set singleton stores no mutable membership cache.")]
     public static EffectThrowSet Unknown { get; } = new([], true);
 
     public ImmutableArray<INamedTypeSymbol> Types => _types.IsDefault ? [] : _types;

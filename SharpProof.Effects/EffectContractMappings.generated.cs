@@ -192,7 +192,7 @@ public readonly record struct EffectProjection(
 
 internal static class EffectContractMappingCatalog
 {
-    internal static readonly (EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis, EffectContractKind Effect)[] Capabilities = [
+    internal static readonly ImmutableArray<(EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis, EffectContractKind Effect)> Capabilities = [
         (EffectContractCapabilityKind.IO, EffectCapabilityKind.IO, EffectContractKind.None),
         (EffectContractCapabilityKind.FileRead, EffectCapabilityKind.FileRead, EffectContractKind.None),
         (EffectContractCapabilityKind.FileWrite, EffectCapabilityKind.FileWrite, EffectContractKind.None),
@@ -208,7 +208,7 @@ internal static class EffectContractMappingCatalog
         (EffectContractCapabilityKind.NativeInterop, EffectCapabilityKind.NativeInterop, EffectContractKind.UsesNativeCode),
     ];
 
-    internal static readonly (EffectRegionKind Region, EffectContractKind Read, EffectContractKind Write, EffectRegionId? AnalysisRegion, bool ExpandParameters)[] RegionContracts = [
+    internal static readonly ImmutableArray<(EffectRegionKind Region, EffectContractKind Read, EffectContractKind Write, EffectRegionId? AnalysisRegion, bool ExpandParameters)> RegionContracts = [
         (EffectRegionKind.Receiver, EffectContractKind.ReadsReceiverState, EffectContractKind.WritesReceiverState, EffectRegionId.Receiver, false),
         (EffectRegionKind.Parameter, EffectContractKind.ReadsArgumentState, EffectContractKind.WritesArgumentState, null, true),
         (EffectRegionKind.Captured, EffectContractKind.ReadsCapturedState, EffectContractKind.WritesCapturedState, EffectRegionId.Captured(0), false),
@@ -218,7 +218,7 @@ internal static class EffectContractMappingCatalog
         (EffectRegionKind.Unknown, EffectContractKind.None, EffectContractKind.None, null, false),
     ];
 
-    internal static readonly (EffectDirectEventKind Event, string WireName)[] DirectEvents = [
+    internal static readonly ImmutableArray<(EffectDirectEventKind Event, string WireName)> DirectEvents = [
         (EffectDirectEventKind.ManagedObjectAllocation, "managed-allocation"),
         (EffectDirectEventKind.ManagedArrayAllocation, "managed-array-allocation"),
         (EffectDirectEventKind.ExplicitThrow, "explicit-throw"),
@@ -229,7 +229,7 @@ internal static class EffectContractMappingCatalog
         (EffectDirectEventKind.VolatileFieldAccess, "volatile-field-access"),
     ];
 
-    internal static readonly (string Marker, ApiSpecReferenceFamily Family)[] ReferenceFamilyMarkers = [
+    internal static readonly ImmutableArray<(string Marker, ApiSpecReferenceFamily Family)> ReferenceFamilyMarkers = [
         ("/MICROSOFT.NETCORE.APP.REF/", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
         ("/PACKS/NETSTANDARD.LIBRARY.REF/", ApiSpecReferenceFamily.NetStandardReferencePack),
         ("/PACKAGES/NETSTANDARD.LIBRARY/", ApiSpecReferenceFamily.NetStandardReferencePack),
@@ -245,17 +245,17 @@ internal static class EffectContractMappingCatalog
 }
 
 internal readonly struct EffectEvidenceRule(
-    Type type, long mask, bool flags, long[] values)
+    Type type, long mask, bool flags, ImmutableArray<long> values)
 {
     internal Type Type { get; } = type;
     internal long Mask { get; } = mask;
     internal bool Flags { get; } = flags;
-    internal long[] Values { get; } = values;
+    internal ImmutableArray<long> Values { get; } = values;
 }
 
 internal static class EffectEvidenceCatalog
 {
-    internal static readonly EffectEvidenceRule[] Rules = [
+    internal static readonly ImmutableArray<EffectEvidenceRule> Rules = [
         new(typeof(EffectContractKind), (long)EffectContractMetadata.AllEffects, true, []),
         new(typeof(EffectContractCapabilityKind), (long)EffectContractMetadata.AllCapabilities, true, []),
         new(typeof(EffectAllocationKind), 0, false, [(long)EffectAllocationKind.None, (long)EffectAllocationKind.Managed, (long)EffectAllocationKind.Native, (long)EffectAllocationKind.ManagedAndNative, (long)EffectAllocationKind.Unknown]),

@@ -750,7 +750,17 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase("SharpProof.Meta.Analyzers.Rules")]
     [TestCase("SharpProof.ContractForGenerator")]
     [TestCase("SharpProof.ContractForGenerator.Generation")]
-    public async Task RejectsMutableStaticStateInEveryRoslynProductionNamespace(
+    [TestCase("SharpProof.Effects")]
+    [TestCase("SharpProof.Contracts")]
+    [TestCase("SharpProof.Dataflow")]
+    [TestCase("SharpProof.Ir")]
+    [TestCase("SharpProof.Specs")]
+    [TestCase("SharpProof.Smt")]
+    [TestCase("SharpProof.Summaries")]
+    [TestCase("SharpProof.CompilerArtifact")]
+    [TestCase("SharpProof.CompilerCollector")]
+    [TestCase("SharpProof.Worker")]
+    public async Task RejectsMutableStaticStateInEveryCriticalProductionNamespace(
         string namespaceName)
     {
         var source =
@@ -769,16 +779,24 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
-    public async Task RejectsReadonlyReferencesToMutableStaticStorage()
+    public async Task RejectsMutableReferencesNestedInsideValueAndImmutableTypes()
     {
         const string source =
             """
-            using System.Collections.Concurrent;
+            using System;
+            using System.Collections.Frozen;
             using System.Collections.Generic;
+            using System.Collections.Immutable;
             namespace SharpProof.Analyzer;
-            sealed class C {
-                internal static readonly Dictionary<string, int> Table = new();
-                internal static ConcurrentDictionary<string, int> Cache { get; } = new();
+            struct UserValueType { internal int[] Values; }
+            static class C {
+                internal static readonly UserValueType UserValue = default;
+                internal static readonly ArraySegment<int> MetadataValue = default;
+                internal static readonly ImmutableArray<int[]> ImmutableArray = default;
+                internal static readonly ImmutableDictionary<string, List<int>> ImmutableDictionary = default;
+                internal static readonly FrozenDictionary<string, int[]> FrozenDictionary = null!;
+                internal static readonly KeyValuePair<string, List<int>> Pair = default;
+                internal static readonly (List<int> Items, int Count) Tuple = default;
             }
             """;
 
@@ -786,7 +804,224 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
-            Is.EqualTo(2));
+            Is.EqualTo(7));
+    }
+
+    [Test]
+    public async Task AllowsThreadStaticAndImmutableStorageControls()
+    {
+        const string source =
+            """
+            using System;
+            using System.Collections.Frozen;
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            using System.Runtime.CompilerServices;
+            using System.Text;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Analyzer;
+            static class C {
+                [ThreadStatic]
+                internal static List<int> ThreadLocal = new();
+                internal static readonly ImmutableArray<int> ImmutableArray = default;
+                internal static readonly ImmutableDictionary<string, int> ImmutableDictionary = default;
+                internal static readonly FrozenDictionary<string, int> FrozenDictionary = null!;
+                internal static readonly (int Count, string Name) Tuple = default;
+                internal static readonly Guid MetadataImmutableStruct = default;
+                internal static readonly Type RuntimeType = typeof(string);
+                internal static readonly UTF8Encoding MetadataImmutableEncoder = new(false, true);
+                internal static readonly ConditionalWeakTable<Compilation, List<int>> Cache = new();
+                internal static readonly ConditionalWeakTable<IMethodSymbol, List<int>> SymbolCache = new();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task AllowsScopeCounterUsedOnlyByInterlockedIncrement()
+    {
+        const string source =
+            """
+            using System.Threading;
+            namespace SharpProof.Ir;
+            static class IrFactory {
+                [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                    "SharpProof.Soundness",
+                    "SPMETA002",
+                    Justification = "Every reference uses Interlocked.Increment(ref s_nextScope).")]
+                private static long s_nextScope;
+                internal static long NextScope() => Interlocked.Increment(ref s_nextScope);
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsScopeCounterWithNonAtomicReference()
+    {
+        const string source =
+            """
+            using System.Threading;
+            namespace SharpProof.Ir;
+            static class IrFactory {
+                private static long s_nextScope;
+                internal static long NextScope() => Interlocked.Increment(ref s_nextScope);
+                internal static long UnsafeNextScope() => ++s_nextScope;
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA002"]));
+    }
+
+    [Test]
+    public async Task RejectsUnannotatedInterlockedScopeCounter()
+    {
+        const string source =
+            """
+            using System.Threading;
+            namespace SharpProof.Ir;
+            static class IrFactory {
+                private static long s_nextScope;
+                internal static long NextScope() => Interlocked.Increment(ref s_nextScope);
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA002"]));
+    }
+
+    [Test]
+    public async Task AllowsAnnotatedApiSpecTableScopeCounter()
+    {
+        const string source =
+            """
+            using System.Threading;
+            namespace SharpProof.Specs;
+            static class ApiSpecTable {
+                [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                    "SharpProof.Soundness",
+                    "SPMETA002",
+                    Justification = "Every reference uses Interlocked.Increment(ref s_nextScope).")]
+                private static long s_nextScope;
+                internal static long NextScope() => Interlocked.Increment(ref s_nextScope);
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task AllowsOnlyDocumentedImmutableEffectSingletonSuppressions()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Effects;
+            readonly struct EffectThrowSet {
+                private readonly HashSet<int>? _membership;
+                [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                    "SharpProof.Soundness",
+                    "SPMETA002",
+                    Justification = "Unknown throw-set singleton stores no mutable membership cache.")]
+                internal static EffectThrowSet Unknown { get; } = default;
+                internal bool Contains(int value) => _membership?.Contains(value) == true;
+            }
+            sealed class EffectSummary {
+                internal EffectThrowSet Throws { get; }
+                [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                    "SharpProof.Soundness",
+                    "SPMETA002",
+                    Justification = "Immutable EffectSummary value singleton with get-only state.")]
+                internal static EffectSummary Empty { get; } = new();
+                private EffectSummary() => Throws = EffectThrowSet.Unknown;
+            }
+            sealed class EffectAnalysisSession {
+                private sealed class MetadataImportAssemblyResult(IAssemblySymbol? assembly) {
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness",
+                        "SPMETA002",
+                        Justification = "Missing metadata-import sentinel has a null assembly and no mutable state.")]
+                    internal static MetadataImportAssemblyResult Missing { get; } = new(null);
+                    internal IAssemblySymbol? Assembly { get; } = assembly;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsUndocumentedEffectSingletonStorage()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Effects;
+            readonly struct EffectThrowSet {
+                private readonly HashSet<int>? _membership;
+                internal static EffectThrowSet Unknown { get; } = default;
+                internal bool Contains(int value) => _membership?.Contains(value) == true;
+            }
+            sealed class EffectSummary {
+                internal EffectThrowSet Throws { get; }
+                internal static EffectSummary Empty { get; } = new();
+                private EffectSummary() => Throws = EffectThrowSet.Unknown;
+            }
+            sealed class EffectAnalysisSession {
+                private sealed class MetadataImportAssemblyResult(IAssemblySymbol? assembly) {
+                    internal static MetadataImportAssemblyResult Missing { get; } = new(null);
+                    internal IAssemblySymbol? Assembly { get; } = assembly;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
+    public async Task RejectsReadonlyReferencesToMutableStaticStorage()
+    {
+        const string source =
+            """
+            using System.Collections.Concurrent;
+            using System.Collections.Generic;
+            using System.Runtime.CompilerServices;
+            namespace SharpProof.Analyzer;
+            sealed class C {
+                internal static readonly Dictionary<string, int> Table = new();
+                internal static ConcurrentDictionary<string, int> Cache { get; } = new();
+                internal static readonly ConditionalWeakTable<object, List<int>> UnscopedCache = new();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(3));
     }
 
     [Test]
@@ -3510,7 +3745,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     internal void Raise() => InstanceChanged?.Invoke();
                 }
             }
-            namespace SharpProof.Effects {
+            namespace SharpProof.BuildTasks {
                 sealed class Noncritical {
                     internal static int State { get; set; }
                     internal static event Action? Changed;

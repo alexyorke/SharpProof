@@ -92,7 +92,7 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
 }
 public sealed class ApiSpecResolver(ApiSpecTable table)
 {
-    private static readonly (string Marker, ApiSpecReferenceFamily Family)[] ReferenceFamilyMarkers =
+    private static readonly ImmutableArray<(string Marker, ApiSpecReferenceFamily Family)> ReferenceFamilyMarkers =
         EffectContractMappingCatalog.ReferenceFamilyMarkers;
     private static readonly ConditionalWeakTable<Compilation, ResolvedApiSpecTable>
         DefaultCache = new();

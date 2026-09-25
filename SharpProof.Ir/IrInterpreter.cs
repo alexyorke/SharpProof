@@ -129,8 +129,6 @@ public sealed class IrInterpreter(IrFactory factory)
     /// </summary>
     private const int MaximumEvaluationDepth = 256;
 
-    private static readonly IReadOnlyDictionary<IrVarId, IrValue> EmptyEnvironment =
-        ImmutableDictionary<IrVarId, IrValue>.Empty;
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
 
@@ -142,7 +140,9 @@ public sealed class IrInterpreter(IrFactory factory)
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
-        return EvaluateCore(term, new(variables ?? EmptyEnvironment, cancellationToken));
+        return EvaluateCore(
+            term,
+            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, cancellationToken));
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)

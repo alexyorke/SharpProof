@@ -685,7 +685,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if ((!field.IsReadOnly || IsMutableStorageType(
                 field.Type,
                 context.CancellationToken)) &&
-            IsForbiddenMutableStaticStorage(field))
+            IsForbiddenMutableStaticStorage(
+                field))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
         }
@@ -714,7 +715,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if ((property.SetMethod != null || IsMutableStorageType(
                 property.Type,
                 context.CancellationToken)) &&
-            IsForbiddenMutableStaticStorage(property) &&
+            IsForbiddenMutableStaticStorage(
+                property) &&
             isAutoProperty)
         {
             Report(
@@ -732,7 +734,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             return;
         }
-        if (IsForbiddenMutableStaticStorage(@event) &&
+        if (IsForbiddenMutableStaticStorage(
+                @event) &&
             IsFieldLikeEvent(@event, context.CancellationToken))
         {
             Report(
@@ -743,10 +746,28 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static bool IsForbiddenMutableStaticStorage(ISymbol symbol)
+    private static bool IsForbiddenMutableStaticStorage(
+        ISymbol symbol)
     {
-        return symbol.IsStatic &&
-            IsCriticalStateNamespace(symbol.ContainingNamespace);
+        if (!symbol.IsStatic ||
+            !IsCriticalStateNamespace(symbol.ContainingNamespace))
+        {
+            return false;
+        }
+
+        if (symbol is IFieldSymbol field &&
+            (field.GetAttributes().Any(static attribute =>
+                 attribute.AttributeClass is { } attributeClass &&
+                 IsExactNamedType(
+                     attributeClass.OriginalDefinition,
+                     "ThreadStaticAttribute",
+                     "System")) ||
+             IsApprovedInterlockedScopeCounter(field)))
+        {
+            return false;
+        }
+
+        return !IsApprovedImmutableStaticSingleton(symbol);
     }
 
     private static bool IsMutableStorageType(
@@ -775,18 +796,38 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return !typeParameter.HasValueTypeConstraint;
         }
 
-        if (type.IsValueType ||
-            type.SpecialType != SpecialType.None ||
+        if (type.SpecialType != SpecialType.None ||
             type is not INamedTypeSymbol named ||
             named.TypeKind == TypeKind.Delegate)
         {
             return false;
         }
-        var initialTypeIsImmutable = IsKnownImmutableStorageType(named);
-        var initialTypeIsWeakCache = IsCompilationScopedWeakCache(named);
-        if (initialTypeIsImmutable || initialTypeIsWeakCache)
+
+        if (IsScopedWeakCache(named))
         {
             return false;
+        }
+
+        var initialTypeIsImmutable = IsKnownImmutableStorageType(named);
+        if (initialTypeIsImmutable || IsKnownGenericValueContainer(named))
+        {
+            return HasMutableTypeArgument(
+                named,
+                visiting,
+                cancellationToken);
+        }
+
+        if (named.TypeKind == TypeKind.Enum)
+        {
+            return false;
+        }
+
+        if (named.IsValueType)
+        {
+            return IsMutableValueType(
+                named,
+                visiting,
+                cancellationToken);
         }
 
         var definition = named.OriginalDefinition;
@@ -806,7 +847,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!isInitialType &&
                     (IsKnownImmutableStorageType(current) ||
-                     IsCompilationScopedWeakCache(current)))
+                     IsScopedWeakCache(current)))
                 {
                     continue;
                 }
@@ -896,6 +937,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         return IsExactNamedType(type, "Version", "System") ||
+            IsExactNamedType(type, "Type", "System") ||
+            IsExactNamedType(type, "UTF8Encoding", "System", "Text") ||
             IsExactNamedType(
                 type,
                 "DiagnosticDescriptor",
@@ -903,7 +946,85 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "CodeAnalysis");
     }
 
-    private static bool IsCompilationScopedWeakCache(INamedTypeSymbol type)
+    private static bool IsMutableValueType(
+        INamedTypeSymbol type,
+        HashSet<ITypeSymbol> visiting,
+        CancellationToken cancellationToken)
+    {
+        var definition = type.OriginalDefinition;
+        if (!visiting.Add(definition))
+        {
+            return false;
+        }
+
+        try
+        {
+            foreach (var field in type.GetMembers().OfType<IFieldSymbol>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!field.IsStatic &&
+                    !field.IsConst &&
+                    IsMutableStorageType(
+                        field.Type,
+                        visiting,
+                        cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            visiting.Remove(definition);
+        }
+    }
+
+    private static bool HasMutableTypeArgument(
+        INamedTypeSymbol type,
+        HashSet<ITypeSymbol> visiting,
+        CancellationToken cancellationToken)
+    {
+        foreach (var typeArgument in type.TypeArguments)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsMutableStorageType(
+                    typeArgument,
+                    visiting,
+                    cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsKnownGenericValueContainer(INamedTypeSymbol type)
+    {
+        if (type.OriginalDefinition.DeclaringSyntaxReferences.Length != 0)
+        {
+            return false;
+        }
+
+        return IsExactNamedType(
+                type.OriginalDefinition,
+                "KeyValuePair",
+                "System",
+                "Collections",
+                "Generic") ||
+            IsExactNamedType(
+                type.OriginalDefinition,
+                "Nullable",
+                "System") ||
+            IsExactNamedType(
+                type.OriginalDefinition,
+                "ValueTuple",
+                "System");
+    }
+
+    private static bool IsScopedWeakCache(INamedTypeSymbol type)
     {
         if (type.OriginalDefinition.DeclaringSyntaxReferences.Length != 0 ||
             !IsExactNamedType(
@@ -917,7 +1038,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        for (var current = type.TypeArguments[0] as INamedTypeSymbol;
+        var keyType = type.TypeArguments[0];
+        for (var current = keyType as INamedTypeSymbol;
              current != null;
              current = current.BaseType)
         {
@@ -931,12 +1053,134 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        return type.TypeArguments[0] is INamedTypeSymbol key &&
-            IsExactNamedType(
-                key,
-                "IAssemblySymbol",
+        if (keyType is INamedTypeSymbol namedKey &&
+            IsRoslynSymbolType(namedKey))
+        {
+            return true;
+        }
+
+        return keyType is ITypeParameterSymbol typeParameter &&
+            typeParameter.ConstraintTypes
+                .OfType<INamedTypeSymbol>()
+                .Any(IsRoslynSymbolType);
+    }
+
+    private static bool IsRoslynSymbolType(INamedTypeSymbol type)
+    {
+        return IsExactNamedType(
+                type.OriginalDefinition,
+                "ISymbol",
                 "Microsoft",
-                "CodeAnalysis");
+                "CodeAnalysis") ||
+            type.AllInterfaces.Any(static @interface => IsExactNamedType(
+                @interface.OriginalDefinition,
+                "ISymbol",
+                "Microsoft",
+                "CodeAnalysis"));
+    }
+
+    private static bool IsApprovedInterlockedScopeCounter(IFieldSymbol field)
+    {
+        if (field.Name != "s_nextScope" ||
+            field.DeclaredAccessibility != Accessibility.Private ||
+            !field.IsStatic ||
+            field.IsReadOnly ||
+            field.IsConst ||
+            field.Type.SpecialType != SpecialType.System_Int64 ||
+            !IsApprovedScopeCounterOwner(field.ContainingType))
+        {
+            return false;
+        }
+
+        return HasSoundnessSuppression(
+            field,
+            "Every reference uses Interlocked.Increment(ref s_nextScope).");
+    }
+
+    private static bool IsApprovedImmutableStaticSingleton(ISymbol symbol)
+    {
+        var justification = symbol switch
+        {
+            IPropertySymbol property when
+                property.Name is ("Bottom" or "Empty" or "Top") &&
+                IsExactNamedType(
+                    property.ContainingType,
+                    "EffectSummary",
+                    "SharpProof",
+                    "Effects") =>
+                "Immutable EffectSummary value singleton with get-only state.",
+            IPropertySymbol property when
+                property.Name == "Unknown" &&
+                IsExactNamedType(
+                    property.ContainingType,
+                    "EffectThrowSet",
+                    "SharpProof",
+                    "Effects") =>
+                "Unknown throw-set singleton stores no mutable membership cache.",
+            IPropertySymbol property when
+                property.Name == "Instance" &&
+                IsExactNamedType(
+                    property.ContainingType,
+                    "EffectSummaryDomain",
+                    "SharpProof",
+                    "Effects") =>
+                "EffectSummaryDomain has no mutable instance state.",
+            IPropertySymbol property when
+                property.Name == "Instance" &&
+                property.ContainingType.Name == "FlowDomain" &&
+                property.ContainingType.ContainingType?.Name == "ManagedFlowState" &&
+                IsExactNamespace(
+                    property.ContainingNamespace,
+                    "SharpProof",
+                    "Effects") =>
+                "ManagedFlowState.FlowDomain has no mutable instance state.",
+            IPropertySymbol property when
+                property.Name == "Missing" &&
+                property.ContainingType.Name == "MetadataImportAssemblyResult" &&
+                property.ContainingType.ContainingType?.Name == "EffectAnalysisSession" &&
+                IsExactNamespace(
+                    property.ContainingNamespace,
+                    "SharpProof",
+                    "Effects") =>
+                "Missing metadata-import sentinel has a null assembly and no mutable state.",
+            _ => null
+        };
+
+        return justification != null &&
+            HasSoundnessSuppression(symbol, justification);
+    }
+
+    private static bool HasSoundnessSuppression(
+        ISymbol symbol,
+        string justification)
+    {
+        return symbol.GetAttributes().Any(attribute =>
+            attribute.AttributeClass is { } attributeClass &&
+            IsExactNamedType(
+                attributeClass.OriginalDefinition,
+                "SuppressMessageAttribute",
+                "System",
+                "Diagnostics",
+                "CodeAnalysis") &&
+            attribute.ConstructorArguments.Length == 2 &&
+            attribute.ConstructorArguments[0].Value as string == "SharpProof.Soundness" &&
+            attribute.ConstructorArguments[1].Value as string == "SPMETA002" &&
+            attribute.NamedArguments.Any(argument =>
+                argument.Key == "Justification" &&
+                argument.Value.Value as string == justification));
+    }
+
+    private static bool IsApprovedScopeCounterOwner(INamedTypeSymbol? containingType)
+    {
+        if (containingType == null)
+        {
+            return false;
+        }
+
+        return (IsExactNamespace(containingType.ContainingNamespace, "SharpProof", "Ir") &&
+                containingType.Name is ("IrFactory" or "IrProgramBuilder")) ||
+            (IsExactNamespace(containingType.ContainingNamespace, "SharpProof", "Specs") &&
+             containingType.Name == "ApiSpecTable");
     }
 
     private static bool IsExactNamedType(
@@ -976,10 +1220,20 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static bool IsCriticalStateNamespace(INamespaceSymbol? value)
     {
         return IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
-        IsNamespaceOrNested(value, "SharpProof", "Frontend") ||
-        IsNamespaceOrNested(value, "SharpProof", "Verify") ||
-        IsNamespaceOrNested(value, "SharpProof", "Meta", "Analyzers") ||
-        IsNamespaceOrNested(value, "SharpProof", "ContractForGenerator");
+            IsNamespaceOrNested(value, "SharpProof", "Frontend") ||
+            IsNamespaceOrNested(value, "SharpProof", "Verify") ||
+            IsNamespaceOrNested(value, "SharpProof", "Meta", "Analyzers") ||
+            IsNamespaceOrNested(value, "SharpProof", "ContractForGenerator") ||
+            IsNamespaceOrNested(value, "SharpProof", "Effects") ||
+            IsNamespaceOrNested(value, "SharpProof", "Contracts") ||
+            IsNamespaceOrNested(value, "SharpProof", "Dataflow") ||
+            IsNamespaceOrNested(value, "SharpProof", "Ir") ||
+            IsNamespaceOrNested(value, "SharpProof", "Specs") ||
+            IsNamespaceOrNested(value, "SharpProof", "Smt") ||
+            IsNamespaceOrNested(value, "SharpProof", "Summaries") ||
+            IsNamespaceOrNested(value, "SharpProof", "CompilerArtifact") ||
+            IsNamespaceOrNested(value, "SharpProof", "CompilerCollector") ||
+            IsNamespaceOrNested(value, "SharpProof", "Worker");
     }
 
     private static bool IsNamespaceOrNested(INamespaceSymbol? value, params string[] expectedPrefix)

@@ -2,6 +2,10 @@ namespace SharpProof.Ir;
 
 public sealed class IrFactory
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA002",
+        Justification = "Every reference uses Interlocked.Increment(ref s_nextScope).")]
     private static long s_nextScope;
     private readonly object _gate = new();
     private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = [];

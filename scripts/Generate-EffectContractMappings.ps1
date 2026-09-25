@@ -100,7 +100,7 @@ foreach ($record in @($catalog.records)) {
 }
 $lines.Add('internal static class EffectContractMappingCatalog')
 $lines.Add('{')
-$lines.Add('    internal static readonly (EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis, EffectContractKind Effect)[] Capabilities = [')
+$lines.Add('    internal static readonly ImmutableArray<(EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis, EffectContractKind Effect)> Capabilities = [')
 foreach ($entry in @($catalog.capabilities)) {
     foreach ($name in @('contract', 'analysis', 'effect')) {
         Assert-Identifier ([string]$entry.PSObject.Properties[$name].Value) "Capability $name"
@@ -111,7 +111,7 @@ foreach ($entry in @($catalog.capabilities)) {
 }
 $lines.Add('    ];')
 $lines.Add('')
-$lines.Add('    internal static readonly (EffectRegionKind Region, EffectContractKind Read, EffectContractKind Write, EffectRegionId? AnalysisRegion, bool ExpandParameters)[] RegionContracts = [')
+$lines.Add('    internal static readonly ImmutableArray<(EffectRegionKind Region, EffectContractKind Read, EffectContractKind Write, EffectRegionId? AnalysisRegion, bool ExpandParameters)> RegionContracts = [')
 foreach ($entry in @($catalog.regions)) {
     foreach ($name in @('region', 'read', 'write')) {
         Assert-Identifier ([string]$entry.PSObject.Properties[$name].Value) "Region $name"
@@ -136,7 +136,7 @@ foreach ($entry in @($catalog.regions)) {
 }
 $lines.Add('    ];')
 $lines.Add('')
-$lines.Add('    internal static readonly (EffectDirectEventKind Event, string WireName)[] DirectEvents = [')
+$lines.Add('    internal static readonly ImmutableArray<(EffectDirectEventKind Event, string WireName)> DirectEvents = [')
 foreach ($entry in @($catalog.directEvents)) {
     Assert-Identifier ([string]$entry.event) 'Direct event'
     $lines.Add(
@@ -145,7 +145,7 @@ foreach ($entry in @($catalog.directEvents)) {
 }
 $lines.Add('    ];')
 $lines.Add('')
-$lines.Add('    internal static readonly (string Marker, ApiSpecReferenceFamily Family)[] ReferenceFamilyMarkers = [')
+$lines.Add('    internal static readonly ImmutableArray<(string Marker, ApiSpecReferenceFamily Family)> ReferenceFamilyMarkers = [')
 foreach ($entry in @($catalog.referenceFamilyMarkers)) {
     Assert-Identifier ([string]$entry.family) 'Reference family'
     $lines.Add(
@@ -157,17 +157,17 @@ $lines.Add('')
 $lines.Add('}')
 $lines.Add('')
 $lines.Add('internal readonly struct EffectEvidenceRule(')
-$lines.Add('    Type type, long mask, bool flags, long[] values)')
+$lines.Add('    Type type, long mask, bool flags, ImmutableArray<long> values)')
 $lines.Add('{')
 $lines.Add('    internal Type Type { get; } = type;')
 $lines.Add('    internal long Mask { get; } = mask;')
 $lines.Add('    internal bool Flags { get; } = flags;')
-$lines.Add('    internal long[] Values { get; } = values;')
+$lines.Add('    internal ImmutableArray<long> Values { get; } = values;')
 $lines.Add('}')
 $lines.Add('')
 $lines.Add('internal static class EffectEvidenceCatalog')
 $lines.Add('{')
-$lines.Add('    internal static readonly EffectEvidenceRule[] Rules = [')
+$lines.Add('    internal static readonly ImmutableArray<EffectEvidenceRule> Rules = [')
 foreach ($entry in @($catalog.evidenceRules)) {
     $type = [string]$entry.type
     Assert-Identifier $type 'Evidence rule type'

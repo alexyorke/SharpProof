@@ -4,13 +4,13 @@ namespace SharpProof.Effects;
 
 internal static class EffectContractMappings
 {
-    private static readonly (EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis,
-        EffectContractKind Effect)[] Capabilities =
+    private static readonly ImmutableArray<(EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis,
+        EffectContractKind Effect)> Capabilities =
         EffectContractMappingCatalog.Capabilities;
 
-    internal static readonly (EffectRegionKind Region, EffectContractKind Read,
+    internal static readonly ImmutableArray<(EffectRegionKind Region, EffectContractKind Read,
         EffectContractKind Write, EffectRegionId? AnalysisRegion,
-        bool ExpandParameters)[] RegionContracts =
+        bool ExpandParameters)> RegionContracts =
         EffectContractMappingCatalog.RegionContracts;
 
     internal static EffectCapabilityKind ToAnalysisCapabilities(EffectContractCapabilityKind source)

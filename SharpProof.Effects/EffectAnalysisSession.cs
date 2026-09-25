@@ -349,6 +349,10 @@ public sealed class EffectAnalysisSession
 
     private sealed class MetadataImportAssemblyResult(IAssemblySymbol? assembly)
     {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "SharpProof.Soundness",
+            "SPMETA002",
+            Justification = "Missing metadata-import sentinel has a null assembly and no mutable state.")]
         internal static MetadataImportAssemblyResult Missing { get; } =
             new(null);
 
