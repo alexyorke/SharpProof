@@ -1582,12 +1582,23 @@ internal sealed partial class OperationEffectScanner
     private static SyntaxNode? GetDirectSyntax(SyntaxNode declaration)
     {
         var body = ExecutableBodySyntax.Get(declaration);
-        return body is BlockSyntax block ? SingleStatement(block) : body;
+        if (body is not BlockSyntax block)
+        {
+            return body;
+        }
+
+        var firstStatement = FirstStatement(block);
+        return firstStatement is ReturnStatementSyntax
+        {
+            Expression: { } expression
+        }
+            ? expression
+            : firstStatement;
     }
 
-    private static StatementSyntax? SingleStatement(BlockSyntax? body)
+    private static StatementSyntax? FirstStatement(BlockSyntax? body)
     {
-        return body is { Statements.Count: 1 } ? body.Statements[0] : null;
+        return body is { Statements.Count: > 0 } ? body.Statements[0] : null;
     }
 
     private static string Symbol(ISymbol? symbol)

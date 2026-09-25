@@ -913,6 +913,175 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task FirstStatementDirectEventsAreReplayedWithTrailingStatements()
+    {
+        async Task<WorkerVerifyResponse> AnalyzeMember(string member)
+        {
+            var source = $$"""
+                using System;
+                using SharpProof.Attributes;
+                public static class Subject {
+                    {{member}}
+                }
+                """;
+            using var project = TestProject.Create(source);
+            var sourceErrors = project.CreateCompilation().GetDiagnostics()
+                .Where(diagnostic =>
+                    diagnostic.Severity == DiagnosticSeverity.Error)
+                .Select(static diagnostic => diagnostic.ToString())
+                .ToArray();
+            Assert.That(
+                sourceErrors,
+                Is.Empty,
+                string.Join(Environment.NewLine, sourceErrors));
+            using var worker = new SharpProofWorker(new CountingBackend(
+                BackendCheckResult.Unsatisfiable([])));
+            return await worker.VerifyAsync(
+                project.CreateRequest(cacheEnabled: false));
+        }
+
+        WorkerClaimResult ClaimFor(
+            WorkerVerifyResponse response,
+            string methodName)
+        {
+            var claim = response.Manifest.Claims.Single(candidate =>
+                candidate.CallableId.Contains(
+                    "." + methodName,
+                    StringComparison.Ordinal));
+            return response.ClaimResults.Single(result =>
+                result.ClaimId == claim.ClaimId);
+        }
+
+        void AssertOutcome(
+            WorkerVerifyResponse response,
+            string methodName,
+            WorkerClaimOutcome expected)
+        {
+            var responseJson = WorkerProtocolJson.SerializeResponse(response);
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True,
+                responseJson);
+            Assert.That(
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Complete),
+                responseJson);
+            Assert.That(
+                ClaimFor(response, methodName).Outcome,
+                Is.EqualTo(expected),
+                responseJson);
+        }
+
+        var lockObject = await AnalyzeMember(
+            """
+            [AllowedCapabilities(SharpProofCapability.None)]
+            public static void LockObjectThenReturn() {
+                lock (new object()) { }
+                return;
+            }
+            """);
+        var lockType = await AnalyzeMember(
+            """
+            [AllowedCapabilities(SharpProofCapability.None)]
+            public static void LockTypeThenContinue() {
+                lock (typeof(Subject)) { }
+                int marker = 0;
+                marker++;
+            }
+            """);
+        var allocateObject = await AnalyzeMember(
+            """
+            [ZeroAllocations]
+            public static void AllocateObjectThenReturn() {
+                new object();
+                return;
+            }
+            """);
+        var lockArray = await AnalyzeMember(
+            """
+            [ZeroAllocations]
+            public static void LockArrayThenReturn() {
+                lock (new object[1]) { }
+                return;
+            }
+            """);
+        var returnArray = await AnalyzeMember(
+            """
+            [ZeroAllocations]
+            public static object[] ReturnArrayThenUnreachableStatement() {
+                return new object[1];
+                int marker = 0;
+            }
+            """);
+        var throwResponse = await AnalyzeMember(
+            """
+            [DoesNotThrow]
+            public static void ThrowThenContinue() {
+                throw new InvalidOperationException();
+                int marker = 0;
+            }
+            """);
+        var conditional = await AnalyzeMember(
+            """
+            [AllowedCapabilities(SharpProofCapability.None)]
+            public static void ConditionalLock(bool condition) {
+                if (condition) {
+                    lock (new object()) { }
+                }
+                return;
+            }
+            """);
+        var laterAllocation = await AnalyzeMember(
+            """
+            [ZeroAllocations]
+            public static void AllocationAfterFirstStatement() {
+                int marker = 0;
+                new object();
+            }
+            """);
+        var expressionBody = await AnalyzeMember(
+            """
+            [ZeroAllocations]
+            public static object AllocateExpressionBody() => new object();
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertOutcome(lockObject, "LockObjectThenReturn", WorkerClaimOutcome.Refuted);
+            AssertOutcome(lockType, "LockTypeThenContinue", WorkerClaimOutcome.Refuted);
+            AssertOutcome(allocateObject, "AllocateObjectThenReturn", WorkerClaimOutcome.Refuted);
+            AssertOutcome(lockArray, "LockArrayThenReturn", WorkerClaimOutcome.Refuted);
+            AssertOutcome(returnArray, "ReturnArrayThenUnreachableStatement", WorkerClaimOutcome.Refuted);
+            AssertOutcome(throwResponse, "ThrowThenContinue", WorkerClaimOutcome.Refuted);
+            AssertOutcome(expressionBody, "AllocateExpressionBody", WorkerClaimOutcome.Refuted);
+            Assert.That(
+                ClaimFor(lockObject, "LockObjectThenReturn").EffectWitness?.Kind,
+                Is.EqualTo("synchronization-lock"));
+            Assert.That(
+                ClaimFor(lockType, "LockTypeThenContinue").EffectWitness?.Kind,
+                Is.EqualTo("synchronization-lock"));
+            Assert.That(
+                ClaimFor(allocateObject, "AllocateObjectThenReturn").EffectWitness?.Kind,
+                Is.EqualTo("managed-allocation"));
+            Assert.That(
+                ClaimFor(lockArray, "LockArrayThenReturn").EffectWitness?.Kind,
+                Is.EqualTo("managed-array-allocation"));
+            Assert.That(
+                ClaimFor(returnArray, "ReturnArrayThenUnreachableStatement").EffectWitness?.Kind,
+                Is.EqualTo("managed-array-allocation"));
+            Assert.That(
+                ClaimFor(throwResponse, "ThrowThenContinue").EffectWitness?.Kind,
+                Is.EqualTo("explicit-throw"));
+            Assert.That(
+                ClaimFor(conditional, "ConditionalLock").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                ClaimFor(laterAllocation, "AllocationAfterFirstStatement").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task TrustedCompleteExternEffectContractIsProven()
     {
         using var project = TestProject.Create(
