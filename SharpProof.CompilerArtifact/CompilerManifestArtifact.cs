@@ -667,7 +667,9 @@ internal static class CompilerManifestArtifactJson
             StringComparer.Ordinal);
         foreach (var lowered in loweredCallables)
         {
-            if (lowered == null || loweredById.ContainsKey(lowered.CallableId))
+            if (lowered == null ||
+                string.IsNullOrWhiteSpace(lowered.CallableId) ||
+                loweredById.ContainsKey(lowered.CallableId))
             {
                 return false;
             }

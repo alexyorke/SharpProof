@@ -460,6 +460,10 @@ public sealed class ContractBinder
     {
         internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
         internal ContractBindingFailure Failure { get; } = failure;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "SharpProof.Soundness",
+            "SPMETA002",
+            Justification = "Empty binding result is an immutable value sentinel.")]
         internal static ClauseBindingResult Empty { get; } = new([], ContractBindingFailure.None);
         internal static ClauseBindingResult Fail(ContractBindingFailure failure)
         {

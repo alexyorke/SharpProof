@@ -6,6 +6,7 @@
 // </auto-generated>
 #nullable enable
 
+using System.Collections.Immutable;
 using SharpProof.Ir;
 
 namespace SharpProof.CompilerArtifact;
@@ -163,15 +164,15 @@ internal sealed class EncodedPortableIrGraph(
 
 internal static class PortableIrWireCatalog
 {
-    internal static readonly IrOpaquePurity[] OpaquePurities = [
+    internal static readonly ImmutableArray<IrOpaquePurity> OpaquePurities = [
         IrOpaquePurity.Pure,
         IrOpaquePurity.Impure
     ];
-    internal static readonly IrUnaryOperator[] UnaryOperators = [
+    internal static readonly ImmutableArray<IrUnaryOperator> UnaryOperators = [
         IrUnaryOperator.Not,
         IrUnaryOperator.Negate
     ];
-    internal static readonly IrBinaryOperator[] BinaryOperators = [
+    internal static readonly ImmutableArray<IrBinaryOperator> BinaryOperators = [
         IrBinaryOperator.Add,
         IrBinaryOperator.Subtract,
         IrBinaryOperator.Multiply,
@@ -187,7 +188,7 @@ internal static class PortableIrWireCatalog
         IrBinaryOperator.GreaterThanOrEqual,
         IrBinaryOperator.StringConcat
     ];
-    internal static readonly IrHavocKind[] HavocKinds = [
+    internal static readonly ImmutableArray<IrHavocKind> HavocKinds = [
         IrHavocKind.Variables,
         IrHavocKind.Memory,
         IrHavocKind.VariablesAndMemory
@@ -196,15 +197,15 @@ internal static class PortableIrWireCatalog
 
 internal readonly struct PortableIrSlotMapping(
     string kind,
-    string[] slots)
+    ImmutableArray<string> slots)
 {
     internal string Kind { get; } = kind;
-    internal string[] Slots { get; } = slots;
+    internal ImmutableArray<string> Slots { get; } = slots;
 }
 internal static class PortableIrSlotCatalog
 {
 
-    internal static readonly PortableIrSlotMapping[] Terms = [
+    internal static readonly ImmutableArray<PortableIrSlotMapping> Terms = [
     new("Boolean", ["booleanValue", "unused", "unused", "unused", "unused", "unused", "empty"]),
     new("Integer", ["unused", "unused", "unused", "unused", "integerValue", "unused", "empty"]),
     new("String", ["unused", "unused", "unused", "unused", "unused", "stringValue", "empty"]),
@@ -219,12 +220,12 @@ internal static class PortableIrSlotCatalog
     new("SequenceAccess", ["termIndex", "termIndex", "unused", "unused", "unused", "unused", "empty"]),
     ];
 
-    internal static readonly PortableIrSlotMapping[] Locations = [
+    internal static readonly ImmutableArray<PortableIrSlotMapping> Locations = [
     new("Member", ["memberIndex", "optionalTermIndex", "unused", "unused", "termIndices"]),
     new("Sequence", ["termIndex", "termIndex", "unused", "unused", "empty"]),
     ];
 
-    internal static readonly PortableIrSlotMapping[] Instructions = [
+    internal static readonly ImmutableArray<PortableIrSlotMapping> Instructions = [
     new("Assign", ["variableIndex", "termIndex", "unused", "unused", "empty", "unused"]),
     new("Load", ["variableIndex", "unused", "unused", "unused", "empty", "location"]),
     new("Store", ["termIndex", "unused", "unused", "unused", "empty", "location"]),

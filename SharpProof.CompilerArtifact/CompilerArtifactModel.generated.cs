@@ -497,7 +497,7 @@ internal static class CompilerEffectEvidenceCatalog
     internal const int MaximumReplayEvents = 256;
     internal const CompilerEffectReplayPathKind ReplayPathKind =
         CompilerEffectReplayPathKind.Unconditional;
-    internal static readonly WorkerClaimReason[] UnknownReasons = [
+    internal static readonly ImmutableArray<WorkerClaimReason> UnknownReasons = [
         WorkerClaimReason.UnsupportedContract,
         WorkerClaimReason.CounterexampleNotReplayable,
         WorkerClaimReason.EffectSummaryIncomplete,
@@ -505,8 +505,8 @@ internal static class CompilerEffectEvidenceCatalog
         WorkerClaimReason.ResourceLimit,
         WorkerClaimReason.UnsupportedBody,
     ];
-    internal static readonly (WorkerClaimOutcome Outcome, WorkerClaimReason Reason,
-        WorkerEffectEvidenceCertainty Certainty)[] SupportedEffectTuples = [
+    internal static readonly ImmutableArray<(WorkerClaimOutcome Outcome, WorkerClaimReason Reason,
+        WorkerEffectEvidenceCertainty Certainty)> SupportedEffectTuples = [
         (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
         (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
         (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry),
@@ -538,7 +538,7 @@ internal static class CompilerEffectEvidenceCatalog
             certainty == WorkerEffectEvidenceCertainty.Unavailable &&
             UnknownReasons.Contains(reason);
     }
-    internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [
+    internal static readonly ImmutableArray<CompilerEffectConstraintRule> ConstraintRules = [
         new(WorkerEffectContractKind.EnforcePure, true, true, true),
         new(WorkerEffectContractKind.ZeroAllocations, true, true, true),
         new(WorkerEffectContractKind.AllowedCapabilities, true, false, true),
@@ -546,7 +546,7 @@ internal static class CompilerEffectEvidenceCatalog
         new(WorkerEffectContractKind.AllowedExceptions, true, true, false),
         new(WorkerEffectContractKind.EffectContract, false, false, false),
     ];
-    internal static readonly CompilerEffectReplayEventKind[] SupportedReplayEventKinds = [
+    internal static readonly ImmutableArray<CompilerEffectReplayEventKind> SupportedReplayEventKinds = [
         CompilerEffectReplayEventKind.ManagedObjectAllocation,
         CompilerEffectReplayEventKind.ManagedArrayAllocation,
         CompilerEffectReplayEventKind.ExplicitThrow,
@@ -559,12 +559,12 @@ internal static class CompilerCallableArtifactReasonCatalog
 {
     internal const WorkerClaimReason SuccessReason = WorkerClaimReason.None;
     internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.UnsupportedCallable;
-    internal static readonly WorkerClaimReason[] FailureReasons = [
+    internal static readonly ImmutableArray<WorkerClaimReason> FailureReasons = [
         WorkerClaimReason.UnsupportedCallable,
         WorkerClaimReason.UnsupportedContract,
         WorkerClaimReason.UnsupportedBody,
         WorkerClaimReason.UnsupportedExpression,
     ];
     internal static bool IsFailureReason(WorkerClaimReason reason) =>
-        Array.IndexOf(FailureReasons, reason) >= 0;
+        FailureReasons.Contains(reason);
 }

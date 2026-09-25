@@ -527,6 +527,10 @@ internal static class EffectContractDiagnostics
 
 internal sealed partial record EffectClaimConstraint
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA002",
+        Justification = "Empty effect-claim constraint is an immutable value sentinel.")]
     internal static EffectClaimConstraint Empty
     {
         get;

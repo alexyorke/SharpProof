@@ -1002,18 +1002,83 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
-    public async Task RejectsReadonlyReferencesToMutableStaticStorage()
+    public async Task AllowsOnlyDocumentedCompilerArtifactAndContractSentinels()
     {
         const string source =
             """
-            using System.Collections.Concurrent;
             using System.Collections.Generic;
             using System.Runtime.CompilerServices;
-            namespace SharpProof.Analyzer;
-            sealed class C {
-                internal static readonly Dictionary<string, int> Table = new();
-                internal static ConcurrentDictionary<string, int> Cache { get; } = new();
-                internal static readonly ConditionalWeakTable<object, List<int>> UnscopedCache = new();
+            namespace SharpProof.Worker.Protocol {
+                public sealed class WorkerSourceLocation { }
+            }
+            namespace SharpProof.CompilerArtifact {
+                static class CompilerDiagnosticArtifactOrdering {
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "Comparer is a stateless immutable ordering singleton.")]
+                    private static readonly IComparer<int> Comparer = System.Collections.Generic.Comparer<int>.Default;
+                }
+                static class CompilerSourceLocationAuthority {
+                    private sealed class TreeBinding(int ordinal) {
+                        internal int Ordinal { get; } = ordinal;
+                    }
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "Weakly associates each source-location object with its immutable owning-tree ordinal.")]
+                    private static readonly ConditionalWeakTable<SharpProof.Worker.Protocol.WorkerSourceLocation, TreeBinding> TreeBindings = new();
+                }
+            }
+            namespace SharpProof.Contracts {
+                sealed class ExpressionBindingResult {
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "Unsupported binding result is an immutable failure sentinel.")]
+                    internal static ExpressionBindingResult Unsupported { get; } = new();
+                }
+                sealed class ContractBinder {
+                    private sealed class ClauseBindingResult {
+                        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                            "SharpProof.Soundness", "SPMETA002",
+                            Justification = "Empty binding result is an immutable value sentinel.")]
+                        internal static ClauseBindingResult Empty { get; } = new();
+                    }
+                }
+                static class ContractForSymbolMatcher {
+                    internal sealed class CompanionResolution {
+                        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                            "SharpProof.Soundness", "SPMETA002",
+                            Justification = "None companion resolution is an immutable value sentinel.")]
+                        internal static CompanionResolution None { get; } = new();
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsUnannotatedAndMismatchedCompilerTreeWeakCaches()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            using System.Runtime.CompilerServices;
+            namespace SharpProof.Worker.Protocol {
+                public sealed class WorkerSourceLocation { }
+            }
+            namespace SharpProof.CompilerArtifact {
+                static class CompilerSourceLocationAuthority {
+                    private sealed class TreeBinding(int ordinal) {
+                        internal int Ordinal { get; } = ordinal;
+                    }
+                    private static readonly ConditionalWeakTable<SharpProof.Worker.Protocol.WorkerSourceLocation, TreeBinding> TreeBindings = new();
+                }
+                static class OtherOwner {
+                    internal static readonly ConditionalWeakTable<object, List<int>> Unapproved = new();
+                }
             }
             """;
 
@@ -1021,7 +1086,177 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
-            Is.EqualTo(3));
+            Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task RejectsReadonlyReferencesToMutableStaticStorage()
+    {
+        const string source =
+            """
+            using System.Collections.Concurrent;
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            using System.Runtime.CompilerServices;
+            namespace SharpProof.Analyzer;
+            sealed class C {
+                internal static readonly Dictionary<string, int> Table = new();
+                internal static ConcurrentDictionary<string, int> Cache { get; } = new();
+                internal static readonly ConditionalWeakTable<object, List<int>> UnscopedCache = new();
+                internal static readonly object ObjectHolder = new List<int>();
+                internal static readonly ImmutableDictionary<object, int> ObjectKeyDictionary = ImmutableDictionary<object, int>.Empty;
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(5));
+    }
+
+    [Test]
+    public async Task AllowsOnlyDocumentedManagedFlowValueSentinels()
+    {
+        const string source =
+            """
+            using System.Collections.Immutable;
+            namespace SharpProof.Effects {
+                sealed class ManagedAbstractValue { }
+                sealed class ManagedFlowState {
+                    private readonly ImmutableDictionary<object, ManagedAbstractValue>? _values;
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "NoValues is an empty immutable dictionary sentinel with no object keys or mutable entries.")]
+                    private static readonly ImmutableDictionary<object, ManagedAbstractValue> NoValues = ImmutableDictionary<object, ManagedAbstractValue>.Empty;
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "ManagedFlowState instances are immutable canonical value sentinels.")]
+                    internal static ManagedFlowState Bottom { get; } = new();
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "ManagedFlowState instances are immutable canonical value sentinels.")]
+                    internal static ManagedFlowState Empty { get; } = new();
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "ManagedFlowState instances are immutable canonical value sentinels.")]
+                    internal static ManagedFlowState Top { get; } = new();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsUndocumentedManagedFlowValueSentinels()
+    {
+        const string source =
+            """
+            using System.Collections.Immutable;
+            namespace SharpProof.Effects {
+                sealed class ManagedAbstractValue { }
+                sealed class ManagedFlowState {
+                    private readonly ImmutableDictionary<object, ManagedAbstractValue>? _values;
+                    private static readonly ImmutableDictionary<object, ManagedAbstractValue> NoValues = ImmutableDictionary<object, ManagedAbstractValue>.Empty;
+                    internal static ManagedFlowState Bottom { get; } = new();
+                    internal static ManagedFlowState Empty { get; } = new();
+                    internal static ManagedFlowState Top { get; } = new();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
+    public async Task AllowsDocumentedWorkerCacheComparer()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Worker {
+                static class VerificationCache {
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "Capacity comparer is a stateless immutable ordering singleton.")]
+                    private static readonly Comparer<int> CapacityPriorityComparer = Comparer<int>.Default;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsUndocumentedWorkerCacheComparer()
+    {
+        const string source =
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Worker {
+                static class VerificationCache {
+                    private static readonly Comparer<int> CapacityPriorityComparer = Comparer<int>.Default;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AllowsOnlyDocumentedEffectClaimConstraintSentinel()
+    {
+        const string source =
+            """
+            using System.Collections.Immutable;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Analyzer {
+                sealed record EffectClaimConstraint(ImmutableArray<INamedTypeSymbol> ExceptionTypes) {
+                    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                        "SharpProof.Soundness", "SPMETA002",
+                        Justification = "Empty effect-claim constraint is an immutable value sentinel.")]
+                    internal static EffectClaimConstraint Empty { get; } = new(default(ImmutableArray<INamedTypeSymbol>));
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsUndocumentedEffectClaimConstraintSentinel()
+    {
+        const string source =
+            """
+            using System.Collections.Immutable;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Analyzer {
+                sealed record EffectClaimConstraint(ImmutableArray<INamedTypeSymbol> ExceptionTypes) {
+                    internal static EffectClaimConstraint Empty { get; } = new(default(ImmutableArray<INamedTypeSymbol>));
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(1));
     }
 
     [Test]
@@ -3255,7 +3490,6 @@ public sealed class SharpProofSoundnessAnalyzerTests
             namespace SharpProof.Verify;
             enum Status { Unknown, Proven }
             static class C {
-                private static readonly object Gate = new();
                 static void M() {
                     try { }
                     catch (OperationCanceledException cancellation) { throw cancellation; }

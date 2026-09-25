@@ -1384,6 +1384,82 @@ public sealed class WorkerTests
         }
     }
 
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("   ")]
+    public async Task NullOrBlankLoweredCallableIdsAreTypedAsManifestInvalid(
+        string? callableId)
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var json = await File.ReadAllTextAsync(
+            request.CompilerManifest.Path);
+        var root = JsonNode.Parse(json)!.AsObject();
+        var loweredCallables = root["callables"]!.AsArray();
+        Assert.That(loweredCallables, Is.Not.Empty);
+        loweredCallables[0]!.AsObject()["callableId"] = callableId;
+        json = root.ToJsonString(WorkerProtocolJson.Options) + "\n";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
+        request.CompilerManifest.Sha256 =
+            WorkerProtocolJson.ComputeSha256(bytes);
+
+        var deserializeException = CaptureJson(() =>
+            CompilerManifestArtifactJson.Deserialize(json));
+        var snapshotException = CaptureIOException(() => WorkerInputSnapshot.Load(
+            request,
+            WorkerCacheIdentity.Current,
+            CancellationToken.None));
+        using var worker = new SharpProofWorker(
+            () => throw new AssertionException(
+                "An invalid manifest must fail before backend creation."));
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                deserializeException,
+                Is.TypeOf<JsonException>());
+            Assert.That(snapshotException, Is.TypeOf<IOException>());
+            Assert.That(
+                snapshotException!.Message,
+                Is.EqualTo(WorkerInputSnapshot.ManifestInvalid));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("compiler_manifest.invalid"));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+
+        static JsonException? CaptureJson(Action action)
+        {
+            try
+            {
+                action();
+                return null;
+            }
+            catch (JsonException exception)
+            {
+                return exception;
+            }
+        }
+
+        static IOException? CaptureIOException(Action action)
+        {
+            try
+            {
+                action();
+                return null;
+            }
+            catch (IOException exception)
+            {
+                return exception;
+            }
+        }
+    }
+
     [Test]
     public async Task NullModuleReferenceRowsAreTypedAsManifestInvalid()
     {

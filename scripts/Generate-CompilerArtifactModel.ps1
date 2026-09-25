@@ -350,7 +350,7 @@ $modelLines = New-GeneratedOutput `
     @('System.Collections.Immutable', 'SharpProof.Ir', 'SharpProof.Worker.Protocol')
 $portableLines = New-GeneratedOutput `
     'PortableIrModel.generated.cs' `
-    @('SharpProof.Ir')
+    @('System.Collections.Immutable', 'SharpProof.Ir')
 $compilationLines = New-GeneratedOutput 'CompilerCompilationModel.generated.cs'
 $collectorLines = New-GeneratedOutput 'CompilerWireMappings.generated.cs'
 
@@ -548,7 +548,7 @@ foreach ($catalog in $catalogs) {
     if ($members.Count -eq 0) {
         throw "Wire catalog '$field' cannot be empty."
     }
-    $portableLines.Add("    internal static readonly $type[] $field = [")
+    $portableLines.Add("    internal static readonly ImmutableArray<$type> $field = [")
     for ($index = 0; $index -lt $members.Count; $index++) {
         $member = [string]$members[$index]
         Assert-Identifier $member "Wire catalog '$field' member"
@@ -564,10 +564,10 @@ $slotMappings = Get-RequiredMember $schema `
 $portableLines.Add('')
 $portableLines.Add('internal readonly struct PortableIrSlotMapping(')
 $portableLines.Add('    string kind,')
-$portableLines.Add('    string[] slots)')
+$portableLines.Add('    ImmutableArray<string> slots)')
 $portableLines.Add('{')
 $portableLines.Add('    internal string Kind { get; } = kind;')
-$portableLines.Add('    internal string[] Slots { get; } = slots;')
+$portableLines.Add('    internal ImmutableArray<string> Slots { get; } = slots;')
 $portableLines.Add('}')
 $slotDomains = @(
     Get-RequiredMember $schema 'portableIrSlotDomains' 'schema' |
@@ -630,7 +630,7 @@ foreach ($domain in $slotDomains) {
     }
     $portableLines.Add('')
     $portableLines.Add(
-        "    internal static readonly PortableIrSlotMapping[] $($domain.Name) = [")
+        "    internal static readonly ImmutableArray<PortableIrSlotMapping> $($domain.Name) = [")
     for ($index = 0; $index -lt $rows.Count; $index++) {
         $row = $rows[$index]
         Assert-Properties `
@@ -1644,13 +1644,13 @@ $modelLines.Add('    internal const int MaximumReplayEvents = ' +
     $maximumReplayEvents + ';')
 $modelLines.Add('    internal const CompilerEffectReplayPathKind ReplayPathKind =')
 $modelLines.Add("        CompilerEffectReplayPathKind.$replayPathKind;")
-$modelLines.Add('    internal static readonly WorkerClaimReason[] UnknownReasons = [')
+$modelLines.Add('    internal static readonly ImmutableArray<WorkerClaimReason> UnknownReasons = [')
 foreach ($reason in $unknownReasons) {
     $modelLines.Add("        WorkerClaimReason.$reason,")
 }
 $modelLines.Add('    ];')
-$modelLines.Add('    internal static readonly (WorkerClaimOutcome Outcome, WorkerClaimReason Reason,')
-$modelLines.Add('        WorkerEffectEvidenceCertainty Certainty)[] SupportedEffectTuples = [')
+$modelLines.Add('    internal static readonly ImmutableArray<(WorkerClaimOutcome Outcome, WorkerClaimReason Reason,')
+$modelLines.Add('        WorkerEffectEvidenceCertainty Certainty)> SupportedEffectTuples = [')
 foreach ($row in $effectTupleRows) {
     $modelLines.Add(
         "        (WorkerClaimOutcome.$($row.Outcome), " +
@@ -1674,7 +1674,7 @@ $modelLines.Add('        return outcome == WorkerClaimOutcome.Unknown &&')
 $modelLines.Add('            certainty == WorkerEffectEvidenceCertainty.Unavailable &&')
 $modelLines.Add('            UnknownReasons.Contains(reason);')
 $modelLines.Add('    }')
-$modelLines.Add('    internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [')
+$modelLines.Add('    internal static readonly ImmutableArray<CompilerEffectConstraintRule> ConstraintRules = [')
 foreach ($kind in $constraintRuleKinds) {
     $effectsEmpty = if ($kind -eq $combinedKind) { 'false' } else { 'true' }
     $capabilitiesEmpty = if ($kind -in $capabilitiesKind, $combinedKind) { 'false' } else { 'true' }
@@ -1684,7 +1684,7 @@ foreach ($kind in $constraintRuleKinds) {
         "$capabilitiesEmpty, $exceptionsEmpty),")
 }
 $modelLines.Add('    ];')
-$modelLines.Add('    internal static readonly CompilerEffectReplayEventKind[] SupportedReplayEventKinds = [')
+$modelLines.Add('    internal static readonly ImmutableArray<CompilerEffectReplayEventKind> SupportedReplayEventKinds = [')
 foreach ($kind in $supportedReplayEventKinds) {
     $modelLines.Add("        CompilerEffectReplayEventKind.$kind,")
 }
@@ -1696,13 +1696,13 @@ $modelLines.Add(
     "    internal const WorkerClaimReason SuccessReason = WorkerClaimReason.$callableSuccessReason;")
 $modelLines.Add(
     "    internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.$callableDiagnosticFailure;")
-$modelLines.Add('    internal static readonly WorkerClaimReason[] FailureReasons = [')
+$modelLines.Add('    internal static readonly ImmutableArray<WorkerClaimReason> FailureReasons = [')
 foreach ($reason in $callableFailureReasons) {
     $modelLines.Add("        WorkerClaimReason.$reason,")
 }
 $modelLines.Add('    ];')
 $modelLines.Add('    internal static bool IsFailureReason(WorkerClaimReason reason) =>')
-$modelLines.Add('        Array.IndexOf(FailureReasons, reason) >= 0;')
+$modelLines.Add('        FailureReasons.Contains(reason);')
 $modelLines.Add('}')
 
 $outputs = [ordered]@{

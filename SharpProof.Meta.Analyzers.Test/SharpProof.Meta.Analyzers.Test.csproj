@@ -7,5 +7,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj" />
+    <!-- This suite is also the compiler build gate for the production assemblies
+         that exercise critical-namespace mutable-storage analysis. -->
+    <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
+    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
   </ItemGroup>
 </Project>

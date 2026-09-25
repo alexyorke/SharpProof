@@ -186,32 +186,37 @@ $lines.Add('internal sealed partial class LauncherArguments')
 $lines.Add('{')
 $required = @($catalog.options | Where-Object category -eq 'required')
 $publication = @($catalog.options | Where-Object category -eq 'publication')
-$lines.Add('    private static readonly string[] s_required = [')
+$lines.Add('    private static readonly System.Collections.Immutable.ImmutableArray<string> s_required = [')
 foreach ($entry in $required) {
     $lines.Add("        $(ConvertTo-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
-$lines.Add('    private static readonly string[] s_publication = [')
+$lines.Add('    private static readonly System.Collections.Immutable.ImmutableArray<string> s_publication = [')
 foreach ($entry in $publication) {
     $lines.Add("        $(ConvertTo-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
-$lines.Add('    private static readonly HashSet<string> s_allowed = [')
+$lines.Add('    private static readonly System.Collections.Immutable.ImmutableHashSet<string> s_allowed =')
+$lines.Add('        System.Collections.Immutable.ImmutableHashSet.CreateRange(')
+$lines.Add('            System.StringComparer.Ordinal, new[] {')
 foreach ($entry in @($catalog.options)) {
-    $lines.Add("        $(ConvertTo-CSharpString $entry.key),")
+    $lines.Add("                $(ConvertTo-CSharpString $entry.key),")
 }
-$lines.Add('    ];')
+$lines.Add('            });')
 $lines.Add('')
-$lines.Add('    private static readonly System.Lazy<string[]> s_launcherRuntimePaths = new(')
-$lines.Add('        static () =>')
-$lines.Add('        {')
-$lines.Add('            var path = typeof(LauncherArguments).Assembly.Location;')
-$lines.Add('            var directory = System.IO.Path.GetDirectoryName(path)!;')
-$lines.Add('            return [')
-$lines.Add('                path,')
+$lines.Add('    private static class LauncherRuntimePathCache')
+$lines.Add('    {')
+$lines.Add('        internal static readonly System.Collections.Immutable.ImmutableArray<string> Value = CreateLauncherRuntimePaths();')
+$lines.Add('    }')
+$lines.Add('    private static System.Collections.Immutable.ImmutableArray<string> CreateLauncherRuntimePaths()')
+$lines.Add('    {')
+$lines.Add('        var path = typeof(LauncherArguments).Assembly.Location;')
+$lines.Add('        var directory = System.IO.Path.GetDirectoryName(path)!;')
+$lines.Add('        return [')
+$lines.Add('            path,')
 foreach ($extension in $runtimeCompanionExtensions) {
     $lines.Add(
-        "                System.IO.Path.ChangeExtension(path, " +
+        "            System.IO.Path.ChangeExtension(path, " +
         "$(ConvertTo-CSharpString $extension)),")
 }
 foreach ($file in $runtimeCompanionFiles) {
@@ -230,15 +235,15 @@ foreach ($file in $runtimeCompanionFiles) {
         ConvertTo-CSharpString $file
     }
     $lines.Add(
-        "                System.IO.Path.Combine(directory, " +
+        "            System.IO.Path.Combine(directory, " +
         "$fileExpression),")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
-$lines.Add('            ];')
-$lines.Add('        });')
+$lines.Add('        ];')
+$lines.Add('    }')
 $lines.Add('')
-$lines.Add('    internal static System.Collections.Generic.IReadOnlyList<string> LauncherRuntimePaths =>')
-$lines.Add('        s_launcherRuntimePaths.Value;')
+$lines.Add('    internal static System.Collections.Immutable.ImmutableArray<string> LauncherRuntimePaths =>')
+$lines.Add('        LauncherRuntimePathCache.Value;')
 $lines.Add('')
 foreach ($entry in @($catalog.options | Where-Object accessor -ne 'none')) {
     $key = ConvertTo-CSharpString $entry.key

@@ -641,6 +641,10 @@ internal static class CompilationFingerprint
 
 internal static class CompilerDiagnosticArtifactOrdering
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA002",
+        Justification = "Comparer is a stateless immutable ordering singleton.")]
     private static readonly IComparer<CompilerDiagnosticArtifact> Comparer =
         System.Collections.Generic.Comparer<CompilerDiagnosticArtifact>.Create(Compare);
 

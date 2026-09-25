@@ -132,7 +132,7 @@ public sealed class CompilerArtifactModelSchemaTests
                 BindingFlags.NonPublic |
                 BindingFlags.Static)!;
             string?[] values = [
-                .. ((Array)field.GetValue(null)!).Cast<object>()
+                .. ((System.Collections.IEnumerable)field.GetValue(null)!).Cast<object>()
                     .Select(static value => value.ToString())
             ];
             Assert.That(
@@ -153,7 +153,8 @@ public sealed class CompilerArtifactModelSchemaTests
                 char.ToUpperInvariant(domain.Name[0]) + domain.Name[1..],
                 BindingFlags.NonPublic |
                 BindingFlags.Static)!;
-            var actual = (PortableIrSlotMapping[])field.GetValue(null)!;
+            var actual = ((IEnumerable<PortableIrSlotMapping>)field.GetValue(null)!)
+                .ToArray();
             var expected = domain.Value.EnumerateArray().ToArray();
             Assert.That(actual.Length, Is.EqualTo(expected.Length), domain.Name);
             for (var index = 0; index < actual.Length; index++)
@@ -161,7 +162,7 @@ public sealed class CompilerArtifactModelSchemaTests
                 Assert.That(actual[index].Kind,
                     Is.EqualTo(expected[index].GetProperty("kind").GetString()),
                     domain.Name + " kind");
-                Assert.That(actual[index].Slots,
+                Assert.That(actual[index].Slots.ToArray(),
                     Is.EqualTo(expected[index].GetProperty("slots")
                         .EnumerateArray()
                         .Select(static value => value.GetString())),
@@ -190,7 +191,8 @@ public sealed class CompilerArtifactModelSchemaTests
                 .EnumerateArray()
                 .Select(static value => value.GetString())
                 .ToArray();
-            var actual = (PortableIrSlotMapping[])field.GetValue(null)!;
+            var actual = ((IEnumerable<PortableIrSlotMapping>)field.GetValue(null)!)
+                .ToArray();
 
             using (Assert.EnterMultipleScope())
             {
@@ -261,7 +263,7 @@ public sealed class CompilerArtifactModelSchemaTests
         var catalogType = s_artifactAssembly.GetType(
             "SharpProof.CompilerArtifact.CompilerEffectEvidenceCatalog",
             throwOnError: true)!;
-        var actual = ((Array)catalogType.GetField(
+        var actual = ((System.Collections.IEnumerable)catalogType.GetField(
                 "UnknownReasons",
                 BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!)
             .Cast<WorkerClaimReason>()

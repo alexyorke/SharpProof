@@ -7,6 +7,10 @@ namespace SharpProof.CompilerArtifact;
 // assembly so the collector and worker cannot gradually diverge.
 internal static class CompilerSourceLocationAuthority
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA002",
+        Justification = "Weakly associates each source-location object with its immutable owning-tree ordinal.")]
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<WorkerSourceLocation, TreeBinding> TreeBindings = new();
     private sealed class TreeBinding(int ordinal) { internal int Ordinal { get; } = ordinal; }
 

@@ -7,7 +7,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.CompilerArtifact;
 internal static class CompilerLoweredArtifact
 {
-    private static readonly WorkerClaimEvidence[] ManifestEvidenceMap =
+    private static readonly ImmutableArray<WorkerClaimEvidence> ManifestEvidenceMap =
     [
         WorkerClaimEvidence.DirectClause,
         WorkerClaimEvidence.ReturnAttribute,

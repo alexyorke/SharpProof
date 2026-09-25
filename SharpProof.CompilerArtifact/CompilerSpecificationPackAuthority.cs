@@ -1,18 +1,22 @@
+using System.Collections.Immutable;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerSpecificationPackAuthorityValidation
 {
-    private static readonly char[] PackIdentitySeparators = [';'];
-    private static readonly string[] KnownPackIds =
-        CompilerSpecificationPackCatalogVersions.PackIds.Split(
-            PackIdentitySeparators,
-            StringSplitOptions.RemoveEmptyEntries);
-    private static readonly string[] KnownPackIdentities =
-        CompilerSpecificationPackCatalogVersions.PackIdentities.Split(
-            PackIdentitySeparators,
-            StringSplitOptions.RemoveEmptyEntries);
+    private static readonly ImmutableHashSet<string> KnownPackIds =
+        ImmutableHashSet.CreateRange(
+            StringComparer.Ordinal,
+            CompilerSpecificationPackCatalogVersions.PackIds.Split(
+                new[] { ';' },
+                StringSplitOptions.RemoveEmptyEntries));
+    private static readonly ImmutableHashSet<string> KnownPackIdentities =
+        ImmutableHashSet.CreateRange(
+            StringComparer.Ordinal,
+            CompilerSpecificationPackCatalogVersions.PackIdentities.Split(
+                new[] { ';' },
+                StringSplitOptions.RemoveEmptyEntries));
 
     internal static string? GetSummaryPrefix(CompilerSummaryOrigin origin)
     {
@@ -39,8 +43,7 @@ internal static class CompilerSpecificationPackAuthorityValidation
             return false;
         }
 
-        return packIds.All(packId =>
-            KnownPackIds.Contains(packId, StringComparer.Ordinal));
+        return packIds.All(KnownPackIds.Contains);
     }
 
     internal static bool Matches(
@@ -60,7 +63,7 @@ internal static class CompilerSpecificationPackAuthorityValidation
     {
         if (identity is not { Length: > 0 and <= 128 } ||
             selectedPackIds == null ||
-            !KnownPackIdentities.Contains(identity, StringComparer.Ordinal))
+            !KnownPackIdentities.Contains(identity))
         {
             return false;
         }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
@@ -6,19 +7,19 @@ namespace SharpProof.CompilerArtifact;
 internal static partial class PortableIrGraphCodec
 {
     internal const int MaximumGraphDepth = 256;
-    private static readonly IrOpaquePurity[] OpaquePurities =
+    private static readonly ImmutableArray<IrOpaquePurity> OpaquePurities =
         PortableIrWireCatalog.OpaquePurities;
-    private static readonly IrUnaryOperator[] UnaryOperators =
+    private static readonly ImmutableArray<IrUnaryOperator> UnaryOperators =
         PortableIrWireCatalog.UnaryOperators;
-    private static readonly IrBinaryOperator[] BinaryOperators =
+    private static readonly ImmutableArray<IrBinaryOperator> BinaryOperators =
         PortableIrWireCatalog.BinaryOperators;
-    private static readonly IrHavocKind[] HavocKinds =
+    private static readonly ImmutableArray<IrHavocKind> HavocKinds =
         PortableIrWireCatalog.HavocKinds;
-    private static readonly IReadOnlyDictionary<string, PortableIrSlotMapping>
+    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
         TermSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Terms);
-    private static readonly IReadOnlyDictionary<string, PortableIrSlotMapping>
+    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
         LocationSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Locations);
-    private static readonly IReadOnlyDictionary<string, PortableIrSlotMapping>
+    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
         InstructionSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Instructions);
 
     internal static bool HasCompleteWireEnumCatalogs =>
@@ -36,7 +37,7 @@ internal static partial class PortableIrGraphCodec
             PortableIrSlotCatalog.Instructions,
             typeof(IrInstructionKind));
 
-    private static bool IsComplete<T>(T[] values) where T : struct, Enum
+    private static bool IsComplete<T>(ImmutableArray<T> values) where T : struct, Enum
     {
         return values.SequenceEqual(Enum.GetValues(typeof(T)).Cast<T>());
     }
@@ -213,10 +214,10 @@ internal static partial class PortableIrGraphCodec
         }
     }
 
-    private static Dictionary<string, PortableIrSlotMapping> CreateSlotIndex(
+    private static ImmutableDictionary<string, PortableIrSlotMapping> CreateSlotIndex(
         IReadOnlyList<PortableIrSlotMapping> catalog)
     {
-        var result = new Dictionary<string, PortableIrSlotMapping>(
+        var result = ImmutableDictionary.CreateBuilder<string, PortableIrSlotMapping>(
             StringComparer.Ordinal);
         foreach (var mapping in catalog)
         {
@@ -225,18 +226,18 @@ internal static partial class PortableIrGraphCodec
                 result.Add(kind, mapping);
             }
         }
-        return result;
+        return result.ToImmutable();
     }
 
     private static PortableIrSlotMapping RequireCanonicalSlotMapping<TEnum>(
-        IReadOnlyDictionary<string, PortableIrSlotMapping> catalog,
+        ImmutableDictionary<string, PortableIrSlotMapping> catalog,
         TEnum kind,
         int slotCount)
         where TEnum : struct, Enum
     {
         catalog.TryGetValue(kind.ToString(), out var mapping);
         Require(mapping.Kind != null, $"Portable IR {kind} slots are not declared.");
-        Require(mapping.Slots != null, $"Portable IR {kind} slots are not declared.");
+        Require(!mapping.Slots.IsDefault, $"Portable IR {kind} slots are not declared.");
         Require(
             mapping.Slots!.Length == slotCount,
             $"Portable IR {kind} slots have an invalid shape.");
@@ -341,13 +342,13 @@ internal static partial class PortableIrGraphCodec
         RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
     }
 
-    private static int Wire<T>(T value, T[] values) where T : struct, Enum
+    private static int Wire<T>(T value, ImmutableArray<T> values) where T : struct, Enum
     {
-        var index = Array.IndexOf(values, value);
+        var index = values.IndexOf(value);
         return index >= 0 ? index : throw Bad("Portable IR contains an unknown enum value.");
     }
 
-    private static T Wire<T>(int value, T[] values) where T : struct, Enum
+    private static T Wire<T>(int value, ImmutableArray<T> values) where T : struct, Enum
     {
         return value >= 0 && value < values.Length
             ? values[value]

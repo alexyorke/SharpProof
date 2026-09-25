@@ -762,7 +762,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                      attributeClass.OriginalDefinition,
                      "ThreadStaticAttribute",
                      "System")) ||
-             IsApprovedInterlockedScopeCounter(field)))
+             IsApprovedInterlockedScopeCounter(field) ||
+             IsApprovedCompilerSourceTreeBindings(field)))
         {
             return false;
         }
@@ -794,6 +795,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (type is ITypeParameterSymbol typeParameter)
         {
             return !typeParameter.HasValueTypeConstraint;
+        }
+
+        if (type.SpecialType == SpecialType.System_Object)
+        {
+            return true;
         }
 
         if (type.SpecialType != SpecialType.None ||
@@ -1118,6 +1124,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     "Effects") =>
                 "Unknown throw-set singleton stores no mutable membership cache.",
             IPropertySymbol property when
+                property.Name == "Empty" &&
+                IsExactNamedType(
+                    property.ContainingType,
+                    "EffectClaimConstraint",
+                    "SharpProof",
+                    "Analyzer") =>
+                "Empty effect-claim constraint is an immutable value sentinel.",
+            IPropertySymbol property when
                 property.Name == "Instance" &&
                 IsExactNamedType(
                     property.ContainingType,
@@ -1143,11 +1157,110 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     "SharpProof",
                     "Effects") =>
                 "Missing metadata-import sentinel has a null assembly and no mutable state.",
+            IFieldSymbol field when
+                field.Name == "Comparer" &&
+                IsExactNamedType(
+                    field.ContainingType,
+                    "CompilerDiagnosticArtifactOrdering",
+                    "SharpProof",
+                    "CompilerArtifact") =>
+                "Comparer is a stateless immutable ordering singleton.",
+            IFieldSymbol field when
+                field.Name == "CapacityPriorityComparer" &&
+                IsExactNamedType(
+                    field.ContainingType,
+                    "VerificationCache",
+                    "SharpProof",
+                    "Worker") =>
+                "Capacity comparer is a stateless immutable ordering singleton.",
+            IPropertySymbol property when
+                property.Name == "Unsupported" &&
+                IsExactNamedType(
+                    property.ContainingType,
+                    "ExpressionBindingResult",
+                    "SharpProof",
+                    "Contracts") =>
+                "Unsupported binding result is an immutable failure sentinel.",
+            IPropertySymbol property when
+                property.Name == "Empty" &&
+                property.ContainingType.Name == "ClauseBindingResult" &&
+                property.ContainingType.ContainingType?.Name == "ContractBinder" &&
+                IsExactNamespace(
+                    property.ContainingNamespace,
+                    "SharpProof",
+                    "Contracts") =>
+                "Empty binding result is an immutable value sentinel.",
+            IPropertySymbol property when
+                property.Name == "None" &&
+                property.ContainingType.Name == "CompanionResolution" &&
+                property.ContainingType.ContainingType?.Name == "ContractForSymbolMatcher" &&
+                IsExactNamespace(
+                    property.ContainingNamespace,
+                    "SharpProof",
+                    "Contracts") =>
+                "None companion resolution is an immutable value sentinel.",
+            IFieldSymbol field when
+                field.Name == "NoValues" &&
+                IsExactNamedType(
+                    field.ContainingType,
+                    "ManagedFlowState",
+                    "SharpProof",
+                    "Effects") =>
+                "NoValues is an empty immutable dictionary sentinel with no object keys or mutable entries.",
+            IPropertySymbol property when
+                property.Name is ("Bottom" or "Empty" or "Top") &&
+                IsExactNamedType(
+                    property.ContainingType,
+                    "ManagedFlowState",
+                    "SharpProof",
+                    "Effects") =>
+                "ManagedFlowState instances are immutable canonical value sentinels.",
             _ => null
         };
 
         return justification != null &&
             HasSoundnessSuppression(symbol, justification);
+    }
+
+    private static bool IsApprovedCompilerSourceTreeBindings(IFieldSymbol field)
+    {
+        if (field.Name != "TreeBindings" ||
+            field.DeclaredAccessibility != Accessibility.Private ||
+            !field.IsStatic ||
+            !IsExactNamedType(
+                field.ContainingType,
+                "CompilerSourceLocationAuthority",
+                "SharpProof",
+                "CompilerArtifact") ||
+            field.Type is not INamedTypeSymbol table ||
+            !IsExactNamedType(
+                table.OriginalDefinition,
+                "ConditionalWeakTable",
+                "System",
+                "Runtime",
+                "CompilerServices") ||
+            table.TypeArguments.Length != 2 ||
+            table.TypeArguments[0] is not INamedTypeSymbol keyType ||
+            !IsExactNamedType(
+                keyType,
+                "WorkerSourceLocation",
+                "SharpProof",
+                "Worker",
+                "Protocol") ||
+            table.TypeArguments[1] is not INamedTypeSymbol valueType ||
+            valueType.Name != "TreeBinding" ||
+            valueType.ContainingType?.Name != "CompilerSourceLocationAuthority" ||
+            !IsExactNamespace(
+                valueType.ContainingNamespace,
+                "SharpProof",
+                "CompilerArtifact"))
+        {
+            return false;
+        }
+
+        return HasSoundnessSuppression(
+            field,
+            "Weakly associates each source-location object with its immutable owning-tree ordinal.");
     }
 
     private static bool HasSoundnessSuppression(

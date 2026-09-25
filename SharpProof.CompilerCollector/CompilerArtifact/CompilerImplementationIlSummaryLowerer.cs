@@ -229,7 +229,7 @@ internal static class CompilerImplementationIlSummaryLowerer
 
     private const int MaximumIlBytes = 65536;
     private const int MaximumStack = 128;
-    private static readonly IReadOnlyDictionary<ILOpCode, IlOperandSize>
+    private static readonly ImmutableDictionary<ILOpCode, IlOperandSize>
         OperandSizes = new Dictionary<ILOpCode, IlOperandSize>
         {
             [ILOpCode.Ldarg_s] = IlOperandSize.Byte,
@@ -301,7 +301,7 @@ internal static class CompilerImplementationIlSummaryLowerer
             [ILOpCode.Add_ovf] = IlOperandSize.None,
             [ILOpCode.Sub_ovf] = IlOperandSize.None,
             [ILOpCode.Mul_ovf] = IlOperandSize.None
-        };
+        }.ToImmutableDictionary();
 
     internal static bool IsCandidate(
         CSharpCompilation compilation,

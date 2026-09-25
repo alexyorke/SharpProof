@@ -13,7 +13,7 @@ namespace SharpProof.Worker.Launcher;
 
 internal sealed partial class LauncherArguments
 {
-    private static readonly string[] s_required = [
+    private static readonly System.Collections.Immutable.ImmutableArray<string> s_required = [
         "worker",
         "request",
         "result",
@@ -21,56 +21,62 @@ internal sealed partial class LauncherArguments
         "verify-policy",
         "assumption-policy",
     ];
-    private static readonly string[] s_publication = [
+    private static readonly System.Collections.Immutable.ImmutableArray<string> s_publication = [
         "publish-request",
         "publish-result",
         "publish-compiler-manifest",
     ];
-    private static readonly HashSet<string> s_allowed = [
-        "worker",
-        "request",
-        "result",
-        "compiler-manifest",
-        "verify-policy",
-        "assumption-policy",
-        "publish-request",
-        "publish-result",
-        "publish-compiler-manifest",
-        "publish-sarif",
-        "termination-grace-ms",
-        "query-rlimit",
-        "method-rlimit",
-        "method-wall-ms",
-        "project-wall-ms",
-        "max-parallelism",
-        "max-expression-depth",
-        "cache-enabled",
-        "cache-directory",
-        "cache-maximum-bytes",
-    ];
+    private static readonly System.Collections.Immutable.ImmutableHashSet<string> s_allowed =
+        System.Collections.Immutable.ImmutableHashSet.CreateRange(
+            System.StringComparer.Ordinal, new[]
+            {
+                "worker",
+                "request",
+                "result",
+                "compiler-manifest",
+                "verify-policy",
+                "assumption-policy",
+                "publish-request",
+                "publish-result",
+                "publish-compiler-manifest",
+                "publish-sarif",
+                "termination-grace-ms",
+                "query-rlimit",
+                "method-rlimit",
+                "method-wall-ms",
+                "project-wall-ms",
+                "max-parallelism",
+                "max-expression-depth",
+                "cache-enabled",
+                "cache-directory",
+                "cache-maximum-bytes",
+            });
 
-    private static readonly System.Lazy<string[]> s_launcherRuntimePaths = new(
-        static () =>
-        {
-            var path = typeof(LauncherArguments).Assembly.Location;
-            var directory = System.IO.Path.GetDirectoryName(path)!;
-            return [
-                path,
-                System.IO.Path.ChangeExtension(path, ".deps.json"),
-                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
-                System.IO.Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
-                System.IO.Path.Combine(directory, "SharpProof.Host.dll"),
-                System.IO.Path.Combine(directory, "SharpProof.Ir.dll"),
-                System.IO.Path.Combine(directory, "SharpProof.Specs.dll"),
-                System.IO.Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
-                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
-                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
-                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
-            ];
-        });
+    private static class LauncherRuntimePathCache
+    {
+        internal static readonly System.Collections.Immutable.ImmutableArray<string> Value = CreateLauncherRuntimePaths();
+    }
+    private static System.Collections.Immutable.ImmutableArray<string> CreateLauncherRuntimePaths()
+    {
+        var path = typeof(LauncherArguments).Assembly.Location;
+        var directory = System.IO.Path.GetDirectoryName(path)!;
+        return [
+            path,
+            System.IO.Path.ChangeExtension(path, ".deps.json"),
+            System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
+            System.IO.Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
+            System.IO.Path.Combine(directory, "SharpProof.Host.dll"),
+            System.IO.Path.Combine(directory, "SharpProof.Ir.dll"),
+            System.IO.Path.Combine(directory, "SharpProof.Specs.dll"),
+            System.IO.Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
+            System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
+            System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
+            System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
+        ];
+    }
 
-    internal static System.Collections.Generic.IReadOnlyList<string> LauncherRuntimePaths =>
-        s_launcherRuntimePaths.Value;
+    internal static System.Collections.Immutable.ImmutableArray<string> LauncherRuntimePaths =>
+        LauncherRuntimePathCache.Value;
 
     internal string WorkerPath => FullPath("worker");
     internal string RequestPath => FullPath("request");
