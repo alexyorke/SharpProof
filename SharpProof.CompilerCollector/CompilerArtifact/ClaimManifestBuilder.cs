@@ -8,6 +8,9 @@ internal sealed partial class ClaimManifestBuilder(
     WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All,
     CancellationToken cancellationToken = default)
 {
+    private const string TopLevelMainCallableId =
+        "M:Program.<Main>$(System.String[])";
+
     private readonly CSharpCompilation _compilation =
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly ContractClauseInventoryBuilder _clauses =
@@ -840,6 +843,21 @@ internal sealed partial class ClaimManifestBuilder(
 
     private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration)
     {
+        if (declaration is CompilationUnitSyntax compilationUnit &&
+            method.MethodKind == MethodKind.Ordinary &&
+            string.Equals(
+                SemanticClaimIdentity.CreateCallableId(method),
+                TopLevelMainCallableId,
+                StringComparison.Ordinal) &&
+            compilationUnit.Members.OfType<GlobalStatementSyntax>()
+                .LastOrDefault() is { } lastGlobalStatement)
+        {
+            return compilationUnit.SyntaxTree.GetLocation(
+                Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                    compilationUnit.FullSpan.Start,
+                    lastGlobalStatement.Span.End));
+        }
+
         return declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
     }
 

@@ -112,6 +112,46 @@ public sealed class CompilerSourceLocationAuthorityTests
             CompilerSourceRebinding.Validate(artifact)));
     }
 
+    [Test]
+    public void SourceRebindingRejectsFullFileSpanForOrdinaryCallable()
+    {
+        var artifact = CreateOnDiskContractArtifact(
+            out var source,
+            trailingText: "// trailing comment\n");
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        var callable = artifact.Manifest.Callables.Single();
+        Assert.That(
+            CompilerSourceLocationAuthority.TryMap(
+                tree.LineMap,
+                0,
+                out var mappedPath,
+                out var mappedLine,
+                out var mappedColumn),
+            Is.True);
+        callable.Location = new WorkerSourceLocation
+        {
+            Path = mappedPath,
+            Start = 0,
+            Length = source.Length,
+            Line = mappedLine + 1,
+            Column = mappedColumn + 1
+        };
+        artifact.LocationAuthorities.Single(authority =>
+                authority.OwnerKind == CompilerSourceLocationOwnerKind.Callable &&
+                authority.OwnerId == callable.CallableId)
+            .Location = CompilerSourceLocationAuthority.CopyLocation(
+                callable.Location);
+        artifact.Manifest.Hash =
+            WorkerProtocolJson.ComputeManifestHash(artifact.Manifest);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerSourceRebinding.Validate(artifact)));
+    }
+
     [TestCase("utf-8")]
     [TestCase("utf-16")]
     [TestCase("utf-16BE")]
@@ -677,7 +717,10 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     private static CompilerManifestArtifact CreateOnDiskContractArtifact(
-        out string source, string ensures = "Ensures", string qualifier = "Contract")
+        out string source,
+        string ensures = "Ensures",
+        string qualifier = "Contract",
+        string trailingText = "")
     {
         source = "using SharpProof.Attributes;\n" +
             (qualifier == "Contract" ? "" : "using " + qualifier + " = SharpProof.Attributes.Contract;\n") +
@@ -686,7 +729,8 @@ public sealed class CompilerSourceLocationAuthorityTests
             "    " + qualifier + "." + ensures + "(Contract.Result<int>() == value);\n" +
             "    return value;\n" +
             "  }\n" +
-            "}\n";
+            "}\n" +
+            trailingText;
         var path = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "SourceRebindingSubject-" + Guid.NewGuid().ToString("N") + ".cs");

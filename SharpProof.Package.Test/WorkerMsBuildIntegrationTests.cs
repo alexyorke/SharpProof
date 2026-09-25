@@ -1538,6 +1538,56 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task TopLevelClaimWithTrailingCommentReachesTheWorker()
+    {
+        RequireContainerWorker();
+        const string source =
+            "using SharpProof.Attributes;\n" +
+            "Contract.Ensures(true);\n" +
+            "return;\n" +
+            "// trailing comment\n";
+        using var project = ConsumerProject.CreateConfigured(
+            source,
+            ("OutputType", "Exe"));
+
+        Assert.That(
+            await File.ReadAllTextAsync(Path.Combine(project.Root, "Subject.cs")),
+            Is.EqualTo(source));
+
+        var build = await BuildOkAsync(project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyPolicy", "advisory")));
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var callable = response.Manifest.Callables.Single();
+        var claimEntry = response.Manifest.Claims.Single();
+        var claim = response.ClaimResults.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(callable.CallableId,
+                Is.EqualTo("M:Program.<Main>$(System.String[])"));
+            Assert.That(callable.Location.Start, Is.Zero);
+            Assert.That(
+                callable.Location.Start + callable.Location.Length,
+                Is.LessThan(source.IndexOf("// trailing comment", StringComparison.Ordinal)));
+            Assert.That(claimEntry.Location.Start,
+                Is.GreaterThanOrEqualTo(callable.Location.Start));
+            Assert.That(
+                claimEntry.Location.Start + claimEntry.Location.Length,
+                Is.LessThanOrEqualTo(
+                    callable.Location.Start + callable.Location.Length));
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(claim.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+            Assert.That(build.Output,
+                Does.Not.Contain("SharpProof launcher input is invalid"));
+        }
+    }
+
+    [Test]
     public async Task VerificationPoliciesIgnoreSurroundingWhitespace()
     {
         RequireContainerWorker();
