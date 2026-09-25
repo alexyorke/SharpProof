@@ -3037,7 +3037,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         return operation switch
         {
             null => false,
-            ILiteralOperation or ILocalReferenceOperation or IParameterReferenceOperation or
+            ILiteralOperation or IInterpolatedStringTextOperation or
+                ILocalReferenceOperation or IParameterReferenceOperation or
                 IDiscardOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation => true,
             IInvocationOperation invocation =>
@@ -3113,6 +3114,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IObjectOrCollectionInitializerOperation or
                 IParenthesizedOperation or IConditionalOperation =>
                 ChildrenCompleteNormally(operation, flow, flowOrigin),
+            IUsingDeclarationOperation usingDeclaration =>
+                CompletesNormally(
+                    usingDeclaration.DeclarationGroup,
+                    flow,
+                    flowOrigin),
             _ => false
         };
     }

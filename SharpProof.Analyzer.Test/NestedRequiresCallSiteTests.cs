@@ -160,6 +160,150 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task NestedCallsInExpressionBodiesAndInterpolationsAreReplayable()
+    {
+        const string source =
+            $$"""
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Fixture : IDisposable {
+                public sealed class Box {
+                    public Box(int value) { }
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static int Identity(int value) => value;
+                private static int Divide(int left, int right) => left / right;
+
+                public static int AddLeft() => 1 + Positive(-1);
+                public static int AsArgument() => Identity(Positive(-2));
+                public static int AddRight() => Positive(-3) + 1;
+                public static int Property => 1 + Positive(-4);
+                public static Box ObjectCreationArgument() =>
+                    new Box(Positive(-11));
+                public static void InterpolatedCall() =>
+                    Console.WriteLine($"a{Positive(-5)}");
+                public static string InterpolatedReturn() => $"a{Positive(-6)}";
+                public static string InterpolatedLocal() {
+                    string text = $"a{Positive(-7)}";
+                    return text;
+                }
+                public static string InterpolationWithoutLiteral() =>
+                    $"{Positive(-8)}";
+
+                public static int DivisionPrefix(int divisor) =>
+                    1 / divisor + Positive(-9);
+
+                public static int InvocationPrefix(int divisor) =>
+                    Divide(1, divisor) + Positive(-10);
+
+                public void Dispose() { }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresAt(
+            diagnostics,
+            source,
+            unordered: false,
+            "Positive(-1)", "Positive(-2)", "Positive(-3)",
+            "Positive(-4)", "Positive(-5)", "Positive(-6)",
+            "Positive(-7)", "Positive(-8)", "Positive(-11)");
+    }
+
+    [Test]
+    public async Task ConstructorInitializerArgumentsReplayNestedCallsAndRespectPrefix()
+    {
+        const string source =
+            $$"""
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+
+                public Fixture() : this(Positive(-1)) { }
+                public Fixture(bool useThrowingPrefix) : this(
+                    useThrowingPrefix ? Fail() : 1,
+                    Positive(-2)) { }
+                private Fixture(int value) { }
+                private Fixture(int first, int second) { }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresAt(
+            diagnostics,
+            source,
+            unordered: false,
+            "Positive(-1)");
+    }
+
+    [Test]
+    public async Task UsingDeclarationsReplayOnlyAfterCompletingInitializers()
+    {
+        const string source =
+            $$"""
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private sealed class Resource : IDisposable {
+                    public void Dispose() { }
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static Resource FailResource() =>
+                    throw new InvalidOperationException();
+
+                public static int CompleteInitializer() {
+                    using var resource = new Resource();
+                    Positive(-1);
+                    return 0;
+                }
+
+                public static int ThrowingInitializer() {
+                    using var resource = FailResource();
+                    Positive(-2);
+                    return 0;
+                }
+
+                public static int UsingStatementControl() {
+                    using (new Resource()) {
+                        Positive(-3);
+                    }
+                    return 0;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresAt(
+            diagnostics,
+            source,
+            unordered: false,
+            "Positive(-1)", "Positive(-3)");
+    }
+
+    [Test]
     public async Task LambdasAndAnonymousMethodsAreAnalyzed()
     {
         var diagnostics = await Analyze(

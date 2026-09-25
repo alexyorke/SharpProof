@@ -629,16 +629,29 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 declaration);
         if (body is ExpressionSyntax expression)
         {
-            return IsOwnedCallSiteExpression(
-                expression,
-                callSite.Syntax);
+            return HasTransparentReplayableExpressionWrappers(
+                    expression,
+                    callSite.Syntax) &&
+                IsReplayableCallExpression(
+                    expression,
+                    callSite,
+                    operationFacts);
         }
 
         if (declaration is ConstructorDeclarationSyntax constructor &&
-            callSite.Syntax is ConstructorInitializerSyntax initializer &&
+            constructor.Initializer is { } initializer &&
             ReferenceEquals(initializer.Parent, constructor))
         {
-            return true;
+            if (callSite.Syntax is ConstructorInitializerSyntax callInitializer &&
+                ReferenceEquals(callInitializer, initializer))
+            {
+                return true;
+            }
+
+            return IsReplayableConstructorInitializerArgument(
+                initializer,
+                callSite,
+                operationFacts);
         }
 
         if (body is not BlockSyntax block)
@@ -690,6 +703,48 @@ internal sealed partial class RequiresCallSiteDiscovery(
         return prefixCompletionIndex.CanReplayBefore(
             directStatement,
             callSite);
+    }
+
+    private bool IsReplayableConstructorInitializerArgument(
+        ConstructorInitializerSyntax initializer,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        var arguments = initializer.ArgumentList.Arguments;
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            var expression = arguments[index].Expression;
+            if (!expression.Span.Contains(callSite.Syntax.Span))
+            {
+                continue;
+            }
+
+            if (!HasTransparentReplayableExpressionWrappers(
+                    expression,
+                    callSite.Syntax) ||
+                !IsReplayableCallExpression(
+                    expression,
+                    callSite,
+                    operationFacts))
+            {
+                return false;
+            }
+
+            for (var prior = 0; prior < index; prior++)
+            {
+                var priorOperation = semanticModel.GetOperation(
+                    arguments[prior].Expression,
+                    cancellationToken);
+                if (!operationFacts.CompletesNormally(priorOperation))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private sealed class BlockPrefixCompletionIndex
@@ -1298,6 +1353,41 @@ internal sealed partial class RequiresCallSiteDiscovery(
             operationFacts);
     }
 
+    private static bool HasTransparentReplayableExpressionWrappers(
+        ExpressionSyntax expression,
+        SyntaxNode callSiteSyntax)
+    {
+        var current = callSiteSyntax;
+        while (!ReferenceEquals(current, expression))
+        {
+            if (current.Parent is not { } parent ||
+                !expression.Span.Contains(parent.Span))
+            {
+                return false;
+            }
+
+            if (parent is ParenthesizedExpressionSyntax parenthesized &&
+                parenthesized.Expression.Span.Contains(current.Span))
+            {
+                current = parent;
+                continue;
+            }
+
+            if (parent is CastExpressionSyntax or
+                CheckedExpressionSyntax ||
+                parent is PostfixUnaryExpressionSyntax postfix &&
+                postfix.IsKind(
+                    SyntaxKind.SuppressNullableWarningExpression))
+            {
+                return false;
+            }
+
+            current = parent;
+        }
+
+        return true;
+    }
+
     private static bool PrecedingExpressionOperationsComplete(
         IOperation callSite,
         ExpressionSyntax expression,
@@ -1331,18 +1421,6 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
 
         return true;
-    }
-
-    private static bool IsOwnedCallSiteExpression(
-        ExpressionSyntax? expression,
-        SyntaxNode callSiteSyntax)
-    {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
-        {
-            expression = parenthesized.Expression;
-        }
-
-        return expression?.Span == callSiteSyntax.Span;
     }
 
     private static ImmutableArray<RequiresCallTarget> GetCalls(

@@ -150,13 +150,16 @@ Unknown arguments, unsupported expressions, possible receiver/argument/prefix
 throws, and non-definitely-executed calls remain silent.
 
 Direct statements and expressions that are definitely executed are replayable,
-including calls inside bare blocks, `if (true)`, `do`/`while`, `checked`,
+including calls inside bare blocks, `if (true)`, `do`/`while`, checked blocks,
 labels, `try`/`finally`, `lock`, and `using` bodies. Nested calls in ordinary
 arguments, arithmetic, interpolations, returns, throws, single local
 initializers, and simple assignments are replayed when the expression prefix
-is definitely non-throwing. Conditional branches, short-circuit operands,
-switch arms, `foreach` bodies, and `catch` bodies remain silent unless the
-flow proof establishes definite execution.
+is definitely non-throwing. Expression-bodied members and constructor-initializer
+arguments follow the same rule. Calls after a `using` declaration are replayed
+only when its initializer definitely completes normally. Conditional branches,
+short-circuit operands, switch arms, `foreach` bodies, and `catch` bodies remain
+silent unless the flow proof establishes definite execution. Nested calls
+wrapped in casts, `checked(...)`, or null-forgiving operators also remain silent.
 
 Example:
 

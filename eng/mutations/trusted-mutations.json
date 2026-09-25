@@ -1290,8 +1290,8 @@
   {
     "name": "requires-parenthesized-call-ownership",
     "file": "SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs",
-    "original": "            expression = parenthesized.Expression;",
-    "mutated": "            expression = null;",
+    "original": "            if (parent is ParenthesizedExpressionSyntax parenthesized &&\n                parenthesized.Expression.Span.Contains(current.Span))\n            {\n                current = parent;\n                continue;\n            }",
+    "mutated": "            if (parent is ParenthesizedExpressionSyntax parenthesized &&\n                parenthesized.Expression.Span.Contains(current.Span))\n            {\n                return false;\n            }",
     "project": "SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj",
     "filter": "FullyQualifiedName~ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape"
   },
