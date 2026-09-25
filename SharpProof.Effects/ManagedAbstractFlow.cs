@@ -1243,6 +1243,25 @@ internal sealed class ManagedAbstractFlow
                 : NonNull;
         }
 
+        if (!conversion.IsTryCast &&
+            conversion.OperatorMethod == null &&
+            !conversion.Conversion.IsUserDefined &&
+            string.Equals(
+                conversion.Syntax.Language,
+                LanguageNames.CSharp,
+                StringComparison.Ordinal) &&
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                .GetConversion(conversion).IsNumeric &&
+            IntegerType(conversion.Operand.Type, out var sourceInteger) &&
+            IntegerType(conversion.Type, out var targetInteger) &&
+            operand.TryGetInteger(out var interval) &&
+            (sourceInteger.Minimum >= targetInteger.Minimum &&
+             sourceInteger.Maximum <= targetInteger.Maximum ||
+             FitsType(interval, conversion.Type)))
+        {
+            return Integer(interval);
+        }
+
         return !conversion.IsTryCast && conversion.OperatorMethod == null && conversion.Conversion.IsReference &&
                operand.TryGetNullness(out var nullness)
             ? Reference(nullness, operand.Cardinality)
@@ -2155,9 +2174,47 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow, IMethodSymbol?
 
     internal bool ProvesNoOverflow(IOperation operation)
     {
-        return !HasMutation(operation)
-            ? TryGetState(operation, out var state) && flow.ProvesNoOverflow(operation, state, method)
-            : false;
+        if (operation is IConversionOperation conversion &&
+            IsRangePreservingNumericConversion(conversion))
+        {
+            return true;
+        }
+
+        if (HasMutation(operation))
+        {
+            return false;
+        }
+
+        if (TryGetState(operation, out var state))
+        {
+            return flow.ProvesNoOverflow(operation, state, method);
+        }
+
+        return operation is IConversionOperation conversionOperation &&
+            TryGetState(conversionOperation.Operand, out state) &&
+            flow.ProvesNoOverflow(conversionOperation, state, method);
+    }
+
+    private static bool IsRangePreservingNumericConversion(
+        IConversionOperation conversion)
+    {
+        return !conversion.IsTryCast &&
+            conversion.OperatorMethod == null &&
+            !conversion.Conversion.IsUserDefined &&
+            string.Equals(
+                conversion.Syntax.Language,
+                LanguageNames.CSharp,
+                StringComparison.Ordinal) &&
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                .GetConversion(conversion).IsNumeric &&
+            ManagedAbstractValue.IntegerType(
+                conversion.Operand.Type,
+                out var source) &&
+            ManagedAbstractValue.IntegerType(
+                conversion.Type,
+                out var target) &&
+            source.Minimum >= target.Minimum &&
+            source.Maximum <= target.Maximum;
     }
 
     private static bool IsControlFlow(IOperation operation)

@@ -2736,6 +2736,105 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task WidenedSmallIntegerAndLongArithmeticSatisfiesDoesNotThrow()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static int ByteProduct(byte left, byte right) =>
+                    checked(left * right);
+
+                [DoesNotThrow]
+                public static int ShortIncrement(short value) =>
+                    checked(value + 1);
+
+                [DoesNotThrow]
+                public static int CharIncrement(char value) =>
+                    checked(value + 1);
+
+                [DoesNotThrow]
+                public static int UShortSum(ushort left, ushort right) =>
+                    checked(left + right);
+
+                [DoesNotThrow]
+                public static int SByteNegate(sbyte value) =>
+                    checked(-value);
+
+                [DoesNotThrow]
+                public static int ByteLocal(byte value) {
+                    int widened = value;
+                    return checked(widened + 1);
+                }
+
+                [DoesNotThrow]
+                public static long LongProduct(int left, int right) =>
+                    checked((long)left * right);
+
+                [DoesNotThrow]
+                public static long LongSum(int left, int right) =>
+                    checked((long)left + right);
+
+                [DoesNotThrow]
+                public static int KnownLongNarrow(
+                    [InRange(-10, 10)] long value) =>
+                    checked((int)value);
+
+                [DoesNotThrow]
+                public static int UnknownIntAdd(int value) =>
+                    checked(value + 1);
+
+                [DoesNotThrow]
+                public static int UnknownLongNarrow(long value) =>
+                    checked((int)value);
+            }
+            """,
+            "effects",
+            [],
+            new SharpProofAnalyzer(factory));
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0046", 2);
+        foreach (var methodName in new[]
+                 {
+                     "UnknownIntAdd",
+                     "UnknownLongNarrow"
+                 })
+        {
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contain("'" + methodName + "'"),
+                methodName);
+            Assert.That(
+                factory.Outcomes[methodName],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown),
+                methodName);
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "ByteProduct",
+                     "ShortIncrement",
+                     "CharIncrement",
+                     "UShortSum",
+                     "SByteNegate",
+                     "ByteLocal",
+                     "LongProduct",
+                     "LongSum",
+                     "KnownLongNarrow"
+                 })
+        {
+            Assert.That(
+                factory.Outcomes[methodName],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven),
+                methodName);
+        }
+    }
+
+    [Test]
     public async Task NullableBoxingProjectsZeroAllocationsFromPresence()
     {
         var factory = new RecordingSessionFactory();
