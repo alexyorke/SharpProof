@@ -250,5 +250,99 @@ public sealed class SarifProjectionTests
                 Assert.That(result.GetProperty("level").GetString(), Is.EqualTo(expectedLevel));
             }
         }
+
+        AssertNonFailResultsUseNoneLevel(results);
+    }
+
+    [TestCase(WorkerAssumptionPolicy.Allow, "review", "none")]
+    [TestCase(WorkerAssumptionPolicy.Warn, "fail", "warning")]
+    [TestCase(WorkerAssumptionPolicy.Error, "fail", "error")]
+    public void AssumptionResultsUseSarifValidKindAndLevel(
+        WorkerAssumptionPolicy policy, string expectedKind,
+        string expectedLevel)
+    {
+        var location = new WorkerSourceLocation
+        {
+            Path = "source.cs",
+            Start = 0,
+            Length = 1,
+            Line = 1,
+            Column = 1
+        };
+        var callable = new WorkerCallableManifestEntry
+        {
+            CallableId = "Consumer.Subject.Identity()",
+            Location = location,
+            ClaimIds = []
+        };
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [callable],
+            Claims = []
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [new WorkerCallableResult
+            {
+                CallableId = callable.CallableId,
+                Coverage = WorkerCallableCoverage.Complete,
+                Reason = WorkerCallableCoverageReason.None,
+                Assumptions = [new WorkerAssumptionEvidence
+                {
+                    Id = "assumption-1",
+                    Kind = WorkerAssumptionKind.UserAssume,
+                    Used = true
+                }]
+            }],
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "1.0.0-test"
+                }
+            }
+        };
+
+        using var document = JsonDocument.Parse(
+            SarifProjection.Serialize(
+                new WorkerVerifyRequest { AssumptionPolicy = policy },
+                response,
+                "/workspace/consumer"));
+        var results = document.RootElement
+            .GetProperty("runs")[0]
+            .GetProperty("results");
+
+        Assert.That(results.GetArrayLength(), Is.EqualTo(1));
+        var assumptionResult = results[0];
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                assumptionResult.GetProperty("kind").GetString(),
+                Is.EqualTo(expectedKind));
+            Assert.That(
+                assumptionResult.GetProperty("level").GetString(),
+                Is.EqualTo(expectedLevel));
+        }
+
+        AssertNonFailResultsUseNoneLevel(results);
+    }
+
+    private static void AssertNonFailResultsUseNoneLevel(JsonElement results)
+    {
+        foreach (var result in results.EnumerateArray())
+        {
+            if (result.TryGetProperty("kind", out var kind) &&
+                kind.GetString() != "fail")
+            {
+                Assert.That(
+                    result.GetProperty("level").GetString(),
+                    Is.EqualTo("none"),
+                    "SARIF results with a non-fail kind must use level none.");
+            }
+        }
     }
 }

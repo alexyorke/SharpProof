@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B5 congruence interval normalization, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B72 top-level source rebinding, B73 return-attribute active-source rebinding, B74 release-resume, B75 AggregateException cancellation forwarding, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and the B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **37 findings**: 0 P0, 0 P1, 0 P2, and 37 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B5 congruence interval normalization, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B72 top-level source rebinding, B73 return-attribute active-source rebinding, B74 release-resume, B75 AggregateException cancellation forwarding, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B20 SARIF assumption-result kind and level consistency, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and the B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **36 findings**: 0 P0, 0 P1, 0 P2, and 36 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,37 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P3 - Low
-
-### B20. SARIF assumption results pair `kind: review` with `level: note`
-
-**Confidence: High. Evidence: source trace against the SARIF 2.1.0 rule.**
-
-- **Location:** `SharpProof.Worker.Launcher/SarifProjection.cs:150-171`
-  (`AssumptionResult`), using `LauncherPresentation.Level` in
-  `SharpProof.Worker.Launcher/LauncherProjections.generated.cs:64-76`.
-- **Defect:** `Level(WorkerAssumptionPolicy.Allow, "note")` returns `"note"`,
-  and `AssumptionResult` then emits `kind = "review"` with `level = "note"`.
-  SARIF 2.1.0 section 3.27.9 requires `level` to be `"none"` whenever `kind`
-  is present with any value other than `"fail"`. `allow` is the default
-  assumption policy for the advisory profile
-  (`SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`), so any
-  selected callable with `Contract.Assume` or a trusted boundary produces a
-  non-conforming result in the default configuration. Claim results already
-  follow the rule: advisory `Unknown` uses `review`/`none`
-  (`SarifProjectionTests.cs:176`, `LauncherArgumentTests.cs:1625`).
-- **Impact:** strict SARIF consumers (for example, GitHub code scanning
-  upload validation or the SARIF multitool validator) may reject or
-  misclassify the published SARIF file. Verification outcomes are unaffected.
-- **Proposed fix:** in `AssumptionResult`, emit `("review", "none")` for the
-  `Allow` policy (keeping the note-level intent in a property if needed), and
-  `("fail", "warning")` / `("fail", "error")` for `Warn`/`Error`, e.g.
-  `var (kind, level) = request.AssumptionPolicy switch { Allow => ("review",
-  "none"), Warn => ("fail", "warning"), Error => ("fail", "error") };`.
-- **Proposed regression:** add `AssumptionResult` cases for all three
-  assumption policies to `SharpProof.Package.Test/SarifProjectionTests.cs`,
-  asserting that every result with `kind != "fail"` has `level == "none"`.
-  A generic assertion over all emitted results would also cover future
-  presentations.
 
 ### B21. `LinuxProcessStatParser.TryParse` throws on a stat line ending at `)`
 

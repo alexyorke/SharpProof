@@ -155,10 +155,10 @@ internal static class SarifProjection
             .Where(IsPolicyAssumption)
             .ToArray();
         var level = LauncherPresentation.Level(
-            request.AssumptionPolicy, "note");
+            request.AssumptionPolicy, "none");
         return Result(
             VerifierDiagnosticCodes.AssumptionsDeclared,
-            level == "note" ? "review" : "fail",
+            level == "none" ? "review" : "fail",
             level,
             LauncherPresentation.AssumptionsDeclaredMessage(
                 result.CallableId, assumptions),
