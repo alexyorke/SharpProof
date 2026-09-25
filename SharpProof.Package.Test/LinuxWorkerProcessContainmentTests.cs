@@ -9,6 +9,58 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class LinuxWorkerProcessContainmentTests
 {
+    private static readonly string[] ProcessStatFields =
+    [
+        "S", "456", "789", "321", "0", "-1", "0", "0", "0", "0",
+        "0", "0", "0", "0", "0", "0", "0", "0", "1", "42"
+    ];
+
+    [TestCase("123 (x)")]
+    [TestCase("123 (x) ")]
+    public void TruncatedProcessStatReturnsFalseWithoutThrowing(string stat)
+    {
+        Assert.That(LinuxProcessStatParser.TryParse(stat, out _), Is.False);
+    }
+
+    [Test]
+    public void ProcessStatCommandMayContainClosingParentheses()
+    {
+        var stat = CreateProcessStat("worker)child");
+
+        Assert.That(
+            LinuxProcessStatParser.TryParse(stat, out var processStat),
+            Is.True);
+        Assert.That(processStat.ParentProcessId, Is.EqualTo(456));
+    }
+
+    [Test]
+    public void ProcessStatExtractsParentGroupSessionAndStartTime()
+    {
+        var stat = CreateProcessStat("worker");
+
+        Assert.That(
+            LinuxProcessStatParser.TryParse(stat, out var processStat),
+            Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(processStat.ParentProcessId, Is.EqualTo(456));
+            Assert.That(processStat.ProcessGroupId, Is.EqualTo(789));
+            Assert.That(processStat.SessionId, Is.EqualTo(321));
+            Assert.That(processStat.StartTime, Is.EqualTo(42UL));
+        }
+    }
+
+    [TestCase("")]
+    [TestCase("  ")]
+    [TestCase("\t")]
+    public void MalformedSpacingAfterProcessStatCommandIsRejected(
+        string separator)
+    {
+        var stat = "123 (x)" + separator + string.Join(' ', ProcessStatFields);
+
+        Assert.That(LinuxProcessStatParser.TryParse(stat, out _), Is.False);
+    }
+
     [Test]
     [NonParallelizable]
     [Platform("Linux")]
@@ -77,5 +129,11 @@ public sealed class LinuxWorkerProcessContainmentTests
         {
             return false;
         }
+    }
+
+    private static string CreateProcessStat(string command)
+    {
+        return "123 (" + command + ") " +
+            string.Join(' ', ProcessStatFields);
     }
 }

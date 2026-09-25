@@ -2,7 +2,7 @@
 
 ## Current audit and evidence
 
-Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B5 congruence interval normalization, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B27 solver-incompleteness classification, B67 suppression claim omission, B72 top-level source rebinding, B73 return-attribute active-source rebinding, B74 release-resume, B75 AggregateException cancellation forwarding, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B20 SARIF assumption-result kind and level consistency, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and the B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **36 findings**: 0 P0, 0 P1, 0 P2, and 36 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
+Updated on 2026-09-24. The findings below were audited against baseline `1d96799e6` (`Fix contract semantics, worker ownership, and evidence recovery`). In this working tree, the compound-assignment false-proof, managed exception-region false-proof, completion-analysis recursion-budget and call-graph blowup, rotating-seed fuzz coverage, malformed UTF-16 canonical-hash collision, null module-reference validation, rejected-cache capacity maintenance, pilot publication-evidence binding, managed struct receiver-write, qualification evidence-admission, qualification receipt snapshot-binding, MSBuild published-result invocation binding, advisory attribute-alias activation, B5 congruence interval normalization, B6 frontend evaluation-order snapshots, B11 root-enumeration ownership, B15 catch-filter rethrow identity, B16 pilot-review handoff, B21 Linux process-stat truncation and delimiter validation, B27 solver-incompleteness classification, B67 suppression claim omission, B72 top-level source rebinding, B73 return-attribute active-source rebinding, B74 release-resume, B75 AggregateException cancellation forwarding, B17 cold framework-package bootstrap, B18 nullable value-type receiver, B19 signed-remainder normal-completion, B20 SARIF assumption-result kind and level consistency, B33 reachable-read-region, B34 implicit-constructor-initializer, B41 trusted-computing-base-completeness, B42 .globalconfig profile consistency, B49 contract-bearing relational-summary, B54 replayable-prefix-completion, B59 guard-clause replayability, and the B65 Z3 payload integrity and B66 inherited runtime environment findings have been fixed and verified, so they are removed from the active backlog. Proposed fixes for the other findings have not been implemented. The active backlog contains **35 findings**: 0 P0, 0 P1, 0 P2, and 35 P3. Former candidate C1 is now B6; no separate candidate remains in this audit. B18 onward come from a fifth pass on 2026-09-22 that ran a real analyzer built from an unchanged `git archive` of HEAD with SDK 9.0.318 outside the container (the pinned 9.0.316 SDK was not installed).
 The fifth pass also ran generated fuzz campaigns with execution-checked ground truth, stack-exhaustion and timing runs (B47, B48, B50), and end-to-end false-proof confirmations through the collector and in-process worker. The next paragraph describes the evidence of the earlier waves only.
 Evidence is scoped per finding. Probes on unchanged sources observed fuzz
 scheduling, canonical hashing, interval precision, frontend IR, module-reference
@@ -216,31 +216,6 @@ to B6, B15, and B27. Areas probed without a new finding:
   both.
 
 ## P3 - Low
-
-### B21. `LinuxProcessStatParser.TryParse` throws on a stat line ending at `)`
-
-**Confidence: High for the parser; Low for reachability with a real procfs.**
-
-- **Location:** `SharpProof.Host/LinuxProcessStatParser.cs:18-26`; callers
-  `SharpProof.Host/LinuxWorkerProcess.cs:394-410` (`TryReadProcessStat`) and
-  `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:459-488`
-  (`ReadProcessParents`).
-- **Defect:** after `var closeName = stat.LastIndexOf(')')`, the parser calls
-  `stat.AsSpan(closeName + 2)`. When `)` is the last character (for example a
-  truncated `"123 (x)"`), `closeName + 2` exceeds the string length and
-  `AsSpan` throws `ArgumentOutOfRangeException` instead of returning `false`.
-  Both callers catch only I/O and access exceptions, so the exception escapes
-  descendant capture during worker termination and supervisor cleanup.
-- **Reachability:** a Linux kernel always writes the fields after the command
-  name in one `/proc/<pid>/stat` read, so this requires a truncated or
-  nonstandard procfs. It is a latent contract violation of a `Try*` API used
-  on the containment path, where an unexpected throw can skip killing
-  captured descendants.
-- **Proposed fix:** return `false` when `closeName + 2 > stat.Length` (or use
-  `stat.AsSpan(closeName + 1).TrimStart()`), before splitting.
-- **Proposed regression:** add parser cases for `"123 (x)"`, `"123 (x) "`, and a
-  command name containing `)`, asserting `false` or correct fields without
-  throwing.
 
 ### B22. Attempt-scoped artifact names make "Re-run failed jobs" unusable
 

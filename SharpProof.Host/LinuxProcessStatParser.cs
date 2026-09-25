@@ -21,7 +21,16 @@ internal static class LinuxProcessStatParser
             return false;
         }
 
-        var fields = stat.AsSpan(closeName + 2)
+        var stateIndex = closeName + 2;
+        if (closeName >= stat.Length - 3 ||
+            stat[closeName + 1] != ' ' ||
+            char.IsWhiteSpace(stat[stateIndex]) ||
+            stat[stateIndex + 1] != ' ')
+        {
+            return false;
+        }
+
+        var fields = stat.AsSpan(stateIndex)
             .ToString()
             .Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (fields.Length < 2 ||
