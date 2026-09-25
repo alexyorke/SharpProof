@@ -458,7 +458,7 @@ internal static partial class RequiresCallSiteAnalyzer
                         _factory.StringType);
                     return new ClauseEvaluation(
                         value.TryGetBoolean(out var proven) ? proven : null,
-                        clause.Condition);
+                        clause.DiagnosticText);
                 }));
         }
 
@@ -608,7 +608,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 // precondition that the caller violated.
                 evaluations.Add(new ClauseEvaluation(
                     value.Value.Boolean,
-                    clause.Condition));
+                    clause.DiagnosticText));
             }
             return CompleteEvaluation(callSite, evaluations);
         }
@@ -618,7 +618,6 @@ internal static partial class RequiresCallSiteAnalyzer
             IEnumerable<ClauseEvaluation> evaluations)
         {
             var outcome = AnalyzerSemanticOutcome.Proven;
-            IrPrinter? printer = null;
             foreach (var evaluation in evaluations)
             {
                 if (!evaluation.Value.HasValue)
@@ -629,27 +628,14 @@ internal static partial class RequiresCallSiteAnalyzer
                 else if (!evaluation.Value.Value)
                 {
                     outcome = AnalyzerSemanticOutcome.Refuted;
-                    printer ??= new IrPrinter(_factory);
                     reportDiagnostic(Diagnostic.Create(
                         GeneratedDiagnosticDescriptors.RequiresNotProvenRule,
                         callSite.Syntax.GetLocation(),
                         callSite.TargetMethod.Name,
-                        FormatCondition(printer, evaluation.Condition)));
+                        evaluation.DiagnosticText));
                 }
             }
             return outcome;
-        }
-
-        private static string FormatCondition(IrPrinter printer, IrTerm condition)
-        {
-            try
-            {
-                return printer.Print(condition);
-            }
-            catch (InvalidOperationException)
-            {
-                return "[condition exceeds the display limit]";
-            }
         }
     }
 

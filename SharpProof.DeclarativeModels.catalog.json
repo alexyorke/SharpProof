@@ -114,7 +114,7 @@
               "name": "ClauseEvaluation",
               "parameters": [
                 {"type": "bool?", "name": "Value"},
-                {"type": "IrTerm", "name": "Condition"}
+                {"type": "string", "name": "DiagnosticText"}
               ]
             }
           ]

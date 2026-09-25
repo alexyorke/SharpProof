@@ -55,18 +55,21 @@ public sealed class BoundContractClause
         BoundContractKind kind,
         IrTerm condition,
         OperationId sourceOperation,
-        BoundContractEvidence evidence
+        BoundContractEvidence evidence,
+        string diagnosticText
     )
     {
         Kind = kind;
         Condition = condition;
         SourceOperation = sourceOperation;
         Evidence = evidence;
+        DiagnosticText = diagnosticText;
     }
     public BoundContractKind Kind { get; }
     public IrTerm Condition { get; }
     public OperationId SourceOperation { get; }
     public BoundContractEvidence Evidence { get; }
+    public string DiagnosticText { get; }
 }
 
 public sealed class BoundContractVariable

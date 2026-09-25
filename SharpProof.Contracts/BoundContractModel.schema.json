@@ -44,15 +44,17 @@
           {"type": "BoundContractKind", "name": "kind"},
           {"type": "IrTerm", "name": "condition"},
           {"type": "OperationId", "name": "sourceOperation"},
-          {"type": "BoundContractEvidence", "name": "evidence"}
+          {"type": "BoundContractEvidence", "name": "evidence"},
+          {"type": "string", "name": "diagnosticText"}
         ],
-        "assignments": ["Kind", "Condition", "SourceOperation", "Evidence"]
+        "assignments": ["Kind", "Condition", "SourceOperation", "Evidence", "DiagnosticText"]
       },
       "properties": [
         {"type": "BoundContractKind", "name": "Kind"},
         {"type": "IrTerm", "name": "Condition"},
         {"type": "OperationId", "name": "SourceOperation"},
-        {"type": "BoundContractEvidence", "name": "Evidence"}
+        {"type": "BoundContractEvidence", "name": "Evidence"},
+        {"type": "string", "name": "DiagnosticText"}
       ]
     },
     {

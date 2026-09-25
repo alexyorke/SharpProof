@@ -62,7 +62,7 @@ internal static partial class AnalyzerFeaturePipeline
 
 internal static partial class RequiresCallSiteAnalyzer
 {
-    private readonly partial record struct ClauseEvaluation(bool? Value, IrTerm Condition);
+    private readonly partial record struct ClauseEvaluation(bool? Value, string DiagnosticText);
 }
 
 internal sealed partial class RequiresCallSiteDiscovery

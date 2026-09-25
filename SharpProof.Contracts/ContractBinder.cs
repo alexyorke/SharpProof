@@ -2,6 +2,8 @@ namespace SharpProof.Contracts;
 
 public sealed class ContractBinder
 {
+    private const int MaximumDiagnosticConditionLength = 512;
+
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
     private readonly ContractIntrinsicValidator _intrinsics;
@@ -230,7 +232,11 @@ public sealed class ContractBinder
                 return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
             }
             clauses.Add(new BoundContractClause(
-                clause.Kind, condition, clause.SourceOperation, clause.Evidence));
+                clause.Kind,
+                condition,
+                clause.SourceOperation,
+                clause.Evidence,
+                clause.DiagnosticText));
         }
 
         var attributeFailure = BindClosedAttributes(
@@ -310,9 +316,52 @@ public sealed class ContractBinder
                     System.Globalization.CultureInfo.InvariantCulture)),
                 usesCompanion
                     ? BoundContractEvidence.Companion
-                    : BoundContractEvidence.CompilerBoundInvocation));
+                    : BoundContractEvidence.CompilerBoundInvocation,
+                FormatDiagnosticSourceText(
+                    invocation.Arguments[0].Value.Syntax)));
         }
         return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
+    }
+
+    private static string FormatClosedAttributeDiagnosticText(
+        AttributeData attribute,
+        ClosedContractAttributeValidation validation,
+        string valueName)
+    {
+        var syntax = attribute.ApplicationSyntaxReference?.GetSyntax();
+        if (syntax != null)
+        {
+            if ((long)syntax.Span.Length + valueName.Length + 3 >
+                MaximumDiagnosticConditionLength)
+            {
+                return "[condition exceeds the display limit]";
+            }
+
+            return "[" + syntax + "] " + valueName;
+        }
+
+        var attributeText = validation.Kind switch
+        {
+            ClosedContractAttributeKind.NotNull => "[NotNull]",
+            ClosedContractAttributeKind.Positive => "[Positive]",
+            ClosedContractAttributeKind.InRange =>
+                "[InRange(" + validation.Minimum.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) + ", " +
+                validation.Maximum.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) + ")]",
+            _ => "[closed contract]"
+        };
+        return (long)attributeText.Length + valueName.Length + 1 >
+            MaximumDiagnosticConditionLength
+            ? "[condition exceeds the display limit]"
+            : attributeText + " " + valueName;
+    }
+
+    private static string FormatDiagnosticSourceText(SyntaxNode syntax)
+    {
+        return syntax.Span.Length > MaximumDiagnosticConditionLength
+            ? "[condition exceeds the display limit]"
+            : syntax.ToString();
     }
 
     private ContractBindingFailure ValidateIntrinsics(
@@ -352,6 +401,9 @@ public sealed class ContractBinder
                 site.RefKind,
                 value,
                 site.IsReturn
+                    ? "return value"
+                    : target.Parameters[site.ParameterIndex].Name,
+                site.IsReturn
                     ? BoundContractKind.Ensures
                     : BoundContractKind.Requires,
                 clauses);
@@ -368,6 +420,7 @@ public sealed class ContractBinder
         ITypeSymbol sourceType,
         RefKind refKind,
         IrTerm? value,
+        string valueName,
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
@@ -396,6 +449,11 @@ public sealed class ContractBinder
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }
+
+            var diagnosticText = FormatClosedAttributeDiagnosticText(
+                attribute,
+                validation,
+                valueName);
 
             IrTerm condition;
             switch (validation.Kind)
@@ -450,7 +508,11 @@ public sealed class ContractBinder
             }
 
             clauses.Add(new BoundContractClause(
-                kind, condition, _factory.CreateOperation("closed-attribute"), BoundContractEvidence.ClosedAttribute));
+                kind,
+                condition,
+                _factory.CreateOperation("closed-attribute"),
+                BoundContractEvidence.ClosedAttribute,
+                diagnosticText));
         }
         return ContractBindingFailure.None;
     }

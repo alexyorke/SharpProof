@@ -929,7 +929,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                 diagnostics[0].GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture),
                 Does.Contain(
-                    "Call to 'Target' violates precondition '(v0 > 0)'"));
+                    "Call to 'Target' violates precondition '[Positive] value'"));
         }
     }
 
