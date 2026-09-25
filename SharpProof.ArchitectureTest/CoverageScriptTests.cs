@@ -314,6 +314,27 @@ public sealed class CoverageScriptTests
     }
 
     [Test]
+    public async Task UnmappedCommentedBraceOnlyChangeRemainsAdmissible()
+    {
+        var result = await RunUnmappedChangedLineFixtureAsync(
+            "        return proven;",
+            "        /* a */ { /* b */",
+            generated: false,
+            targetClosesMethod: false,
+            targetInsideMethodBody: true,
+            changedLineOpensBlock: true);
+
+        Assert.That(result.Process.ExitCode, Is.Zero, result.Process.Error);
+        using var document = JsonDocument.Parse(result.Process.Output);
+        var changed = document.RootElement.GetProperty("changedTcb");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(changed.GetProperty("uncoveredLines").GetArrayLength(), Is.Zero);
+            Assert.That(changed.GetProperty("passed").GetBoolean(), Is.True);
+        }
+    }
+
+    [Test]
     public async Task CaseDistinctTcbPathsKeepIndependentCoverage()
     {
         RequireLinuxFileNames();
@@ -820,13 +841,66 @@ public sealed class CoverageScriptTests
             true).SetName("UnmappedGeneratedDeclarationChangeFailsClosed");
     }
 
+    [TestCase(
+        "        /* a */ DangerousCall(); /* b */",
+        false,
+        TestName = "UnmappedStatementInsideBlockCommentsFailsClosed")]
+    [TestCase(
+        "        /**/ return proven; /**/",
+        false,
+        TestName = "UnmappedReturnInsideBlockCommentsFailsClosed")]
+    [TestCase(
+        "        */ code(); /*",
+        true,
+        TestName = "UnmappedClosedThenOpenBlockCommentShapeFailsClosed")]
+    [TestCase(
+        "        var commentText = \"//\";",
+        false,
+        TestName = "UnmappedStringLiteralWithLineCommentMarkersFailsClosed")]
+    [TestCase(
+        "        var commentText = \"/* text */\";",
+        false,
+        TestName = "UnmappedStringLiteralWithBlockCommentMarkersFailsClosed")]
+    public async Task UnmappedCodeInsideOrBetweenBlockCommentsFailsClosed(
+        string changedLine,
+        bool commentTransitionContext = false)
+    {
+        var result = await RunUnmappedChangedLineFixtureAsync(
+            "        return proven;",
+            changedLine,
+            generated: false,
+            targetClosesMethod: false,
+            targetInsideMethodBody: true,
+            commentTransitionContext: commentTransitionContext);
+
+        Assert.That(result.Process.ExitCode, Is.Zero, result.Process.Error);
+        using var document = JsonDocument.Parse(result.Process.Output);
+        var changed = document.RootElement.GetProperty("changedTcb");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changed.GetProperty("uncoveredLines")
+                    .EnumerateArray()
+                    .Select(static value => value.GetString())
+                    .ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "Project/Trusted.cs:" + result.ChangedLine
+                }));
+            Assert.That(changed.GetProperty("passed").GetBoolean(), Is.False);
+        }
+    }
+
     private static async Task<ChangedLineResult>
         RunUnmappedChangedLineFixtureAsync(
             string originalLine,
         string changedLine,
         bool generated,
         bool targetClosesMethod,
-        double minimumChangedTcbLinePercent = 100)
+        double minimumChangedTcbLinePercent = 100,
+        bool targetInsideMethodBody = false,
+        bool changedLineOpensBlock = false,
+        bool commentTransitionContext = false)
     {
         var root = TestRepository.FindRoot();
         using var temporary = CreateTemporaryRepository("unmapped-");
@@ -835,7 +909,10 @@ public sealed class CoverageScriptTests
         var original = CreateChangedLineSource(
             originalLine,
             generated,
-            targetClosesMethod);
+            targetClosesMethod,
+            targetInsideMethodBody,
+            targetStartsBlock: false,
+            commentTransitionContext);
         await WriteChangedLineFixtureAsync(
             root,
             repository,
@@ -852,7 +929,10 @@ public sealed class CoverageScriptTests
         var changed = CreateChangedLineSource(
             changedLine,
             generated,
-            targetClosesMethod);
+            targetClosesMethod,
+            targetInsideMethodBody,
+            targetStartsBlock: changedLineOpensBlock,
+            commentTransitionContext);
         await File.WriteAllTextAsync(
             Path.Combine(repository, "Project", "Trusted.cs"),
             changed.Text);
@@ -868,7 +948,10 @@ public sealed class CoverageScriptTests
     private static SourceFixture CreateChangedLineSource(
         string targetLine,
         bool generated,
-        bool targetClosesMethod)
+        bool targetClosesMethod,
+        bool targetInsideMethodBody = false,
+        bool targetStartsBlock = false,
+        bool commentTransitionContext = false)
     {
         var lines = new List<string>();
         if (generated)
@@ -879,13 +962,37 @@ public sealed class CoverageScriptTests
         lines.Add("{");
         lines.Add("    public static int Covered()");
         lines.Add("    {");
+        if (targetInsideMethodBody)
+        {
+            lines.Add("        void DangerousCall() { }");
+            lines.Add("        void code() { }");
+            lines.Add("        int proven = 2;");
+            lines.Add("        DangerousCall();");
+            lines.Add("        code();");
+        }
         lines.Add("        return 1;");
-        if (!targetClosesMethod)
+        if (targetInsideMethodBody && commentTransitionContext)
+        {
+            lines.Add("        /* preceding block comment");
+        }
+        else if (!targetInsideMethodBody && !targetClosesMethod)
         {
             lines.Add("    }");
         }
         lines.Add(targetLine);
         var targetLineNumber = lines.Count;
+        if (targetInsideMethodBody)
+        {
+            if (commentTransitionContext)
+            {
+                lines.Add("        */");
+            }
+            if (targetStartsBlock)
+            {
+                lines.Add("        }");
+            }
+            lines.Add("    }");
+        }
         lines.Add("}");
         return new SourceFixture(
             string.Join("\n", lines) + "\n",

@@ -962,8 +962,8 @@
   {
     "name": "launcher-checks-protocol-companion-path",
     "file": "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
-    "original": "                System.IO.Path.Combine(directory, \"SharpProof.Worker.Protocol.dll\"),",
-    "mutated": "                System.IO.Path.Combine(directory, \"SharpProof.Worker.dll\"),",
+    "original": "            System.IO.Path.Combine(directory, \"SharpProof.Worker.Protocol.dll\"),",
+    "mutated": "            System.IO.Path.Combine(directory, \"SharpProof.Worker.dll\"),",
     "project": "SharpProof.Package.Test/SharpProof.Package.Test.csproj",
     "filter": "FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead"
   },

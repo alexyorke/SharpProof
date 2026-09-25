@@ -40,8 +40,15 @@ function Test-ClearlyNonSemanticSourceLine {
     if ($trimmed.StartsWith('//', [StringComparison]::Ordinal)) {
         return $true
     }
-    return $trimmed.StartsWith('/*', [StringComparison]::Ordinal) -and
-        $trimmed.EndsWith('*/', [StringComparison]::Ordinal)
+
+    $withoutBlockComments = [regex]::Replace(
+        $trimmed,
+        '/\*.*?\*/',
+        '')
+    $withoutBlockComments = $withoutBlockComments.Trim()
+    return $withoutBlockComments.Length -eq 0 -or
+        $withoutBlockComments -in @('{', '}') -or
+        $withoutBlockComments.StartsWith('//', [StringComparison]::Ordinal)
 }
 
 function Resolve-DurableComparisonCommit {
