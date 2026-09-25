@@ -24,7 +24,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "System.AggregateException",
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
-        "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
+        "SharpProof.Analyzer.GeneratedDiagnosticDescriptors",
+        "SharpProof.ContractForValidation.ContractForDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
         "SharpProof.Worker.CallableEvidenceBuilder",
         "SharpProof.Worker.CallableVerifier", "SharpProof.Worker.PostconditionObligationBuilder",
@@ -662,14 +663,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
         var containingType = context.ContainingSymbol.ContainingType;
         if (IsSameType(creation.Type, symbols[KnownType.DiagnosticDescriptor]) &&
-            !creation.Syntax.SyntaxTree.FilePath.EndsWith(".generated.cs", StringComparison.OrdinalIgnoreCase) &&
-            !IsAnyType(
-                containingType,
-                symbols,
-                KnownType.MetaDiagnosticDescriptors,
-                KnownType.AnalyzerDiagnosticDescriptors,
-                KnownType.ContractForDiagnosticDescriptors) &&
-            containingType?.Name != "ContractForDiagnosticDescriptors")
+            !IsGeneratedDescriptorCatalog(containingType, symbols))
         {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
         }
@@ -680,6 +674,60 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             creation.Syntax.GetLocation(),
             containingType,
             symbols);
+    }
+
+    private static bool IsGeneratedDescriptorCatalog(
+        INamedTypeSymbol? containingType,
+        KnownSymbols symbols)
+    {
+        return IsGeneratedDescriptorCatalog(
+                containingType,
+                symbols[KnownType.AnalyzerDiagnosticDescriptors],
+                "SharpProof.Analyzer.Core",
+                "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs") ||
+            IsGeneratedDescriptorCatalog(
+                containingType,
+                symbols[KnownType.ContractForDiagnosticDescriptors],
+                "SharpProof.Analyzer.Core",
+                "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs") ||
+            IsGeneratedDescriptorCatalog(
+                containingType,
+                symbols[KnownType.MetaDiagnosticDescriptors],
+                "SharpProof.Meta.Analyzers",
+                "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs");
+    }
+
+    private static bool IsGeneratedDescriptorCatalog(
+        INamedTypeSymbol? actual,
+        INamedTypeSymbol? expected,
+        string assemblyName,
+        string sourcePathSuffix)
+    {
+        if (!IsSameType(actual, expected) ||
+            !string.Equals(
+                actual!.ContainingAssembly.Name,
+                assemblyName,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var declarations = actual.DeclaringSyntaxReferences;
+        if (declarations.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var declaration in declarations)
+        {
+            var path = declaration.SyntaxTree.FilePath.Replace('\\', '/');
+            if (!path.EndsWith(sourcePathSuffix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsAnyType(ITypeSymbol? actual, KnownSymbols symbols, params KnownType[] expected)

@@ -1,6 +1,9 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using static SharpProof.ArchitectureTest.ArchitectureRepository;
 
@@ -16,6 +19,8 @@ public sealed class BoundaryEnforcementTests
                 .Descendants("SharpProofUsesMetaAnalyzer")
                 .Any(static element =>
                     string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase)))];
+    private static readonly MetadataReference[] DescriptorAuditReferences =
+        CreateDescriptorAuditReferences();
 
     private static readonly (string Project, string[] Grantees)[] ExpectedInternalsVisibleTo = [
         ("SharpProof.Analyzer.Core", [
@@ -416,49 +421,102 @@ public sealed class BoundaryEnforcementTests
     [Test]
     public void DiagnosticDescriptorsComeOnlyFromTheGeneratedCatalog()
     {
+        var root = TestRepository.FindRoot();
         Assert.That(
             File.Exists(Path.Combine(
-                TestRepository.FindRoot(),
+                root,
                 "SharpProof.Analyzer",
                 "AnalyzerDiagnosticCatalog.cs")),
             Is.False);
 
-        string[] descriptorProjects = [
-            "SharpProof.Analyzer.Core",
-            "SharpProof.Meta.Analyzers"
-        ];
+        using var catalog = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "eng", "diagnostics", "diagnostic-descriptors.v1.json")));
+        var allowedPaths = catalog.RootElement.GetProperty("outputs")
+            .EnumerateArray()
+            .Select(output => output.GetProperty("outputPath").GetString()!)
+            .ToHashSet(StringComparer.Ordinal);
+        var descriptorProjects = ProductionRoslynProjects();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(descriptorProjects, Does.Contain("SharpProof.Analyzer.Core"));
+            Assert.That(descriptorProjects, Does.Contain("SharpProof.Meta.Analyzers"));
+            Assert.That(descriptorProjects, Does.Contain("SharpProof.Gates"));
+        }
+
+        var observedCatalogPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (var project in descriptorProjects)
         {
-            foreach (var file in ProductionSourceFiles(project))
+            var sourceFiles = ProductionSourceFiles(project).ToArray();
+            foreach (var file in sourceFiles)
             {
-                var source = File.ReadAllText(file);
                 Assert.That(
-                    source,
+                    File.ReadAllText(file),
                     Does.Not.Contain("AnalyzerDiagnosticCatalog.Get("),
                     TestRepository.Relative(file));
-                if (Path.GetFileName(file).EndsWith(
-                        "DiagnosticDescriptors.generated.cs",
-                        StringComparison.Ordinal))
-                {
-                    continue;
-                }
+            }
 
+            var trees = sourceFiles
+                .Select(file => CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(file),
+                    new CSharpParseOptions(LanguageVersion.Preview),
+                    path: file))
+                .ToArray();
+            var compilation = CSharpCompilation.Create(
+                "SharpProofDescriptorAudit_" + project.Replace('.', '_'),
+                trees,
+                DescriptorAuditReferences,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var descriptorType = compilation.GetTypeByMetadataName(
+                "Microsoft.CodeAnalysis.DiagnosticDescriptor");
+            Assert.That(descriptorType, Is.Not.Null, project);
+
+            foreach (var (tree, creation) in FindDiagnosticDescriptorCreations(
+                         compilation,
+                         trees))
+            {
+                var relativePath = Path.GetRelativePath(root, tree.FilePath)
+                    .Replace('\\', '/');
                 Assert.That(
-                    Regex.IsMatch(
-                        source,
-                        @"new\s+DiagnosticDescriptor\s*\("),
-                    Is.False,
-                    TestRepository.Relative(file));
+                    allowedPaths,
+                    Does.Contain(relativePath),
+                    relativePath + " constructs DiagnosticDescriptor at " +
+                    creation.GetLocation().GetLineSpan().StartLinePosition);
+                observedCatalogPaths.Add(relativePath);
             }
         }
 
         var generated = File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
+            root,
             "SharpProof.Analyzer.Core",
             "GeneratedDiagnosticDescriptors.generated.cs"));
+        Assert.That(generated, Does.Contain("SupportedDiagnostics"));
         Assert.That(
-            generated,
-            Does.Contain("SupportedDiagnostics"));
+            observedCatalogPaths,
+            Is.EquivalentTo(allowedPaths),
+            "Each declared generated catalog must contain descriptor creations.");
+    }
+
+    [Test]
+    public void DiagnosticDescriptorBackstopRecognizesTargetTypedCreation()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            using Microsoft.CodeAnalysis;
+            static class OutsideCatalog {
+                static readonly DiagnosticDescriptor Rule = new(
+                    "ID", "title", "message", "category",
+                    DiagnosticSeverity.Info, true);
+            }
+            """,
+            new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            "TargetTypedDescriptorAudit",
+            [tree],
+            DescriptorAuditReferences,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var creations = FindDiagnosticDescriptorCreations(compilation, [tree]);
+        Assert.That(creations.Count(), Is.EqualTo(1));
     }
 
     [Test]
@@ -602,6 +660,77 @@ public sealed class BoundaryEnforcementTests
                 analyzerPayload,
                 Does.Not.Contain(forbidden),
                 forbidden);
+        }
+    }
+
+    private static string[] ProductionRoslynProjects()
+    {
+        return BannedApiProjects
+            .Where(project => XDocument.Load(ProjectFile(project))
+                .Descendants()
+                .Where(static element =>
+                    element.Name.LocalName is "PackageReference" or "Reference")
+                .Select(static element =>
+                    (string?)element.Attribute("Include") ??
+                    (string?)element.Attribute("Update"))
+                .Any(static include =>
+                    include is "Microsoft.CodeAnalysis" or
+                        "Microsoft.CodeAnalysis.CSharp" ||
+                    include?.StartsWith(
+                        "Microsoft.CodeAnalysis.",
+                        StringComparison.Ordinal) == true))
+            .OrderBy(static project => project, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static MetadataReference[] CreateDescriptorAuditReferences()
+    {
+        var trustedPlatformAssemblies =
+            AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+        {
+            throw new InvalidOperationException(
+                "The runtime did not provide its trusted platform assemblies.");
+        }
+
+        return trustedPlatformAssemblies
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Append(typeof(Compilation).Assembly.Location)
+            .Append(typeof(CSharpCompilation).Assembly.Location)
+            .Where(File.Exists)
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .ToArray();
+    }
+
+    private static IEnumerable<(SyntaxTree Tree, SyntaxNode Creation)>
+        FindDiagnosticDescriptorCreations(
+            CSharpCompilation compilation,
+            IEnumerable<SyntaxTree> trees)
+    {
+        var descriptorType = compilation.GetTypeByMetadataName(
+            "Microsoft.CodeAnalysis.DiagnosticDescriptor");
+        if (descriptorType is null)
+        {
+            yield break;
+        }
+
+        foreach (var tree in trees)
+        {
+            var semanticModel = compilation.GetSemanticModel(tree);
+            foreach (var creation in tree.GetRoot().DescendantNodes()
+                         .Where(static node =>
+                             node is ObjectCreationExpressionSyntax or
+                                 ImplicitObjectCreationExpressionSyntax))
+            {
+                var typeInfo = semanticModel.GetTypeInfo((ExpressionSyntax)creation);
+                var type = typeInfo.Type ?? typeInfo.ConvertedType;
+                if (SymbolEqualityComparer.Default.Equals(type, descriptorType))
+                {
+                    yield return (tree, creation);
+                }
+            }
         }
     }
 

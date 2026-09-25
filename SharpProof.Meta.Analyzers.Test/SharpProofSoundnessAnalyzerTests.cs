@@ -2868,7 +2868,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
-    public async Task AllowsOnlyTheResolvedGeneratedDescriptorCatalog()
+    public async Task DescriptorCatalogTypeNamesDoNotAuthorizeConstruction()
     {
         const string source =
             """
@@ -2899,7 +2899,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPMETA005"]));
+            Is.EqualTo(["SPMETA005", "SPMETA005", "SPMETA005"]));
     }
 
     [Test]
@@ -2922,7 +2922,122 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """;
 
+        var diagnostics = await AnalyzeCore(
+            source,
+            "SharpProof.Meta.Analyzers",
+            "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs");
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA005"]));
+    }
+
+    [Test]
+    public async Task GeneratedFileSuffixDoesNotAuthorizeTargetTypedDescriptorConstruction()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Untrusted;
+            static class C {
+                static readonly DiagnosticDescriptor Rule = new(
+                    "ID", "title", "message", "category",
+                    DiagnosticSeverity.Info, true);
+            }
+            """;
+
+        var diagnostics = await AnalyzeCore(
+            source,
+            "GeneratedPathDescriptorBypass",
+            "Untrusted.generated.cs");
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA005"]));
+    }
+
+    [Test]
+    public async Task DescriptorTypeNameInAnotherNamespaceDoesNotAuthorizeConstruction()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Untrusted;
+            static class ContractForDiagnosticDescriptors {
+                static readonly DiagnosticDescriptor Rule = new(
+                    "ID", "title", "message", "category",
+                    DiagnosticSeverity.Info, true);
+            }
+            """;
+
         var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA005"]));
+    }
+
+    [Test]
+    public async Task ResolvedGeneratedCatalogSymbolsRemainAuthorized()
+    {
+        var catalogs = new[]
+        {
+            (
+                Namespace: "SharpProof.Analyzer",
+                TypeName: "GeneratedDiagnosticDescriptors",
+                AssemblyName: "SharpProof.Analyzer.Core",
+                SourcePath: "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs"),
+            (
+                Namespace: "SharpProof.Meta.Analyzers",
+                TypeName: "MetaDiagnosticDescriptors",
+                AssemblyName: "SharpProof.Meta.Analyzers",
+                SourcePath: "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"),
+            (
+                Namespace: "SharpProof.ContractForValidation",
+                TypeName: "ContractForDiagnosticDescriptors",
+                AssemblyName: "SharpProof.Analyzer.Core",
+                SourcePath: "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs")
+        };
+
+        foreach (var catalog in catalogs)
+        {
+            var source =
+                $$"""
+                using Microsoft.CodeAnalysis;
+                namespace {{catalog.Namespace}} {
+                    static class {{catalog.TypeName}} {
+                        static readonly DiagnosticDescriptor Rule = new(
+                            "ID", "title", "message", "category",
+                            DiagnosticSeverity.Info, true);
+                    }
+                }
+                """;
+            var diagnostics = await AnalyzeCore(
+                source,
+                catalog.AssemblyName,
+                catalog.SourcePath);
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.Empty,
+                catalog.TypeName);
+        }
+    }
+
+    [Test]
+    public async Task ExactCatalogTypeInUntrustedSourceDoesNotAuthorizeConstruction()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Meta.Analyzers;
+            static class MetaDiagnosticDescriptors {
+                static readonly DiagnosticDescriptor Rule = new(
+                    "ID", "title", "message", "category",
+                    DiagnosticSeverity.Info, true);
+            }
+            """;
+
+        var diagnostics = await AnalyzeCore(
+            source,
+            "MetaAnalyzerTest",
+            "Fake.generated.cs");
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SPMETA005"]));
