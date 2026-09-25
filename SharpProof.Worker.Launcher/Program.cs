@@ -487,8 +487,17 @@ internal static class Program
         WorkerProtocolJson.Canonicalize(response);
         validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
-        var projectTimedOut = response.RunStatus == WorkerRunStatus.TimedOut &&
-            response.FailureReason == WorkerRunFailureReason.None;
+        var hasProjectTimeoutCoverage = response.CallableResults.Any(
+            static result => result.Coverage == WorkerCallableCoverage.Incomplete &&
+                result.Reason == WorkerCallableCoverageReason.ProjectTimeout);
+        var hasMethodTimeoutCoverage = response.CallableResults.Any(
+            static result => result.Coverage == WorkerCallableCoverage.Incomplete &&
+                result.Reason == WorkerCallableCoverageReason.MethodTimeout);
+        var projectTimedOut = hasProjectTimeoutCoverage ||
+            response.CallableResults.Length == 0 &&
+                response.RunStatus == WorkerRunStatus.TimedOut &&
+                response.FailureReason == WorkerRunFailureReason.None;
+        var timeoutAttributedToCoverage = projectTimedOut || hasMethodTimeoutCoverage;
 
         var refuted = false;
         for (var index = 0; index < response.ClaimResults.Length; index++)
@@ -523,7 +532,7 @@ internal static class Program
                 callable.Location,
                 LauncherPresentation.Level(request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                projectTimedOut
+                result.Reason == WorkerCallableCoverageReason.ProjectTimeout
                     ? FormattableString.Invariant(
                         $"Project analysis timed out for {result.CallableId} ({result.Reason}).")
                     : FormattableString.Invariant(
@@ -549,7 +558,8 @@ internal static class Program
                 response.Summary
             },
             WorkerProtocolJson.SharedOptions));
-        if (response.RunStatus != WorkerRunStatus.Complete && !projectTimedOut)
+        if (response.RunStatus != WorkerRunStatus.Complete &&
+            !timeoutAttributedToCoverage)
         {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
@@ -557,7 +567,7 @@ internal static class Program
                 response.RunStatus,
                 response.FailureReason);
         }
-        if (response.Errors.Length != 0 && !projectTimedOut)
+        if (response.Errors.Length != 0 && !timeoutAttributedToCoverage)
         {
             return 3;
         }

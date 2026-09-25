@@ -1385,6 +1385,231 @@ public sealed class LauncherArgumentTests
         }
     }
 
+    [Test]
+    [NonParallelizable]
+    public void BoundResultTimeoutDiagnosticsPreservePerCallableReasons()
+    {
+        var methodTimeout = RunTimeoutClassificationCase(
+            WorkerClaimReason.MethodTimeout);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(methodTimeout.Valid, Is.True, methodTimeout.Error);
+            Assert.That(methodTimeout.ExitCode, Is.EqualTo(6));
+            Assert.That(
+                methodTimeout.Error,
+                Does.Contain("Selected analysis is incomplete for C.MethodTimeout (MethodTimeout)."));
+            Assert.That(
+                methodTimeout.Error,
+                Does.Contain("Selected analysis is incomplete for C.UnsupportedBody (SemanticUnknown)."));
+            Assert.That(
+                methodTimeout.Error,
+                Does.Not.Contain("Project analysis timed out for C.MethodTimeout"));
+            Assert.That(
+                methodTimeout.Error,
+                Does.Not.Contain("Project analysis timed out for C.UnsupportedBody"));
+            Assert.That(
+                methodTimeout.Output,
+                Does.Contain("C.UnsupportedBody effect:EnforcePure claim claim-unsupported-body (UnsupportedBody)"));
+        }
+
+        var projectTimeout = RunTimeoutClassificationCase(
+            WorkerClaimReason.ProjectTimeout);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(projectTimeout.Valid, Is.True, projectTimeout.Error);
+            Assert.That(projectTimeout.ExitCode, Is.EqualTo(6));
+            Assert.That(
+                projectTimeout.Error,
+                Does.Contain("Project analysis timed out for C.ProjectTimeout (ProjectTimeout)."));
+            Assert.That(
+                projectTimeout.Error,
+                Does.Contain("Selected analysis is incomplete for C.UnsupportedBody (SemanticUnknown)."));
+            Assert.That(
+                projectTimeout.Error,
+                Does.Not.Contain("Project analysis timed out for C.UnsupportedBody"));
+        }
+
+        var complete = RunTimeoutClassificationCase(WorkerClaimReason.None);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(complete.Valid, Is.True, complete.Error);
+            Assert.That(complete.ExitCode, Is.Zero);
+            Assert.That(complete.Error, Does.Not.Contain("SP0047"));
+            Assert.That(complete.Error, Does.Not.Contain("incomplete"));
+        }
+    }
+
+    private static (
+        bool Valid,
+        int ExitCode,
+        string Output,
+        string Error) RunTimeoutClassificationCase(
+        WorkerClaimReason timeoutReason)
+    {
+        var request = CreateValidRequest();
+        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        var methodId = timeoutReason == WorkerClaimReason.ProjectTimeout
+            ? "C.ProjectTimeout"
+            : "C.MethodTimeout";
+        var manifest = CreateTimeoutClassificationManifest(methodId);
+        const string inputHash = ValidInputHash;
+        var expectedVersions = new WorkerVersionSummary
+        {
+            WorkerVersion = "launcher-test",
+            ApiSpecVersion = "launcher-test"
+        };
+        var complete = timeoutReason == WorkerClaimReason.None;
+        var response = WorkerResultAssembler.Create(
+            inputHash,
+            manifest,
+            complete ? WorkerRunStatus.Complete : WorkerRunStatus.TimedOut,
+            WorkerRunFailureReason.None,
+            [
+                new WorkerCallableResult
+                {
+                    CallableId = methodId,
+                    Coverage = complete
+                        ? WorkerCallableCoverage.Complete
+                        : WorkerCallableCoverage.Incomplete,
+                    Reason = complete
+                        ? WorkerCallableCoverageReason.None
+                        : timeoutReason == WorkerClaimReason.MethodTimeout
+                            ? WorkerCallableCoverageReason.MethodTimeout
+                            : WorkerCallableCoverageReason.ProjectTimeout
+                },
+                new WorkerCallableResult
+                {
+                    CallableId = "C.UnsupportedBody",
+                    Coverage = complete
+                        ? WorkerCallableCoverage.Complete
+                        : WorkerCallableCoverage.Incomplete,
+                    Reason = complete
+                        ? WorkerCallableCoverageReason.None
+                        : WorkerCallableCoverageReason.SemanticUnknown
+                }
+            ],
+            [
+                new WorkerClaimResult
+                {
+                    ClaimId = "claim-timeout",
+                    Outcome = complete
+                        ? WorkerClaimOutcome.Proven
+                        : WorkerClaimOutcome.Unknown,
+                    Reason = complete
+                        ? WorkerClaimReason.None
+                        : timeoutReason
+                },
+                new WorkerClaimResult
+                {
+                    ClaimId = "claim-unsupported-body",
+                    Outcome = complete
+                        ? WorkerClaimOutcome.Proven
+                        : WorkerClaimOutcome.Unknown,
+                    Reason = complete
+                        ? WorkerClaimReason.None
+                        : WorkerClaimReason.UnsupportedBody,
+                    EffectCertainty = complete
+                        ? WorkerEffectEvidenceCertainty.CompleteMayEffectSummary
+                        : WorkerEffectEvidenceCertainty.Unavailable
+                }
+            ],
+            request.Budgets,
+            WorkerCacheStatus.Disabled,
+            elapsedMilliseconds: 0,
+            requestHash: WorkerProtocolJson.ComputeRequestHash(request),
+            versions: expectedVersions);
+
+        using var temporary = new TempDirectory(
+            "sharpproof-timeout-classification-",
+            TestContext.CurrentContext.WorkDirectory);
+        var path = Path.Combine(temporary.FullName, "response.json");
+        var output = Console.Out;
+        var error = Console.Error;
+        using var outputCapture = new StringWriter();
+        using var errorCapture = new StringWriter();
+        try
+        {
+            Console.SetOut(outputCapture);
+            Console.SetError(errorCapture);
+            File.WriteAllText(path, WorkerProtocolJson.SerializeResponse(response));
+            var exitCode = Program.ValidateAndReport(
+                path,
+                request,
+                inputHash,
+                manifest,
+                expectedVersions,
+                out var valid,
+                out _);
+            return (valid, exitCode, outputCapture.ToString(), errorCapture.ToString());
+        }
+        finally
+        {
+            Console.SetOut(output);
+            Console.SetError(error);
+        }
+    }
+
+    private static WorkerClaimManifest CreateTimeoutClassificationManifest(
+        string timeoutCallableId)
+    {
+        var location = new WorkerSourceLocation
+        {
+            Path = @"C:\source\Subject.cs",
+            Start = 10,
+            Length = 4,
+            Line = 2,
+            Column = 5
+        };
+        var manifest = new WorkerClaimManifest
+        {
+            Callables =
+            [
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = timeoutCallableId,
+                    SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                    SelectionReasons = [
+                        WorkerSelectionReason.DiscoveredPostcondition
+                    ],
+                    Location = location,
+                    ClaimIds = ["claim-timeout"]
+                },
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = "C.UnsupportedBody",
+                    SelectedFeatures = [WorkerSelectedFeature.Effects],
+                    SelectionReasons = [WorkerSelectionReason.ExplicitAnnotation],
+                    Location = location,
+                    ClaimIds = ["claim-unsupported-body"]
+                }
+            ],
+            Claims =
+            [
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = "claim-timeout",
+                    CallableId = timeoutCallableId,
+                    Kind = WorkerClaimKind.Postcondition,
+                    Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = location
+                },
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = "claim-unsupported-body",
+                    CallableId = "C.UnsupportedBody",
+                    Kind = WorkerClaimKind.Effect,
+                    Evidence = WorkerClaimEvidence.Attribute,
+                    EffectContractKind = WorkerEffectContractKind.EnforcePure,
+                    Location = location
+                }
+            ]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        return manifest;
+    }
+
     private static WorkerVerifyRequest CreateValidRequest()
     {
         return new WorkerVerifyRequest
