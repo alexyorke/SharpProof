@@ -59,28 +59,42 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
         }
 
         var normalizedRemainder = Normalize(remainder, modulus);
-        long? adjustedLower = lowerBound == long.MinValue ? null : lowerBound;
-        long? adjustedUpper = upperBound == long.MaxValue ? null : upperBound;
-        if (!TryCongruentBoundary(adjustedLower ?? long.MinValue,
+        long? adjustedLower = lowerBound;
+        long? adjustedUpper = upperBound;
+        if (!TryCongruentBoundary(lowerBound ?? long.MinValue,
                 modulus, normalizedRemainder, atOrAbove: true, out var first))
         {
             return Bottom;
         }
 
-        if (adjustedLower.HasValue)
+        if (lowerBound.HasValue)
         {
-            adjustedLower = first;
+            if (!TryCongruentBoundary(long.MinValue,
+                    modulus, normalizedRemainder, atOrAbove: true,
+                    out var firstRepresentable))
+            {
+                return Bottom;
+            }
+
+            adjustedLower = first == firstRepresentable ? null : first;
         }
 
-        if (!TryCongruentBoundary(adjustedUpper ?? long.MaxValue,
+        if (!TryCongruentBoundary(upperBound ?? long.MaxValue,
                 modulus, normalizedRemainder, atOrAbove: false, out var last))
         {
             return Bottom;
         }
 
-        if (adjustedUpper.HasValue)
+        if (upperBound.HasValue)
         {
-            adjustedUpper = last;
+            if (!TryCongruentBoundary(long.MaxValue,
+                    modulus, normalizedRemainder, atOrAbove: false,
+                    out var lastRepresentable))
+            {
+                return Bottom;
+            }
+
+            adjustedUpper = last == lastRepresentable ? null : last;
         }
 
         if (first > last)

@@ -99,6 +99,51 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void CongruentCarrierBoundariesHaveCanonicalRepresentations()
+    {
+        var openLower = _domain.Create(null, 0, 3, 0);
+        var boundedLower = _domain.Create(long.MinValue + 2, 0, 3, 0);
+        var openUpper = _domain.Create(0, null, 3, 0);
+        var boundedUpper = _domain.Create(0, long.MaxValue - 1, 3, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(boundedLower, Is.EqualTo(openLower));
+            Assert.That(
+                boundedLower.GetHashCode(),
+                Is.EqualTo(openLower.GetHashCode()));
+            Assert.That(_domain.LessThanOrEqual(openLower, boundedLower), Is.True);
+            Assert.That(_domain.LessThanOrEqual(boundedLower, openLower), Is.True);
+            Assert.That(boundedUpper, Is.EqualTo(openUpper));
+            Assert.That(
+                boundedUpper.GetHashCode(),
+                Is.EqualTo(openUpper.GetHashCode()));
+            Assert.That(_domain.LessThanOrEqual(openUpper, boundedUpper), Is.True);
+            Assert.That(_domain.LessThanOrEqual(boundedUpper, openUpper), Is.True);
+            Assert.That(
+                _domain.AssumeAtLeast(openLower, long.MinValue + 1),
+                Is.EqualTo(openLower));
+            Assert.That(
+                _domain.AssumeAtMost(openUpper, long.MaxValue - 1),
+                Is.EqualTo(openUpper));
+
+            var neighboringResidue = _domain.Create(null, 0, 3, 1);
+            Assert.That(_domain.AreEquivalent(openLower, neighboringResidue), Is.False);
+
+            var narrower = _domain.Create(long.MinValue + 5, 0, 3, 0);
+            Assert.That(_domain.AreEquivalent(openLower, narrower), Is.False);
+            Assert.That(_domain.LessThanOrEqual(narrower, openLower), Is.True);
+            Assert.That(_domain.LessThanOrEqual(openLower, narrower), Is.False);
+
+            Assert.That(_domain.Create(2, 2, 2, 1), Is.EqualTo(_domain.Bottom));
+            Assert.That(_domain.Create(1, 1, 3, 1), Is.EqualTo(_domain.Constant(1)));
+            Assert.That(
+                _domain.Create(long.MinValue, long.MinValue, 3, 0),
+                Is.EqualTo(_domain.Bottom));
+        }
+    }
+
+    [Test]
     public void JoinComputesCongruenceHull()
     {
         var joined = _domain.Join(_domain.Constant(2), _domain.Constant(6));
