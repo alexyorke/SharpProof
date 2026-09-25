@@ -129,6 +129,88 @@ public sealed partial class ReleaseQualificationMatrixTests
     }
 
     [Test]
+    public async Task WorkflowArtifactsSurvivePartialRerunsAndFollowProducerNeeds()
+    {
+        var root = TestRepository.FindRoot();
+        var workflow = await File.ReadAllTextAsync(Path.Combine(
+            root, ".github", "workflows", "package-consumers.yml"));
+        var packageAction = await File.ReadAllTextAsync(Path.Combine(
+            root, ".github", "actions", "prepare-qualified-packages", "action.yml"));
+        var package = Job(workflow, "package", "container-verifier");
+        var container = Job(workflow, "container-verifier", "portable-consumers");
+        var portable = Job(workflow, "portable-consumers", "release-qualification");
+        var qualification = Job(
+            workflow,
+            "release-qualification",
+            "publish-private-preview");
+        var privatePublish = Job(workflow, "publish-private-preview", "publish");
+        var publicPublishStart = workflow.IndexOf(
+            "  publish:\n",
+            StringComparison.Ordinal);
+        Assert.That(publicPublishStart, Is.GreaterThanOrEqualTo(0));
+        var publicPublish = workflow[publicPublishStart..];
+        var packageUpload = Step(package, "Upload exact NuGet artifacts");
+        var consumerUpload = Step(
+            container,
+            "Upload package-consumer qualification evidence");
+
+        const string packages =
+            "nuget-packages-${{ github.run_id }}-${{ github.sha }}";
+        const string consumers =
+            "package-consumer-qualification-${{ github.run_id }}-${{ github.sha }}";
+        const string portableReceipt =
+            "portable-receipt-${{ matrix.family }}-${{ github.run_id }}-${{ github.sha }}";
+
+        static string ResolveName(string template, string attempt)
+        {
+            return template
+                .Replace("${{ github.run_id }}", "12345", StringComparison.Ordinal)
+                .Replace("${{ github.sha }}", "abcdef", StringComparison.Ordinal)
+                .Replace("${{ github.run_attempt }}", attempt, StringComparison.Ordinal);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(packageUpload, Does.Contain($"name: {packages}"));
+            Assert.That(packageUpload, Does.Contain("overwrite: true"));
+            Assert.That(packageAction, Does.Contain($"name: {packages}"));
+            Assert.That(packageAction, Does.Not.Contain("github.run_attempt"));
+            Assert.That(ResolveName(packages, "2"), Is.EqualTo(ResolveName(packages, "1")));
+            Assert.That(ResolveName(consumers, "2"), Is.EqualTo(ResolveName(consumers, "1")));
+            Assert.That(ResolveName(portableReceipt, "2"), Is.EqualTo(ResolveName(portableReceipt, "1")));
+
+            Assert.That(container, Does.Contain("needs: package"));
+            Assert.That(container, Does.Contain("./.github/actions/prepare-qualified-packages"));
+            Assert.That(consumerUpload, Does.Contain($"name: {consumers}"));
+            Assert.That(consumerUpload, Does.Contain("overwrite: true"));
+
+            Assert.That(portable, Does.Contain("needs: package"));
+            Assert.That(portable, Does.Contain($"name: {packages}"));
+            Assert.That(portable, Does.Contain($"name: {portableReceipt}"));
+            Assert.That(portable, Does.Contain("overwrite: true"));
+
+            Assert.That(qualification, Does.Contain("- container-verifier"));
+            Assert.That(qualification, Does.Contain("- portable-consumers"));
+            Assert.That(qualification, Does.Contain("- package"));
+            Assert.That(qualification, Does.Contain("./.github/actions/prepare-qualified-packages"));
+            Assert.That(qualification, Does.Contain($"name: {consumers}"));
+            Assert.That(qualification, Does.Contain(
+                "name: release-qualification-${{ github.sha }}-${{ github.run_attempt }}"));
+            Assert.That(qualification, Does.Contain(
+                "pattern: portable-receipt-*-${{ github.run_id }}-${{ github.sha }}"));
+            Assert.That(qualification, Does.Not.Contain(
+                "package-consumer-qualification-${{ github.sha }}-${{ github.run_attempt }}"));
+            Assert.That(qualification, Does.Not.Contain(
+                "portable-receipt-*-${{ github.sha }}-${{ github.run_attempt }}"));
+
+            Assert.That(privatePublish, Does.Contain("needs: release-qualification"));
+            Assert.That(privatePublish, Does.Contain("./.github/actions/prepare-qualified-packages"));
+            Assert.That(publicPublish, Does.Contain("needs: release-qualification"));
+            Assert.That(publicPublish, Does.Contain("./.github/actions/prepare-qualified-packages"));
+        }
+    }
+
+    [Test]
     public async Task ReceiptWriterRejectsStaleAndPackageMismatchedMatrixRows()
     {
         var sourceRoot = TestRepository.FindRoot();
@@ -399,6 +481,16 @@ public sealed partial class ReleaseQualificationMatrixTests
         Assert.That(start, Is.GreaterThanOrEqualTo(0), name);
         Assert.That(end, Is.GreaterThan(start), next);
         return workflow[start..end];
+    }
+
+    private static string Step(string job, string name)
+    {
+        var start = job.IndexOf(
+            "      - name: " + name,
+            StringComparison.Ordinal);
+        var end = job.IndexOf("\n      - ", start + 1, StringComparison.Ordinal);
+        Assert.That(start, Is.GreaterThanOrEqualTo(0), name);
+        return end > start ? job[start..end] : job[start..];
     }
 
     private sealed record PackageArtifact(string fileName, int bytes, string sha256);
