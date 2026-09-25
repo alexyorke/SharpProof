@@ -850,9 +850,9 @@ public sealed class ContractBinderTests
 
     [TestCase("Value")]
     [TestCase("Choice")]
+    [TestCase("int")]
     [TestCase("System.DateTime")]
     [TestCase("System.IntPtr")]
-    [TestCase("Value?")]
     public void NotNullRejectsNonReferenceDomains(string typeName)
     {
         var source =
@@ -901,13 +901,60 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void NotNullRejectsUnconstrainedTypeParameters()
+    public void NotNullAcceptsNullableValueTypes()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read([NotNull] int? value) {
+                }
+            }
+            """;
+        var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var condition = result.Contracts!.Clauses.Single().Condition;
+        Assert.That(condition, Is.TypeOf<IrBinaryTerm>());
+        var binary = (IrBinaryTerm)condition;
+        Assert.That(binary.Operator, Is.EqualTo(IrBinaryOperator.NotEqual));
+        Assert.That(binary.Right, Is.TypeOf<IrNullTerm>());
+    }
+
+    [Test]
+    public void NotNullAcceptsUnconstrainedTypeParameters()
     {
         const string source =
             """
             using SharpProof.Attributes;
             public static class Target {
                 public static void Read<T>([NotNull] T value) {
+                }
+            }
+            """;
+        var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var condition = result.Contracts!.Clauses.Single().Condition;
+        Assert.That(condition, Is.TypeOf<IrBinaryTerm>());
+        var binary = (IrBinaryTerm)condition;
+        Assert.That(binary.Operator, Is.EqualTo(IrBinaryOperator.NotEqual));
+        Assert.That(binary.Right, Is.TypeOf<IrNullTerm>());
+    }
+
+    [Test]
+    public void NotNullRejectsValueConstrainedTypeParameters()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read<T>([NotNull] T value)
+                    where T : struct {
                 }
             }
             """;

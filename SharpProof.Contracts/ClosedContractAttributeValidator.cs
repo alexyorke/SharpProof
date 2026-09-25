@@ -81,8 +81,8 @@ internal static class ClosedContractAttributeValidator
 
         return kind switch
         {
-            ClosedContractAttributeKind.NotNull when !type.IsReferenceType =>
-                Invalid(kind, "expected a definitely reference-capable value"),
+            ClosedContractAttributeKind.NotNull when !CanBeNull(type) =>
+                Invalid(kind, "expected a nullable or reference-capable value"),
             ClosedContractAttributeKind.Positive when !IsSupportedInteger(type) =>
                 Invalid(kind, "expected a supported integral value"),
             ClosedContractAttributeKind.InRange =>
@@ -122,5 +122,24 @@ internal static class ClosedContractAttributeValidator
     private static bool IsSupportedInteger(ITypeSymbol type)
     {
         return CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
+    }
+
+    private static bool CanBeNull(ITypeSymbol type)
+    {
+        if (type.IsReferenceType)
+        {
+            return true;
+        }
+
+        return type switch
+        {
+            INamedTypeSymbol named =>
+                named.OriginalDefinition.SpecialType ==
+                    SpecialType.System_Nullable_T,
+            ITypeParameterSymbol parameter =>
+                !parameter.HasValueTypeConstraint &&
+                !parameter.HasUnmanagedTypeConstraint,
+            _ => false
+        };
     }
 }

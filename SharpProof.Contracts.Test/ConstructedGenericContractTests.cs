@@ -325,6 +325,33 @@ public sealed class ConstructedGenericContractTests
     }
 
     [Test]
+    public void NotNullGenericValueSpecializationFailsClosed()
+    {
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Target {
+                public static void Read<T>([NotNull] T value) { }
+            }
+
+            public static class Caller {
+                public static void Call() => Target.Read<int>(1);
+            }
+            """);
+        var target = GetConstructedTargets(compilation, "Target.Read")
+            .Single();
+
+        var result = new ContractBinder(compilation, new IrFactory())
+            .Bind(target);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
     public void BindingCachePreservesConstructedMethodNullability()
     {
         var fixture = CreateConstructedMethodFixture();

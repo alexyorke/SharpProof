@@ -107,8 +107,9 @@ current analyzer reports SP0024 for:
 - a missing or blank `[SharpProofTrusted]` or `[SharpProofSuppress]` reason;
 - an undefined `[AllowedCapabilities]` flag value;
 - malformed or non-exception `[AllowedExceptions]` types;
-- `[NotNull]` on a value that cannot be null, `[Positive]` on an unsupported
-  type, or `[InRange]` with an unsupported type or unordered bounds;
+- `[NotNull]` on a definitely non-nullable value such as `int` or a
+  `where T : struct` parameter, `[Positive]` on an unsupported type, or
+  `[InRange]` with an unsupported type or unordered bounds;
 - a `Requires`, `Ensures`, or `Assume` clause that is conditional, nested,
   unreachable, late, or otherwise not a direct contiguous prologue statement.
 

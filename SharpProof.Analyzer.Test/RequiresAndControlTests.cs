@@ -2395,7 +2395,7 @@ public sealed class RequiresAndControlTests
             Assert.That(
                 diagnostics.Count(static diagnostic =>
                     diagnostic.Id == "SP0024"),
-                Is.EqualTo(3));
+                Is.EqualTo(2));
             Assert.That(
                 diagnostics.Count(static diagnostic =>
                     diagnostic.Id == "SP0047"),
@@ -2417,10 +2417,43 @@ public sealed class RequiresAndControlTests
             Assert.That(
                 malformed.Count(static message =>
                     message.Contains(
-                        "definitely reference-capable",
+                        "nullable or reference-capable",
                         StringComparison.Ordinal)),
-                Is.EqualTo(1));
+                Is.Zero);
         }
+    }
+
+    [Test]
+    public async Task NotNullAcceptsOnlyTypesThatCanRepresentNull()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void NullableValue([NotNull] int? value) { }
+                public static void Unconstrained<T>([NotNull] T value) { }
+                public static void ReferenceConstrained<T>([NotNull] T value)
+                    where T : class { }
+                public static void NonNullableValue([NotNull] int value) { }
+                public static void ValueConstrained<T>([NotNull] T value)
+                    where T : struct { }
+            }
+            """,
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(diagnostics, Has.Length.EqualTo(2));
+        var messages = diagnostics
+            .Select(static diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
+            .ToArray();
+        Assert.That(
+            messages.All(static message =>
+                message.Contains(
+                    "nullable or reference-capable",
+                    StringComparison.Ordinal)),
+            Is.True);
     }
 
 

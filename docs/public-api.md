@@ -49,6 +49,12 @@ parameters and return values. Their constructors and properties are part of
 the supported API. Invalid target or argument shapes produce diagnostics
 instead of being treated as evidence.
 
+`NotNullAttribute` accepts reference types, `Nullable<T>`, and type parameters
+that are not constrained to non-nullable value types. For `Nullable<T>`, the
+condition means that the value has a value (`HasValue`). A definitely
+non-nullable value such as `int`, or a type parameter constrained with
+`where T : struct`, is rejected because it cannot represent null.
+
 ## Effect contracts
 
 The supported effect attributes are:

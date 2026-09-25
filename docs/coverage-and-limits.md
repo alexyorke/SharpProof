@@ -97,8 +97,8 @@ constructors:
 
 | Attribute placement | Bound clause | Current consumer |
 |---|---|---|
-| `[NotNull]` on a parameter | `parameter != null` precondition for reference, string, or sequence IR values | Analyzer exact replay/managed facts and worker entry assumptions |
-| `[NotNull]` on a return value | `result != null` postcondition | Worker |
+| `[NotNull]` on a parameter | `parameter != null` precondition for reference-like IR values, including `Nullable<T>` and type parameters that may represent null | Analyzer exact replay/managed facts and worker entry assumptions; unsupported specialized domains remain fail-closed |
+| `[NotNull]` on a return value | `result != null` postcondition for reference-like IR values, including `Nullable<T>` and type parameters that may represent null | Worker |
 | `[Positive]` on a parameter | `parameter > 0` integer precondition | Analyzer exact replay/managed facts and worker entry assumptions |
 | `[Positive]` on a return value | `result > 0` integer postcondition | Worker |
 | `[InRange(min, max)]` on a parameter | Inclusive integer precondition `min <= parameter && parameter <= max` | Analyzer exact replay/managed facts and worker entry assumptions |
