@@ -86,15 +86,10 @@ internal readonly partial record struct GuardedBodySummaryAssumption(
 
 internal readonly partial record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable);
 
-internal sealed partial class AcyclicBlockPredicateExecutor
+internal sealed partial class SymbolicBodyExecutor
 {
     private sealed partial class Run
     {
-        private readonly partial record struct FlowState(
-            int Order,
-            IrTerm Predicate,
-            ImmutableDictionary<IrVarId, IrTerm> Environment
-        );
         private readonly partial record struct SpecApplication(
             IrTerm Result,
             IrTerm Predicate,

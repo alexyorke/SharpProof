@@ -1159,18 +1159,29 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
-    public void CyclicControlFlowAbstainsWithTypedReason()
+    public void IrreducibleControlFlowAbstainsWithTypedReason()
     {
+        // Reducible loops are cut at their headers; a cycle with two
+        // entries has no header and abstains.
         var fixture = new SummaryFixture("Loop");
         var bodyParameter = fixture.Factory.CreateVariable(
             "body:value",
             fixture.Factory.IntegerType);
         var builder = new IrProgramBuilder(fixture.Factory);
         var entry = builder.CreateBlock("entry");
-        builder.Goto(
+        var first = builder.CreateBlock("first");
+        var second = builder.CreateBlock("second");
+        builder.Branch(
             entry,
-            fixture.Factory.CreateOperation("loop"),
-            entry);
+            fixture.Factory.CreateOperation("branch"),
+            fixture.Factory.Binary(
+                IrBinaryOperator.GreaterThan,
+                fixture.Factory.Variable(bodyParameter),
+                fixture.Factory.Integer(0)),
+            first,
+            second);
+        builder.Goto(first, fixture.Factory.CreateOperation("to-second"), second);
+        builder.Goto(second, fixture.Factory.CreateOperation("to-first"), first);
 
         var built = IrRelationalSummaryBuilder.Build(
             builder.Build(),

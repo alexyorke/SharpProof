@@ -25,26 +25,6 @@ internal sealed class IrLoopCut(
 
 internal static class IrBlockOrder
 {
-    internal static ImmutableArray<IrBlockId> TryCreateAcyclicOrder(
-        IrProgram program,
-        Func<int, bool> spend,
-        out IrAcyclicOrderFailure failure)
-    {
-        var cut = TryCutLoops(program, spend, out failure);
-        if (cut == null)
-        {
-            return default;
-        }
-
-        if (!cut.BackEdges.IsEmpty)
-        {
-            failure = IrAcyclicOrderFailure.CyclicControlFlow;
-            return default;
-        }
-
-        return cut.Order;
-    }
-
     // Loop cutting (Boogie-style): every back edge u -> h must target a
     // header h that dominates u. Irreducible control flow is rejected as
     // CyclicControlFlow.

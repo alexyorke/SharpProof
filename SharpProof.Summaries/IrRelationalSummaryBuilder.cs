@@ -164,14 +164,20 @@ public static class IrRelationalSummaryBuilder
         return new IrRelationalSummaryBuildResult(null, reason);
     }
 
-    private sealed class Run
+    private sealed class Run(
+        IrProgram program,
+        IrSummarySignature signature,
+        ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
+        IReadOnlyDictionary<IrInstructionId, IrRelationalSummary> calls,
+        IrRelationalSummaryBuildLimits limits,
+        bool mayThrow)
+        : IrForwardExecutor(
+            program,
+            initialEnvironment,
+            limits.MaximumExpressionDepth,
+            limits.MaximumSymbolicOperations,
+            CancellationToken.None)
     {
-        private readonly IrProgram _program;
-        private readonly IrSummarySignature _signature;
-        private readonly ImmutableDictionary<IrVarId, IrTerm> _initialEnvironment;
-        private readonly IReadOnlyDictionary<IrInstructionId, IrRelationalSummary> _calls;
-        private readonly IrRelationalSummaryBuildLimits _limits;
-        private readonly Dictionary<IrBlockId, List<FlowState>> _incoming = [];
         private readonly List<IrTerm> _completions = [];
         private readonly List<IrTerm> _relations = [];
         private readonly List<IrVarId> _existentials = [];
@@ -181,70 +187,20 @@ public static class IrRelationalSummaryBuilder
             string EvidenceCallIdentity,
             string EvidenceIdentity,
             string EvidenceSha256), IrSummaryProvenance> _dependencyProvenance = [];
-        private readonly HashSet<IrId> _visitedTerms = [];
-        private readonly Dictionary<IrId, int> _termDepths = [];
-        private int _remainingOperations;
-        private bool _mayThrow;
+        private bool _mayThrow = mayThrow;
         private IrSummaryAbstentionReason _reason;
-
-        internal Run(
-            IrProgram program,
-            IrSummarySignature signature,
-            ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
-            IReadOnlyDictionary<IrInstructionId, IrRelationalSummary> calls,
-            IrRelationalSummaryBuildLimits limits,
-            bool mayThrow)
-        {
-            _program = program;
-            _signature = signature;
-            _initialEnvironment = initialEnvironment;
-            _calls = calls;
-            _limits = limits;
-            _remainingOperations = limits.MaximumSymbolicOperations;
-            _mayThrow = mayThrow;
-        }
-
-        private IrFactory Factory => _program.Factory;
 
         internal IrRelationalSummaryBuildResult Execute()
         {
-            foreach (var term in _initialEnvironment.Values)
+            if (!Run())
             {
-                if (!Supported(term))
-                {
-                    return Failure();
-                }
-            }
-
-            var order = CreateOrder();
-            if (order.IsDefault)
-            {
-                return Failure();
-            }
-
-            foreach (var blockId in order)
-            {
-                var state = Merge(blockId);
-                if (state == null)
-                {
-                    if (_reason != IrSummaryAbstentionReason.None)
-                    {
-                        return Failure();
-                    }
-
-                    continue;
-                }
-
-                if (!ExecuteBlock(_program.GetBlock(blockId), state.Value))
-                {
-                    return Failure();
-                }
+                return Abstain();
             }
 
             if (_relations.Count == 0)
             {
                 _reason = IrSummaryAbstentionReason.UnsupportedBody;
-                return Failure();
+                return Abstain();
             }
 
             var normalCompletion = IrSemanticTerms.Disjoin(
@@ -255,12 +211,12 @@ public static class IrRelationalSummaryBuilder
                 _relations);
             if (!Supported(normalCompletion) || !Supported(normalRelation))
             {
-                return Failure();
+                return Abstain();
             }
 
             var summary = new IrRelationalSummary(
                 Factory,
-                _signature,
+                signature,
                 [.. _existentials],
                 normalCompletion,
                 normalRelation,
@@ -281,117 +237,54 @@ public static class IrRelationalSummaryBuilder
                 IrSummaryAbstentionReason.None);
         }
 
-        private bool ExecuteBlock(IrBasicBlock block, FlowState state)
+        protected override void OnThrowSite(IrTerm predicate, IrTerm completes)
         {
-            var environment = state.Environment;
-            var predicate = state.Predicate;
-            for (var index = 0; index < block.Instructions.Length; index++)
+            _mayThrow = true;
+        }
+
+        // Loop-header and merge unknowns are existential in the relation.
+        protected override void OnFreshVariable(IrVarId variable)
+        {
+            _existentials.Add(variable);
+        }
+
+        protected override bool ExecuteCall(
+            IrCallInstruction call,
+            ref IrTerm predicate,
+            ref ImmutableDictionary<IrVarId, IrTerm> environment)
+        {
+            if (!calls.TryGetValue(call.Id, out var dependency) ||
+                dependency.Signature.Member != call.Member ||
+                !call.Target.HasValue ||
+                ApplyCall(
+                    call,
+                    dependency,
+                    environment,
+                    predicate) is not { } application)
             {
-                if (!Spend())
+                if (_reason == IrSummaryAbstentionReason.None &&
+                    Failure == IrForwardFailure.None)
                 {
-                    return false;
+                    _reason = calls.ContainsKey(call.Id)
+                        ? IrSummaryAbstentionReason.InvalidSignature
+                        : IrSummaryAbstentionReason.MissingDependency;
                 }
-
-                var instruction = block.Instructions[index];
-                switch (instruction)
-                {
-                    case IrAssignInstruction assign:
-                        {
-                            var assigned = Substitute(assign.Value, environment);
-                            if (assigned == null ||
-                                ConstrainNormalExecution(
-                                    predicate,
-                                    assigned) is not { } constrained)
-                            {
-                                return false;
-                            }
-
-                            predicate = constrained;
-                            environment = environment.SetItem(
-                                assign.Target,
-                                assigned);
-                            break;
-                        }
-                    case IrAssumeInstruction { Condition: IrBooleanTerm { Value: false } }:
-                        // An uncaught throw: the path has no normal return.
-                        _mayThrow = true;
-                        return true;
-                    case IrAssumeInstruction assume:
-                        {
-                            var condition = Substitute(
-                                assume.Condition,
-                                environment);
-                            if (condition == null ||
-                                condition.Type != Factory.BooleanType)
-                            {
-                                return false;
-                            }
-
-                            _mayThrow |=
-                                IrSemanticTerms.RequiresDefinednessWitness(condition);
-                            predicate = Factory.Binary(
-                                IrBinaryOperator.AndAlso,
-                                predicate,
-                                condition);
-                            if (!Supported(predicate))
-                            {
-                                return false;
-                            }
-
-                            break;
-                        }
-                    case IrCallInstruction call:
-                        {
-                            if (!_calls.TryGetValue(call.Id, out var dependency) ||
-                                dependency.Signature.Member != call.Member ||
-                                !call.Target.HasValue ||
-                                ApplyCall(
-                                    call,
-                                    dependency,
-                                    environment,
-                                    predicate) is not { } application)
-                            {
-                                if (_reason == IrSummaryAbstentionReason.None)
-                                {
-                                    _reason = _calls.ContainsKey(call.Id)
-                                        ? IrSummaryAbstentionReason.InvalidSignature
-                                        : IrSummaryAbstentionReason.MissingDependency;
-                                }
-                                return false;
-                            }
-
-                            predicate = application.Predicate;
-                            environment = environment.SetItem(
-                                call.Target.Value,
-                                Factory.Variable(application.Result));
-                            break;
-                        }
-                    case IrBranchInstruction branch:
-                        return index == block.Instructions.Length - 1 &&
-                            TransferBranch(
-                                block.Id,
-                                branch,
-                                predicate,
-                                environment);
-                    case IrGotoInstruction go:
-                        AddIncoming(
-                            go.Target,
-                            block.Id.Value << 1,
-                            predicate,
-                            environment);
-                        return index == block.Instructions.Length - 1;
-                    case IrReturnInstruction returned:
-                        return index == block.Instructions.Length - 1 &&
-                            AddReturn(returned, predicate, environment);
-                    default:
-                        _reason =
-                            IrSummaryAbstentionReason.UnsupportedInstruction;
-                        return false;
-                }
+                return false;
             }
 
-            _reason = IrSummaryAbstentionReason.UnsupportedBody;
-            return false;
+            predicate = application.Predicate;
+            environment = environment.SetItem(
+                call.Target.Value,
+                Factory.Variable(application.Result));
+            return true;
+        }
+
+        protected override bool ExecuteReturn(
+            IrReturnInstruction returned,
+            IrTerm predicate,
+            ImmutableDictionary<IrVarId, IrTerm> environment)
+        {
+            return AddReturn(returned, predicate, environment);
         }
 
         private CallApplication? ApplyCall(
@@ -534,7 +427,7 @@ public static class IrRelationalSummaryBuilder
             var value = Substitute(returned.Value, environment);
             if (value == null ||
                 value.Type != Factory.GetVariableInfo(
-                    _signature.Result).Type ||
+                    signature.Result).Type ||
                 ConstrainNormalExecution(
                     predicate,
                     value) is not { } completion)
@@ -547,7 +440,7 @@ public static class IrRelationalSummaryBuilder
                 predicate,
                 Factory.Binary(
                     IrBinaryOperator.Equal,
-                    Factory.Variable(_signature.Result),
+                    Factory.Variable(signature.Result),
                     value));
             if (!Supported(completion) || !Supported(relation))
             {
@@ -559,346 +452,18 @@ public static class IrRelationalSummaryBuilder
             return true;
         }
 
-        private IrTerm? ConstrainNormalExecution(
-            IrTerm predicate,
-            IrTerm evaluated)
+        private IrRelationalSummaryBuildResult Abstain()
         {
-            if (IrSemanticTerms.RequiresDefinednessWitness(evaluated))
-            {
-                _mayThrow = true;
-                if (!Spend(2))
+            return Failed(_reason != IrSummaryAbstentionReason.None
+                ? _reason
+                : Failure switch
                 {
-                    return null;
-                }
-            }
-
-            var result = IrSemanticTerms.ConstrainSuccessfulEvaluation(
-                Factory,
-                predicate,
-                evaluated);
-            return Supported(result) ? result : null;
-        }
-
-        private bool TransferBranch(
-            IrBlockId predecessor,
-            IrBranchInstruction branch,
-            IrTerm predicate,
-            ImmutableDictionary<IrVarId, IrTerm> environment)
-        {
-            var condition = Substitute(branch.Condition, environment);
-            if (condition == null ||
-                condition.Type != Factory.BooleanType)
-            {
-                return false;
-            }
-
-            _mayThrow |=
-                IrSemanticTerms.RequiresDefinednessWitness(condition);
-            var order = predecessor.Value << 1;
-            if (condition is IrBooleanTerm literal)
-            {
-                AddIncoming(
-                    literal.Value ? branch.WhenTrue : branch.WhenFalse,
-                    order + (literal.Value ? 0 : 1),
-                    predicate,
-                    environment);
-                return true;
-            }
-
-            if (!Spend(2))
-            {
-                return false;
-            }
-
-            var whenTrue = Factory.Binary(
-                IrBinaryOperator.AndAlso,
-                predicate,
-                condition);
-            var whenFalse = Factory.Binary(
-                IrBinaryOperator.AndAlso,
-                predicate,
-                Factory.Unary(IrUnaryOperator.Not, condition));
-            if (!Supported(whenTrue) || !Supported(whenFalse))
-            {
-                return false;
-            }
-
-            AddIncoming(
-                branch.WhenTrue,
-                order,
-                whenTrue,
-                environment);
-            AddIncoming(
-                branch.WhenFalse,
-                order + 1,
-                whenFalse,
-                environment);
-            return true;
-        }
-
-        private FlowState? Merge(IrBlockId block)
-        {
-            if (block == _program.Entry)
-            {
-                return new FlowState(
-                    0,
-                    Factory.Boolean(true),
-                    _initialEnvironment);
-            }
-
-            if (!_incoming.TryGetValue(block, out var values) ||
-                values.Count == 0)
-            {
-                return null;
-            }
-
-            values.Sort(static (left, right) =>
-                left.Order.CompareTo(right.Order));
-            if (!Spend(values.Count))
-            {
-                return null;
-            }
-
-            var predicate = IrSemanticTerms.Disjoin(
-                Factory,
-                values.Select(static value => value.Predicate).ToArray());
-            if (!Supported(predicate))
-            {
-                return null;
-            }
-
-            ImmutableDictionary<IrVarId, IrTerm>.Builder? environment =
-                values.Count == 1
-                    ? null
-                    : ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
-            foreach (var variable in values[0].Environment.Keys.OrderBy(
-                         static value => value.Value))
-            {
-                if (!Spend(values.Count))
-                {
-                    return null;
-                }
-
-                var first = values[0].Environment[variable];
-                var merged = first;
-                var hasMissing = false;
-                var hasDifferentValue = false;
-                for (var index = 1; index < values.Count; index++)
-                {
-                    if (!values[index].Environment.TryGetValue(
-                            variable,
-                            out var value))
-                    {
-                        hasMissing = true;
-                        break;
-                    }
-
-                    hasDifferentValue |= value.Id != first.Id;
-                }
-
-                if (hasMissing)
-                {
-                    continue;
-                }
-
-                if (hasDifferentValue)
-                {
-                    merged = values[values.Count - 1].Environment[variable];
-                    for (var index = values.Count - 2; index >= 0; index--)
-                    {
-                        merged = Factory.Conditional(
-                            values[index].Predicate,
-                            values[index].Environment[variable],
-                            merged);
-                    }
-                }
-
-                if (!Supported(merged))
-                {
-                    return null;
-                }
-
-                environment?.Add(variable, merged);
-            }
-
-            return new FlowState(
-                0,
-                predicate,
-                environment is null
-                    ? values[0].Environment
-                    : environment.ToImmutable());
-        }
-
-        private ImmutableArray<IrBlockId> CreateOrder()
-        {
-            var result = IrBlockOrder.TryCreateAcyclicOrder(
-                _program, Spend, out var failure);
-            if (result.IsDefault)
-            {
-                _reason = failure switch
-                {
-                    IrAcyclicOrderFailure.ResourceLimit =>
-                        IrSummaryAbstentionReason.ResourceLimit,
-                    IrAcyclicOrderFailure.CyclicControlFlow =>
-                        IrSummaryAbstentionReason.CyclicControlFlow,
-                    IrAcyclicOrderFailure.UnsupportedInstruction =>
-                        IrSummaryAbstentionReason.UnsupportedInstruction,
+                    IrForwardFailure.ResourceLimit => IrSummaryAbstentionReason.ResourceLimit,
+                    IrForwardFailure.ExpressionDepth => IrSummaryAbstentionReason.ExpressionDepth,
+                    IrForwardFailure.CyclicControlFlow => IrSummaryAbstentionReason.CyclicControlFlow,
+                    IrForwardFailure.UnsupportedInstruction => IrSummaryAbstentionReason.UnsupportedInstruction,
                     _ => IrSummaryAbstentionReason.UnsupportedBody
-                };
-            }
-            return result;
-        }
-
-        private IrTerm? Substitute(
-            IrTerm term,
-            IReadOnlyDictionary<IrVarId, IrTerm> environment)
-        {
-            if (!Supported(term))
-            {
-                return null;
-            }
-            if (!IrTermAnalysis.CollectVariables(term).All(
-                    environment.ContainsKey))
-            {
-                _reason = IrSummaryAbstentionReason.UnsupportedBody;
-                return null;
-            }
-
-            try
-            {
-                var result = IrSubstitution.Substitute(
-                    Factory,
-                    term,
-                    environment);
-                return Supported(result) ? result : null;
-            }
-            catch (ArgumentException)
-            {
-                _reason = IrSummaryAbstentionReason.InvalidSignature;
-                return null;
-            }
-        }
-
-        private bool Supported(IrTerm term)
-        {
-            if (!_termDepths.TryGetValue(term.Id, out var depth) &&
-                !ChargeAndMeasureDepth(term, out depth))
-            {
-                return false;
-            }
-            if (depth <= _limits.MaximumExpressionDepth)
-            {
-                return true;
-            }
-
-            _reason = IrSummaryAbstentionReason.ExpressionDepth;
-            return false;
-        }
-
-        private bool ChargeAndMeasureDepth(IrTerm root, out int depth)
-        {
-            depth = 0;
-            var pending = new Stack<(
-                IrTerm Term,
-                ImmutableArray<IrTerm> Children,
-                bool ChildrenReady)>();
-            pending.Push((root, [], ChildrenReady: false));
-            while (pending.Count != 0)
-            {
-                var (term, children, childrenReady) = pending.Pop();
-                if (childrenReady)
-                {
-                    var termDepth = 1;
-                    foreach (var child in children)
-                    {
-                        termDepth = Math.Max(
-                            termDepth,
-                            1 + _termDepths[child.Id]);
-                    }
-                    _termDepths[term.Id] = termDepth;
-                    continue;
-                }
-
-                if (_termDepths.ContainsKey(term.Id))
-                {
-                    continue;
-                }
-                if (_visitedTerms.Add(term.Id) && !Spend())
-                {
-                    return false;
-                }
-
-                children = IrTraversal.GetChildren(term);
-                pending.Push((term, children, ChildrenReady: true));
-                for (var index = children.Length - 1; index >= 0; index--)
-                {
-                    pending.Push((children[index], [], ChildrenReady: false));
-                }
-            }
-
-            return _termDepths.TryGetValue(root.Id, out depth);
-        }
-
-        private void AddIncoming(
-            IrBlockId block,
-            int order,
-            IrTerm predicate,
-            ImmutableDictionary<IrVarId, IrTerm> environment)
-        {
-            if (predicate is IrBooleanTerm { Value: false })
-            {
-                return;
-            }
-
-            if (!_incoming.TryGetValue(block, out var values))
-            {
-                values = [];
-                _incoming.Add(block, values);
-            }
-
-            values.Add(new FlowState(order, predicate, environment));
-        }
-
-        private bool Spend(int amount = 1)
-        {
-            if (amount >= 0 && amount <= _remainingOperations)
-            {
-                _remainingOperations -= amount;
-                return true;
-            }
-
-            _reason = IrSummaryAbstentionReason.ResourceLimit;
-            return false;
-        }
-
-        private IrRelationalSummaryBuildResult Failure()
-        {
-            return Failed(
-                _reason == IrSummaryAbstentionReason.None
-                    ? IrSummaryAbstentionReason.UnsupportedBody
-                    : _reason);
-        }
-
-        private readonly struct FlowState
-        {
-            internal FlowState(
-                int order,
-                IrTerm predicate,
-                ImmutableDictionary<IrVarId, IrTerm> environment)
-            {
-                Order = order;
-                Predicate = predicate;
-                Environment = environment;
-            }
-
-            internal int Order { get; }
-
-            internal IrTerm Predicate { get; }
-
-            internal ImmutableDictionary<IrVarId, IrTerm> Environment
-            {
-                get;
-            }
+                });
         }
 
         private readonly struct CallApplication

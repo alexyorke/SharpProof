@@ -4031,7 +4031,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task CyclicImplementationIlAbstainsWithoutTrustingTheBody()
+    public async Task ImplementationIlLoopsAreCutWhileRecursionAbstains()
     {
         using var project = TestProject.Create(
             """
@@ -4067,18 +4067,18 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        var loop = response.ClaimResults.Single(result =>
+            GetCallableId(response, result).Contains(".Loop(", StringComparison.Ordinal));
+        var recurse = response.ClaimResults.Single(result =>
+            GetCallableId(response, result).Contains(".Recurse(", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(
-                response.ClaimResults.SelectMany(
-                    static result => result.ProofCore),
-                Is.Empty);
+            // The callee returns only when value is false, so every normal
+            // return satisfies the claim.
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(recurse.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(recurse.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(recurse.ProofCore, Is.Empty);
         }
     }
 

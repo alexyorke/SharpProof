@@ -9,7 +9,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class AcyclicBlockPredicateExecutorTests
+public sealed class SymbolicBodyExecutorTests
 {
     [Test]
     public void DiamondProducesOneJoinedReturnInsteadOfTwoPaths()
@@ -77,7 +77,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             .ToImmutableDictionary(
                 static variable => variable,
                 variable => (IrTerm)factory.Variable(variable));
-        var execution = new AcyclicBlockPredicateExecutor(maximumExpressionDepth).Execute(
+        var execution = new SymbolicBodyExecutor(maximumExpressionDepth).Execute(
             [],
             factory,
             program,
@@ -157,7 +157,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             .ToImmutableDictionary(
                 static variable => variable,
                 variable => (IrTerm)factory.Variable(variable));
-        var execution = new AcyclicBlockPredicateExecutor(maximumExpressionDepth).Execute(
+        var execution = new SymbolicBodyExecutor(maximumExpressionDepth).Execute(
             [],
             factory,
             program,
@@ -456,7 +456,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
         using (Assert.EnterMultipleScope())
         {
             Assert.Throws<OperationCanceledException>((Action)(() =>
-                new AcyclicBlockPredicateExecutor(
+                new SymbolicBodyExecutor(
                     WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
                     [],
                     factory,
@@ -487,7 +487,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
-        var executor = new AcyclicBlockPredicateExecutor(
+        var executor = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth,
             maximumSymbolicOperations: 1);
 
@@ -525,7 +525,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             divisor,
             factory.Variable(divisor));
 
-        var limited = new AcyclicBlockPredicateExecutor(
+        var limited = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth,
             maximumSymbolicOperations: 4).Execute(
             [],
@@ -535,9 +535,9 @@ public sealed class AcyclicBlockPredicateExecutorTests
             ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
-        var exact = new AcyclicBlockPredicateExecutor(
+        var exact = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            maximumSymbolicOperations: 6).Execute(
+            maximumSymbolicOperations: 16).Execute(
             [],
             factory,
             program,
@@ -592,7 +592,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             .Add(firstCall.Id, Prepared(firstCall))
             .Add(secondCall.Id, Prepared(secondCall));
 
-        var execution = new AcyclicBlockPredicateExecutor(
+        var execution = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
                 [],
                 factory,
@@ -668,7 +668,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
         var environment = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(
             divisor,
             factory.Variable(divisor));
-        var limited = new AcyclicBlockPredicateExecutor(
+        var limited = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth,
             maximumSymbolicOperations: 4).Execute(
             [],
@@ -678,7 +678,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
-        var execution = new AcyclicBlockPredicateExecutor(
+        var execution = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
             [],
             factory,
@@ -748,7 +748,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
         var environment = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(
             divisor,
             factory.Variable(divisor));
-        var limited = new AcyclicBlockPredicateExecutor(
+        var limited = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth,
             maximumSymbolicOperations: 4).Execute(
             [],
@@ -758,7 +758,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
-        var execution = new AcyclicBlockPredicateExecutor(
+        var execution = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
             [],
             factory,
@@ -830,7 +830,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
                     string.Empty,
                     []));
 
-        var execution = new AcyclicBlockPredicateExecutor(
+        var execution = new SymbolicBodyExecutor(
             WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
                 [],
                 factory,
@@ -867,7 +867,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
         var environment = inputs.ToImmutableDictionary(
             static variable => variable,
             variable => (IrTerm)factory.Variable(variable));
-        return new AcyclicBlockPredicateExecutor(WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
+        return new SymbolicBodyExecutor(WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
             [],
             factory,
             program,

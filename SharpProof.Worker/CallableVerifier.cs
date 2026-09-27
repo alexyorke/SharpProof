@@ -8,7 +8,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
 {
     private readonly ProofKernel _kernel = new(
         ArgumentNullGuard.NotNull(backend, nameof(backend)));
-    private readonly AcyclicBlockPredicateExecutor _executor = new(maximumExpressionDepth);
+    private readonly SymbolicBodyExecutor _executor = new(maximumExpressionDepth);
     private CallableEffectVerifier? _effects;
     private readonly int _maximumExpressionDepth =
         ArgumentNullGuard.RequirePositive(

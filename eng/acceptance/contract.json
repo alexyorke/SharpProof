@@ -161,7 +161,7 @@
           "SharpProof.Worker/CallableEvidenceBuilder.cs",
           "SharpProof.Worker/CallableEntryFeasibility.cs",
           "SharpProof.Worker/CallableVerifier.cs",
-          "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
+          "SharpProof.Worker/SymbolicBodyExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
           "SharpProof.Worker/SharpProofWorker.cs"
         ]

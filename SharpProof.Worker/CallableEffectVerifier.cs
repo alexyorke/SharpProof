@@ -9,7 +9,7 @@ namespace SharpProof.Worker;
 // claim does not allow.
 internal sealed class CallableEffectVerifier(
     ProofKernel kernel,
-    AcyclicBlockPredicateExecutor executor,
+    SymbolicBodyExecutor executor,
     int maximumExpressionDepth)
 {
     private const int MaximumLoopReplaySteps = 1_000_000;

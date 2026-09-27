@@ -35,10 +35,6 @@ public sealed class IrBlockOrderTests
             Assert.That(cut.Loops[outer], Is.EquivalentTo(new[] { outer, inner, body, latch }));
             Assert.That(cut.Order.IndexOf(outer), Is.LessThan(cut.Order.IndexOf(inner)));
             Assert.That(cut.Order.IndexOf(inner), Is.LessThan(cut.Order.IndexOf(latch)));
-            Assert.That(
-                IrBlockOrder.TryCreateAcyclicOrder(graph.Program, static _ => true, out var acyclic).IsDefault,
-                Is.True);
-            Assert.That(acyclic, Is.EqualTo(IrAcyclicOrderFailure.CyclicControlFlow));
         }
     }
 
