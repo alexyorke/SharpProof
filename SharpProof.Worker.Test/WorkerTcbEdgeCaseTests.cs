@@ -1070,10 +1070,10 @@ public sealed class WorkerTcbEdgeCaseTests
                 builder.Return(entry, factory.CreateOperation());
                 break;
             case MalformedBodyKind.UnsupportedInstruction:
-                builder.Assume(
+                builder.Havoc(
                     entry,
                     factory.CreateOperation(),
-                    factory.Boolean(true));
+                    IrHavocKind.Memory);
                 builder.Return(
                     entry,
                     factory.CreateOperation(),

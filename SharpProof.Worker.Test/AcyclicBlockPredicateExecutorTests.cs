@@ -351,36 +351,19 @@ public sealed class AcyclicBlockPredicateExecutorTests
     }
 
     [Test]
-    public async Task CycleProducesTypedUnknownWithoutInvokingTheBackend()
+    public void LoopWithoutExitHasNoNormalReturn()
     {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("cycle");
         builder.Goto(entry, factory.CreateOperation(), entry);
-        var program = builder.Build();
-        var execution = Execute(factory, program, []);
-        var backend = new ThrowingBackend(
-            "A cyclic body reached the backend.");
-        var verifier = new CallableVerifier(backend, WorkerBudgets.DefaultMaximumExpressionDepth);
 
-        var results = (await verifier.VerifyWithEntryFeasibilityAsync(
-            CreateTarget(
-                factory,
-                program,
-                [],
-                ImmutableDictionary<IrVarId, IrVarId>.Empty),
-            new MethodResourceBudget(
-                null,
-                WorkerBudgets.DefaultQueryRlimit,
-                WorkerBudgets.DefaultMethodRlimit),
-            CancellationToken.None)).Postconditions;
+        var execution = Execute(factory, builder.Build(), []);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(backend.CallCount, Is.Zero);
-            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(execution.Returns, Is.Empty);
         }
     }
 

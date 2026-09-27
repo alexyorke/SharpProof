@@ -102,8 +102,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 }
             }
             inputs.CancellationToken.ThrowIfCancellationRequested();
-            return _returns.Count == 0 ? SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody) :
-                new SymbolicBodyExecution(WorkerClaimReason.None, _returns.ToImmutable(),
+            // No returns means no path completes normally (every path throws
+            // or loops); the verifier reports such proofs as vacuous.
+            return new SymbolicBodyExecution(WorkerClaimReason.None, _returns.ToImmutable(),
                     _projections.ToImmutable(), _assumptions.ToImmutable(),
                     _summaryAssumptions.ToImmutable());
         }
@@ -138,6 +139,27 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 }
                 switch (instruction)
                 {
+                    case IrAssumeInstruction { Condition: IrBooleanTerm { Value: false } }:
+                        // The path does not complete normally (an uncaught
+                        // throw); it contributes no return.
+                        return true;
+                    case IrAssumeInstruction assume:
+                        var assumed = Substitute(assume.Condition, environment);
+                        if (assumed == null ||
+                            assumed.Type != inputs.Factory.BooleanType ||
+                            ConstrainNormalExecution(predicate, assumed) is not { } guarded ||
+                            !Spend())
+                        {
+                            return false;
+                        }
+
+                        predicate = inputs.Factory.Binary(IrBinaryOperator.AndAlso, guarded, assumed);
+                        if (!Supported(predicate))
+                        {
+                            return false;
+                        }
+
+                        break;
                     case IrAssignInstruction assign:
                         var assigned = Substitute(assign.Value, environment);
                         if (assigned == null)

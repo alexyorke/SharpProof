@@ -709,6 +709,17 @@ public sealed class RoslynProgramLowerer(
 
             var fallThrough = source.FallThroughSuccessor;
             var conditional = source.ConditionalSuccessor;
+            if (fallThrough?.Semantics == ControlFlowBranchSemantics.Throw &&
+                conditional == null &&
+                !IsInsideCatchingRegion(source))
+            {
+                // An uncaught throw never completes normally. Normal-return
+                // reasoning ends the path here; nothing after the operand's
+                // evaluation can reach a return, so it is not lowered.
+                _builder.Assume(block, operation, _factory.Boolean(false));
+                _builder.Return(block, operation);
+                return;
+            }
             if (HasMandatoryFinally(fallThrough) ||
                 HasMandatoryFinally(conditional))
             {
@@ -964,6 +975,24 @@ public sealed class RoslynProgramLowerer(
         private static bool HasMandatoryFinally(ControlFlowBranch? branch)
         {
             return branch != null && !branch.FinallyRegions.IsDefaultOrEmpty;
+        }
+
+        private static bool IsInsideCatchingRegion(BasicBlock block)
+        {
+            for (var region = block.EnclosingRegion;
+                 region != null;
+                 region = region.EnclosingRegion)
+            {
+                if (region.Kind is
+                    ControlFlowRegionKind.TryAndCatch or
+                    ControlFlowRegionKind.Catch or
+                    ControlFlowRegionKind.Filter or
+                    ControlFlowRegionKind.FilterAndHandler)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool IsInsideCatchHandler(BasicBlock block)

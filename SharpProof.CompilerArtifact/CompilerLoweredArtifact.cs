@@ -1148,7 +1148,11 @@ internal static class CompilerLoweredArtifact
             var terminator = block.Instructions[block.Instructions.Length - 1];
             if (terminator is IrReturnInstruction returned)
             {
-                if (resultType.HasValue &&
+                // A block that assumes false never returns, so its return
+                // carries no value.
+                var deadEnd = block.Instructions.Any(static instruction =>
+                    instruction is IrAssumeInstruction { Condition: IrBooleanTerm { Value: false } });
+                if (resultType.HasValue && !deadEnd &&
                     (returned.Value == null ||
                      returned.Value.Type != resultType.Value))
                 {

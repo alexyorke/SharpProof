@@ -312,6 +312,10 @@ public static class IrRelationalSummaryBuilder
                                 assigned);
                             break;
                         }
+                    case IrAssumeInstruction { Condition: IrBooleanTerm { Value: false } }:
+                        // An uncaught throw: the path has no normal return.
+                        _mayThrow = true;
+                        return true;
                     case IrAssumeInstruction assume:
                         {
                             var condition = Substitute(

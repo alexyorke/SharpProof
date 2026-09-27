@@ -4537,6 +4537,83 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task UncaughtThrowsEndPathsForNormalReturnClaims()
+    {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Guarded(int value) {
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    if (value <= 0) {
+                        throw new ArgumentOutOfRangeException(nameof(value));
+                    }
+                    return value;
+                }
+                public static int GuardedWrongly(int value) {
+                    Contract.Ensures(Contract.Result<int>() > 1);
+                    if (value <= 0) {
+                        throw new ArgumentOutOfRangeException(nameof(value));
+                    }
+                    return value;
+                }
+                public static int ThrowExpression(int value) {
+                    Contract.Ensures(Contract.Result<int>() != 0);
+                    return value != 0 ? value : throw new InvalidOperationException();
+                }
+                public static int AlwaysThrows(int value) {
+                    Contract.Ensures(Contract.Result<int>() == 42);
+                    throw new NotSupportedException();
+                }
+                public static int Caught(int value) {
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    try {
+                        if (value <= 0) {
+                            throw new InvalidOperationException();
+                        }
+                    } catch (InvalidOperationException) {
+                        return 0;
+                    }
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        WorkerClaimResult Claim(string method)
+        {
+            return response.ClaimResults.Single(record =>
+                GetCallableId(response, record).Contains(
+                    "." + method + "(",
+                    StringComparison.Ordinal));
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(Claim("Guarded").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("GuardedWrongly").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                Claim("GuardedWrongly").Model.Select(static value => value.Value),
+                Does.Contain("1"));
+            Assert.That(Claim("ThrowExpression").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            // No normal return is modeled: the proof is vacuous and says so.
+            Assert.That(Claim("AlwaysThrows").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                Claim("AlwaysThrows").Vacuity,
+                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+            // A throw that a catch in the same method can observe still
+            // abstains.
+            Assert.That(Claim("Caught").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task NarrowIntegerArithmeticAndConversionsAreExact()
     {
         using var project = TestProject.Create(

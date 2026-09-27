@@ -205,6 +205,12 @@ covers every iteration. A counterexample is replayed by running the real loop;
 if the concrete run does not reproduce it, the claim is `Unknown` with
 `CounterexampleNotReplayable`. Irreducible control flow abstains.
 
+A `throw` that no `catch` in the same method can observe ends its path:
+postconditions describe normal returns, so the lowering records `assume false`
+and does not evaluate the thrown operand. A body in which every path throws or
+loops forever has no modeled normal return, and its proofs are reported as
+vacuous. Throws inside `try`/`catch` still abstain.
+
 The manifest discovers local functions, lambdas, anonymous methods, and the
 top-level entry point, including their directly owned postconditions. These
 forms currently remain outside worker execution and produce
