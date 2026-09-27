@@ -9,8 +9,8 @@ internal static class CorpusSnapshotFormat
 {
     private static readonly string[] Header =
     [
-        "# SharpProof analyzer corpus snapshot schema 3",
-        "# case-id|verdict|semantic-outcome|sorted-diagnostics",
+        "# SharpProof analyzer corpus snapshot schema 4",
+        "# case-id|verdict|semantic-outcome|sorted-diagnostics|worker-claim-outcomes",
         "# diagnostic=id@effective-severity@normalized-location@base64-invariant-message"
     ];
 
@@ -130,7 +130,8 @@ internal static class CorpusSnapshotFormat
         }
 
         var parts = line!.Split('|');
-        if (parts.Length != 4 ||
+        if (parts.Length != 5 ||
+            parts[4].Length == 0 ||
             !Enum.TryParse<CorpusVerdict>(
                 parts[1],
                 ignoreCase: false,
@@ -156,14 +157,15 @@ internal static class CorpusSnapshotFormat
             parts[0],
             verdict,
             semanticOutcome,
-            diagnostics);
+            diagnostics,
+            parts[4]);
         return true;
     }
 
     private static InvalidDataException Invalid()
     {
         return new InvalidDataException(
-            "Corpus snapshot does not use the canonical schema-3 byte format.");
+            "Corpus snapshot does not use the canonical schema-4 byte format.");
     }
 
     private sealed record ParsedSnapshot(

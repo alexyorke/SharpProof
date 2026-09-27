@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -274,7 +275,28 @@ internal static class AnalyzerGateHost
                         diagnostic.ToString())));
         }
 
-        return references.Add(MetadataReference.CreateFromImage(stream.ToArray()));
+        // A file reference, so the worker's compiler artifact can record it.
+        var image = stream.ToArray();
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-gates-" + Convert.ToHexString(SHA256.HashData(image)));
+        var path = Path.Combine(directory, "SharpProof.Gates.ExternalEffects.dll");
+        if (!File.Exists(path))
+        {
+            Directory.CreateDirectory(directory);
+            var staging = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            File.WriteAllBytes(staging, image);
+            try
+            {
+                File.Move(staging, path);
+            }
+            catch (IOException) when (File.Exists(path))
+            {
+                File.Delete(staging);
+            }
+        }
+
+        return references.Add(MetadataReference.CreateFromFile(path));
     }
 
     private sealed class RecordingAnalyzerSessionFactory(

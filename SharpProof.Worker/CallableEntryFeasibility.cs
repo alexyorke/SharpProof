@@ -155,6 +155,12 @@ internal static class CallableEntryFeasibilityEvaluator
     }
 }
 
+internal sealed partial record CallableProofVerification
+{
+    internal ImmutableDictionary<string, WorkerClaimResult> Effects { get; init; } =
+        ImmutableDictionary<string, WorkerClaimResult>.Empty;
+}
+
 internal static class CallableProofCore
 {
     internal static ImmutableArray<string> Create(

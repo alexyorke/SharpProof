@@ -1082,10 +1082,21 @@ public sealed class WorkerTcbEdgeCaseTests
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
+        // A value-returning callable: its returns must carry a value.
+        ImmutableArray<CompilerCanonicalVariable> variables =
+        [
+            new(
+                CompilerVariableRole.Result,
+                0,
+                factory.CreateVariable("result", factory.IntegerType),
+                null,
+                null,
+                "result")
+        ];
         return CreateTarget(
             factory,
             factory.Boolean(true),
-            [],
+            variables,
             CompilerPreparedBody.ProgramBody(
                 builder.Build(),
                 ImmutableDictionary<IrVarId, IrVarId>.Empty,

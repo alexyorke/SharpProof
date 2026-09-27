@@ -64,6 +64,10 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         private IrLoopCut? _cut;
         private IrBlockId _current;
         private Dictionary<IrVarId, (long Minimum, long Maximum)?>? _ranges;
+        // Conditions under which no reachable operation throws: each is
+        // "path condition implies this operation completes normally".
+        private readonly List<IrTerm> _normalCompletions = [];
+        private bool _throwsUnmodeled;
 
         internal SymbolicBodyExecution Execute()
         {
@@ -106,7 +110,12 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             // or loops); the verifier reports such proofs as vacuous.
             return new SymbolicBodyExecution(WorkerClaimReason.None, _returns.ToImmutable(),
                     _projections.ToImmutable(), _assumptions.ToImmutable(),
-                    _summaryAssumptions.ToImmutable());
+                    _summaryAssumptions.ToImmutable())
+            {
+                NoThrow = _throwsUnmodeled
+                    ? null
+                    : IrSemanticTerms.Conjoin(inputs.Factory, _normalCompletions)
+            };
         }
 
         private bool ExecuteBlock(IrBasicBlock block, FlowState state)
@@ -142,6 +151,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     case IrAssumeInstruction { Condition: IrBooleanTerm { Value: false } }:
                         // The path does not complete normally (an uncaught
                         // throw); it contributes no return.
+                        RequireNormalCompletion(predicate, inputs.Factory.Boolean(false));
                         return true;
                     case IrAssumeInstruction assume:
                         var assumed = Substitute(assume.Condition, environment);
@@ -219,15 +229,28 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                         AddIncoming(go.Target, block.Id.Value << 1, predicate, environment);
                         return index == block.Instructions.Length - 1;
                     case IrReturnInstruction returned:
-                        if (index != block.Instructions.Length - 1 || returned.Value == null)
+                        if (index != block.Instructions.Length - 1 ||
+                            returned.Value == null && inputs.Variables.Any(static variable =>
+                                variable.Role == CompilerVariableRole.Result))
                         {
                             return false;
                         }
 
-                        var returnTerm = Substitute(returned.Value, environment);
+                        // A void method's return carries no value; any
+                        // placeholder works because no result variable reads it.
+                        var returnTerm = returned.Value == null
+                            ? inputs.Factory.Boolean(true)
+                            : Substitute(returned.Value, environment);
                         if (returnTerm == null)
                         {
                             return false;
+                        }
+
+                        if (IrSemanticTerms.RequiresDefinednessWitness(returnTerm))
+                        {
+                            RequireNormalCompletion(
+                                predicate,
+                                inputs.Factory.Binary(IrBinaryOperator.Equal, returnTerm, returnTerm));
                         }
 
                         var currentStates = CreateCurrentStates(environment);
@@ -261,7 +284,15 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 inputs.Factory,
                 predicate,
                 evaluated);
+            RequireNormalCompletion(
+                predicate,
+                inputs.Factory.Binary(IrBinaryOperator.Equal, evaluated, evaluated));
             return Supported(constrained) ? constrained : null;
+        }
+
+        private void RequireNormalCompletion(IrTerm predicate, IrTerm completes)
+        {
+            _normalCompletions.Add(IrSemanticTerms.Guard(inputs.Factory, predicate, completes));
         }
 
         private bool TransferBranch(
@@ -607,6 +638,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     return null;
                 }
 
+                RequireNormalCompletion(guard, normalCompletion);
                 normalCompletionGuard = inputs.Factory.Binary(
                     IrBinaryOperator.AndAlso,
                     guard,
@@ -699,6 +731,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
+            // A summary describes normal completion only; when the callee
+            // may throw, when it does is not modeled.
+            _throwsUnmodeled |= prepared.MayThrow;
             _summaryAssumptions.Add(new GuardedBodySummaryAssumption(
                 prepared.CallIdentity,
                 prepared.Origin,
@@ -863,6 +898,10 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 internal sealed partial record SymbolicBodyExecution
 {
     internal bool IsSuccess => Reason == WorkerClaimReason.None;
+
+    // Holds exactly when no reachable operation throws; null when a callee's
+    // throwing is not modeled.
+    internal IrTerm? NoThrow { get; init; }
     internal static SymbolicBodyExecution Failed(WorkerClaimReason reason)
     {
         return new(

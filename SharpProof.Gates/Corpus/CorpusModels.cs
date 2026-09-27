@@ -59,15 +59,17 @@ internal sealed record CorpusUnknownReasonRatchet(
     int MaximumTotalUnknown,
     ImmutableDictionary<string, int> MaximumByReason);
 
+// Worker lists the Z3 worker's per-claim outcomes; "-" when it has none.
 internal sealed record CorpusObservation(
     string CaseId,
     CorpusVerdict Verdict,
     AnalyzerSemanticOutcome SemanticOutcome,
-    ImmutableArray<string> Diagnostics)
+    ImmutableArray<string> Diagnostics,
+    string Worker = "-")
 {
     public string ToCanonicalLine()
     {
-        return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
+        return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}|{Worker}";
     }
 }
 

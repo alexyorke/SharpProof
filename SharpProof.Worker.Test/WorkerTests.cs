@@ -238,7 +238,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task EffectOnlyClaimUsesSealedCompilerEvidenceWithoutSmtQuery()
+    public async Task EffectOnlyDoesNotThrowClaimIsDecidedByOneSmtQuery()
     {
         using var project = TestProject.Create(
             """
@@ -274,8 +274,103 @@ public sealed class WorkerTests
                 Does.Match("^[0-9a-f]{64}$"));
             Assert.That(response.Summary.Versions.ApiSpecContentSha256,
                 Does.Match("^[0-9a-f]{64}$"));
-            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(result.ProofCore, Does.Contain("z3:does-not-throw"));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task Z3DecidesDoesNotThrowFromThrowSiteReachability()
+    {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                [DoesNotThrow]
+                public static int Increment(int value) => value + 1;
+
+                [DoesNotThrow]
+                public static int Divide(int value) => 100 / value;
+
+                [DoesNotThrow]
+                public static int DivideByGap(int larger, int smaller) {
+                    Contract.Requires(larger > smaller);
+                    return 100 / (larger - smaller);
+                }
+
+                [DoesNotThrow]
+                public static int Guard(int value) {
+                    if (value < 0) {
+                        throw new ArgumentOutOfRangeException(nameof(value));
+                    }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static void Check(int value) {
+                    if (100 / value > 1) {
+                        return;
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void CheckSafely(int value) {
+                    if (value != 0 && 100 / value > 1) {
+                        return;
+                    }
+                }
+
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                public static int WrongAllowance(int value) => 100 / value;
+
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                public static int SafeAllowance(int value) => value + 1;
+
+                private static int Identity(int value) => value;
+
+                [DoesNotThrow]
+                public static int AddAfterHelper(int input) {
+                    var probe = Identity(input);
+                    _ = probe;
+                    return input + 1;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        WorkerClaimResult Claim(string method)
+        {
+            return response.ClaimResults.Single(record =>
+                GetCallableId(response, record).Contains(
+                    "." + method + "(",
+                    StringComparison.Ordinal));
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+            Assert.That(Claim("Increment").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("Divide").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(Claim("Divide").EffectWitness?.Detail, Is.EqualTo("System.DivideByZeroException"));
+            // x > y makes x - y nonzero; intervals alone cannot see this.
+            Assert.That(Claim("DivideByGap").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("DivideByGap").ProofCore, Does.Contain("z3:does-not-throw"));
+            Assert.That(Claim("Guard").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(Claim("Guard").EffectWitness?.Kind, Is.EqualTo("explicit-throw"));
+            Assert.That(Claim("Check").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(Claim("CheckSafely").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("CheckSafely").ProofCore, Does.Contain("z3:does-not-throw"));
+            Assert.That(Claim("WrongAllowance").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(Claim("SafeAllowance").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            // A summarized helper that cannot throw keeps the body decidable.
+            Assert.That(Claim("AddAfterHelper").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("AddAfterHelper").ProofCore, Does.Contain("z3:does-not-throw"));
         }
     }
 
@@ -609,9 +704,7 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
-        using var worker = new SharpProofWorker(backend);
+        using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request);
         var maybeNull = response.ClaimResults.Single(result =>
@@ -662,7 +755,6 @@ public sealed class WorkerTests
                         ".RequiredNonNull(",
                         StringComparison.Ordinal)).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
-            Assert.That(backend.CallCount, Is.Zero);
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
                 Is.True);
@@ -724,9 +816,9 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task ConditionalEffectViolationRemainsTypedUnknown()
+    public async Task ConditionalThrowIsRefutedByZ3()
     {
-        var response = await RunAsync(
+        var response = await RunWithZ3Async(
             """
             using System;
             using SharpProof.Attributes;
@@ -737,23 +829,18 @@ public sealed class WorkerTests
                         throw new InvalidOperationException();
                 }
             }
-            """,
-            cacheEnabled: false);
+            """);
         var result = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.EffectContractNotEstablished);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 result.EffectCertainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
-            Assert.That(result.EffectWitness, Is.Null);
-            Assert.That(
-                response.CallableResults.Single().Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(result.EffectWitness?.Kind, Is.EqualTo("explicit-throw"));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -761,7 +848,7 @@ public sealed class WorkerTests
     [Test]
     public async Task UnprovenInitializationAndExceptionConstructionDoNotRefute()
     {
-        var response = await RunAsync(
+        var response = await RunWithZ3Async(
             """
             using System;
             using SharpProof.Attributes;
@@ -785,8 +872,7 @@ public sealed class WorkerTests
                 public static void Throw() =>
                     throw new UserException();
             }
-            """,
-            cacheEnabled: false);
+            """);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1120,7 +1206,8 @@ public sealed class WorkerTests
                 Is.EqualTo(response.Manifest.Claims.Select(static claim => claim.ClaimId)));
             Assert.That(response.ClaimResults.Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+            // One query for the postcondition, one for the Z3 effect decision.
+            Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -6337,6 +6424,16 @@ public sealed class WorkerTests
                 cache.GetProperty("enabledByDefault").GetBoolean(),
                 Is.True);
         }
+    }
+
+    // Effect claims on scalar bodies are decided by Z3, so tests about their
+    // verdicts need the real backend rather than an always-unsat stub.
+    private static async Task<WorkerVerifyResponse> RunWithZ3Async(string source)
+    {
+        using var project = TestProject.Create(source);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        return await worker.VerifyAsync(request);
     }
 
     private static async Task<WorkerVerifyResponse> RunAsync(

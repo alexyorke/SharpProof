@@ -519,9 +519,13 @@ public sealed class CompilerCallableLowererTests
                 [DoesNotThrow]
                 internal static void Verify(int value) {
                     Contract.Requires(value >= 0);
-                    while (value > 0) {
-                        value--;
-                    }
+                    // Two entries into one cycle: irreducible, so the body
+                    // stays unsupported.
+                    if (value > 5) goto Second;
+                    First:
+                    value--;
+                    Second:
+                    if (value > 0) goto First;
                 }
             }
             """,
@@ -574,9 +578,13 @@ public sealed class CompilerCallableLowererTests
             internal static class Subject {
                 [DoesNotThrow]
                 internal static void Verify(int value) {
-                    while (value > 0) {
-                        value--;
-                    }
+                    // Two entries into one cycle: irreducible, so the body
+                    // stays unsupported.
+                    if (value > 5) goto Second;
+                    First:
+                    value--;
+                    Second:
+                    if (value > 0) goto First;
                 }
             }
             """,

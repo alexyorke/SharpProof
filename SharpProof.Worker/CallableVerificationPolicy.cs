@@ -30,11 +30,16 @@ internal static class CallableVerificationPolicy
                 .ToDictionary(static item => item.claimId, static item => item.index, StringComparer.Ordinal);
             var records = proof.Postconditions
                 .Concat(target.EffectClaims.Select(evidence =>
-                    EffectClaimResultAssembler.Assemble(
-                        target,
-                        evidence,
-                        proof.EntryFeasibility,
-                        methodBoundary.Token)))
+                    // Z3 decides unless the compiler already refuted the
+                    // claim; a replayed Z3 counterexample also overrides a
+                    // compiler proof.
+                    proof.Effects.TryGetValue(evidence.ClaimId, out var decided)
+                        ? decided
+                        : EffectClaimResultAssembler.Assemble(
+                            target,
+                            evidence,
+                            proof.EntryFeasibility,
+                            methodBoundary.Token)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
             var reason = WorkerResultAssembler.ProjectCallableReasons(records).Reason;

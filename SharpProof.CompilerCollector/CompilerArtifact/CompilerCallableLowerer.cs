@@ -123,18 +123,29 @@ internal sealed class CompilerCallableLowerer
             // still classify an unsupported implementation so its typed
             // incomplete result is not reported as complete. Effect-only
             // callables without clauses intentionally skip this admission.
-            _ = PrepareBody(target, contracts, cancellationToken, out var bodyFailure);
+            var entryBody = PrepareBody(target, contracts, cancellationToken, out var bodyFailure);
             if (bodyFailure != WorkerClaimReason.None)
             {
                 return Fail(target, bodyFailure, clauses, variables);
             }
 
-            return Success(target, clauses, variables, body: null);
+            // Effect claims use the body; entry clauses alone do not need it.
+            return Success(
+                target,
+                clauses,
+                variables,
+                IsEffectExecutable(target, entryBody) ? entryBody : null);
         }
 
         if (target.Claims.IsDefaultOrEmpty)
         {
-            return Success(target, clauses, variables, body: null);
+            // Effect claims use the body when it lowers exactly; otherwise
+            // the compiler's effect evidence still stands.
+            return Success(
+                target,
+                clauses,
+                variables,
+                PrepareEffectBody(target, contracts, cancellationToken));
         }
 
         var preparedBody = PrepareBody(target, contracts, cancellationToken, out var failure);
@@ -148,6 +159,32 @@ internal sealed class CompilerCallableLowerer
             clauses,
             variables,
             target.Claims.IsDefaultOrEmpty ? null : preparedBody);
+    }
+
+    private CompilerPreparedBody? PrepareEffectBody(
+        ManifestCallableTarget target,
+        BoundMethodContracts contracts,
+        CancellationToken cancellationToken)
+    {
+        if (target.EffectClaims.IsDefaultOrEmpty)
+        {
+            return null;
+        }
+
+        var body = PrepareBody(target, contracts, cancellationToken, out var failure);
+        return failure == WorkerClaimReason.None && IsEffectExecutable(target, body) ? body : null;
+    }
+
+    // The worker decides effect claims only for static bodies made of
+    // scalar instructions; anything else keeps the compiler's evidence.
+    private static bool IsEffectExecutable(ManifestCallableTarget target, CompilerPreparedBody? body)
+    {
+        return !target.EffectClaims.IsDefaultOrEmpty &&
+            target.Method.IsStatic &&
+            body is { Kind: CompilerPreparedBodyKind.Program, Program: { } program } &&
+            program.Blocks.SelectMany(static block => block.Instructions).All(static instruction =>
+                instruction is IrAssignInstruction or IrCallInstruction or IrBranchInstruction or
+                    IrGotoInstruction or IrReturnInstruction or IrAssumeInstruction);
     }
 
     private CompilerPreparedBody? PrepareBody(ManifestCallableTarget target, BoundMethodContracts contracts,
@@ -169,13 +206,11 @@ internal sealed class CompilerCallableLowerer
             !inventory.Clauses.IsDefaultOrEmpty
             ? CreateClauseSiteIndex(inventory)
             : null;
-        if (target.Method.ReturnsVoid)
+        if (target.Method.ReturnsVoid &&
+            ContainsOnlyContractStatements(target, inventory, clauseSites))
         {
-            failure = ContainsOnlyContractStatements(
-                target,
-                inventory,
-                clauseSites) ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody;
-            return failure == WorkerClaimReason.None ? CompilerPreparedBody.Trivial() : null;
+            failure = WorkerClaimReason.None;
+            return CompilerPreparedBody.Trivial();
         }
         var bodyStart = FindExecutableBodyStart(target, inventory, clauseSites);
         if (!bodyStart.HasValue)
@@ -429,7 +464,10 @@ internal sealed class CompilerCallableLowerer
                     ToCompilerOrigin(provenance.Origin),
                     provenance.EvidenceCallIdentity,
                     provenance.EvidenceSha256,
-                    provenance.EvidenceIdentity))]);
+                    provenance.EvidenceIdentity))])
+        {
+            MayThrow = summary.Effects != IrSummaryEffect.None
+        };
         return true;
     }
 

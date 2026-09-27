@@ -304,6 +304,7 @@ internal static class CompilerLoweredArtifact
                 EvidenceSha256 = item.EvidenceSha256,
                 EvidenceIdentity = item.EvidenceIdentity,
                 DependencyEvidence = [.. item.DependencyEvidence],
+                MayThrow = item.MayThrow,
                 InstantiationSha256 = SummaryInstantiationSha256(
                     preparation.Factory,
                     call,
@@ -1012,7 +1013,8 @@ internal static class CompilerLoweredArtifact
                 summary.EvidenceIdentity,
                 [.. summary.DependencyEvidence])
             {
-                InstantiationSha256 = summary.InstantiationSha256
+                InstantiationSha256 = summary.InstantiationSha256,
+                MayThrow = summary.MayThrow
             });
         }
 

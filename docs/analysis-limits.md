@@ -211,6 +211,17 @@ and does not evaluate the thrown operand. A body in which every path throws or
 loops forever has no modeled normal return, and its proofs are reported as
 vacuous. Throws inside `try`/`catch` still abstain.
 
+The same symbolic pass decides `[DoesNotThrow]` and `[AllowedExceptions]`
+for static bodies made of scalar instructions. Each implicit throw site
+(an undefined term), explicit throw, spec call with a normal-completion
+condition, and summarized call that may throw contributes one "completes
+normally" conjunct. Z3 proves the claim when the conjunction holds under the
+preconditions, parameter domains, and spec facts; the postcondition-only
+normal-completion assumption is deliberately excluded. A counterexample is
+reported only after running the program on the model's inputs raises an
+exception the claim does not allow. A compiler refutation with a replayed
+witness is kept as is.
+
 `try`/`finally` runs its finally block on every normal exit. Each finally
 region has one continuation variable: a branch leaving the `try` records where
 it was going, the finally block runs once, and its end dispatches on that

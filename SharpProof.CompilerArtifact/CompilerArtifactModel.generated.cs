@@ -181,6 +181,10 @@ internal sealed record CompilerPreparedSummaryCall(
 )
 {
     internal string InstantiationSha256 { get; init; } = string.Empty;
+
+    // Whether the callee may throw; its relation describes normal
+    // completion only.
+    internal bool MayThrow { get; init; } = true;
 }
 
 internal sealed class CompilerSpecificationPackAuthority
@@ -384,6 +388,7 @@ internal sealed class CompilerSummaryCallArtifact
     public string EvidenceIdentity { get; set; } = string.Empty;
     public CompilerPreparedSummaryEvidence[] DependencyEvidence { get; set; } = [];
     public string InstantiationSha256 { get; set; } = string.Empty;
+    public bool MayThrow { get; set; } = true;
 }
 
 internal enum CompilerOutputKind

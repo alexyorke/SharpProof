@@ -277,6 +277,14 @@ public sealed class RoslynProgramLowerer(
                 return;
             }
 
+            if (assignment.Target is IDiscardOperation)
+            {
+                // `_ = value` still evaluates value, and may throw doing so.
+                var discarded = LowerValue(block, operation, assignment.Value);
+                _builder.Assign(block, operation, CreateTemporary("discard", discarded.Type), discarded);
+                return;
+            }
+
             var variable = _expressions.GetReferencedVariable(assignment.Target, unwrapConversions: false);
             if (variable.HasValue)
             {

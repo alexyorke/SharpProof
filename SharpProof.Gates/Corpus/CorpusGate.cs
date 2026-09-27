@@ -431,7 +431,11 @@ internal static class CorpusGate
                 item.Mode,
                 cancellationToken)
             .ConfigureAwait(false);
-        return Observe(item, analysis);
+        return Observe(item, analysis) with
+        {
+            Worker = await CorpusWorkerHost.ObserveAsync(item, cancellationToken)
+                .ConfigureAwait(false)
+        };
     }
 
     private static async Task<ImmutableArray<CorpusObservation>> ObserveAllAsync(
@@ -495,6 +499,7 @@ internal static class CorpusGate
     {
         return expected.Verdict == actual.Verdict &&
         expected.SemanticOutcome == actual.SemanticOutcome &&
+        expected.Worker == actual.Worker &&
         expected.Diagnostics.SequenceEqual(
             actual.Diagnostics,
             StringComparer.Ordinal);
@@ -532,8 +537,11 @@ internal static class CorpusGate
                         concurrentAnalysis: true,
                         cancellationToken)
                     .ConfigureAwait(false));
-            if (!Matches(byId[item.Id], first) ||
-                !Matches(byId[item.Id], second))
+            // Cache replay exercises the analyzer; the worker is
+            // deterministic and checked by the concurrent replay.
+            var worker = byId[item.Id].Worker;
+            if (!Matches(byId[item.Id], first with { Worker = worker }) ||
+                !Matches(byId[item.Id], second with { Worker = worker }))
             {
                 failures.Add($"Cache replay changed {item.Id}.");
             }

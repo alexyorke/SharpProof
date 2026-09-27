@@ -126,6 +126,14 @@ public sealed class ProofKernel(ISmtBackend backend)
         }
         cancellationToken.ThrowIfCancellationRequested();
         var goal = interpreter.Evaluate(query.Goal.Predicate, model.Assignments, cancellationToken);
+        if (goal.Status == IrEvaluationStatus.Exception &&
+            query.Goal.Diagnostic == ProofDiagnosticKind.EffectContract)
+        {
+            // An effect goal asserts that evaluation completes normally, so a
+            // validated model under which it throws is the violation.
+            return new RefutedOutcome(new ValidatedModel(model.Assignments));
+        }
+
         if (goal.Status == IrEvaluationStatus.Exception)
         {
             return Unknown(query.Goal.Diagnostic switch

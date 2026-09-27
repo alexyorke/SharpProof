@@ -9,6 +9,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
     private readonly ProofKernel _kernel = new(
         ArgumentNullGuard.NotNull(backend, nameof(backend)));
     private readonly AcyclicBlockPredicateExecutor _executor = new(maximumExpressionDepth);
+    private CallableEffectVerifier? _effects;
     private readonly int _maximumExpressionDepth =
         ArgumentNullGuard.RequirePositive(
             maximumExpressionDepth, nameof(maximumExpressionDepth));
@@ -53,9 +54,16 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 entryFeasibility,
                 cancellationToken)
             .ConfigureAwait(false);
+        var effects = await (_effects ??= new CallableEffectVerifier(
+                _kernel, _executor, _maximumExpressionDepth))
+            .VerifyAsync(target, resourceBudget, entryFeasibility, cancellationToken)
+            .ConfigureAwait(false);
         return new CallableProofVerification(
             postconditions,
-            entryFeasibility);
+            entryFeasibility)
+        {
+            Effects = effects
+        };
     }
 
     private async Task<ImmutableArray<WorkerClaimResult>>

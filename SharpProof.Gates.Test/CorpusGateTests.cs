@@ -11,7 +11,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
-    private const string CorpusSnapshotHeader = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+    private const string CorpusSnapshotHeader = "# SharpProof analyzer corpus snapshot schema 4\n# case-id|verdict|semantic-outcome|sorted-diagnostics|worker-claim-outcomes\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
 
     [Test]
     public void OssImporterRejectsMitLicenseWithAppendedRestrictions()
@@ -451,9 +451,9 @@ public sealed class CorpusGateTests
     }
 
     [Test]
-    public void CorpusSnapshotFormatRequiresExactSchemaThreeBytes()
+    public void CorpusSnapshotFormatRequiresExactSchemaFourBytes()
     {
-        const string data = "case|Proven|Proven|";
+        const string data = "case|Proven|Proven||-";
         var canonical = Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n");
         string[]? parsed = null;
         try
@@ -462,7 +462,7 @@ public sealed class CorpusGateTests
         }
         catch (InvalidDataException)
         {
-            Assert.Fail("The canonical schema-three snapshot must be accepted.");
+            Assert.Fail("The canonical schema-four snapshot must be accepted.");
         }
         Assert.That(parsed, Is.EqualTo(new[] { data }));
         Assert.That(CorpusSnapshotFormat.Render(new[] { data }), Is.EqualTo(CorpusSnapshotHeader + data + "\n"));
@@ -471,11 +471,11 @@ public sealed class CorpusGateTests
             Encoding.UTF8.GetBytes(data + "\n"),
             Encoding.UTF8.GetBytes(CorpusSnapshotHeader.Split('\n')[0] + "\n" + data + "\n"),
             Encoding.UTF8.GetBytes(CorpusSnapshotHeader + CorpusSnapshotHeader + data + "\n"),
-            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 2", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 999", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 4", "schema 3", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 4", "schema 999", StringComparison.Ordinal)),
             Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("SharpProof", "sharpproof", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema  3", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes("# case-id|verdict|semantic-outcome|sorted-diagnostics\n# SharpProof analyzer corpus snapshot schema 3\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n" + data + "\n"),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 4", "schema  4", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes("# case-id|verdict|semantic-outcome|sorted-diagnostics|worker-claim-outcomes\n# SharpProof analyzer corpus snapshot schema 4\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n" + data + "\n"),
             Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "# extra\n" + data + "\n"),
             Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "\n" + data + "\n"),
             Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("\n", "\r\n", StringComparison.Ordinal)),
@@ -493,8 +493,8 @@ public sealed class CorpusGateTests
     [Test]
     public void CorpusSnapshotFormatRequiresCanonicalRowOrdering()
     {
-        const string first = "a|Proven|Proven|";
-        const string second = "b|Proven|Proven|";
+        const string first = "a|Proven|Proven||-";
+        const string second = "b|Proven|Proven||-";
 
         Assert.That(
             CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
@@ -529,7 +529,7 @@ public sealed class CorpusGateTests
                      "Proven", "Refuted", "Unknown", "SilentUnknown"
                  })
         {
-            AssertAccepted(CorpusSnapshotHeader, $"case|{verdict}|Proven|");
+            AssertAccepted(CorpusSnapshotHeader, $"case|{verdict}|Proven||-");
         }
         foreach (var semanticOutcome in new[]
                  {
@@ -537,17 +537,17 @@ public sealed class CorpusGateTests
                      "Unknown", "Refuted"
                  })
         {
-            AssertAccepted(CorpusSnapshotHeader, $"case|Proven|{semanticOutcome}|");
+            AssertAccepted(CorpusSnapshotHeader, $"case|Proven|{semanticOutcome}||-");
         }
 
         foreach (var noncanonical in new[]
                  {
-                     "case|0|Proven|",
-                     "case| Proven|Proven|",
-                     "case|Proven |Proven|",
-                     "case|Proven|1|",
-                     "case|Proven| Proven|",
-                     "case|Proven|Proven |"
+                     "case|0|Proven||-",
+                     "case| Proven|Proven||-",
+                     "case|Proven |Proven||-",
+                     "case|Proven|1||-",
+                     "case|Proven| Proven||-",
+                     "case|Proven|Proven |-"
                  })
         {
             Assert.Throws<InvalidDataException>((Action)(() =>
@@ -818,7 +818,10 @@ public sealed class CorpusGateTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(refutedParts, Has.Length.EqualTo(4));
+            Assert.That(refutedParts, Has.Length.EqualTo(5));
+            // A call-site precondition is an analyzer diagnostic; the worker
+            // has no claim for it.
+            Assert.That(refutedParts[4], Is.EqualTo("-"));
             Assert.That(refutedParts[1], Is.EqualTo("Refuted"));
             Assert.That(refutedParts[2], Is.EqualTo("Refuted"));
             Assert.That(diagnosticParts, Has.Length.EqualTo(4));
@@ -834,7 +837,7 @@ public sealed class CorpusGateTests
             Assert.That(silentUnknown[1], Is.EqualTo("SilentUnknown"));
             Assert.That(silentUnknown[2], Is.EqualTo("Unknown"));
             Assert.That(silentUnknown[3], Is.Empty);
-            Assert.That(openSource, Has.Length.EqualTo(4));
+            Assert.That(openSource, Has.Length.EqualTo(5));
             Assert.That(openSource[1], Is.EqualTo("Unknown"));
             Assert.That(openSource[2], Is.EqualTo("Abstained"));
             Assert.That(openSource[3], Does.StartWith("SP0047@Warning@"));

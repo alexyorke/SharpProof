@@ -980,7 +980,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void SuccessfulCallableWithoutPostconditionsMayRemainBodyless()
+    public void OnlyEffectClaimsCarryABodyWithoutPostconditions()
     {
         var requiresOnly = CreateContractArtifact(
             """
@@ -997,7 +997,7 @@ public sealed class CompilerManifestArtifactTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(requiresOnly.Callables[0].Body, Is.Null);
-            Assert.That(effectOnly.Callables[0].Body, Is.Null);
+            Assert.That(effectOnly.Callables[0].Body, Is.Not.Null);
             Assert.DoesNotThrow((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(
                     CanonicalRoundTrip(requiresOnly))));
