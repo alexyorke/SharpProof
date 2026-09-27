@@ -16,11 +16,6 @@
              Link="Utf16WellFormedness.cs" />
     <Compile Include="..\SharpProof.Ir\ArgumentNullGuard.cs"
              Link="ArgumentNullGuard.cs" />
-    <Compile Update="ProtocolModel.generated.cs">
-      <AutoGen>true</AutoGen>
-      <DesignTime>true</DesignTime>
-      <DependentUpon>ProtocolModel.schema.json</DependentUpon>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.BuildTasks" />

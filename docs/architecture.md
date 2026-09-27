@@ -70,11 +70,10 @@ and protocol validation have their own non-overlapping inventories rather than
  `apiSpecificationCatalog` component. The contract API vocabulary has its own
  `contractApiCatalog` component; its generated output is limited to descriptors
  and ordered tables, while lookup behavior remains handwritten. The C# scalar type, conversion, checked
-arithmetic, IR enum vocabulary, and operator rules likewise come from the
-versioned `SharpProof.Frontend/CSharpScalarSemantics.json` catalog and its verified
-frontend and IR generated projections. The compiler-artifact schema also owns
- the portable IR wire-enum and slot catalogs; generated portable output contains
- declarative tables and wire projection adapters, while the codec keeps
+arithmetic, IR enum vocabulary, and operator rules likewise live in the
+`CSharpScalarSemantics.generated.cs` and `IrOperatorCatalog.generated.cs`
+tables. The portable IR wire-enum and slot tables and wire projection
+adapters are declarative, while the codec keeps
  indexing, depth/cycle, canonicality, and malformed-input validation handwritten.
 The effect-contract mapping catalog similarly owns finite capability, region,
 direct-event, and reference-family mappings; effect analysis and fail-closed
@@ -82,9 +81,9 @@ validation remain handwritten.
 The operation-support catalog similarly owns the finite Roslyn operation lists
 for contract-expression lowering and effect discovery; support queries,
 lowering, shape checks, and fail-closed behavior remain handwritten.
-Finite output, result-label, policy, operation-stage, and effect-wiring projections are likewise owned by
-the verified `SharpProof.Projection.catalog.json`; replay, validation, and
-analysis algorithms remain handwritten.
+Finite output, result-label, policy, operation-stage, and effect-wiring
+projections live in the per-project `*Projections.generated.cs` tables;
+replay, validation, and analysis algorithms remain handwritten.
  Launcher containment and publication
  remain separately checked by architecture, package, and integration tests.
 

@@ -12,8 +12,8 @@ release action rather than routine configuration.
 | Pin | Owner | Enforcement |
 |---|---|---|
 | Package and assembly version | `SharpProof.Release.props` | package, README, release-manifest, tag, and promotion checks |
-| Worker protocol, manifest, and cache schemas | `SharpProof.Worker.Protocol/ProtocolModel.schema.json` | generated model plus acceptance/package parity checks |
-| Compiler-artifact schema | `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` | generated model plus acceptance/package parity checks |
+| Worker protocol, manifest, and cache schemas | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs` | worker and package tests |
+| Compiler-artifact schema | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs` | worker and package tests |
 | Supported target frameworks and host boundary | `eng/acceptance/contract.json` and `docs/preview-support.md` | acceptance and packaged-host tests |
 | TCB paths and mutation catalog | `eng/acceptance/contract.json` | exact path/count ownership and deterministic mutation gates |
 | Corpus, fuzz, performance, and complexity ceilings | `eng/acceptance/contract.json` | acceptance scripts; complexity changes require `ceilingRationale` |

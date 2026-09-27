@@ -13,16 +13,13 @@ profile/feature defaults, and verifier-package requirements.
 `SharpProof.Verifier.defaults.props` and
 `SharpProof.Verifier.targets` define worker budgets, policy defaults,
 compiler-manifest properties, paths, invocation, and host enforcement.
-`SharpProof.Worker.Protocol/ProtocolModel.schema.json` is the authoritative
-model. `ProtocolModel.generated.cs` defines the matching runtime defaults and
-validation bounds, while the generated verifier defaults companion projects
-the same schema values into MSBuild. The release gate mirrors selected values
+`SharpProof.Worker.Protocol/ProtocolModel.generated.cs` defines the runtime
+defaults and validation bounds, and the verifier defaults companion projects
+the same values into MSBuild. The release gate mirrors selected values
 in `eng/acceptance/contract.json` and verifies that they agree.
-`SharpProof.Frontend/CSharpScalarSemantics.json` is the corresponding review
-source for admitted integer widths and ranges, value-preserving conversions,
-checked behavior, Roslyn-to-IR and inverse mappings, comparison relations, and
-the ordered IR type/operator vocabulary and canonical metadata; CI verifies
-both generated C# projections before building.
+`SharpProof.Frontend/CSharpScalarSemantics.generated.cs` lists the admitted
+integer widths and ranges, value-preserving conversions, checked behavior,
+Roslyn-to-IR and inverse mappings, and comparison relations.
 
 ## Package and worker defaults
 

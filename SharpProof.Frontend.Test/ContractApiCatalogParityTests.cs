@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Reflection;
-using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Attributes;
 
@@ -45,26 +44,6 @@ public sealed class ContractApiCatalogParityTests
                 ContractApiClauseProjection.GetClauseRole(method.Name),
                 Is.EqualTo(descriptor.ClauseRole),
                 method.Name);
-        }
-    }
-
-    [Test]
-    public void CatalogIdentityMatchesTheExportedContractDeclaration()
-    {
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
-            "SharpProof.Frontend",
-            "ContractApi.catalog.json")));
-        var root = document.RootElement;
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                root.GetProperty("namespace").GetString() + "." +
-                    root.GetProperty("contractType").GetString(),
-                Is.EqualTo(typeof(Contract).FullName));
-            Assert.That(
-                root.GetProperty("conditionalSymbol").GetString(),
-                Is.EqualTo(Contract.ConditionalSymbol));
         }
     }
 
@@ -122,76 +101,6 @@ public sealed class ContractApiCatalogParityTests
                     Assert.Fail("The catalog contains an unknown attribute category.");
                     break;
             }
-        }
-    }
-
-    [TestCase(
-        "duplicate",
-        "contains duplicate property 'schemaVersion'")]
-    [TestCase(
-        "unknown",
-        "contains unsupported property 'unknownProperty'")]
-    [TestCase(
-        "shape",
-        "must be one of: Clause, Old, Result")]
-    public async Task GeneratorRejectsMalformedCatalogs(
-        string mutation,
-        string expectedError)
-    {
-        var repository = TestRepository.FindRoot();
-        var catalog = await File.ReadAllTextAsync(Path.Combine(
-            repository,
-            "SharpProof.Frontend",
-            "ContractApi.catalog.json"));
-        catalog = mutation switch
-        {
-            "duplicate" => catalog.Replace(
-                "\"schemaVersion\": 1,",
-                "\"schemaVersion\": 1,\n  \"schemaVersion\": 1,",
-                StringComparison.Ordinal),
-            "unknown" => catalog.Replace(
-                "\"schemaVersion\": 1,",
-                "\"schemaVersion\": 1,\n  \"unknownProperty\": true,",
-                StringComparison.Ordinal),
-            "shape" => catalog.Replace(
-                "\"shape\": \"Clause\"",
-                "\"shape\": \"Invalid\"",
-                StringComparison.Ordinal),
-            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
-        };
-
-        using var temporary = new TempDirectory(
-            "contract-api-catalog-",
-            TestContext.CurrentContext.WorkDirectory);
-        var temporaryDirectory = temporary.FullName;
-        var catalogPath = Path.Combine(temporaryDirectory, "catalog.json");
-        var outputPath = Path.Combine(temporaryDirectory, "generated.cs");
-        await File.WriteAllTextAsync(catalogPath, catalog);
-        var start = ProcessRunner.CreateStartInfo(
-            Environment.CurrentDirectory,
-            "pwsh",
-            new[]
-        {
-            "-NoLogo",
-            "-NoProfile",
-            "-File",
-            Path.Combine(repository, "scripts", "Generate-ContractApiCatalog.ps1"),
-            "-CatalogPath",
-            catalogPath,
-            "-OutputPath",
-            outputPath
-        });
-
-        var result = await ProcessRunner.RunCapturedAsync(
-            start,
-            CancellationToken.None);
-        var output = result.Output + result.Error;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.ExitCode, Is.Not.Zero, output);
-            Assert.That(output, Does.Contain(expectedError));
-            Assert.That(File.Exists(outputPath), Is.False);
         }
     }
 

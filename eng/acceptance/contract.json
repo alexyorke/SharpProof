@@ -197,9 +197,7 @@
       {
         "name": "apiSpecificationCatalog",
         "paths": [
-          "SharpProof.Specs/DefaultApiSpecCatalog.json",
           "SharpProof.Specs/RelationalSpecPackCatalog.json",
-          "scripts/Generate-ApiSpecCatalog.ps1",
           "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
           "SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
@@ -207,8 +205,6 @@
       {
         "name": "scalarSemanticsCatalog",
         "paths": [
-          "SharpProof.Frontend/CSharpScalarSemantics.json",
-          "scripts/Generate-CSharpScalarSemantics.ps1",
           "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
           "SharpProof.Ir/IrOperatorCatalog.generated.cs"
         ]
@@ -216,8 +212,6 @@
       {
         "name": "contractApiCatalog",
         "paths": [
-          "SharpProof.Frontend/ContractApi.catalog.json",
-          "scripts/Generate-ContractApiCatalog.ps1",
           "SharpProof.Frontend/ContractApiMetadata.generated.cs",
           "SharpProof.Attributes/Contract.cs",
           "SharpProof.Attributes/ContractForAttribute.cs",
@@ -237,16 +231,12 @@
       {
         "name": "analyzerDiagnosticCatalog",
         "paths": [
-          "SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json",
-          "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
           "SharpProof.Analyzer.Core/AnalyzerDiagnosticCatalog.generated.cs"
         ]
       },
       {
         "name": "diagnosticDescriptorCatalog",
         "paths": [
-          "eng/diagnostics/diagnostic-descriptors.v1.json",
-          "scripts/Generate-DiagnosticDescriptors.ps1",
           "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
           "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs"
         ]
@@ -254,8 +244,6 @@
       {
         "name": "projectionCatalog",
         "paths": [
-          "SharpProof.Projection.catalog.json",
-          "scripts/Generate-ProjectionCatalog.ps1",
           "SharpProof.Verify/VerificationProjections.generated.cs",
           "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
@@ -270,19 +258,9 @@
       {
         "name": "launcherArgumentCatalog",
         "paths": [
-          "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
-          "scripts/Generate-LauncherArguments.ps1",
           "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
           "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
           "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
-        ]
-      },
-      {
-        "name": "generatedOutputPolicy",
-        "paths": [
-          "eng/generated/approved-outputs.v1.json",
-          "scripts/GeneratedFileHelpers.ps1",
-          "scripts/CSharpSourceMetrics.ps1"
         ]
       },
       {
@@ -294,8 +272,6 @@
       {
         "name": "declarativeModelsCatalog",
         "paths": [
-          "SharpProof.DeclarativeModels.catalog.json",
-          "scripts/Generate-DeclarativeModels.ps1",
           "SharpProof.Analyzer.Core/DeclarativeModels.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
           "SharpProof.Specs/DeclarativeModels.generated.cs",
@@ -311,32 +287,24 @@
       {
         "name": "boundContractModelCatalog",
         "paths": [
-          "SharpProof.Contracts/BoundContractModel.schema.json",
-          "scripts/Generate-BoundContractModel.ps1",
           "SharpProof.Contracts/BoundContractModel.generated.cs"
         ]
       },
       {
         "name": "effectContractCatalog",
         "paths": [
-          "SharpProof.Effects/EffectContractMappings.catalog.json",
-          "scripts/Generate-EffectContractMappings.ps1",
           "SharpProof.Effects/EffectContractMappings.generated.cs"
         ]
       },
       {
         "name": "operationSupportCatalog",
         "paths": [
-          "SharpProof.Frontend/OperationSupport.catalog.json",
-          "scripts/Generate-OperationSupportCatalog.ps1",
           "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
         ]
       },
       {
         "name": "irModelCatalog",
         "paths": [
-          "SharpProof.Ir/IrModel.schema.json",
-          "scripts/Generate-IrModel.ps1",
           "SharpProof.Ir/IrIdentifierAliases.cs",
           "SharpProof.Ir/ScopedIrId.cs",
           "SharpProof.Ir/ArgumentNullGuard.cs",
@@ -347,8 +315,6 @@
       {
         "name": "compilerWireCatalog",
         "paths": [
-          "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
-          "scripts/Generate-CompilerArtifactModel.ps1",
           "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]
@@ -471,8 +437,6 @@
         "name": "protocolValidation",
         "paths": [
           "SharpProof.Worker/Program.cs",
-          "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
-          "scripts/Generate-ProtocolModel.ps1",
           "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
@@ -571,7 +535,6 @@
           "scripts/SharpProof.PackageIdentity.psm1",
           "scripts/Read-SharpProofSdkPolicy.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
-          "scripts/Test-SharpProofGeneratedOutputs.ps1",
           "scripts/Test-SharpProofSamples.ps1",
           "scripts/Test-SharpProofSymbolPackages.ps1",
           "scripts/SharpProof.SymbolPackageValidator.cs",
