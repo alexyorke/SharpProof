@@ -452,7 +452,7 @@ public sealed class ScalarDifferentialMatrixTests
     }
 
     [Test]
-    public async Task WidthSensitiveConversionsRemainTypedUnknown()
+    public async Task NarrowingConversionsAreExact()
     {
         using var project = DifferentialProject.Create(
             CreateUnsupportedConversionSource());
@@ -470,13 +470,14 @@ public sealed class ScalarDifferentialMatrixTests
         {
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(conversions, Has.Length.EqualTo(4));
+            Assert.That(conversions, Has.Length.EqualTo(6));
             Assert.That(
                 conversions.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
-                conversions.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+                conversions.Single(result => CallableId(response, result).Contains(
+                    "CheckedOverflowConversion(", StringComparison.Ordinal)).Vacuity,
+                Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
         }
     }
 
@@ -645,6 +646,18 @@ public sealed class ScalarDifferentialMatrixTests
                     Contract.Ensures(
                         Contract.Result<int>() >= int.MinValue);
                     return unchecked((int)value);
+                }
+
+                public static int UncheckedWrapConversion(long value) {
+                    Contract.Requires(value == 2147483648L);
+                    Contract.Ensures(Contract.Result<int>() == int.MinValue);
+                    return unchecked((int)value);
+                }
+
+                public static int CheckedOverflowConversion(long value) {
+                    Contract.Requires(value == 2147483648L);
+                    Contract.Ensures(false);
+                    return checked((int)value);
                 }
             }
             """;
@@ -868,7 +881,7 @@ public sealed class ScalarDifferentialMatrixTests
                 if (item.ExpectedException == null)
                 {
                     Assert.That(
-                        Convert.ToInt64(method.Invoke(null, item.Inputs), CultureInfo.InvariantCulture),
+                        System.Convert.ToInt64(method.Invoke(null, item.Inputs), CultureInfo.InvariantCulture),
                         Is.EqualTo(item.ExpectedResult),
                         item.MethodName);
                     AssertIntegerReturn(execution, item.ExpectedResult!.Value, item.MethodName);
@@ -931,7 +944,41 @@ public sealed class ScalarDifferentialMatrixTests
                     $"IntNegate{context}{index++}", context, value,
                     () => context == "checked" ? checked(-value) : unchecked(-value));
             }
+            long[] sources = [long.MinValue, -129L, -1L, 0L, 255L, 65536L, 2147483648L, long.MaxValue];
+            foreach (var type in new[] { "sbyte", "byte", "short", "ushort", "char", "int", "uint" })
+            {
+                foreach (var value in sources)
+                {
+                    var isChecked = context == "checked";
+                    var (expected, exception, irException) = Outcome(() => ConvertNarrow(type, isChecked, value));
+                    yield return new(
+                        $"Convert{type}{context}{index++}", type, $"{context}(({type})value)",
+                        [value], expected, exception, irException, "long");
+                }
+            }
         }
+    }
+
+    private static long ConvertNarrow(string type, bool isChecked, long value)
+    {
+        return (type, isChecked) switch
+        {
+            ("sbyte", true) => checked((sbyte)value),
+            ("sbyte", false) => unchecked((sbyte)value),
+            ("byte", true) => checked((byte)value),
+            ("byte", false) => unchecked((byte)value),
+            ("short", true) => checked((short)value),
+            ("short", false) => unchecked((short)value),
+            ("ushort", true) => checked((ushort)value),
+            ("ushort", false) => unchecked((ushort)value),
+            ("char", true) => checked((char)value),
+            ("char", false) => unchecked((char)value),
+            ("int", true) => checked((int)value),
+            ("int", false) => unchecked((int)value),
+            ("uint", true) => checked((uint)value),
+            ("uint", false) => unchecked((uint)value),
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
     }
 
     private static long EvaluateInt(string name, bool isChecked, int left, int right)
@@ -1003,15 +1050,13 @@ public sealed class ScalarDifferentialMatrixTests
         var methods = cases.Select(static item =>
         {
             var names = item.Inputs.Length == 1 ? UnaryParameterNames : BinaryParameterNames;
-            var parameters = string.Join(", ", names.Select(name => item.Type + " " + name));
+            var parameterType = item.ParameterType ?? item.Type;
+            var parameters = string.Join(", ", names.Select(name => parameterType + " " + name));
             var requires = names.Select((name, index) =>
-                $"        Contract.Requires({name} == " +
-                Convert.ToString(item.Inputs[index], CultureInfo.InvariantCulture) +
-                (item.Type == "uint" ? "U" : string.Empty) + ");");
+                $"        Contract.Requires({name} == " + Literal(parameterType, item.Inputs[index]) + ");");
             var ensures = item.ExpectedException == null
                 ? $"        Contract.Ensures(Contract.Result<{item.Type}>() == " +
-                  item.ExpectedResult!.Value.ToString(CultureInfo.InvariantCulture) +
-                  (item.Type == "uint" ? "U" : string.Empty) + ");"
+                  Literal(item.Type, item.ExpectedResult!.Value) + ");"
                 : "        Contract.Ensures(false);";
             return
                 $$"""
@@ -1036,6 +1081,19 @@ public sealed class ScalarDifferentialMatrixTests
             """;
     }
 
+    private static string Literal(string type, object value)
+    {
+        var number = System.Convert.ToInt64(value, CultureInfo.InvariantCulture);
+        return type switch
+        {
+            "uint" => number.ToString(CultureInfo.InvariantCulture) + "U",
+            "long" when number == long.MinValue => "long.MinValue",
+            "long" => number.ToString(CultureInfo.InvariantCulture) + "L",
+            "char" => "(char)" + number.ToString(CultureInfo.InvariantCulture),
+            _ => number.ToString(CultureInfo.InvariantCulture)
+        };
+    }
+
     private sealed record NarrowCase(
         string MethodName,
         string Type,
@@ -1043,7 +1101,8 @@ public sealed class ScalarDifferentialMatrixTests
         object[] Inputs,
         long? ExpectedResult,
         Type? ExpectedException,
-        IrExceptionKind? ExpectedIrException);
+        IrExceptionKind? ExpectedIrException,
+        string? ParameterType = null);
 
     private sealed record ArithmeticCase(
         string MethodName,

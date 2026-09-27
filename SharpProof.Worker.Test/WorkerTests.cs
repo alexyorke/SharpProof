@@ -4447,7 +4447,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task NarrowIntegerArithmeticIsExactAndConversionsAbstain()
+    public async Task NarrowIntegerArithmeticAndConversionsAreExact()
     {
         using var project = TestProject.Create(
             """
@@ -4505,11 +4505,11 @@ public sealed class WorkerTests
                 Claim("CheckedContract").Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
-                Claim("UncheckedBody").Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Claim("UncheckedBody").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
-                Claim("CheckedBody").Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Claim("CheckedBody").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
         }
     }
 

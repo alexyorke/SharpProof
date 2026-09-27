@@ -233,6 +233,20 @@ internal static class CSharpScalarSemantics
         TryGetInteger(type, out var semantics) &&
         semantics.SupportsExactIrArithmetic;
 
+    // An explicit integer conversion into a type narrower than 64 bits,
+    // which checks or wraps the exact source value.
+    internal static IrUnaryOperator? NarrowIntegerConversion(
+        SpecialType source,
+        SpecialType target,
+        bool isChecked)
+    {
+        return IsSupportedInteger(source) &&
+            TryGetInteger(target, out var semantics) &&
+            semantics.BitWidth < 64
+            ? IrIntegerNarrowing.OperatorFor(semantics.BitWidth, semantics.IsSigned, isChecked)
+            : null;
+    }
+
     // How a C# integer operator result narrower than 64 bits is formed from
     // the exact IR value, or null when the IR cannot model it exactly. The
     // exact 64-bit intermediate must not overflow where C# completes, and

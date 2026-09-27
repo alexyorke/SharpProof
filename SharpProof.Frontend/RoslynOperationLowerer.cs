@@ -1003,6 +1003,16 @@ public sealed class RoslynOperationLowerer
                 return operand;
             }
 
+            if (target == operand.Term.Type &&
+                CSharpScalarSemantics.NarrowIntegerConversion(
+                    specializedOperandType?.SpecialType ?? SpecialType.None,
+                    specializedTargetType?.SpecialType ?? SpecialType.None,
+                    operation.IsChecked) is { } narrowing)
+            {
+                return LoweredExpression.Exact(
+                    _owner._factory.Unary(narrowing, operand.Term));
+            }
+
             // Routing stays keyed on the operand's constant so the abstention
             // reasons keep their existing split. LowerConstant is what guards
             // against the conversion itself carrying no constant, which is the

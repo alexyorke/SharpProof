@@ -894,8 +894,8 @@ public sealed class FrontendLoweringTests
             """
             public static int Target(long value) => checked((int)value);
             """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.ConversionMayChangeValue)
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None)
             .SetName("OverflowAndConversionShapes_CheckedLongToInt");
         yield return new TestCaseData(
             """
