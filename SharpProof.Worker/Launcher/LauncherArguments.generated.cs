@@ -11,7 +11,6 @@ namespace SharpProof.Worker.Launcher;
 internal sealed partial class LauncherArguments
 {
     private static readonly System.Collections.Immutable.ImmutableArray<string> s_required = [
-        "worker",
         "request",
         "result",
         "compiler-manifest",
@@ -49,33 +48,6 @@ internal sealed partial class LauncherArguments
                 "cache-maximum-bytes",
             });
 
-    private static class LauncherRuntimePathCache
-    {
-        internal static readonly System.Collections.Immutable.ImmutableArray<string> Value = CreateLauncherRuntimePaths();
-    }
-    private static System.Collections.Immutable.ImmutableArray<string> CreateLauncherRuntimePaths()
-    {
-        var path = typeof(LauncherArguments).Assembly.Location;
-        var directory = System.IO.Path.GetDirectoryName(path)!;
-        return [
-            path,
-            System.IO.Path.ChangeExtension(path, ".deps.json"),
-            System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
-            System.IO.Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
-            System.IO.Path.Combine(directory, "SharpProof.Host.dll"),
-            System.IO.Path.Combine(directory, "SharpProof.Ir.dll"),
-            System.IO.Path.Combine(directory, "SharpProof.Specs.dll"),
-            System.IO.Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
-            System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
-            System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
-            System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
-        ];
-    }
-
-    internal static System.Collections.Immutable.ImmutableArray<string> LauncherRuntimePaths =>
-        LauncherRuntimePathCache.Value;
-
-    internal string WorkerPath => FullPath("worker");
     internal string RequestPath => FullPath("request");
     internal string ResultPath => FullPath("result");
     internal string CompilerManifestPath => FullPath("compiler-manifest");

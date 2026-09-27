@@ -602,7 +602,7 @@ public sealed class SharpProofWorker : IDisposable
             }
 
             error = exception.GetBaseException().Message;
-            return Program.IsBackendUnavailable(exception)
+            return WorkerHost.IsBackendUnavailable(exception)
                 ? LaneCreationResult.BackendUnavailable
                 : LaneCreationResult.InfrastructureFailure;
         }
@@ -689,7 +689,7 @@ public sealed class SharpProofWorker : IDisposable
                 catch (Exception exception) when (exception is not OutOfMemoryException and
                     not StackOverflowException and not OperationCanceledException)
                 {
-                    return Program.IsBackendUnavailable(exception)
+                    return WorkerHost.IsBackendUnavailable(exception)
                         ? LaneRenewalResult.BackendUnavailable
                         : LaneRenewalResult.InfrastructureFailure;
                 }

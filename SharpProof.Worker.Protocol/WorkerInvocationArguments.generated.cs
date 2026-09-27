@@ -4,17 +4,11 @@
 // </auto-generated>
 #nullable enable
 
-#if SHARPPROOF_HOST_INVOCATION_TOKENS
-namespace SharpProof.Host.Invocation;
-#else
 namespace SharpProof.Worker.Protocol;
-#endif
 
 internal static class WorkerInvocationArguments
 {
     internal const string Command = "verify";
     internal const string RequestOption = "--request";
     internal const string ResultOption = "--result";
-    internal const string StartStdinOption = "--start-stdin";
-    internal const string ParentPidOption = "--parent-pid";
 }

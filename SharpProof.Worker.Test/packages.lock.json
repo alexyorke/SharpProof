@@ -244,14 +244,6 @@
           "System.Text.Json": "[10.0.10, )"
         }
       },
-      "sharpproof.worker.launcher": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
-          "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
-        }
-      },
       "sharpproof.worker.protocol": {
         "type": "Project",
         "dependencies": {

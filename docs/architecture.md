@@ -31,7 +31,6 @@ Host
 Worker.Protocol
 Worker                -> CompilerArtifact, Dataflow, Host, Ir, Smt, Specs,
                          Verify, Worker.Protocol
-Worker.Launcher       -> CompilerArtifact, Host, Ir, Specs, Worker.Protocol
 ```
 
 Frontend's
@@ -84,8 +83,6 @@ lowering, shape checks, and fail-closed behavior remain handwritten.
 Finite output, result-label, policy, operation-stage, and effect-wiring
 projections live in the per-project `*Projections.generated.cs` tables;
 replay, validation, and analysis algorithms remain handwritten.
- Launcher containment and publication
- remain separately checked by architecture, package, and integration tests.
 
 Source complexity is measured independently of formatting. Repository,
 coordinator, algorithm-file, and member ratchets count Roslyn expression nodes,
@@ -203,86 +200,29 @@ The request carries only the compiler-artifact path/digest, policies, budgets,
 and cache controls. The artifact carries `WorkerFeatureSet` and applies the same
 `effects`/`contracts`/`all` selection before manifest discovery: contract-only
 artifacts exclude effect annotations and effect-only artifacts exclude
-postcondition claims. In the supported Linux amd64 container, the launcher
-validates the container and runtime closure, starts one direct child worker,
-and releases it through an exact stdin startup message. Docker owns the hard
-CPU and memory boundary. Concurrent builds use isolated
-artifact/request/result paths. A packaged net9.0 Core-MSBuild task assembly
-owns host validation, cancellation, path validation, and pre-verification
-invalidation.
-After validating a response, ordered cross-process locks cover the canonical
-request, result, manifest, and optional SARIF publication set. Partial overlap
-with another declared set is rejected. The stable result is deleted first, the
-manifest and request are atomically replaced, and the result is written last as
-the commit marker. A failed publication therefore cannot leave a stale
-successful result associated with a partly updated evidence set. The
-content-addressed cache includes semantic, protocol, tool, compilation,
-reference, option, target-framework, canonical packaged worker runtime-closure,
-and spec-content identity.
-Cache schema version 14 stores complete, postcondition-only responses whose
-claims are all `Proven` or `Refuted`. The key already binds the compiler
-artifact, worker binary, spec content, and budgets, so a hit whose manifest
-hash matches is reused as-is. `Unknown` outcomes and effect claims are not
-cacheable.
-
-During container verification, the build-only compiler collector observes the
-final post-generator Roslyn `Compilation` and atomically emits compiler
-artifact schema version 18. The compiler owns selection, contract/spec binding,
-effect evaluation, relational-summary inference, and body lowering. Every selected callable has either a
-typed failure record or a portable graph containing its bound clauses,
-canonical variables, whole-body CFG/IR, body start, initial environment,
-parameter mappings, exact API-spec witness metadata, and canonical source,
-implementation-IL, or audited-pack summary calls. Summary evidence includes
-the complete transitive origin/digest/pack-identity closure under summary and
-pack schema version 1. Every selected
-effect-attribute occurrence also has one compiler-sealed `Proven`, candidate
-`Refuted`, or typed `Unknown` evidence record. Repeated attributes retain
-distinct claim IDs while sharing their effective combined
-constraint/evidence. Current effect-event admission and replay boundaries are
-maintained in [Coverage and limits](coverage-and-limits.md#outcomes-accountability-and-cache-boundary).
-Callable IDs, claim ownership, and user-assumption IDs remain tied to the sealed
-manifest.
-The semantic-operation hash is a canonical consistency check over those
-compiler-produced event fields, not an independent source binding. Compiler
-contract discovery, effect analysis, and event lowering are therefore
-explicit trusted-computing-base components; the worker independently owns
-event interpretation and constraint comparison.
-
-The artifact also contains compiler error diagnostics with mapped locations,
-handwritten and generated tree hashes, raw and effective per-tree preprocessor
-symbols, parse settings, the bounded proof-relevant compilation-option set,
-assembly and target identity, and compiler/reference provenance. An effective
-`SHARPPROOF_CONTRACTS` symbol invalidates the artifact before worker
+postcondition claims. In the supported Linux amd64 container, the
+`RunVerifier` MSBuild task starts one verifier process
+(`dotnet SharpProof.Worker.dll verify ...`) with a hard deadline and kills the
+process tree on timeout or cancellation. The verifier runs verification
+in-process and writes its typed result itself; a killed run has no fresh
+result. Docker owns the hard CPU and memory boundary. Concurrent builds use
+isolated artifact/request/result paths. After validating a response the
+verifier atomically replaces the published manifest, request, and optional
+SARIF, and writes the result last.
 verification. It intentionally contains no source text.
 Readable file-backed references are required while the compiler records their
 path, image hash, identity, kind, embed flag, and aliases. Resolver-dependent
 `#r`/`#load`, missing-assembly resolver mode, reference supersession, and custom
 assembly-identity comparers fail artifact collection as SP0049.
 
-The launcher binds the artifact bytes and request identity into the response
-and publishes the request, response, and manifest under one lock with the
-result written last. The artifact is the worker's sole compilation input. The
-worker validates its digest and canonical shape, requires the embedded maximum
-expression depth to equal the request budget, and decodes the portable graph.
-Exact manifest/lowered-callable equality, claim lists, assumption declarations,
-and graph indices are checked before cache lookup or backend creation.
-Compiler diagnostics fail as `CompilationFailure`; malformed lowered evidence
-or option mismatch fails as `CompilerManifestMismatch`. That structural gate
-also rejects a changed effect-event order, source tree/span, event or
-constraint hash, identity field, or witness relationship before semantic
-replay.
-
-Location authorities bind every manifest callable and claim to one captured
-tree and valid mapped geometry. Hydration also requires each direct-clause
-claim to lie strictly inside its callable's implementation declaration and a
-callable's direct clauses to keep source order, so a resealed artifact cannot
-move a claim into another declaration or swap claim locations. Because the
-worker has no source text, the launcher, which runs beside the build's
-sources, rereads each owning tree, requires its captured length and content
-hash, and requires callable spans to be declarations, clause claims to be
-`Ensures` invocations, and attribute claims to be attribute syntax. In-memory
-source-generator output has no file to reread and keeps only the hydration
-checks.
+The verifier binds the artifact bytes and request identity into the response.
+The artifact is trusted build output and the worker's sole compilation input:
+the worker checks its digest against the request, requires the embedded
+maximum expression depth to equal the request budget, checks that the manifest
+and lowered callables agree, and decodes the portable graph before cache lookup
+or backend creation. Compiler diagnostics fail as `CompilationFailure`;
+undecodable lowered evidence or option mismatch fails as
+`CompilerManifestMismatch`.
 
 The worker project contains no direct Roslyn dependency and performs no
 compiler reconstruction or source parsing. It does not reread reference files.

@@ -56,310 +56,34 @@ internal static class CompilerArtifactInputHash
     }
 }
 
+// Cache identity of the worker runtime: the SharpProof and Z3 managed
+// assemblies shipped beside the worker plus the native Z3 library digest.
 internal static class WorkerBinaryIdentity
 {
-    internal const int MaximumComponentKeyCharacters = 256;
-    internal const int MaximumRuntimeComponents = 64;
-    internal const int MaximumComponentBytes = 32 * 1024 * 1024;
-    internal const long MaximumClosureBytes = 64L * 1024 * 1024;
-    internal const long MaximumDependenciesBytes = 1024L * 1024;
-    internal const long MaximumRuntimeConfigBytes = 64L * 1024;
-
-    internal static WorkerRuntimeClosureSnapshot CreateSnapshot(
-        string workerPath,
-        string? z3LibrarySha256 = null)
-    {
-        if (z3LibrarySha256 is not null &&
-            !WorkerProtocolJson.IsSha256(z3LibrarySha256))
-        {
-            throw new InvalidDataException(
-                "The Z3 native library identity is not a SHA-256 digest.");
-        }
-        var path = NormalizeWorkerPath(workerPath);
-        var stagingDirectory = CreateStagingDirectory();
-        FileStream[] stagedHandles = [];
-        var stagedCount = 0;
-        var ownershipTransferred = false;
-        try
-        {
-            Directory.CreateDirectory(stagingDirectory);
-            using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
-            var dependencyBytes = ReadSnapshotBytes(
-                dependency,
-                MaximumDependenciesBytes);
-            var components = RuntimeComponents(path, dependencyBytes);
-            ValidateSnapshotBytes(dependencyBytes);
-            stagedHandles = new FileStream[components.Count];
-            using var hash = new CanonicalHashWriter();
-            hash.Add("SharpProof.WorkerBinarySet")
-                .Add(z3LibrarySha256 is null ? 1 : 2);
-            long totalBytes = 0;
-#pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
-            foreach (var component in components)
-            {
-                var sourceBytes = string.Equals(
-                        component.Key,
-                        GetFileName(ChangeExtension(path, ".deps.json")),
-                        StringComparison.Ordinal)
-                    ? dependencyBytes
-                    : CompilerManifestArtifactFile.ReadAllBytes(
-                        component.Value,
-                        MaximumComponentBytes);
-                var sourceLength = sourceBytes.LongLength;
-                ValidateComponentLength(component.Key, sourceLength, ref totalBytes);
-                var stagedPath = Combine(
-                    stagingDirectory,
-                    component.Key.Replace('/', DirectorySeparatorChar));
-                Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
-                using (var staged = new FileStream(
-                           stagedPath,
-                           FileMode.CreateNew))
-                {
-                    staged.Write(sourceBytes, 0, sourceBytes.Length);
-                }
-                using (var stagedRead = OpenRead(stagedPath))
-                {
-                    var stagedTotalBytes = totalBytes - sourceLength;
-                    ValidateComponentLength(
-                        component.Key,
-                        stagedRead.Length,
-                        ref stagedTotalBytes);
-                    if (!ReferenceEquals(sourceBytes, dependencyBytes))
-                    {
-                        EnsureStagedComponentConsistency(
-                            component.Value,
-                            stagedPath);
-                    }
-                    hash.Add(component.Key).Add(stagedRead);
-                }
-                stagedHandles[stagedCount++] = OpenRead(stagedPath);
-            }
-            if (z3LibrarySha256 is not null)
-            {
-                hash.Add("z3-native-sha256").Add(z3LibrarySha256);
-            }
-#pragma warning restore CA2000
-            var snapshot = new WorkerRuntimeClosureSnapshot(
-                path,
-                Combine(stagingDirectory, GetFileName(path)),
-                components.Values,
-                hash.Finish(),
-                stagedHandles);
-            ownershipTransferred = true;
-            return snapshot;
-        }
-        finally
-        {
-            if (!ownershipTransferred)
-            {
-                for (var index = 0; index < stagedCount; index++)
-                {
-                    stagedHandles[index].Dispose();
-                }
-                DeleteStagingDirectory(stagingDirectory);
-            }
-        }
-    }
-
     internal static string ComputeSha256(
         string workerPath,
         string? z3LibrarySha256 = null)
     {
-        using var snapshot = CreateSnapshot(workerPath, z3LibrarySha256);
-        return snapshot.Sha256;
-    }
-
-    private static string NormalizeWorkerPath(string workerPath)
-    {
-        var path = GetFullPath(workerPath);
-        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        var path = Path.GetFullPath(workerPath);
+        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
         {
             throw new FileNotFoundException(
-                "The managed worker binary must be a .dll.",
+                "The managed worker binary must be an existing .dll.",
                 path);
         }
 
-        return path;
-    }
-    internal static void ValidateComponentCount(int count)
-    {
-        if (count > MaximumRuntimeComponents)
+        var directory = Path.GetDirectoryName(path)!;
+        var files = Directory.EnumerateFiles(directory, "SharpProof.*.dll")
+            .Append(Path.Combine(directory, "Microsoft.Z3.dll"))
+            .Where(File.Exists)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static file => Path.GetFileName(file), StringComparer.Ordinal);
+        using var hash = new CanonicalHashWriter();
+        foreach (var file in files)
         {
-            throw new InvalidDataException(
-                "The worker runtime closure contains too many components.");
+            hash.Add(Path.GetFileName(file)).Add(File.ReadAllBytes(file));
         }
-    }
-
-    internal static void ValidateComponentLength(
-        string key,
-        long length,
-        ref long totalBytes)
-    {
-        if (key.Length > MaximumComponentKeyCharacters)
-        {
-            throw new InvalidDataException(
-                "A worker runtime component identity is too long.");
-        }
-
-        var maximum = key switch
-        {
-            "dependencies" => MaximumDependenciesBytes,
-            "runtimeConfig" => MaximumRuntimeConfigBytes,
-            _ when key.EndsWith(".deps.json", StringComparison.OrdinalIgnoreCase) =>
-                MaximumDependenciesBytes,
-            _ when key.EndsWith(".runtimeconfig.json", StringComparison.OrdinalIgnoreCase) =>
-                MaximumRuntimeConfigBytes,
-            _ => MaximumComponentBytes
-        };
-        if (length > maximum || totalBytes > MaximumClosureBytes - length)
-        {
-            throw new InvalidDataException(
-                "The worker runtime closure exceeds its byte limits.");
-        }
-
-        totalBytes += length;
-    }
-
-    internal static void EnsureStagedComponentConsistency(
-        string sourcePath,
-        string stagedPath)
-    {
-        if (!CompilerManifestArtifactFile.ReadAllBytes(
-                    sourcePath,
-                    MaximumComponentBytes).SequenceEqual(
-                CompilerManifestArtifactFile.ReadAllBytes(
-                    stagedPath,
-                    MaximumComponentBytes)))
-        {
-            throw new InvalidDataException(
-                "A worker runtime component changed during staging.");
-        }
-    }
-
-    private static byte[] ReadSnapshotBytes(FileStream stream, long maximumBytes)
-    {
-        if (stream.Length > maximumBytes)
-        {
-            throw new InvalidDataException(
-                "The worker runtime component exceeds the byte limit.");
-        }
-
-        return CompilerManifestArtifactFile.ReadExact(
-            stream,
-            checked((int)stream.Length),
-            "A worker runtime component changed while it was read.");
-    }
-
-    private static void ValidateSnapshotBytes(byte[] bytes)
-    {
-        if (bytes.Length == 0)
-        {
-            throw new InvalidDataException(
-                "The worker runtime component exceeds the byte limit.");
-        }
-    }
-
-    private static SortedDictionary<string, string> RuntimeComponents(
-        string workerPath,
-        byte[] dependencyBytes)
-    {
-        var directory = GetDirectoryName(workerPath)!;
-        using var document = JsonDocument.Parse(
-            dependencyBytes,
-            new JsonDocumentOptions { MaxDepth = 32 });
-        var root = document.RootElement;
-        var names = new HashSet<string>(StringComparer.Ordinal)
-        {
-            GetFileName(workerPath),
-            GetFileName(ChangeExtension(workerPath, ".deps.json")),
-            GetFileName(ChangeExtension(workerPath, ".runtimeconfig.json"))
-        };
-        foreach (Match match in Regex.Matches(
-                     root.GetRawText(),
-                     @"(?<![A-Za-z0-9_./-])(?!runtimes/)(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.dll"))
-        {
-            var name = match.Value;
-            names.Add(GetFileName(name));
-        }
-        var optionalFrameworkAssembly = GetFileName(
-            typeof(ImmutableArray<>).Assembly.Location);
-        if (File.Exists(Combine(directory, optionalFrameworkAssembly)))
-        {
-            names.Add(optionalFrameworkAssembly);
-        }
-
-        ValidateComponentCount(names.Count);
-        var result = new SortedDictionary<string, string>(
-            StringComparer.Ordinal);
-        foreach (var name in names)
-        {
-            if (name.IndexOf('\\') >= 0 ||
-                name.IndexOf("..", StringComparison.Ordinal) >= 0)
-            {
-                throw new InvalidDataException(
-                    "A worker runtime component identity is invalid.");
-            }
-
-            result.Add(
-                name,
-                Combine(directory, name.Replace('/', DirectorySeparatorChar)));
-        }
-
-        return result;
-    }
-
-    private static FileStream OpenRead(string path)
-    {
-        return new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
-    }
-
-    private static string CreateStagingDirectory()
-    {
-        return Combine(
-            GetTempPath(),
-            "SharpProof.Worker.Runtime." + GetRandomFileName());
-    }
-
-    internal static void DeleteStagingDirectory(string path)
-    {
-        try
-        {
-            Directory.Delete(path, recursive: true);
-        }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException)
-        {
-        }
-    }
-
-}
-
-internal sealed class WorkerRuntimeClosureSnapshot(
-    string workerPath,
-    string executionWorkerPath,
-    IEnumerable<string> componentPaths,
-    string sha256,
-    IReadOnlyList<FileStream> stagedHandles) : IDisposable
-{
-    internal string WorkerPath { get; } = workerPath;
-    internal string ExecutionWorkerPath { get; } = executionWorkerPath;
-    internal IReadOnlyList<string> ComponentPaths { get; } =
-        ImmutableArray.CreateRange(componentPaths);
-    internal string Sha256 { get; } = sha256;
-    private IReadOnlyList<FileStream> StagedHandles { get; } = stagedHandles;
-
-    public void Dispose()
-    {
-        foreach (var handle in StagedHandles)
-        {
-            handle.Dispose();
-        }
-        WorkerBinaryIdentity.DeleteStagingDirectory(
-            GetDirectoryName(ExecutionWorkerPath)!);
+        return hash.Add("z3.native").Add(z3LibrarySha256 ?? string.Empty).Finish();
     }
 }
 

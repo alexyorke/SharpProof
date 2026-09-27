@@ -50,20 +50,6 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             var sarifPath = string.IsNullOrWhiteSpace(SarifPath)
                 ? null
                 : ResolvePath(SarifPath!);
-            // The launcher publishes these files as one owned set. Hold the
-            // same lease while reading them so a concurrent publisher cannot
-            // interleave generations between the independent reads below.
-            // Standalone callers (and malformed-file diagnostics) may not
-            // have publication metadata; in that case retain the existing
-            // direct validation behavior.
-            using var publicationLease =
-                File.Exists(LinuxPathIdentity.PublicationMarkerPath(resultPath))
-                    ? LinuxPathIdentity.AcquirePublicationSet(
-                    sarifPath is null
-                        ? [requestPath, resultPath, manifestPath]
-                        : [requestPath, resultPath, manifestPath, sarifPath],
-                    TimeSpan.FromSeconds(30))
-                    : null;
             WorkerVerifyResponse? invocationResponse = null;
             if (!string.IsNullOrWhiteSpace(InvocationResultPath))
             {

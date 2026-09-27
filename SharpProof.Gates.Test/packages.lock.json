@@ -203,8 +203,7 @@
           "SharpProof.Analyzer": "[1.0.0-preview.1, )",
           "SharpProof.Attributes": "[1.0.0-preview.1, )",
           "SharpProof.CompilerCollector": "[1.0.0-preview.1, )",
-          "SharpProof.Worker": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Launcher": "[1.0.0-preview.1, )"
+          "SharpProof.Worker": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.host": {
@@ -252,14 +251,6 @@
           "SharpProof.Host": "[1.0.0-preview.1, )",
           "SharpProof.Smt": "[1.0.0-preview.1, )",
           "System.Text.Json": "[10.0.10, )"
-        }
-      },
-      "sharpproof.worker.launcher": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
-          "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.worker.protocol": {

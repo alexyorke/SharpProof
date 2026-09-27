@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -29,24 +29,18 @@ internal static class Program
                 variable + ".");
             return 125;
         }
-        return await RunMain(
-            args,
-            static path => WorkerBinaryIdentity.ComputeSha256(
-                path,
-                ContainerContract.GetZ3LibrarySha256Required()))
-            .ConfigureAwait(false);
+        return await RunMain(args).ConfigureAwait(false);
     }
 
     internal static async Task<int> RunMain(
         string[] args,
-        Func<string, string> computeWorkerSha256,
-        Func<LauncherArguments, WorkerVerifyRequest, string, string, int>? runWorker = null,
+        Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify = null,
         Action<LauncherArguments>? validatePreflight = null)
     {
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
             Console.Error.WriteLine(
-                "Usage: SharpProof.Worker.Launcher " + WorkerInvocationArguments.Command + " --worker <path> " +
+                "Usage: SharpProof.Worker " + WorkerInvocationArguments.Command + " " +
                 WorkerInvocationArguments.RequestOption + " <path> " +
                 WorkerInvocationArguments.ResultOption + " <path> " +
                 "--compiler-manifest <path> --verify-policy <policy> --assumption-policy <policy> " +
@@ -60,41 +54,15 @@ internal static class Program
         byte[] artifactBytes;
         string expectedInputHash;
         WorkerVersionSummary expectedVersions;
-        WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
-            if (validatePreflight == null)
-            {
-                arguments.ValidatePreflight();
-            }
-            else
-            {
-                validatePreflight(arguments);
-            }
-            arguments.ValidateDistinctPaths(runtimeSnapshot);
-            var z3LibrarySha256 = ContainerContract.GetZ3LibrarySha256Required();
-            runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
-                arguments.WorkerPath,
-                z3LibrarySha256);
-            request = arguments.CreateRequest(
-                runtimeSnapshot,
-                out artifact,
-                out artifactBytes,
-                pathsAlreadyValidated: true);
-            var workerVersion = ReadWorkerVersion(runtimeSnapshot);
-            expectedInputHash = ComputeExpectedInputHash(
-                request,
-                artifactBytes,
-                runtimeSnapshot,
-                workerVersion);
-            expectedVersions = ComputeExpectedVersions(
-                runtimeSnapshot,
-                workerVersion.ProductVersion);
+            (validatePreflight ?? (static value => value.ValidatePreflight()))(arguments);
+            expectedVersions = ExpectedVersions();
+            request = arguments.CreateRequest(out artifact, out artifactBytes);
+            expectedInputHash = ComputeExpectedInputHash(request, artifactBytes);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
-                runtimeSnapshot.Dispose();
-                runtimeSnapshot = null;
                 WriteErrors(validation.Errors, string.Empty);
                 return 2;
             }
@@ -104,8 +72,6 @@ internal static class Program
         }
         catch (PlatformNotSupportedException exception)
         {
-            runtimeSnapshot?.Dispose();
-            runtimeSnapshot = null;
             var failure = ClassifyLauncherFailure(exception);
             Console.Error.WriteLine(failure.ConsoleMessage);
             return failure.ExitCode;
@@ -114,85 +80,55 @@ internal static class Program
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
                 InvalidDataException or JsonException or KeyNotFoundException or
-                InvalidOperationException or System.ComponentModel.Win32Exception)
+                InvalidOperationException)
         {
-            runtimeSnapshot?.Dispose();
-            runtimeSnapshot = null;
             Console.Error.WriteLine(
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
             return 2;
         }
 
-        int exitCode;
+        using var cancellation = new CancellationTokenSource();
+        using var terminate = PosixSignalRegistration.Create(
+            PosixSignal.SIGTERM,
+            context =>
+            {
+                context.Cancel = true;
+                cancellation.Cancel();
+            });
         try
         {
-            using (runtimeSnapshot)
-            {
-                if (computeWorkerSha256(
-                        runtimeSnapshot.ExecutionWorkerPath) !=
-                    runtimeSnapshot.Sha256)
-                {
-                    throw new InvalidOperationException(
-                        "The staged worker runtime closure changed before launch.");
-                }
-
-                exitCode = (runWorker ?? RunWorker)(
-                    arguments,
-                    request,
-                    artifact.Compilation.ProjectDirectory,
-                    runtimeSnapshot.ExecutionWorkerPath);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
+            var response = await (verify ?? WorkerHost.VerifyAsync)(request, cancellation.Token)
+                .ConfigureAwait(false);
+            await AtomicFile.WriteUtf8Async(
+                    arguments.ResultPath,
+                    WorkerProtocolJson.SerializeCanonicalResponse(response))
+                .ConfigureAwait(false);
         }
         catch (AggregateException)
         {
             throw;
         }
-        // Matches the worker's own discipline (Worker/Program.cs): ordinary
-        // failures are caught so the launcher leaves a fail-closed result, while
-        // cancellation and process-fatal exceptions remain observable.
         catch (Exception exception) when (
-            exception is not OutOfMemoryException and not StackOverflowException)
+            exception is not OutOfMemoryException and not StackOverflowException and
+                not OperationCanceledException)
         {
             var failure = ClassifyLauncherFailure(exception);
-            exitCode = failure.ExitCode;
             Console.Error.WriteLine(failure.ConsoleMessage);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, failure.Status, failure.Reason,
                 failure.Code, failure.Message).ConfigureAwait(false);
         }
-        if (exitCode == 124)
-        {
-            DeleteIfExists(arguments.ResultPath);
-        }
-        if (!File.Exists(arguments.ResultPath))
-        {
-            LauncherFailure launcherFailure =
-                LauncherPresentation.NoResultFailure(exitCode);
-            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                expectedVersions, launcherFailure.Status, launcherFailure.Reason,
-                launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
-        }
-        else if (exitCode == 0)
-        {
-            await PromotePreManifestProjectTimeoutAsync(
-                    arguments.ResultPath,
-                    request,
-                    artifact,
-                    expectedInputHash,
-                    expectedVersions,
-                    arguments.TerminationGraceMilliseconds)
-                .ConfigureAwait(false);
-        }
+        await PromotePreManifestProjectTimeoutAsync(
+                arguments.ResultPath,
+                request,
+                artifact,
+                expectedInputHash,
+                expectedVersions)
+            .ConfigureAwait(false);
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
-            out var validResponse, out var validatedResponse,
-            arguments.TerminationGraceMilliseconds,
-            exitCode);
+            out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
@@ -201,54 +137,25 @@ internal static class Program
                 "The worker result was unavailable or malformed.").ConfigureAwait(false);
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
-                out validResponse, out validatedResponse,
-                arguments.TerminationGraceMilliseconds,
-                exitCode);
+                out validResponse, out validatedResponse);
         }
         if (validResponse)
         {
             try
             {
-                PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
-                    expectedVersions, validatedResponse!);
+                await PublishOutputsAsync(arguments, request, artifact, artifactBytes, expectedInputHash,
+                    expectedVersions, validatedResponse!).ConfigureAwait(false);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
-                    UnauthorizedAccessException or ArgumentException or
-                    System.ComponentModel.Win32Exception)
+                    UnauthorizedAccessException or ArgumentException)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
                 return 3;
             }
         }
-        if (exitCode == 0)
-        {
-            return resultExitCode;
-        }
-
-        if (validResponse && resultExitCode != 0)
-        {
-            return resultExitCode;
-        }
-
-        if (validResponse &&
-            validatedResponse is
-            {
-                RunStatus: WorkerRunStatus.TimedOut,
-                FailureReason: WorkerRunFailureReason.None
-            } &&
-            resultExitCode == 0)
-        {
-            // The worker process uses 124 for its transport timeout, while
-            // the validated response is an incomplete analysis whose build
-            // outcome is governed by SharpProofVerifyPolicy.
-            return 0;
-        }
-
-        Console.Error.WriteLine("SharpProof worker failed closed with exit code " +
-            exitCode.ToString(CultureInfo.InvariantCulture) + ".");
-        return exitCode;
+        return resultExitCode;
     }
 
     private static LauncherFailure ClassifyLauncherFailure(Exception exception)
@@ -278,152 +185,39 @@ internal static class Program
         int ExitCode, WorkerRunStatus Status, WorkerRunFailureReason Reason,
         string Code, string Message, string ConsoleMessage);
 
-    private static int RunWorker(
-        LauncherArguments arguments, WorkerVerifyRequest request,
-        string projectDirectory, string workerPath)
-    {
-        var terminationStart = TimeSpan.FromMilliseconds(
-            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
-            request,
-            arguments.TerminationGraceMilliseconds));
-        var finalLimit = TimeSpan.FromMilliseconds(checked(
-            request.Budgets.ProjectWallTimeMilliseconds +
-            arguments.TerminationGraceMilliseconds));
-        var dotNetHostPath = ResolveDotNetHostPath(projectDirectory);
-        using var process = LinuxWorkerProcess.StartDotNet(
-            dotNetHostPath,
-            [workerPath, WorkerInvocationArguments.Command,
-                WorkerInvocationArguments.RequestOption, arguments.RequestPath,
-                WorkerInvocationArguments.ResultOption, arguments.ResultPath,
-                WorkerInvocationArguments.StartStdinOption],
-            projectDirectory);
-        var completion = process.WaitForExit(
-            terminationStart,
-            finalLimit);
-        if (completion.Kind == LinuxWorkerCompletionKind.Exited)
-        {
-            return completion.ExitCode;
-        }
-        return 124;
-    }
-
-    internal static string ResolveDotNetHostPath(string projectDirectory)
-    {
-        return ValidateDotNetHostPath(Environment.ProcessPath ??
-            throw new InvalidOperationException(
-                "The dotnet host path is unavailable."), projectDirectory);
-    }
-
-    internal static string ValidateDotNetHostPath(
-        string candidate, string projectDirectory)
-    {
-        var hostPath = NormalizeAbsolutePath(candidate);
-        var hostRoot = Path.GetDirectoryName(hostPath) ?? string.Empty;
-        var projectRoot = NormalizeAbsolutePath(projectDirectory);
-        if (!Path.EndsInDirectorySeparator(projectRoot))
-        {
-            projectRoot += Path.DirectorySeparatorChar;
-        }
-        if (!Path.IsPathFullyQualified(candidate) ||
-            !string.Equals(Path.GetFileName(hostPath), "dotnet",
-                StringComparison.Ordinal) ||
-            !File.Exists(hostPath) ||
-            !Directory.Exists(Path.Combine(hostRoot, "host", "fxr")) ||
-            hostPath.StartsWith(projectRoot, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "The current process is not hosted by a trusted absolute .NET installation.");
-        }
-
-        return hostPath;
-    }
-
     internal static string NormalizeAbsolutePath(string path)
     {
-        return LinuxPathIdentity.Canonicalize(path);
+        return Path.GetFullPath(path);
     }
 
     internal static string ComputeExpectedInputHash(
-        string workerPath, WorkerVerifyRequest request, byte[] artifactBytes)
+        WorkerVerifyRequest request,
+        byte[] artifactBytes)
     {
-        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
-            workerPath,
-            ContainerContract.GetZ3LibrarySha256Required());
-        return ComputeExpectedInputHash(
-            request,
-            artifactBytes,
-            snapshot);
+        var identity = WorkerCacheIdentity.Current;
+        return CompilerArtifactInputHash.Compute(
+            request, artifactBytes, identity.ToolIdentity, identity.ToolVersion,
+            identity.WorkerBinarySha256, identity.ApiSpecIdentity,
+            identity.ApiSpecVersion, identity.ApiSpecContentSha256);
     }
 
-    internal static WorkerVersionSummary ComputeExpectedVersions(
-        WorkerRuntimeClosureSnapshot snapshot)
+    internal static WorkerVersionSummary ExpectedVersions()
     {
-        var workerVersion = ReadWorkerVersion(snapshot);
-        return ComputeExpectedVersions(snapshot, workerVersion.ProductVersion);
-    }
-
-    private static WorkerVersionSummary ComputeExpectedVersions(
-        WorkerRuntimeClosureSnapshot snapshot,
-        string workerVersion)
-    {
+        var identity = WorkerCacheIdentity.Current;
         return new WorkerVersionSummary
         {
-            WorkerVersion = workerVersion,
-            ApiSpecVersion = ApiSpecTable.DefaultTableVersion,
-            WorkerBinarySha256 = snapshot.Sha256,
-            ApiSpecContentSha256 = ApiSpecTable.Default.ContentSha256
+            WorkerVersion = identity.ToolVersion,
+            ApiSpecVersion = identity.ApiSpecVersion,
+            WorkerBinarySha256 = identity.WorkerBinarySha256,
+            ApiSpecContentSha256 = identity.ApiSpecContentSha256
         };
-    }
-
-    internal static string ComputeExpectedInputHash(
-        WorkerVerifyRequest request,
-        byte[] artifactBytes,
-        WorkerRuntimeClosureSnapshot snapshot)
-    {
-        var workerVersion = ReadWorkerVersion(snapshot);
-        return ComputeExpectedInputHash(
-            request,
-            artifactBytes,
-            snapshot,
-            workerVersion);
-    }
-
-    private static string ComputeExpectedInputHash(
-        WorkerVerifyRequest request,
-        byte[] artifactBytes,
-        WorkerRuntimeClosureSnapshot snapshot,
-        (string ProductName, string ProductVersion) workerVersion)
-    {
-        return CompilerArtifactInputHash.Compute(
-            request, artifactBytes, workerVersion.ProductName,
-            workerVersion.ProductVersion,
-            snapshot.Sha256,
-            ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
-            ApiSpecTable.Default.ContentSha256);
-    }
-
-    private static (string ProductName, string ProductVersion) ReadWorkerVersion(
-        WorkerRuntimeClosureSnapshot snapshot)
-    {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
-        return (
-            RequiredVersion(version.ProductName, "product name"),
-            RequiredVersion(version.ProductVersion, "product version"));
-    }
-
-    private static string RequiredVersion(string? value, string name)
-    {
-        return !string.IsNullOrWhiteSpace(value) ? value : throw new InvalidDataException("The worker " + name + " is unavailable.");
     }
 
     internal static int ValidateAndReport(
         string resultPath, WorkerVerifyRequest request,
         string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         WorkerVersionSummary? expectedVersions,
-        out bool validResponse, out WorkerVerifyResponse? validatedResponse,
-        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
-        int? workerExitCode = null)
+        out bool validResponse, out WorkerVerifyResponse? validatedResponse)
     {
         validResponse = false;
         validatedResponse = null;
@@ -452,19 +246,11 @@ internal static class Program
                 response, WorkerProtocolJson.ComputeRequestHash(request),
                 expectedInputHash, expectedManifest, request,
                 expectedVersions ?? throw new InvalidOperationException(
-                    "Expected runtime provenance is unavailable."),
-                terminationGraceMilliseconds);
+                    "Expected runtime provenance is unavailable."));
         }
         if (!validation.IsValid)
         {
             WriteErrors(validation.Errors, "SharpProof ");
-            return 3;
-        }
-        if (workerExitCode is not (null or 0) &&
-            response?.RunStatus == WorkerRunStatus.Complete)
-        {
-            Console.Error.WriteLine(
-                "SharpProof worker result is inconsistent with its process exit code.");
             return 3;
         }
         validResponse = true;
@@ -648,7 +434,9 @@ internal static class Program
         Console.Out.WriteLine(diagnostic);
     }
 
-    private static void PublishOutputs(
+    // Each member is written atomically; the result is written last so a
+    // reader that sees the new result also sees the matching inputs.
+    private static async Task PublishOutputsAsync(
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
@@ -659,278 +447,33 @@ internal static class Program
             return;
         }
 
-        using var publication = LinuxPathIdentity.AcquirePublicationSet(
-            new[]
-            {
-                arguments.PublishRequestPath,
-                arguments.PublishResultPath,
-                arguments.PublishCompilerManifestPath,
-                arguments.PublishSarifPath
-            }.OfType<string>(),
-            TimeSpan.FromSeconds(30));
-
         request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
         response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
         if (!WorkerProtocolJson.ValidateForRequest(
                 response, response.RequestHash, expectedInputHash,
                 artifact.Manifest, request,
-                expectedVersions,
-                arguments.TerminationGraceMilliseconds).IsValid)
+                expectedVersions).IsValid)
         {
             throw new IOException("The worker response binding is invalid.");
         }
 
-        var members = new List<PublicationMember>
-        {
-            new(
-                arguments.PublishCompilerManifestPath!,
-                artifactBytes),
-            new(
-                arguments.PublishRequestPath,
-                Encoding.UTF8.GetBytes(
-                    WorkerProtocolJson.SerializeRequest(request)))
-        };
+        await AtomicFile.WriteBytesAsync(
+            arguments.PublishCompilerManifestPath!, artifactBytes).ConfigureAwait(false);
+        await AtomicFile.WriteUtf8Async(
+            arguments.PublishRequestPath,
+            WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
         if (arguments.PublishSarifPath != null)
         {
-            members.Add(new PublicationMember(
+            await AtomicFile.WriteUtf8Async(
                 arguments.PublishSarifPath,
-                Encoding.UTF8.GetBytes(
-                    SarifProjection.Serialize(
-                        request,
-                        response,
-                        artifact.Compilation.ProjectDirectory))));
+                SarifProjection.Serialize(
+                    request,
+                    response,
+                    artifact.Compilation.ProjectDirectory)).ConfigureAwait(false);
         }
-        members.Add(new PublicationMember(
+        await AtomicFile.WriteUtf8Async(
             arguments.PublishResultPath!,
-            Encoding.UTF8.GetBytes(
-                WorkerProtocolJson.SerializeCanonicalResponse(response))));
-
-        using var previous = CapturePreviousPublication(members);
-        var commitStarted = false;
-        try
-        {
-            StagePublication(members);
-            commitStarted = true;
-            foreach (var member in members)
-            {
-                PublishMember(member);
-            }
-        }
-        catch (AggregateException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (
-            exception is not OperationCanceledException)
-        {
-            if (commitStarted)
-            {
-                TryRollbackPublication(members, previous);
-            }
-            throw;
-        }
-        finally
-        {
-            CleanupPublicationStaging(members);
-        }
-    }
-
-    private static PreviousPublication CapturePreviousPublication(
-        IReadOnlyList<PublicationMember> members)
-    {
-        var backups = new Dictionary<string, string>(StringComparer.Ordinal);
-        var complete = true;
-        var captured = false;
-        try
-        {
-            foreach (var member in members)
-            {
-                if (File.Exists(member.Path))
-                {
-                    // Keep rollback snapshots on disk. Reading every destination into
-                    // managed memory made publication allocation proportional to the
-                    // size of all existing outputs.
-                    var backup = AtomicFile.PrepareStaged(member.Path);
-                    backups.Add(member.Path, backup);
-                    File.Copy(member.Path, backup);
-                    continue;
-                }
-
-                if (Directory.Exists(member.Path))
-                {
-                    throw new IOException(
-                        "SharpProof publication members must be regular files.");
-                }
-
-                complete = false;
-            }
-            var previous = new PreviousPublication(complete, backups);
-            captured = true;
-            return previous;
-        }
-        finally
-        {
-            if (!captured)
-            {
-                new PreviousPublication(complete, backups).Dispose();
-            }
-        }
-    }
-
-    private static void StagePublication(
-        IReadOnlyList<PublicationMember> members)
-    {
-        foreach (var member in members)
-        {
-            member.Temporary = AtomicFile.PrepareStaged(member.Path);
-            AtomicFile.WriteStagedBytes(member.Temporary, member.Content);
-            LinuxPathIdentity.SyncDirectory(
-                Path.GetDirectoryName(member.Path)!);
-        }
-    }
-
-    private static void PublishMember(PublicationMember member)
-    {
-        var temporary = member.Temporary ??
-            throw new IOException("SharpProof publication staging is incomplete.");
-        AtomicFile.PublishStaged(temporary, member.Path);
-        member.Temporary = null;
-        LinuxPathIdentity.SyncDirectory(
-            Path.GetDirectoryName(member.Path)!);
-    }
-
-    private static void TryRollbackPublication(
-        IReadOnlyList<PublicationMember> members,
-        PreviousPublication previous)
-    {
-        try
-        {
-            if (previous.IsComplete)
-            {
-                RestorePreviousPublication(members, previous);
-            }
-            else
-            {
-                InvalidatePublication(members);
-            }
-        }
-        catch (AggregateException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (
-            exception is not OutOfMemoryException and
-            not StackOverflowException and
-            not OperationCanceledException)
-        {
-            TryInvalidatePublication(members);
-        }
-    }
-
-    private static void RestorePreviousPublication(
-        IReadOnlyList<PublicationMember> members,
-        PreviousPublication previous)
-    {
-        try
-        {
-            foreach (var member in members)
-            {
-                member.Temporary = AtomicFile.PrepareStaged(member.Path);
-                File.Copy(previous.BackupPaths[member.Path], member.Temporary);
-                LinuxPathIdentity.SyncDirectory(Path.GetDirectoryName(member.Path)!);
-            }
-            foreach (var member in members)
-            {
-                PublishMember(member);
-            }
-        }
-        finally
-        {
-            CleanupPublicationStaging(members);
-        }
-    }
-
-    private static void CleanupPublicationStaging(
-        IReadOnlyList<PublicationMember> members)
-    {
-        foreach (var member in members)
-        {
-            if (member.Temporary != null)
-            {
-                AtomicFile.TryDeleteStaged(member.Temporary);
-            }
-        }
-    }
-
-    private static void TryInvalidatePublication(
-        IReadOnlyList<PublicationMember> members)
-    {
-        try
-        {
-            InvalidatePublication(members);
-        }
-        catch (AggregateException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (
-            exception is not OutOfMemoryException and
-            not StackOverflowException and
-            not OperationCanceledException)
-        {
-        }
-    }
-
-    private static void InvalidatePublication(
-        IReadOnlyList<PublicationMember> members)
-    {
-        Exception? failure = null;
-        foreach (var member in members)
-        {
-            try
-            {
-                if (Directory.Exists(member.Path))
-                {
-                    throw new IOException(
-                        "SharpProof publication members must be regular files.");
-                }
-                if (File.Exists(member.Path))
-                {
-                    File.Delete(member.Path);
-                    LinuxPathIdentity.SyncDirectory(
-                        Path.GetDirectoryName(member.Path)!);
-                }
-            }
-            catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or
-                    ArgumentException or System.ComponentModel.Win32Exception)
-            {
-                failure ??= exception;
-            }
-        }
-
-        if (failure != null)
-        {
-            throw failure;
-        }
-    }
-
-    private sealed record PublicationMember(string Path, byte[] Content)
-    {
-        internal string? Temporary { get; set; }
-    }
-
-    private sealed record PreviousPublication(
-        bool IsComplete,
-        Dictionary<string, string> BackupPaths) : IDisposable
-    {
-        public void Dispose()
-        {
-            foreach (var path in BackupPaths.Values)
-            {
-                AtomicFile.TryDeleteStaged(path);
-            }
-        }
+            WorkerProtocolJson.SerializeCanonicalResponse(response)).ConfigureAwait(false);
     }
 
     private static Task WriteLauncherFailureAsync(
@@ -956,8 +499,7 @@ internal static class Program
         WorkerVerifyRequest request,
         CompilerManifestArtifact artifact,
         string expectedInputHash,
-        WorkerVersionSummary expectedVersions,
-        int terminationGraceMilliseconds)
+        WorkerVersionSummary expectedVersions)
     {
         WorkerVerifyResponse? response;
         try
@@ -994,8 +536,7 @@ internal static class Program
                 WorkerResultAssembler.EmptyInputHash,
                 emptyManifest,
                 request,
-                expectedVersions,
-                terminationGraceMilliseconds)
+                expectedVersions)
             .IsValid)
         {
             return;
@@ -1097,30 +638,14 @@ internal sealed partial class LauncherArguments
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
-        return CreateRequest(null, out artifact, out artifactBytes);
-    }
-
-    internal WorkerVerifyRequest CreateRequest(
-        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
-        out CompilerManifestArtifact artifact,
-        out byte[] artifactBytes,
-        bool pathsAlreadyValidated = false)
-    {
-        var cacheEnabled = Boolean("cache-enabled", true);
-        if (!pathsAlreadyValidated)
-        {
-            var configuredCacheDirectory = cacheEnabled
-                ? OptionalFullPath("cache-directory")
-                : null;
-            ValidateDistinctPaths(runtimeSnapshot, configuredCacheDirectory);
-        }
+        ValidateDistinctPaths(
+            Boolean("cache-enabled", true) ? OptionalFullPath("cache-directory") : null);
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
         var request = ProjectRequest(compilerManifest);
         ValidateDistinctPaths(
-            runtimeSnapshot,
-            cacheEnabled
+            Boolean("cache-enabled", true)
                 ? Program.NormalizeAbsolutePath(WorkerCachePath.Resolve(
                     Optional("cache-directory"),
                     artifact.Compilation.ProjectDirectory))
@@ -1128,71 +653,24 @@ internal sealed partial class LauncherArguments
         return request;
     }
 
-    internal void ValidateDistinctPaths(
-        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
-        string? cacheDirectory = null)
+    internal void ValidateDistinctPaths(string? cacheDirectory = null)
     {
-        if (cacheDirectory is null && Boolean("cache-enabled", true))
-        {
-            cacheDirectory = OptionalFullPath("cache-directory");
-        }
-        var workerPath = WorkerPath;
-        var launcherRuntimePaths = LauncherArguments.LauncherRuntimePaths;
         if (Directory.Exists(ResultPath))
         {
             throw new ArgumentException(
                 "The SharpProof result path must name a file.");
         }
 
-        var runtimeRoots = new[] {
-            workerPath,
-            Path.ChangeExtension(workerPath, ".deps.json"),
-            Path.ChangeExtension(workerPath, ".runtimeconfig.json")
-        };
-        var publicationPaths = new[] {
+        string?[] candidates = [
+            cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
-        }.OfType<string>().ToArray();
-        foreach (var publicationPath in publicationPaths)
-        {
-            LinuxPathIdentity.RequireLocalPath(publicationPath);
-        }
-        var runtimeDirectories = runtimeRoots
-            .Concat(launcherRuntimePaths)
-            .Select(static path => Path.GetDirectoryName(
-                LinuxPathIdentity.Canonicalize(path))!)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        string?[] writableCandidates = [
-            cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
-            ..publicationPaths
         ];
-        var writablePaths = writableCandidates
-            .OfType<string>();
-        if (writablePaths.Any(path => runtimeDirectories.Any(directory =>
-                LinuxPathIdentity.IsSameOrDescendant(path, directory))))
+        var paths = candidates.OfType<string>().ToArray();
+        if (paths.Distinct(StringComparer.Ordinal).Count() != paths.Length)
         {
             throw new ArgumentException(
-                "SharpProof writable paths must be outside the worker runtime directory.");
-        }
-        string?[] candidates = [..runtimeRoots,
-            ..launcherRuntimePaths,
-            cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
-            ..publicationPaths,
-            ..publicationPaths.Select(
-                LinuxPathIdentity.PublicationMarkerPath)];
-        var paths = candidates.OfType<string>()
-            .Concat(runtimeSnapshot?.ComponentPaths.Where(path =>
-                !runtimeRoots.Contains(path, StringComparer.Ordinal) &&
-                !launcherRuntimePaths.Contains(
-                    path, StringComparer.Ordinal)) ?? [])
-            .Select(LinuxPathIdentity.Canonicalize)
-            .ToArray();
-        if (paths.Where((path, index) => paths.Take(index).Any(other =>
-                LinuxPathIdentity.CanonicalPathsConflict(other, path))).Any())
-        {
-            throw new ArgumentException(
-                "SharpProof I/O paths must be distinct and non-nested.");
+                "SharpProof I/O paths must be distinct.");
         }
     }
 

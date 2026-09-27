@@ -22,7 +22,6 @@
     <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj" />
-    <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />

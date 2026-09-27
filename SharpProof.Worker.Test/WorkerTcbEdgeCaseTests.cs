@@ -19,28 +19,6 @@ public sealed class WorkerTcbEdgeCaseTests
 {
     private const string CacheFileSuffix = VerificationCache.CacheFileSuffix;
 
-    [Test]
-    public void SymbolicLinkIsRejectedBeforeTraversal()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            Assert.Ignore("The verifier host is Linux-only.");
-        }
-
-        using var temporary = new TempDirectory(
-            "symlink-rejection-",
-            TestContext.CurrentContext.WorkDirectory);
-        var root = temporary.FullName;
-        var target = Path.Combine(root, "target");
-        var link = Path.Combine(root, "link");
-        Directory.CreateDirectory(target);
-        Directory.CreateSymbolicLink(link, target);
-        Action canonicalize = () =>
-            LinuxPathIdentity.Canonicalize(
-                Path.Combine(link, "SharpProof", "cache"));
-        Assert.Throws<ArgumentException>(canonicalize);
-    }
-
     [TestCase(
         BackendFailureReason.Timeout,
         WorkerClaimReason.MethodTimeout)]

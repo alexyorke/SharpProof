@@ -5,9 +5,6 @@ namespace SharpProof.CompilerArtifact;
 // valid merely because it is plausible JSON.
 internal static class CompilerCaptureAuthority
 {
-    internal const string EmptyTextSha256 =
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
     internal static string NormalizePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))

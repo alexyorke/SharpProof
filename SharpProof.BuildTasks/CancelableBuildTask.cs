@@ -56,33 +56,9 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         }
     }
 
-    protected static IEnumerable<string> Present(
-        string? first,
-        string? second,
-        string? third = null,
-        string? fourth = null,
-        string? fifth = null)
+    protected static IEnumerable<string> Present(params string?[] paths)
     {
-        if (!string.IsNullOrWhiteSpace(first))
-        {
-            yield return first!;
-        }
-        if (!string.IsNullOrWhiteSpace(second))
-        {
-            yield return second!;
-        }
-        if (!string.IsNullOrWhiteSpace(third))
-        {
-            yield return third!;
-        }
-        if (!string.IsNullOrWhiteSpace(fourth))
-        {
-            yield return fourth!;
-        }
-        if (!string.IsNullOrWhiteSpace(fifth))
-        {
-            yield return fifth!;
-        }
+        return paths.Where(static path => !string.IsNullOrWhiteSpace(path))!;
     }
 
     internal static string ResolveProjectRelativePath(
@@ -100,7 +76,7 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         string projectRoot,
         string path)
     {
-        return LinuxPathIdentity.RequireLocalPath(
+        return Path.GetFullPath(
             Path.IsPathRooted(path)
                 ? path
                 : Path.Combine(projectRoot, path));

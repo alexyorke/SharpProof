@@ -10,319 +10,10 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerProgramTests
 {
-    private static readonly string[] ExpectedWorkerInvocationTokens =
-    [
-        "verify", "--request", "<request>", "--result", "<result>",
-        "--start-stdin", "--parent-pid", "<pid>"
-    ];
-
-    [Test]
-    public void WorkerInvocationConstantsPreserveExactTokenSequence()
-    {
-        var actual = new[]
-        {
-            WorkerInvocationArguments.Command,
-            WorkerInvocationArguments.RequestOption,
-            "<request>",
-            WorkerInvocationArguments.ResultOption,
-            "<result>",
-            WorkerInvocationArguments.StartStdinOption,
-            WorkerInvocationArguments.ParentPidOption,
-            "<pid>"
-        };
-
-        Assert.That(
-            actual,
-            Is.EqualTo(ExpectedWorkerInvocationTokens));
-    }
 
     [Test]
     [NonParallelizable]
-    public async Task StartBarrierTimeoutDoesNotBlockOnSynchronousConsoleReader()
-    {
-        var original = Console.In;
-        using var release = new ManualResetEventSlim();
-        using var input = new BlockingTextReader(release);
-        Console.SetIn(input);
-        try
-        {
-            var started = Stopwatch.GetTimestamp();
-            var accepted = await Program.WaitForStartAsync(
-                TimeSpan.FromMilliseconds(100));
-            var elapsed = Stopwatch.GetElapsedTime(started);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(accepted, Is.False);
-                Assert.That(elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
-            }
-        }
-        finally
-        {
-            release.Set();
-            Console.SetIn(original);
-        }
-    }
-
-    private sealed class BlockingTextReader(ManualResetEventSlim release)
-        : TextReader
-    {
-        public override string? ReadLine()
-        {
-            release.Wait();
-            return null;
-        }
-    }
-
-    [Test]
-    public async Task DirectInvocationRequiresContainmentStartBarrier()
-    {
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Worker.Test",
-            Guid.NewGuid().ToString("N"));
-        var resultPath = Path.Combine(directory, "result.json");
-
-        var exitCode = await Program.Main([
-            "verify",
-            "--request",
-            Path.Combine(directory, "request.json"),
-            "--result",
-            resultPath
-        ]);
-
-        Assert.That(exitCode, Is.EqualTo(2));
-        Assert.That(File.Exists(resultPath), Is.False);
-    }
-
-    [Test]
-    public async Task DirectInvocationRejectsRequestResultAliasBeforeStartBarrier()
-    {
-        using var temporaryDirectory = new TempDirectory(
-            "SharpProof.Worker.Test-");
-        var directory = temporaryDirectory.FullName;
-        var requestAndResultPath = Path.Combine(directory, "request.json");
-        const string sentinel = "request-sentinel";
-        await File.WriteAllTextAsync(requestAndResultPath, sentinel);
-        var exitCode = await Program.Main([
-            "verify",
-            "--request",
-            requestAndResultPath,
-            "--result",
-            requestAndResultPath,
-            "--start-stdin",
-            "--parent-pid",
-            "1"
-        ]);
-
-        Assert.That(exitCode, Is.EqualTo(2));
-        Assert.That(
-            await File.ReadAllTextAsync(requestAndResultPath),
-            Is.EqualTo(sentinel));
-    }
-
-    [Test]
-    public async Task DirectInvocationRejectsMalformedPathsWithoutThrowing()
-    {
-        var exitCode = await Program.Main([
-            "verify",
-            "--request", "request\0.json",
-            "--result", "result.json",
-            "--start-stdin", "--parent-pid", "1"
-        ]);
-
-        Assert.That(exitCode, Is.EqualTo(2));
-    }
-
-    [Test]
-    public async Task DirectInvocationWritesFailureForMalformedRequest()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            Assert.Ignore("The direct worker is supported only in the Linux container.");
-        }
-
-        using var temporaryDirectory = new TempDirectory(
-            "SharpProof-worker-malformed-");
-        var directory = temporaryDirectory.FullName;
-        var requestPath = Path.Combine(directory, "request.json");
-        var resultPath = Path.Combine(directory, "result.json");
-        await File.WriteAllTextAsync(requestPath, "{");
-        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
-        using var process = LinuxWorkerProcess.Start(
-            host,
-            [typeof(SharpProofWorker).Assembly.Location,
-                "verify", "--request", requestPath,
-                "--result", resultPath, "--start-stdin"],
-            directory);
-        var completion = process.WaitForExit(
-            TimeSpan.FromSeconds(10),
-            TimeSpan.FromSeconds(11));
-
-        var response = WorkerProtocolJson.DeserializeResponse(
-            await File.ReadAllTextAsync(resultPath))!;
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
-            Assert.That(completion.ExitCode, Is.Zero);
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
-            Assert.That(
-                response.Errors.Select(static error => error.Code),
-                Does.Contain("request.malformed"));
-        }
-    }
-
-    [Test]
-    public async Task ParentDeathKillsAWorkerBlockedBeforeStartupRelease()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            Assert.Ignore("The direct worker is supported only in the Linux container.");
-        }
-
-        using var temporaryDirectory = new TempDirectory(
-            "SharpProof-worker-parent-death-");
-        var directory = temporaryDirectory.FullName;
-        var requestPath = Path.Combine(directory, "request.json");
-        var resultPath = Path.Combine(directory, "result.json");
-        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
-            "dotnet";
-        const string script = """
-            "$1" "$2" verify --request "$3" --result "$4" --start-stdin --parent-pid "$$" <&0 &
-            child="$!"
-            sleep 2
-            printf '%s\n' "$child"
-            sleep 300
-            """;
-        using var parent = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "/bin/bash",
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            }
-        };
-        parent.StartInfo.ArgumentList.Add("-c");
-        parent.StartInfo.ArgumentList.Add(script);
-        parent.StartInfo.ArgumentList.Add("sharpproof-parent");
-        parent.StartInfo.ArgumentList.Add(host);
-        parent.StartInfo.ArgumentList.Add(typeof(SharpProofWorker).Assembly.Location);
-        parent.StartInfo.ArgumentList.Add(requestPath);
-        parent.StartInfo.ArgumentList.Add(resultPath);
-
-        var childProcessId = 0;
-        var parentStarted = false;
-        try
-        {
-            parentStarted = parent.Start();
-            Assert.That(parentStarted, Is.True);
-            var childText = await parent.StandardOutput.ReadLineAsync()
-                .WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.That(
-                int.TryParse(childText, out childProcessId),
-                Is.True);
-            Assert.That(
-                Directory.Exists($"/proc/{childProcessId}"),
-                Is.True,
-                "The worker exited before its parent-death boundary was tested.");
-
-            parent.Kill();
-            await parent.WaitForExitAsync();
-            var terminated = SpinWait.SpinUntil(
-                () => !Directory.Exists($"/proc/{childProcessId}"),
-                TimeSpan.FromSeconds(5));
-            Assert.That(
-                terminated,
-                Is.True,
-                "The blocked worker survived termination of its direct parent.");
-        }
-        finally
-        {
-            if (parentStarted)
-            {
-                await parent.StandardInput.DisposeAsync();
-                if (!parent.HasExited)
-                {
-                    parent.Kill();
-                    await parent.WaitForExitAsync();
-                }
-            }
-            if (childProcessId > 0 &&
-                Directory.Exists($"/proc/{childProcessId}"))
-            {
-                using var child = Process.GetProcessById(childProcessId);
-                child.Kill();
-                await child.WaitForExitAsync();
-            }
-        }
-    }
-
-    [Test]
-    [NonParallelizable]
-    public async Task TimeoutKillsDescendantWhenWorkerExitsDuringTerminationGrace()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            Assert.Ignore("The direct worker is supported only in the Linux container.");
-        }
-
-        using var temporaryDirectory = new TempDirectory(
-            "SharpProof-worker-timeout-descendant-");
-        var directory = temporaryDirectory.FullName;
-        var pidPath = Path.Combine(directory, "descendant.pid");
-        const string script =
-            "sleep 300 & child=$!; printf '%s\\n' \"$child\" > \"$1\"; " +
-            "trap 'exit 0' TERM; while :; do sleep 1; done";
-        LinuxWorkerProcess? worker = null;
-        var descendantPid = 0;
-        try
-        {
-            worker = LinuxWorkerProcess.Start(
-                "/bin/bash",
-                ["-c", script, "sharpproof-timeout", pidPath],
-                directory);
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => File.Exists(pidPath),
-                    TimeSpan.FromSeconds(5)),
-                Is.True);
-            Assert.That(
-                int.TryParse(await File.ReadAllTextAsync(pidPath), out descendantPid),
-                Is.True);
-
-            var completion = worker.WaitForExit(
-                TimeSpan.FromMilliseconds(100),
-                TimeSpan.FromSeconds(2));
-
-            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => !Directory.Exists($"/proc/{descendantPid}"),
-                    TimeSpan.FromSeconds(2)),
-                Is.True,
-                "The worker descendant survived timeout cleanup.");
-        }
-        finally
-        {
-            worker?.Dispose();
-            if (descendantPid > 0 && Directory.Exists($"/proc/{descendantPid}"))
-            {
-                using var descendant = Process.GetProcessById(descendantPid);
-                descendant.Kill();
-                await descendant.WaitForExitAsync();
-            }
-        }
-    }
-
-    [Test]
-    [NonParallelizable]
-    public async Task InvalidProjectedRequestDisposesRuntimeSnapshotBeforeReturning()
+    public async Task InvalidProjectedRequestStopsBeforeWritingRequest()
     {
         using var temporaryDirectory = new TempDirectory(
             "SharpProof.Worker.Test-");
@@ -388,33 +79,28 @@ public sealed class WorkerProgramTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                Program.IsBackendUnavailable(new DllNotFoundException()),
+                WorkerHost.IsBackendUnavailable(new DllNotFoundException()),
                 Is.True);
             Assert.That(
-                Program.IsBackendUnavailable(
+                WorkerHost.IsBackendUnavailable(
                     new TypeInitializationException(
                         "Z3",
                         new EntryPointNotFoundException())),
                 Is.True);
             Assert.That(
-                Program.IsBackendUnavailable(new InvalidOperationException()),
+                WorkerHost.IsBackendUnavailable(new InvalidOperationException()),
                 Is.False);
             Assert.That(
-                Program.IsBackendUnavailable(new FileNotFoundException()),
+                WorkerHost.IsBackendUnavailable(new FileNotFoundException()),
                 Is.False);
             Assert.That(
-                Program.IsBackendUnavailable(new FileLoadException()),
+                WorkerHost.IsBackendUnavailable(new FileLoadException()),
                 Is.False);
         }
     }
 
-    private static async Task<int> InvokeLauncherAsync(string[] arguments)
+    private static Task<int> InvokeLauncherAsync(string[] arguments)
     {
-        var launcherProgram = Assembly.Load("SharpProof.Worker.Launcher")
-            .GetType("SharpProof.Worker.Launcher.Program", throwOnError: true)!;
-        var main = launcherProgram.GetMethod(
-            "Main",
-            BindingFlags.Static | BindingFlags.NonPublic)!;
-        return await (Task<int>)main.Invoke(null, [arguments])!;
+        return SharpProof.Worker.Launcher.Program.Main(arguments);
     }
 }

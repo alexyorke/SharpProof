@@ -11,7 +11,7 @@
     <_SharpProofBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofBuildTasksPath>
     <_SharpProofBuildTasksPath Condition="'$(_SharpProofTestBuildTasksPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestBuildTasksPath)'))</_SharpProofBuildTasksPath>
     <_SharpProofPackageWorkerPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.dll'))</_SharpProofPackageWorkerPath>
-    <_SharpProofPackageLauncherPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Launcher.dll'))</_SharpProofPackageLauncherPath>
+    <_SharpProofPackageLauncherPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.dll'))</_SharpProofPackageLauncherPath>
     <_SharpProofPackageWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofPackageWorkerProtocolPath>
     <_SharpProofPackageBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofPackageBuildTasksPath>
   </PropertyGroup>

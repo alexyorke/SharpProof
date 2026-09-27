@@ -223,8 +223,7 @@ public static partial class WorkerProtocolJson
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
-        WorkerVersionSummary expectedVersions,
-        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
+        WorkerVersionSummary expectedVersions)
     {
         return ValidateForRequestCore(
             response,
@@ -232,14 +231,13 @@ public static partial class WorkerProtocolJson
             expectedInputHash,
             expectedManifest,
             expectedRequest,
-            expectedVersions,
-            terminationGraceMilliseconds);
+            expectedVersions);
     }
 
     private static WorkerProtocolValidationResult ValidateForRequestCore(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
-        WorkerVersionSummary expectedVersions, int terminationGraceMilliseconds)
+        WorkerVersionSummary expectedVersions)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
@@ -259,12 +257,9 @@ public static partial class WorkerProtocolJson
                 "Expected runtime provenance is invalid.",
                 nameof(expectedVersions));
         }
-        var maximumElapsedMilliseconds = WorkerExecutionEnvelope.MaximumElapsedMillisecondsAfterValidation(
-            expectedRequest, terminationGraceMilliseconds);
         return ValidateResponse(
             response, expectedInputHash, expectedManifest,
-            expectedRequestHash, expectedRequest, expectedVersions,
-            maximumElapsedMilliseconds);
+            expectedRequestHash, expectedRequest, expectedVersions);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -318,8 +313,7 @@ public static partial class WorkerProtocolJson
     private static WorkerProtocolValidationResult ValidateResponse(
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
-        WorkerVersionSummary? expectedVersions,
-        long? maximumElapsedMilliseconds = null)
+        WorkerVersionSummary? expectedVersions)
     {
         var errors = new Validator();
         if (response == null)
@@ -384,12 +378,6 @@ public static partial class WorkerProtocolJson
                 response.Summary.ElapsedMilliseconds <=
                     WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds,
                 "response.elapsed_unrepresentable");
-            if (maximumElapsedMilliseconds.HasValue)
-            {
-                errors.Check(
-                    response.Summary.ElapsedMilliseconds <= maximumElapsedMilliseconds.Value,
-                    "response.elapsed_request_envelope");
-            }
         }
         if (expectedVersions != null)
         {

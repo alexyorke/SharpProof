@@ -181,7 +181,7 @@ public static class ContainerContract
         {
             nativeRoot = "/opt/sharpproof/native";
         }
-        var library = LinuxPathIdentity.RequireLocalPath(Path.Combine(
+        var library = Path.GetFullPath(Path.Combine(
             nativeRoot,
             "z3",
             contract.Z3Version,

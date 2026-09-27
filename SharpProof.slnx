@@ -39,7 +39,6 @@
   <Project Path="SharpProof.Verifier/SharpProof.Verifier.csproj" />
   <Project Path="SharpProof.Verify.Test/SharpProof.Verify.Test.csproj" />
   <Project Path="SharpProof.Verify/SharpProof.Verify.csproj" />
-  <Project Path="SharpProof.Worker.Launcher/SharpProof.Worker.Launcher.csproj" />
   <Project Path="SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj" />
   <Project Path="SharpProof.Worker.Test/SharpProof.Worker.Test.csproj" />
   <Project Path="SharpProof.Worker/SharpProof.Worker.csproj" />

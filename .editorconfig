@@ -66,7 +66,7 @@ dotnet_diagnostic.CA1064.severity = none
 dotnet_diagnostic.CA2000.severity = none
 
 # Console entry points must remain synchronous for the host contract.
-[SharpProof.Worker{,.Launcher}/Program.cs]
+[SharpProof.Worker/Launcher/LauncherProgram.cs]
 dotnet_diagnostic.CA1849.severity = none
 
 # The worker host is instantiated by its external launcher.

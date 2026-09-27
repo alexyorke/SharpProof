@@ -250,7 +250,6 @@
           "SharpProof.Contracts/ContractProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
           "SharpProof.Effects/EffectProjections.generated.cs",
-          "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
           "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
         ]
@@ -258,8 +257,6 @@
       {
         "name": "launcherArgumentCatalog",
         "paths": [
-          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
-          "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
           "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
         ]
       },
@@ -397,7 +394,6 @@
           "SharpProof.Effects/TrustedBoundaryPolicy.cs",
           "SharpProof.Frontend/FrontendSubset.cs",
           "SharpProof.Frontend/OperationSubsetClassifier.cs",
-          "SharpProof.Worker.Launcher/Program.cs",
           "SharpProof.Worker/CallableVerificationPolicy.cs",
           "scripts/Get-SharpProofProductionInventory.ps1",
           "scripts/Get-SharpProofTcbPaths.ps1",
@@ -435,7 +431,6 @@
       {
         "name": "protocolValidation",
         "paths": [
-          "SharpProof.Worker/Program.cs",
           "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
@@ -460,15 +455,11 @@
         "paths": [
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
-          "SharpProof.BuildTasks/Program.cs",
           "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
-          "SharpProof.BuildTasks/VerifierProcessSupervisor.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
-          "SharpProof.Host/ContainerNativeLibrary.cs",
-          "SharpProof.Host/LinuxPathIdentity.cs",
-          "SharpProof.Host/LinuxWorkerProcess.cs"
+          "SharpProof.Host/ContainerNativeLibrary.cs"
         ],
         "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
       },
@@ -589,8 +580,7 @@
       {
         "name": "partialTypeSourceClosure",
         "paths": [
-          "SharpProof.Analyzer.Core/RequiresCallSiteCandidate.Cache.cs",
-          "SharpProof.Worker.Launcher/LauncherProjections.cs"
+          "SharpProof.Analyzer.Core/RequiresCallSiteCandidate.Cache.cs"
         ],
         "rationale": "These files complete partial types that already have trusted declarations in other source files."
       },

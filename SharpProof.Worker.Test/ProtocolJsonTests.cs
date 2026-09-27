@@ -1903,33 +1903,6 @@ public sealed class ProtocolJsonTests
             "response.elapsed_unrepresentable");
     }
 
-    [TestCase(101, 300001L)]
-    [TestCase(200, 300100L)]
-    [TestCase(1000, 300900L)]
-    public void RequestBoundElapsedTimeUsesTheActualLauncherGrace(
-        int terminationGraceMilliseconds,
-        long exactMaximum)
-    {
-        var request = CreateRequest();
-        var manifest = CreateManifest();
-        var response = CreateResponse(manifest);
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        response.Summary.ElapsedMilliseconds = exactMaximum;
-
-        var exact = WorkerProtocolJson.ValidateForRequest(
-            response, response.RequestHash, InputHash, manifest, request,
-            CreateExpectedVersions(), terminationGraceMilliseconds);
-        Assert.That(exact.IsValid, Is.True,
-            string.Join(Environment.NewLine,
-                exact.Errors.Select(static error => error.Code)));
-
-        response.Summary.ElapsedMilliseconds++;
-        var over = WorkerProtocolJson.ValidateForRequest(
-            response, response.RequestHash, InputHash, manifest, request,
-            CreateExpectedVersions(), terminationGraceMilliseconds);
-        AssertErrorCode(over, "response.elapsed_request_envelope");
-    }
-
     [Test]
     public void RequestElapsedEnvelopeRejectsInvalidAuthority()
     {

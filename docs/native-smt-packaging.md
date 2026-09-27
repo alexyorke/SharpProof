@@ -37,11 +37,9 @@ not trust inputs.
 ## Container process boundary
 
 The full verifier runs only in the pinned Linux amd64 container. Core MSBuild
-starts the launcher, which validates the container contract, runtime closure,
-paths, and publication ownership before releasing its direct child worker via
-an exact stdin startup message. Cancellation terminates the child gracefully
-and then forcibly within one monotonic deadline. The worker installs a Linux
-parent-death signal so launcher loss cannot leave it running.
+starts one verifier process, which validates the container contract and paths
+and verifies in-process. The build task kills the process tree on timeout or
+cancellation.
 
 Docker is the hard CPU and memory boundary. SharpProof does not implement a
 second cgroup or RSS controller. Its own protocol retains wall-clock,
