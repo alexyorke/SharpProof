@@ -452,9 +452,8 @@ public static partial class WorkerProtocolJson
             WorkerCacheStatus.Rejected =>
                 response.RunStatus == WorkerRunStatus.Failed &&
                 response.FailureReason == WorkerRunFailureReason.MalformedResult,
-            WorkerCacheStatus.Miss or WorkerCacheStatus.Unavailable => true,
-            WorkerCacheStatus.Disabled =>
-                response.RunStatus != WorkerRunStatus.Complete,
+            WorkerCacheStatus.Miss or WorkerCacheStatus.Unavailable or
+                WorkerCacheStatus.Disabled => true,
             _ => false
         };
         errors.Check(valid, "response.cache_request_mismatch");

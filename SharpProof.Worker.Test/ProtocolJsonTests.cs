@@ -1452,7 +1452,7 @@ public sealed class ProtocolJsonTests
         var activeRequest = CreateRequest();
         var proven = CreateResponse(CreateManifest());
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Miss, true);
-        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Disabled, false);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Disabled, true);
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Hit, true);
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, true);
 
@@ -1465,7 +1465,7 @@ public sealed class ProtocolJsonTests
         var provenOnlyRequest = CreateRequest();
         provenOnlyRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
         AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Hit, true);
-        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, false);
+        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, true);
 
         var refuted = CreateResponse(CreateManifest());
         refuted.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
