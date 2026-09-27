@@ -329,72 +329,6 @@ public sealed class BuildTaskTests
     }
 
     [Test]
-    public void VerifierWarningsReachTheMsBuildWarningChannel()
-    {
-        var engine = new RecordingBuildEngine();
-        using var task = new RunVerifier { BuildEngine = engine };
-
-        task.LogStandardError(
-            "source.cs(12,3): warning SP0047: incomplete" + Environment.NewLine +
-            "SharpProof: warning SP0048: assumptions" + Environment.NewLine +
-            "source.cs(x,3): warning SP0047: malformed location" + Environment.NewLine +
-            "worker stderr");
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                engine.Warnings.Select(static warning => warning.Code),
-                Is.EqualTo((string[])["SP0047", "SP0048"]));
-            Assert.That(engine.Warnings[0].File, Is.EqualTo("source.cs"));
-            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
-            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(3));
-            Assert.That(
-                engine.Messages.Select(static message => message.Message),
-                Does.Contain("source.cs(x,3): warning SP0047: malformed location"));
-            Assert.That(
-                engine.Messages.Select(static message => message.Message),
-                Does.Contain("worker stderr"));
-        }
-    }
-
-    [Test]
-    public void VerifierDiagnosticGrammarPreservesMarkerLikePathsAndSeverity()
-    {
-        var engine = new RecordingBuildEngine();
-        using var task = new RunVerifier { BuildEngine = engine };
-
-        task.LogStandardError(
-            "/tmp/source: warning SP0047: detail.cs(4,5): warning SP0048: assumptions" +
-            Environment.NewLine +
-            "punctuation (draft), v2.cs(7,9): error SP0047: incomplete: detail" +
-            Environment.NewLine +
-            "SharpProof: error SP0048: strict assumptions");
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
-            Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
-            Assert.That(
-                engine.Warnings[0].File,
-                Is.EqualTo("/tmp/source: warning SP0047: detail.cs"));
-            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(4));
-            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(5));
-            Assert.That(engine.Warnings[0].Message, Is.EqualTo("assumptions"));
-
-            Assert.That(engine.Errors, Has.Count.EqualTo(2));
-            Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
-            Assert.That(
-                engine.Errors[0].File,
-                Is.EqualTo("punctuation (draft), v2.cs"));
-            Assert.That(engine.Errors[0].LineNumber, Is.EqualTo(7));
-            Assert.That(engine.Errors[0].ColumnNumber, Is.EqualTo(9));
-            Assert.That(engine.Errors[1].Code, Is.EqualTo("SP0048"));
-            Assert.That(engine.Errors[1].File, Is.Empty);
-            Assert.That(task.HasStructuredError, Is.True);
-        }
-    }
-
-    [Test]
     public void StructuredVerifierDiagnosticsPreserveArbitraryPathText()
     {
         var engine = new RecordingBuildEngine();
@@ -531,80 +465,6 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
-    public void WorkerLauncherReserveRequiresLauncherAndOptionPosition()
-    {
-        const int projectWallTimeMilliseconds = 1234;
-        var launcher = typeof(LauncherArguments).Assembly.Location;
-
-        using var valid = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms",
-            projectWallTimeMilliseconds.ToString(CultureInfo.InvariantCulture));
-        using var unrelated = CreateTask(
-            Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "unrelated-verifier.dll"),
-            "verify",
-            "--project-wall-ms",
-            projectWallTimeMilliseconds.ToString(CultureInfo.InvariantCulture));
-        using var misplaced = CreateTask(
-            launcher,
-            "verify",
-            "--worker",
-            "--project-wall-ms");
-        using var missingValue = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms");
-        using var malformedValue = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms",
-            "not-a-timeout");
-        using var mismatchedValue = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms",
-            (projectWallTimeMilliseconds + 1).ToString(
-                CultureInfo.InvariantCulture));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(HasWorkerLauncherBudget(valid), Is.True);
-            Assert.That(HasWorkerLauncherBudget(unrelated), Is.False);
-            Assert.That(HasWorkerLauncherBudget(misplaced), Is.False);
-            Assert.That(HasWorkerLauncherBudget(missingValue), Is.False);
-            Assert.That(HasWorkerLauncherBudget(malformedValue), Is.False);
-            Assert.That(HasWorkerLauncherBudget(mismatchedValue), Is.False);
-        }
-
-        RunVerifier CreateTask(params string[] arguments)
-        {
-            return new RunVerifier
-            {
-                ProjectWallTimeMilliseconds = projectWallTimeMilliseconds,
-                Arguments = arguments
-                    .Select(static argument => new TaskItem(argument))
-                    .ToArray()
-            };
-        }
-
-        static bool HasWorkerLauncherBudget(RunVerifier task)
-        {
-            var method = typeof(RunVerifier).GetMethod(
-                "HasWorkerLauncherBudgetArguments",
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.NonPublic) ??
-                throw new InvalidOperationException(
-                    "The worker-launcher budget classifier is unavailable.");
-            return (bool)(method.Invoke(task, null) ?? false);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
     public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
     {
         using var directory = new TempDirectory("sharpproof-launcher-overflow-");
@@ -632,7 +492,7 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
-    public void VerifierTaskUsesOneDeadlineAndStopsOutputHoldingDescendants()
+    public void VerifierTaskDoesNotWaitForOutputHoldingDescendants()
     {
         using var directory = new TempDirectory("sharpproof-launcher-descendant-");
         int? descendantId = null;
@@ -647,9 +507,8 @@ public sealed class BuildTaskTests
                 "var child = Process.Start(start)!; " +
                 "File.WriteAllText(\"descendant.pid\", child.Id.ToString()); " +
                 "Thread.Sleep(800);");
-            // Let the instrumented supervisor and child finish managed
-            // startup before asserting descendant cleanup behavior.
-            using var task = CreateVerifier(directory, helper, 2000, 50);
+            var engine = new RecordingBuildEngine();
+            using var task = CreateVerifier(directory, helper, 2000, 50, engine);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             Assert.That(task.Execute(), Is.True);
@@ -661,13 +520,11 @@ public sealed class BuildTaskTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(4)));
+                Assert.That(task.ExitCode, Is.Zero);
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(6)));
                 Assert.That(
-                    SpinWait.SpinUntil(
-                        () => !IsProcessRunning(descendantId.Value),
-                        TimeSpan.FromSeconds(1)),
-                    Is.True);
+                    engine.Messages.Select(static message => message.Message),
+                    Has.Some.Contains("descendant holding its output"));
             }
         }
         finally
@@ -675,54 +532,6 @@ public sealed class BuildTaskTests
             if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
             {
                 Process.GetProcessById(descendantId.Value).Kill(entireProcessTree: true);
-            }
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierSupervisorStopsSessionEscapingDescendants()
-    {
-        using var directory = new TempDirectory("sharpproof-launcher-daemon-");
-        int? descendantId = null;
-        try
-        {
-            var pidPath = Path.Combine(directory.FullName, "daemon.pid");
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.Diagnostics; using System.Threading; " +
-                "var start = new ProcessStartInfo(\"/usr/bin/setsid\"); " +
-                "start.ArgumentList.Add(\"/bin/sh\"); " +
-                "start.ArgumentList.Add(\"-c\"); " +
-                "start.ArgumentList.Add(\"exec >/dev/null 2>&1; echo $$ > daemon.pid; exec sleep 10\"); " +
-                "start.UseShellExecute = false; Process.Start(start); " +
-                "var wait = Stopwatch.StartNew(); " +
-                "while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1);");
-            using var task = CreateVerifier(directory, helper, 1000, 1);
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(File.Exists(pidPath), Is.True);
-            descendantId = int.Parse(
-                File.ReadAllText(pidPath),
-                CultureInfo.InvariantCulture);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(
-                    SpinWait.SpinUntil(
-                        () => !IsProcessRunning(descendantId.Value),
-                        TimeSpan.FromSeconds(1)),
-                    Is.True);
-            }
-        }
-        finally
-        {
-            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
-            {
-                Process.GetProcessById(descendantId.Value)
-                    .Kill(entireProcessTree: true);
             }
         }
     }

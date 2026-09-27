@@ -18,6 +18,9 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     // the task's kill is only a safety net for a hung process.
     internal const int LauncherProcessReserveMilliseconds = 30000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
+    // Once the verifier exits, only a leaked descendant can keep its pipes
+    // open; the build does not wait for one.
+    internal const int OutputDrainMilliseconds = 2000;
     private const int StructuredRefutedFailureExitCode = 5;
     private const int StructuredSemanticFailureExitCode = 6;
     private readonly object _gate = new();
@@ -109,8 +112,15 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 Kill(process);
             }
             process.WaitForExit();
-            var output = standardOutput.GetAwaiter().GetResult();
-            var error = standardError.GetAwaiter().GetResult();
+            if (!System.Threading.Tasks.Task.WaitAll(
+                    [standardOutput, standardError], OutputDrainMilliseconds))
+            {
+                Log.LogMessage(
+                    MessageImportance.High,
+                    "SharpProof verifier left a descendant holding its output; output was discarded.");
+            }
+            var output = standardOutput.IsCompletedSuccessfully ? standardOutput.Result : string.Empty;
+            var error = standardError.IsCompletedSuccessfully ? standardError.Result : string.Empty;
             if (!string.IsNullOrWhiteSpace(output))
             {
                 Log.LogMessage(MessageImportance.High, "{0}", output);
