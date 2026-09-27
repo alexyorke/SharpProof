@@ -248,8 +248,7 @@
           "eng/diagnostics/diagnostic-descriptors.v1.json",
           "scripts/Generate-DiagnosticDescriptors.ps1",
           "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
-          "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs",
-          "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"
+          "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs"
         ]
       },
       {
@@ -282,7 +281,6 @@
         "name": "generatedOutputPolicy",
         "paths": [
           "eng/generated/approved-outputs.v1.json",
-          "scripts/Test-ProductionCSharpComplexity.ps1",
           "scripts/GeneratedFileHelpers.ps1",
           "scripts/CSharpSourceMetrics.ps1"
         ]
@@ -290,16 +288,7 @@
       {
         "name": "mutationEvidencePolicy",
         "paths": [
-          "scripts/SharpProof.MutationEvidence.psm1",
-          "scripts/SharpProof.MutationScheduling.psm1",
-          "scripts/SharpProof.MutationBaselines.psm1",
-          "scripts/Test-SharpProofMutationBaselines.ps1",
-          "scripts/Test-SharpProofMutationScheduling.ps1",
-          "scripts/Test-SharpProofMutationEvidence.ps1",
-          "eng/mutations/trusted-mutations.json",
-          "scripts/Test-SharpProofTrustedMutations.ps1",
-          "scripts/Invoke-SharpProofTrustedMutationsParallel.ps1",
-          "scripts/Test-SharpProofMutationCatalog.ps1"
+          "scripts/SharpProof.MutationEvidence.psm1"
         ]
       },
       {
@@ -360,7 +349,6 @@
         "paths": [
           "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
           "scripts/Generate-CompilerArtifactModel.ps1",
-          "scripts/Test-CompilerArtifactModelGenerator.ps1",
           "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]
@@ -450,10 +438,7 @@
           "scripts/Get-SharpProofTcbPaths.ps1",
           "scripts/Test-SharpProofCoverage.ps1",
           "scripts/SharpProof.ContainerExecution.psm1",
-          "SharpProof.Semantic.Tests.slnf",
-          "eng/acceptance/SharpProof.AcceptanceTiming.psm1",
-          "eng/acceptance/Verify.ps1",
-          "eng/acceptance/preview-evidence.v1.json"
+          "SharpProof.Semantic.Tests.slnf"
         ]
       },
       {
@@ -541,10 +526,7 @@
       {
         "name": "releaseConfigurationAuthority",
         "paths": [
-          ".github/workflows/package-consumers.yml",
-          "eng/release/environment-contract.json",
-          "scripts/Test-SharpProofReleaseConfiguration.ps1",
-          "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1"
+          ".github/workflows/package-consumers.yml"
         ]
       },
       {
@@ -564,7 +546,6 @@
           "scripts/Invoke-SharpProofContainer.ps1",
           "scripts/Invoke-SharpProofChangedTests.ps1",
           "scripts/Invoke-SharpProofDevCheck.ps1",
-          "scripts/Invoke-SharpProofReleaseContainer.ps1",
           "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Invoke-SharpProofSemanticTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
@@ -581,47 +562,19 @@
           "SharpProof.Gates/SharpProof.Gates.csproj",
           "SharpProof.Verifier/SharpProof.Verifier.nuspec",
           "eng/coverage/baseline.json",
-          "eng/release/first-party-assemblies.json",
           "eng/release/third-party-components.json",
-          "scripts/Assert-SharpProofStandaloneGateResult.ps1",
           "scripts/Get-SharpProofDevCheckPlan.ps1",
-          "scripts/Get-SharpProofPilotPackageAuthority.ps1",
-          "scripts/Get-SharpProofReleaseAuthorityClosure.ps1",
-          "scripts/Get-SharpProofReleaseVersion.ps1",
           "scripts/Assert-SharpProofJsonProperties.ps1",
           "scripts/Invoke-SharpProofCoverage.ps1",
           "scripts/Invoke-SharpProofDotnet.ps1",
-          "scripts/Invoke-SharpProofGateEvidence.ps1",
-          "scripts/New-SharpProofPilotReviewLedger.ps1",
-          "scripts/New-SharpProofReleaseEvidence.ps1",
-          "scripts/Publish-SharpProofRelease.ps1",
           "scripts/SharpProof.PEMetadata.psm1",
           "scripts/SharpProof.PackageIdentity.psm1",
-          "scripts/SharpProof.PublicationDestination.ps1",
-          "scripts/SharpProof.PublicationPlanTopology.ps1",
-          "scripts/SharpProof.PublicationPlanIdentity.psm1",
-          "scripts/SharpProof.ReleaseBundle.ps1",
-          "scripts/SharpProof.ReleaseJson.ps1",
           "scripts/Read-SharpProofSdkPolicy.ps1",
-          "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofGeneratedOutputs.ps1",
-          "scripts/Test-SharpProofPackageDependencies.ps1",
-          "scripts/Test-SharpProofPackagePayloads.ps1",
-          "scripts/Test-SharpProofPublicationPlan.ps1",
-          "scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1",
-          "scripts/Complete-SharpProofPilotReview.ps1",
-          "scripts/Test-SharpProofPilotAuthorityFixtures.ps1",
-          "scripts/Test-SharpProofPilots.ps1",
-          "scripts/Test-SharpProofPilotReport.ps1",
-          "scripts/Test-SharpProofReleaseArtifacts.ps1",
-          "scripts/Test-SharpProofReleaseAuthorityClosure.ps1",
-          "scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1",
           "scripts/Test-SharpProofSamples.ps1",
-          "scripts/Test-SharpProofStandaloneGateEvidence.ps1",
           "scripts/Test-SharpProofSymbolPackages.ps1",
           "scripts/SharpProof.SymbolPackageValidator.cs",
-          "scripts/Write-SharpProofQualificationReceipt.ps1",
           "scripts/package-projects.json"
         ]
       },
@@ -637,9 +590,7 @@
           "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
           "Tools/SharpProof.Fuzz/packages.lock.json",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
-          "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
-          "scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1",
-          "scripts/Test-SharpProofFuzzRunnerResult.ps1"
+          "scripts/SharpProof.FuzzEvidenceLifecycle.ps1"
         ]
       },
       {
@@ -654,10 +605,8 @@
         "name": "containedPathAuthority",
         "paths": [
           "eng/fuzz/retained-seeds.json",
-          "scripts/Test-SharpProofReadme.ps1",
           "scripts/Invoke-SharpProofFuzzCampaign.ps1",
-          "scripts/Resolve-SharpProofContainedPath.ps1",
-          "scripts/Test-SharpProofContainedPathFixtures.ps1"
+          "scripts/Resolve-SharpProofContainedPath.ps1"
         ]
       },
       {
