@@ -892,7 +892,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var first = await BuildOkAsync(project.BuildSerialAsync(
             verify: true,
             ("SharpProofVerifySarifFile", configured)));
-        await AssertFrameworkScopedSarifAsync(first.Output);
+        AssertFrameworkScopedSarif(first.Output);
         // Keep one serial build to exercise the explicit BuildInParallel=false
         // contract. The incremental and clean builds verify the same
         // framework-scoped outputs through the normal parallel dispatch path,
@@ -900,7 +900,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var incremental = await BuildOkAsync(project.BuildParallelAsync(
             verify: true,
             ("SharpProofVerifySarifFile", configured)));
-        await AssertFrameworkScopedSarifAsync(incremental.Output);
+        AssertFrameworkScopedSarif(incremental.Output);
 
         var rebuilt = await project.RebuildParallelAsync(
             verify: true,
@@ -916,9 +916,9 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(rebuilt.Output,
                 Does.Not.Contain("Determining projects to restore"));
         }
-        await AssertFrameworkScopedSarifAsync(rebuilt.Output);
+        AssertFrameworkScopedSarif(rebuilt.Output);
 
-        async Task AssertFrameworkScopedSarifAsync(string output)
+        void AssertFrameworkScopedSarif(string output)
         {
             var markerIdentities = new List<string>();
             foreach (var framework in new[]
@@ -932,7 +932,9 @@ public sealed class WorkerMsBuildIntegrationTests
                     framework,
                     "verification.sarif");
                 Assert.That(File.Exists(sarif), Is.True, output);
-                markerIdentities.Add(await File.ReadAllTextAsync(sarif));
+                using var document = JsonDocument.Parse(File.ReadAllText(sarif));
+                Assert.That(document.RootElement.GetProperty("runs").GetArrayLength(), Is.EqualTo(1), sarif);
+                markerIdentities.Add(sarif);
             }
             Assert.That(markerIdentities, Is.Unique);
         }
