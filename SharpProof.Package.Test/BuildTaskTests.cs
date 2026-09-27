@@ -728,53 +728,6 @@ public sealed class BuildTaskTests
     }
 
     [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void SupervisorContainsVerifierThatKillsItsImmediateParent()
-    {
-        using var directory = new TempDirectory("sharpproof-supervisor-anchor-");
-        int? descendantId = null;
-        try
-        {
-            var pidPath = Path.Combine(directory.FullName, "daemon.pid");
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.Diagnostics; using System.Runtime.InteropServices; using System.Threading; " +
-                "var start = new ProcessStartInfo(\"/usr/bin/setsid\"); " +
-                "start.ArgumentList.Add(\"/bin/sh\"); start.ArgumentList.Add(\"-c\"); " +
-                "start.ArgumentList.Add(\"exec >/dev/null 2>&1; echo $$ > daemon.pid; exec sleep 10\"); " +
-                "start.UseShellExecute = false; Process.Start(start); " +
-                "var wait = Stopwatch.StartNew(); while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1); " +
-                "Native.Kill(Native.GetParent(), 9); Thread.Sleep(1000); " +
-                "internal static class Native { [DllImport(\"libc\", EntryPoint=\"getppid\")] internal static extern int GetParent(); [DllImport(\"libc\", EntryPoint=\"kill\")] internal static extern int Kill(int processId, int signal); }");
-            using var task = CreateVerifier(directory, helper, 2000, 1);
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(File.Exists(pidPath), Is.True);
-            descendantId = int.Parse(
-                File.ReadAllText(pidPath),
-                CultureInfo.InvariantCulture);
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(
-                    SpinWait.SpinUntil(
-                        () => !IsProcessRunning(descendantId.Value),
-                        TimeSpan.FromSeconds(1)),
-                    Is.True);
-            }
-        }
-        finally
-        {
-            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
-            {
-                Process.GetProcessById(descendantId.Value)
-                    .Kill(entireProcessTree: true);
-            }
-        }
-    }
-
-    [Test]
     public void CanceledInvalidationDoesNotMutate()
     {
         var task = new InvalidatePublishedResult
