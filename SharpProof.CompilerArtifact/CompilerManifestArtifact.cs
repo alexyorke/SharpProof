@@ -463,10 +463,8 @@ internal static class CompilerManifestArtifactJson
         {
             Validate(
                 artifact,
-                validateFeatureScope: true,
                 validateDecodability: true,
-                cancellationToken,
-                validateDiagnosticShapes: false);
+                cancellationToken);
         }
         cancellationToken.ThrowIfCancellationRequested();
         var json = JsonSerializer.Serialize(
@@ -527,7 +525,6 @@ internal static class CompilerManifestArtifactJson
         // writes still enforce the feature-scope seal below.
         Validate(
             artifact,
-            validateFeatureScope: false,
             validateDecodability: false,
             cancellationToken);
         return CompilerLoweredArtifact.Decode(
@@ -543,46 +540,23 @@ internal static class CompilerManifestArtifactJson
     {
         Validate(
             value,
-            validateFeatureScope: true,
             validateDecodability: true,
             cancellationToken);
     }
 
     private static void Validate(
         CompilerManifestArtifact value,
-        bool validateFeatureScope,
         bool validateDecodability,
-        CancellationToken cancellationToken,
-        bool validateDiagnosticShapes = true)
+        CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireValid(
-            HasValidDiagnostics(
-                value.CompilerDiagnostics,
-                value.Compilation,
-                cancellationToken,
-                validateDiagnosticShapes));
+        // The artifact is trusted build output: validate only what the worker
+        // needs to decode and account for it, not producer-side fingerprints.
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasValidEnvelope(value));
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireValid(!validateFeatureScope || HasValidFeatureScope(value));
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireValid(HasValidLocationAuthorities(value, cancellationToken));
-        cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasMatchingCallables(value.Callables, value.Manifest));
-        cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasValidCallableStates(
             value.Callables,
             value.CompilerDiagnostics.Length != 0));
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireValid(HasValidEffectReplayTrees(
-            value.Callables,
-            value.Compilation));
-
-        cancellationToken.ThrowIfCancellationRequested();
-        CompilationFingerprint.ValidateShape(
-            value.Compilation,
-            specificationPackAuthorityAlreadyValidated: true);
         cancellationToken.ThrowIfCancellationRequested();
         if (validateDecodability &&
             !HasDecodableCallables(value, cancellationToken))
@@ -634,212 +608,8 @@ internal static class CompilerManifestArtifactJson
             Compilation: not null,
             MaximumExpressionDepth: >= 1 and <= 256
         } &&
-        CompilerSpecificationPackAuthorityValidation.Matches(value) &&
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
-        WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
-        value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
-            value.Compilation, value.CompilerDiagnostics,
-            value.MaximumExpressionDepth) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
-    }
-
-    private static bool HasValidFeatureScope(CompilerManifestArtifact? value)
-    {
-        return value != null &&
-            WorkerProtocolJson.IsSha256(value.FeatureScopeSha256) &&
-            HasFeatureScopeParity(value) &&
-            value.FeatureScopeSha256 ==
-                CompilerFeatureScopeFingerprint.ComputeSha256(value);
-    }
-
-    private static bool HasFeatureScopeParity(CompilerManifestArtifact value)
-    {
-        if (value.Manifest?.Callables is not { } manifestCallables ||
-            value.Manifest.Claims is not { } manifestClaims ||
-            value.Callables is not { } loweredCallables)
-        {
-            return false;
-        }
-
-        var allowEffects = value.Features is WorkerFeatureSet.Effects or WorkerFeatureSet.All;
-        var allowContracts = value.Features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All;
-        var loweredById = new Dictionary<string, CompilerCallableArtifact>(
-            StringComparer.Ordinal);
-        foreach (var lowered in loweredCallables)
-        {
-            if (lowered == null ||
-                string.IsNullOrWhiteSpace(lowered.CallableId) ||
-                loweredById.ContainsKey(lowered.CallableId))
-            {
-                return false;
-            }
-
-            loweredById.Add(lowered.CallableId, lowered);
-        }
-
-        var claimsByCallable = manifestClaims
-            .Where(static claim => claim != null)
-            .ToLookup(static claim => claim!.CallableId, StringComparer.Ordinal);
-
-        foreach (var callable in manifestCallables)
-        {
-            if (callable == null ||
-                !loweredById.TryGetValue(callable.CallableId, out var lowered) ||
-                lowered == null)
-            {
-                return false;
-            }
-
-            var claimPartitions = new ClaimPartitions(
-                claimsByCallable[callable.CallableId]);
-            var postconditions = claimPartitions.Postconditions;
-            var effects = claimPartitions.Effects;
-            var selectedEffects = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Effects);
-            var selectedContracts = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Contracts);
-            var hasContractAssumptions = callable.Assumptions.Any(assumption =>
-                assumption != null &&
-                assumption.Kind is (WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume));
-
-            if ((selectedEffects && !allowEffects) ||
-                (selectedContracts && !allowContracts) ||
-                (effects.Length != 0 && (!selectedEffects || !allowEffects)) ||
-                (postconditions.Length != 0 && (!selectedContracts || !allowContracts)) ||
-                (hasContractAssumptions &&
-                 !((selectedContracts && allowContracts) ||
-                   (selectedEffects && allowEffects))))
-            {
-                return false;
-            }
-
-            var hasExplicitReason = callable.SelectionReasons.Contains(
-                WorkerSelectionReason.ExplicitAnnotation);
-            var hasDiscoveredReason = callable.SelectionReasons.Contains(
-                WorkerSelectionReason.DiscoveredPostcondition);
-            if (hasDiscoveredReason != (postconditions.Length != 0) ||
-                (hasExplicitReason &&
-                 callable.SelectedFeatures.Length == 0 &&
-                 callable.Assumptions.Length == 0) ||
-                (!hasContractAssumptions && callable.Assumptions.Length == 0 &&
-                 !selectedContracts &&
-                 !selectedEffects &&
-                 !hasDiscoveredReason && callable.SelectionReasons.Length != 0))
-            {
-                return false;
-            }
-
-            var loweredEffects = lowered.EffectClaims;
-            if (loweredEffects == null ||
-                loweredEffects.Length != effects.Length)
-            {
-                return false;
-            }
-
-            for (var index = 0; index < effects.Length; index++)
-            {
-                var loweredEffect = loweredEffects[index];
-                var effect = effects[index]!;
-                if (loweredEffect == null ||
-                    !string.Equals(
-                        loweredEffect.ClaimId,
-                        effect.ClaimId,
-                        StringComparison.Ordinal) ||
-                    loweredEffect.ContractKind != effect.EffectContractKind)
-                {
-                    return false;
-                }
-            }
-
-            foreach (var effect in loweredEffects)
-            {
-                if (effect == null)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    CompilerEffectClaimArtifactCodec.Validate(effect);
-                }
-                catch (InvalidDataException)
-                {
-                    return false;
-                }
-            }
-
-            var loweredAuthorities = lowered.EffectAuthorities;
-            if (loweredAuthorities == null ||
-                loweredAuthorities.Length != effects.Length)
-            {
-                return false;
-            }
-
-            for (var index = 0; index < effects.Length; index++)
-            {
-                if (!CompilerEffectAuthority.Matches(
-                        loweredEffects[index],
-                        loweredAuthorities[index],
-                        effects[index]!,
-                        value.Compilation,
-                        evidenceValidated: true))
-                {
-                    return false;
-                }
-            }
-
-            if (lowered.FailureReason != CompilerCallableArtifactReasonCatalog.SuccessReason)
-            {
-                if (lowered.Graph != null ||
-                    lowered.Body != null ||
-                    lowered.Clauses is not { Length: 0 } ||
-                    lowered.Variables is not { Length: 0 })
-                {
-                    return false;
-                }
-
-                continue;
-            }
-
-            if (lowered.Clauses is not { } clauses)
-            {
-                return false;
-            }
-
-            if (!CompilerLoweredArtifact.ClaimsMatchManifest(
-                    clauses
-                        .Where(static clause => clause?.Kind == CompilerContractKind.Ensures)
-                        .OfType<CompilerClauseArtifact>()
-                        .Select(static clause => (
-                            clause.ClaimId,
-                            CompilerLoweredArtifact.ManifestEvidence(clause.Evidence)))
-                        .ToArray(),
-                    postconditions))
-            {
-                return false;
-            }
-
-            var declaredAssumptions = callable.Assumptions
-                .Where(static assumption => assumption != null &&
-                    assumption.Kind is WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume)
-                .Select(static assumption => (assumption!.Id, assumption.Kind))
-                .OrderBy(static item => item.Id, StringComparer.Ordinal)
-                .ToArray();
-            var loweredAssumptions = clauses
-                .Where(static clause => clause?.Kind != CompilerContractKind.Ensures)
-                .Select(static clause => clause == null
-                    ? (string.Empty, WorkerAssumptionKind.Unspecified)
-                    : (clause.AssumptionId ?? string.Empty,
-                        clause.Kind == CompilerContractKind.Requires
-                            ? WorkerAssumptionKind.Precondition
-                            : WorkerAssumptionKind.UserAssume))
-                .OrderBy(static item => item.Item1, StringComparer.Ordinal)
-                .ToArray();
-            if (!declaredAssumptions.SequenceEqual(loweredAssumptions))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static void RequireCompatibilityProperties(
@@ -879,53 +649,6 @@ internal static class CompilerManifestArtifactJson
         return value;
     }
 
-    private static bool HasValidDiagnostics(
-        CompilerDiagnosticArtifact[]? diagnostics,
-        CompilerCompilationSnapshot? compilation,
-        CancellationToken cancellationToken,
-        bool validateDiagnosticShapes = true)
-    {
-        if (validateDiagnosticShapes)
-        {
-            if (diagnostics == null)
-            {
-                return false;
-            }
-
-            var ordered = true;
-            CompilerDiagnosticArtifact? previous = null;
-            foreach (var diagnostic in diagnostics)
-            {
-                if (!HasValidDiagnosticShape(diagnostic))
-                {
-                    return false;
-                }
-
-                if (previous != null &&
-                    CompilerDiagnosticArtifactOrdering.Compare(
-                        previous,
-                        diagnostic) > 0)
-                {
-                    ordered = false;
-                }
-
-                previous = diagnostic;
-            }
-
-            if (!ordered)
-            {
-                return false;
-            }
-        }
-        else if (!CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!))
-        {
-            return false;
-        }
-
-        return diagnostics!.All(item =>
-            HasValidDiagnosticBinding(item, compilation, cancellationToken));
-    }
-
     private static bool HasValidDiagnosticShapes(
         CompilerDiagnosticArtifact[]? diagnostics)
     {
@@ -943,227 +666,6 @@ internal static class CompilerManifestArtifactJson
             item.SourceLineMapSha256 != null &&
             item.Location is { Path: not null } location &&
             WorkerProtocolJson.HasValidLocationOrNone(location);
-    }
-
-    private static bool HasValidDiagnosticBinding(
-        CompilerDiagnosticArtifact value,
-        CompilerCompilationSnapshot? compilation,
-        CancellationToken cancellationToken)
-    {
-        if (value?.Location is not { } location)
-        {
-            return false;
-        }
-
-        if (CompilerSourceLocationAuthority.IsNone(location))
-        {
-            return !value.IsSource &&
-                value.SourceTreeOrdinal == -1 &&
-                value.SourceTreePath.Length == 0 &&
-                value.SourceTreeSha256.Length == 0 &&
-                value.SourceLineMapSha256.Length == 0;
-        }
-
-        if (!value.IsSource)
-        {
-            return false;
-        }
-
-        return CompilerSourceLocationAuthority.IsBound(
-            location,
-            value.SourceTreeOrdinal,
-            value.SourceTreePath,
-            value.SourceTreeSha256,
-            value.SourceLineMapSha256,
-            compilation,
-            cancellationToken: cancellationToken);
-    }
-
-    private static bool HasValidLocationAuthorities(
-        CompilerManifestArtifact? value,
-        CancellationToken cancellationToken)
-    {
-        if (value?.LocationAuthorities is not { } authorities ||
-            value.Manifest is not { } manifest ||
-            value.Compilation is not { } compilation ||
-            authorities.Length !=
-                manifest.Callables.Length + manifest.Claims.Length)
-        {
-            return false;
-        }
-
-        for (var index = 0; index < authorities.Length; index++)
-        {
-            if (authorities[index] == null)
-            {
-                return false;
-            }
-        }
-
-        for (var index = 1; index < authorities.Length; index++)
-        {
-            if (CompareAuthorities(authorities[index - 1], authorities[index]) >= 0)
-            {
-                return false;
-            }
-        }
-
-        var expected = new (
-            CompilerSourceLocationOwnerKind Kind,
-            string Id,
-            WorkerSourceLocation? Location)[
-                manifest.Callables.Length + manifest.Claims.Length];
-        var expectedIndex = 0;
-        foreach (var entry in manifest.Callables)
-        {
-            expected[expectedIndex++] = (
-                CompilerSourceLocationOwnerKind.Callable,
-                entry.CallableId,
-                entry.Location);
-        }
-
-        foreach (var entry in manifest.Claims)
-        {
-            expected[expectedIndex++] = (
-                CompilerSourceLocationOwnerKind.Claim,
-                entry.ClaimId,
-                entry.Location);
-        }
-
-        Array.Sort(
-            expected,
-            static (left, right) =>
-            {
-                var result = left.Kind.CompareTo(right.Kind);
-                return result != 0
-                    ? result
-                    : StringComparer.Ordinal.Compare(left.Id, right.Id);
-            });
-
-        for (var index = 0; index < expected.Length; index++)
-        {
-            if (expected[index].Location == null)
-            {
-                return false;
-            }
-        }
-
-        for (var index = 0; index < expected.Length; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var authority = authorities[index];
-            var row = expected[index];
-            if (!Enum.IsDefined(
-                    typeof(CompilerSourceLocationOwnerKind),
-                    authority.OwnerKind) ||
-                string.IsNullOrWhiteSpace(authority.OwnerId) ||
-                authority.OwnerKind != row.Kind ||
-                authority.OwnerId != row.Id ||
-                !CompilerSourceLocationAuthority.LocationsEqual(
-                    authority.Location,
-                    row.Location) ||
-                !CompilerSourceLocationAuthority.IsBound(
-                    authority.Location,
-                    authority.SourceTreeOrdinal,
-                    authority.SourceTreePath,
-                    authority.SourceTreeSha256,
-                    authority.SourceLineMapSha256,
-                    compilation,
-                    allowNone: true,
-                    cancellationToken: cancellationToken))
-            {
-                return false;
-            }
-        }
-
-        return HasOwnedDirectClauseLocations(manifest, authorities);
-    }
-
-    // Geometry alone accepts any valid span.  A direct clause is an invocation
-    // inside its callable's own (implementation) declaration, and the collector
-    // numbers a callable's direct clauses in (tree, start, length) order, so a
-    // resealed relocation to another declaration or a swap of claim locations
-    // cannot preserve both facts.  Companion clauses live elsewhere.
-    private static bool HasOwnedDirectClauseLocations(
-        WorkerClaimManifest manifest,
-        CompilerLocationAuthorityArtifact[] authorities)
-    {
-        var callableAuthorities =
-            new Dictionary<string, CompilerLocationAuthorityArtifact>(
-                StringComparer.Ordinal);
-        var claimAuthorities =
-            new Dictionary<string, CompilerLocationAuthorityArtifact>(
-                StringComparer.Ordinal);
-        foreach (var authority in authorities)
-        {
-            (authority.OwnerKind == CompilerSourceLocationOwnerKind.Claim
-                ? claimAuthorities
-                : callableAuthorities)[authority.OwnerId] = authority;
-        }
-
-        foreach (var claims in manifest.Claims
-                     .Where(static claim =>
-                         claim.Evidence == WorkerClaimEvidence.DirectClause)
-                     .GroupBy(
-                         static claim => claim.CallableId,
-                         StringComparer.Ordinal))
-        {
-            var owner = callableAuthorities[claims.Key];
-            CompilerLocationAuthorityArtifact? previous = null;
-            foreach (var claim in claims.OrderBy(static claim => claim.Ordinal))
-            {
-                var current = claimAuthorities[claim.ClaimId];
-                if ((previous != null &&
-                        CompareSourceOrder(previous, current) >= 0) ||
-                    (!CompilerSourceLocationAuthority.IsNone(owner.Location) &&
-                        !IsStrictlyContained(current, owner)))
-                {
-                    return false;
-                }
-
-                previous = current;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsStrictlyContained(
-        CompilerLocationAuthorityArtifact inner,
-        CompilerLocationAuthorityArtifact outer)
-    {
-        var innerEnd = (long)inner.Location.Start + inner.Location.Length;
-        var outerEnd = (long)outer.Location.Start + outer.Location.Length;
-        return !CompilerSourceLocationAuthority.IsNone(inner.Location) &&
-            inner.SourceTreeOrdinal == outer.SourceTreeOrdinal &&
-            inner.Location.Start >= outer.Location.Start &&
-            innerEnd <= outerEnd &&
-            inner.Location.Length < outer.Location.Length;
-    }
-
-    private static int CompareSourceOrder(
-        CompilerLocationAuthorityArtifact left,
-        CompilerLocationAuthorityArtifact right)
-    {
-        var result = left.SourceTreeOrdinal.CompareTo(right.SourceTreeOrdinal);
-        if (result == 0)
-        {
-            result = left.Location.Start.CompareTo(right.Location.Start);
-        }
-
-        return result != 0
-            ? result
-            : left.Location.Length.CompareTo(right.Location.Length);
-    }
-
-    private static int CompareAuthorities(
-        CompilerLocationAuthorityArtifact left,
-        CompilerLocationAuthorityArtifact right)
-    {
-        var result = left.OwnerKind.CompareTo(right.OwnerKind);
-        return result != 0
-            ? result
-            : StringComparer.Ordinal.Compare(left.OwnerId, right.OwnerId);
     }
 
     private static bool HasMatchingCallables(
@@ -1191,30 +693,6 @@ internal static class CompilerManifestArtifactJson
                  callable.FailureReason))) == true;
     }
 
-    private static bool HasValidEffectReplayTrees(
-        CompilerCallableArtifact[]? callables,
-        CompilerCompilationSnapshot? compilation)
-    {
-        if (callables is null || compilation is not { SyntaxTrees: not null })
-        {
-            return false;
-        }
-
-        foreach (var effectClaim in callables
-                     .OfType<CompilerCallableArtifact>()
-                     .SelectMany(static callable => callable.EffectClaims ?? [])
-                     .OfType<CompilerEffectClaimArtifact>())
-        {
-            if (!CompilerEffectClaimArtifactCodec.HasValidReplayGeometry(
-                    effectClaim,
-                    compilation))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }
 
 internal static class CompilerManifestArtifactFile

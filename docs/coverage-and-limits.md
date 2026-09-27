@@ -244,12 +244,11 @@ ghost specification evidence.
   and follows the selected incomplete-analysis policy; infrastructure,
   protocol, backend, and replay failure is `Failed`. None is a successful
   claim outcome.
-- Cache schema version 13 stores only complete, postcondition-only, all-refuted
-  payloads. Cache reads are checked against the entire current manifest, then
-  every supported scalar model is reconstructed and whole-body replayed.
-  Proven claims, effect claims, unsupported models, `Unknown`, cancellation,
-  timeout, malformed result, infrastructure failure, and failed replay are not
-  semantic cache entries. `require-proven` disables the local semantic cache.
+- Cache schema version 14 stores complete, postcondition-only responses whose
+  claims are all `Proven` or `Refuted`, keyed by the exact artifact, worker,
+  spec content, and budgets. Effect claims, `Unknown`, cancellation, timeout,
+  malformed results, and infrastructure failure are not semantic cache
+  entries.
 - `SharpProofVerifyPolicy` maps incomplete selected analysis to informational,
   warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
   trusted evidence to SP0048. These policies do not make fatal runs successful.

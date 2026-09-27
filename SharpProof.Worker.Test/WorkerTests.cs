@@ -92,36 +92,6 @@ public sealed class WorkerTests
     private static readonly ImmutableArray<string>
         ReplayedAllocationWitnessKinds = AllocationWitnessKinds.Managed;
 
-    private static bool TryCreateFileSymbolicLink(string link, string target)
-    {
-        try
-        {
-            File.CreateSymbolicLink(link, target);
-            return true;
-        }
-        catch (Exception exception) when (exception is
-            IOException or UnauthorizedAccessException or
-            PlatformNotSupportedException)
-        {
-            return false;
-        }
-    }
-
-    private static bool TryCreateDirectorySymbolicLink(string link, string target)
-    {
-        try
-        {
-            Directory.CreateSymbolicLink(link, target);
-            return true;
-        }
-        catch (Exception exception) when (exception is
-            IOException or UnauthorizedAccessException or
-            PlatformNotSupportedException)
-        {
-            return false;
-        }
-    }
-
     [Test]
     public void ProtocolValidationClosesVersionAndBudgetBounds()
     {
@@ -259,10 +229,10 @@ public sealed class WorkerTests
                     result.Outcome == WorkerClaimOutcome.Proven &&
                     result.Reason == WorkerClaimReason.None),
                 Is.True);
-            Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Miss));
+            Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(factoryCalls, Is.EqualTo(1));
             Assert.That(backend.CallCount, Is.EqualTo(1));
-            Assert.That(CacheFiles(project), Is.Empty);
+            Assert.That(CacheFiles(project), Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -353,10 +323,10 @@ public sealed class WorkerTests
                 Is.True);
             Assert.That(
                 first.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Disabled));
+                Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(
                 response.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Disabled));
+                Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(CacheFiles(project), Is.Empty);
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
@@ -1419,8 +1389,6 @@ public sealed class WorkerTests
         evidence.Witness!.Effects = WorkerEffectSet.Throws;
         authority.Witness!.Effects = WorkerEffectSet.Throws;
         CompilerEffectClaimArtifactCodec.Seal(evidence);
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact));
         await File.WriteAllBytesAsync(
@@ -1523,36 +1491,6 @@ public sealed class WorkerTests
         }
     }
 
-    [Test]
-    public async Task NullCompilerDiagnosticsAreTypedAsManifestInvalid()
-    {
-        using var project = TestProject.Create(TautologySource);
-        var request = project.CreateRequest(cacheEnabled: false);
-        var json = await File.ReadAllTextAsync(request.CompilerManifest.Path);
-        json = json.Replace(
-            "\"compilerDiagnostics\":[]",
-            "\"compilerDiagnostics\":null",
-            StringComparison.Ordinal);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 = WorkerProtocolJson.ComputeSha256(bytes);
-        using var worker = new SharpProofWorker(
-            () => throw new AssertionException(
-                "An invalid manifest must fail before backend creation."));
-
-        var response = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
-            Assert.That(
-                response.Errors.Single().Code,
-                Is.EqualTo("compiler_manifest.invalid"));
-        }
-    }
-
     [TestCase(null)]
     [TestCase("")]
     [TestCase("   ")]
@@ -1626,76 +1564,6 @@ public sealed class WorkerTests
             {
                 return exception;
             }
-        }
-    }
-
-    [Test]
-    public async Task NullModuleReferenceRowsAreTypedAsManifestInvalid()
-    {
-        using var project = TestProject.Create(TautologySource);
-        var request = project.CreateRequest(cacheEnabled: false);
-        await WriteNullModuleReferenceRowAsync(request);
-        using var worker = new SharpProofWorker(
-            () => throw new AssertionException(
-                "An invalid manifest must fail before backend creation."));
-
-        var response = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
-            Assert.That(
-                response.Errors.Single().Code,
-                Is.EqualTo("compiler_manifest.invalid"));
-            Assert.That(response.Manifest.Claims, Is.Empty);
-            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-        }
-    }
-
-    [Test]
-    public async Task CliWritesStructuredFailureForNullModuleReferenceRows()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            Assert.Ignore("The direct worker is supported only in the Linux container.");
-        }
-
-        using var project = TestProject.Create(TautologySource);
-        var request = project.CreateRequest(cacheEnabled: false);
-        await WriteNullModuleReferenceRowAsync(request);
-        var requestPath = Path.Combine(project.DirectoryPath, "request.json");
-        var resultPath = Path.Combine(project.DirectoryPath, "result.json");
-        await File.WriteAllTextAsync(
-            requestPath,
-            WorkerProtocolJson.SerializeRequest(request));
-        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
-            "dotnet";
-        using var process = LinuxWorkerProcess.Start(
-            host,
-            [typeof(SharpProofWorker).Assembly.Location,
-                "verify", "--request", requestPath,
-                "--result", resultPath, "--start-stdin"],
-            project.DirectoryPath);
-
-        var completion = process.WaitForExit(
-            TimeSpan.FromSeconds(10),
-            TimeSpan.FromSeconds(11));
-        var response = WorkerProtocolJson.DeserializeResponse(
-            await File.ReadAllTextAsync(resultPath))!;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
-            Assert.That(completion.ExitCode, Is.Zero);
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
-            Assert.That(
-                response.Errors.Single().Code,
-                Is.EqualTo("compiler_manifest.invalid"));
-            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
@@ -1821,7 +1689,7 @@ public sealed class WorkerTests
                 response.ClaimResults.Single().Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(factoryCalls, Is.EqualTo(1));
-            Assert.That(CacheFiles(project), Is.Empty);
+            Assert.That(CacheFiles(project), Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -1945,46 +1813,6 @@ public sealed class WorkerTests
         {
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(factoryCalls, Is.Zero);
-        }
-    }
-
-    [Test]
-    public async Task CacheReadCapacityOverflowDegradesToAMiss()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        var cacheHooks = new VerificationCacheTestHooks();
-        using var worker = new SharpProofWorker(backend, null, cacheHooks);
-        var first = await worker.VerifyAsync(request);
-        var cacheFile = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        var cachePathValidations = 0;
-        cacheHooks.PathValidation = (_, path) =>
-        {
-            if (string.Equals(path, cacheFile, StringComparison.Ordinal) &&
-                Interlocked.Increment(ref cachePathValidations) == 2)
-            {
-                throw new OverflowException(
-                    "Synthetic cache capacity overflow.");
-            }
-        };
-
-        var recomputed = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                first.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(
-                recomputed.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                recomputed.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
         }
     }
 
@@ -2541,10 +2369,10 @@ public sealed class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Miss));
+                Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(response.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Miss));
-            Assert.That(CacheFiles(project), Is.Empty);
+                Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(CacheFiles(project), Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -4971,28 +4799,6 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task RequireProvenDoesNotReuseTheAdvisorySemanticCache()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        request.AssumptionPolicy = WorkerAssumptionPolicy.Error;
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(second.InputHash, Is.EqualTo(first.InputHash));
-            Assert.That(second.RequestHash, Is.Not.EqualTo(first.RequestHash));
-            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Disabled));
-        }
-    }
-
-    [Test]
     public async Task UnknownOutcomesNeverEnterTheCache()
     {
         using var project = TestProject.Create(TautologySource);
@@ -5012,55 +4818,6 @@ public sealed class WorkerTests
         Assert.That(
             CacheFiles(project),
             Is.Empty);
-    }
-
-    [Test]
-    public async Task RejectedCacheReadMaintainsCapacityBeforeNonCacheableResult()
-    {
-        using var project = TestProject.Create(TautologySource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 150;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unknown(
-                BackendFailureReason.ResourceLimit));
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        var rejected = Path.Combine(
-            project.CacheDirectory,
-            first.InputHash + ".sharp-proof-cache.json");
-        var oldest = Path.Combine(
-            project.CacheDirectory,
-            new string('a', 64) + ".sharp-proof-cache.json");
-        var newest = Path.Combine(
-            project.CacheDirectory,
-            new string('b', 64) + ".sharp-proof-cache.json");
-        await File.WriteAllTextAsync(rejected, "{corrupt");
-        await File.WriteAllBytesAsync(oldest, new byte[100]);
-        await File.WriteAllBytesAsync(newest, new byte[100]);
-        File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
-        File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
-
-        var second = await worker.VerifyAsync(request);
-        var remaining = CacheFiles(project);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(
-                first.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                second.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                second.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Miss));
-            Assert.That(File.Exists(rejected), Is.False);
-            Assert.That(remaining, Is.EqualTo(new[] { newest }));
-            Assert.That(
-                remaining.Sum(static path => new FileInfo(path).Length),
-                Is.EqualTo(100));
-        }
     }
 
     [TestCase(
@@ -5226,21 +4983,6 @@ public sealed class WorkerTests
             }]
         };
         WorkerProtocolJson.SealManifest(manifest);
-        var factory = new IrFactory();
-        ImmutableArray<CompilerCallablePreparation> targets = [
-            new CompilerCallablePreparation(
-                factory,
-                manifest.Callables[0],
-                [new CompilerPreparedClause(
-                    CompilerContractKind.Ensures,
-                    factory.Boolean(false),
-                    CompilerContractEvidence.CompilerBoundInvocation,
-                    "claim",
-                    null)],
-                [],
-                WorkerClaimReason.None,
-                CompilerPreparedBody.Trivial())
-        ];
         var response = WorkerResultAssembler.Create(
             new string('a', 64),
             manifest,
@@ -5266,22 +5008,19 @@ public sealed class WorkerTests
             VerificationCache.IsCacheable(
                 response,
                 response.InputHash,
-                manifest,
-                targets),
-            Is.False);
+                manifest),
+            Is.True);
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
                 "not-a-sha-256-hash",
-                manifest,
-                targets),
+                manifest),
             Is.False);
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
                 response.InputHash,
-                null!,
-                targets),
+                null!),
             Is.False);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
@@ -5291,8 +5030,7 @@ public sealed class WorkerTests
             VerificationCache.IsCacheable(
                 response,
                 response.InputHash,
-                manifest,
-                targets),
+                manifest),
             Is.True);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
@@ -5300,8 +5038,7 @@ public sealed class WorkerTests
             VerificationCache.IsCacheable(
                 response,
                 response.InputHash,
-                manifest,
-                targets),
+                manifest),
             Is.False);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
@@ -5311,8 +5048,7 @@ public sealed class WorkerTests
             VerificationCache.IsCacheable(
                 response,
                 response.InputHash,
-                manifest,
-                targets),
+                manifest),
             Is.False);
 
         response.ClaimResults[0].Reason = WorkerClaimReason.None;
@@ -5326,30 +5062,26 @@ public sealed class WorkerTests
             VerificationCache.IsCacheable(
                 response,
                 response.InputHash,
-                manifest,
-                targets),
+                manifest),
             Is.False);
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
                 new string('b', 64),
-                manifest,
-                targets),
+                manifest),
             Is.False);
         response.Errors = [];
         response.ClaimResults[0].Assumptions = [];
         Assert.That(VerificationCache.IsCacheable(
             response,
             response.InputHash,
-            manifest,
-            targets), Is.False);
+            manifest), Is.False);
 
         response.ClaimResults = [null!];
         Assert.That(VerificationCache.IsCacheable(
             response,
             response.InputHash,
-            manifest,
-            targets), Is.False);
+            manifest), Is.False);
     }
 
     [Test]
@@ -5422,140 +5154,6 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task CacheHitEnforcesALoweredByteBound()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        var cacheFile = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        request.Cache.MaximumBytes = new FileInfo(cacheFile).Length - 1;
-
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(
-                CacheFiles(project),
-                Is.Empty);
-        }
-    }
-
-    [TestCase("rollback")]
-    [TestCase("eviction")]
-    public async Task InterruptedCacheTransactionIsRecovered(string transactionKind)
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        var cacheFile = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        var artifact = cacheFile + "." +
-            Guid.NewGuid().ToString("N") + "." + transactionKind;
-        File.Move(cacheFile, artifact);
-
-        var recovered = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(recovered.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
-            Assert.That(File.Exists(cacheFile), Is.True);
-            Assert.That(File.Exists(artifact), Is.False);
-        }
-    }
-
-    [Test]
-    public async Task CacheHitEvictsOlderEntriesUnderTheActiveByteBound()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var firstRequest = project.CreateRequest(
-            cacheEnabled: true,
-            targetFramework: "net8.0-linux");
-        var secondRequest = project.CreateRequest(
-            cacheEnabled: true,
-            targetFramework: "net9.0-linux");
-        await worker.VerifyAsync(firstRequest);
-        var oldest = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        await worker.VerifyAsync(secondRequest);
-        var files = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json");
-        Assert.That(files, Has.Length.EqualTo(2));
-        var newest = files.Single(path => !string.Equals(
-            path,
-            oldest,
-            StringComparison.Ordinal));
-        File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
-        File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
-        secondRequest.Cache.MaximumBytes = new FileInfo(newest).Length;
-
-        var hit = await worker.VerifyAsync(secondRequest);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(hit.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(
-                CacheFiles(project),
-                Is.EqualTo(new[] { newest }));
-        }
-    }
-
-    [Test]
-    public async Task CanceledCachePublicationCannotBecomeALaterHit()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        var cacheHooks = new VerificationCacheTestHooks();
-        using var worker = new SharpProofWorker(backend, null, cacheHooks);
-        using var cancellation = new CancellationTokenSource();
-        cacheHooks.PathValidation = (_, path) =>
-        {
-            if (path.EndsWith(
-                    ".sharp-proof-cache.json",
-                    StringComparison.Ordinal) &&
-                File.Exists(path))
-            {
-                cancellation.Cancel();
-                cancellation.Token.ThrowIfCancellationRequested();
-            }
-        };
-        var canceled = await worker.VerifyAsync(request, cancellation.Token);
-        Assert.That(canceled.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
-        Assert.That(
-            CacheFiles(project),
-            Is.Empty);
-
-        var recoveredBackend = new SpuriousModelBackend();
-        using var recoveredWorker = new SharpProofWorker(recoveredBackend);
-        var recomputed = await recoveredWorker.VerifyAsync(request);
-        var cached = await recoveredWorker.VerifyAsync(request);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(recomputed.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
-            Assert.That(recoveredBackend.CallCount, Is.EqualTo(1));
-        }
-    }
-
-    [Test]
     public async Task CacheEvictionPreservesUnrelatedJsonFiles()
     {
         using var project = TestProject.Create(RefutationSource);
@@ -5569,176 +5167,6 @@ public sealed class WorkerTests
         await worker.VerifyAsync(request);
 
         Assert.That(File.Exists(unrelatedPath), Is.True);
-    }
-
-    [Test]
-    public async Task CacheEvictionPreservesUnownedSuffixMatches()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var firstRequest = project.CreateRequest(cacheEnabled: true);
-        var first = await worker.VerifyAsync(firstRequest);
-        Assert.That(
-            first.Summary.CacheStatus,
-            Is.EqualTo(WorkerCacheStatus.Written));
-        var owned = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        var maximumBytes = new FileInfo(owned).Length + 16;
-        File.Delete(owned);
-
-        Directory.CreateDirectory(project.CacheDirectory);
-        var unowned = new[]
-        {
-            Path.Combine(
-                project.CacheDirectory,
-                "important.sharp-proof-cache.json"),
-            Path.Combine(
-                project.CacheDirectory,
-                new string('A', 64) + ".sharp-proof-cache.json")
-        };
-        foreach (var path in unowned)
-        {
-            await File.WriteAllBytesAsync(
-                path,
-                new byte[maximumBytes]);
-        }
-
-        var request = project.CreateRequest(
-            cacheEnabled: true,
-            targetFramework: "net8.0-linux");
-        request.Cache.MaximumBytes = maximumBytes;
-        var response = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(response.Errors, Is.Empty);
-            Assert.That(unowned.Select(File.Exists), Is.All.True);
-        }
-    }
-
-    [Test]
-    public async Task CacheDirectoryLockMakesReadMissAndWriteUnavailable()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-
-        using var heldLock = new FileStream(
-            Path.Combine(project.CacheDirectory, ".sharp-proof-cache.lock"),
-            FileMode.OpenOrCreate,
-            FileAccess.ReadWrite,
-            FileShare.None);
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
-        }
-    }
-
-    [TestCase("entry")]
-    [TestCase("lock")]
-    public async Task ReparsePointCacheFailsClosedWithoutTouchingTarget(
-        string cacheKind)
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-
-        var (linkPath, externalName, externalContents) = cacheKind switch
-        {
-            "entry" => (
-                Directory.GetFiles(
-                    project.CacheDirectory,
-                    "*.sharp-proof-cache.json").Single(),
-                "external-cache.json",
-                "external cache target"),
-            "lock" => (
-                Path.Combine(project.CacheDirectory, ".sharp-proof-cache.lock"),
-                "external-lock",
-                "external lock target"),
-            _ => throw new ArgumentOutOfRangeException(nameof(cacheKind))
-        };
-        var external = Path.Combine(project.DirectoryPath, externalName);
-        await File.WriteAllTextAsync(external, externalContents);
-        File.Delete(linkPath);
-        if (!TryCreateFileSymbolicLink(linkPath, external))
-        {
-            Assert.Ignore("The host does not permit symbolic-link creation.");
-        }
-
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
-            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
-        }
-    }
-
-    [Test]
-    public async Task ReparsePointEvictionEntryFailsClosedWithoutDeletion()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
-        var external = Path.Combine(project.DirectoryPath, "external-eviction.json");
-        const string externalContents = "external eviction target";
-        await File.WriteAllTextAsync(external, externalContents);
-        Directory.CreateDirectory(project.CacheDirectory);
-        var cacheFile = Path.Combine(
-            project.CacheDirectory,
-            new string('b', 64) + ".sharp-proof-cache.json");
-        if (!TryCreateFileSymbolicLink(cacheFile, external))
-        {
-            Assert.Ignore("The host does not permit symbolic-link creation.");
-        }
-
-        using var worker = new SharpProofWorker(new SpuriousModelBackend());
-        var response = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
-            Assert.That(File.Exists(cacheFile), Is.True);
-            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
-            Assert.That(
-                Directory.GetFiles(
-                    project.CacheDirectory,
-                    "*.sharp-proof-cache.json"),
-                Is.EqualTo(new[] { cacheFile }));
-        }
-    }
-
-    [Test]
-    public async Task ReparsePointCacheDirectoryFailsClosedBeforeChildAccess()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var realDirectory = Path.Combine(project.DirectoryPath, "real-cache");
-        var aliasDirectory = Path.Combine(project.DirectoryPath, "cache-alias");
-        Directory.CreateDirectory(realDirectory);
-        if (!TryCreateDirectorySymbolicLink(aliasDirectory, realDirectory))
-        {
-            Assert.Ignore("The host does not permit symbolic-link creation.");
-        }
-
-        var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.Directory = aliasDirectory;
-        using var worker = new SharpProofWorker(new SpuriousModelBackend());
-        var response = await worker.VerifyAsync(request);
-
-        Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
-        Assert.That(Directory.GetFiles(realDirectory), Is.Empty);
     }
 
     [Test]
@@ -5792,36 +5220,6 @@ public sealed class WorkerTests
             Assert.That(
                 CacheFiles(project),
                 Has.Length.EqualTo(1));
-        }
-    }
-
-    [TestCase("outcome")]
-    [TestCase("manifest")]
-    [TestCase("model")]
-    public async Task RehashedCacheMissesAndRecomputesAfterMutation(
-        string mutationKind)
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        await RewriteRehashedCacheAsync(project, mutationKind);
-
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                first.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(
-                second.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(
-                second.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
         }
     }
 
@@ -6533,7 +5931,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task ProjectBoundaryIncludesManifestLoading()
+    public async Task ProjectBoundaryStopsBeforeSolving()
     {
         var sources = Enumerable.Range(0, 512)
             .Select(index => ($"Padding{index}.cs", $"internal sealed class Padding{index} {{ }}"))
@@ -6551,11 +5949,9 @@ public sealed class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
-            Assert.That(response.Manifest.Claims, Is.Empty);
-            Assert.That(response.ClaimResults, Is.Empty);
             Assert.That(
-                response.Errors.Select(static error => error.Code),
-                Does.Contain("worker.timeout"));
+                response.ClaimResults.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
@@ -6737,59 +6133,6 @@ public sealed class WorkerTests
         return Directory.Exists(project.CacheDirectory)
             ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
             : [];
-    }
-
-    private static async Task RewriteCachedClaimAsync(
-        TestProject project,
-        Action<JsonObject> mutate)
-    {
-        await RewriteCachedPayloadAsync(
-            project,
-            payload => mutate(payload["claimResults"]![0]!.AsObject()));
-    }
-
-    private static Task RewriteRehashedCacheAsync(
-        TestProject project,
-        string mutationKind)
-    {
-        return mutationKind switch
-        {
-            "outcome" => RewriteCachedClaimAsync(
-                project,
-                claim =>
-                {
-                    claim["outcome"] = nameof(WorkerClaimOutcome.Proven);
-                    claim["model"] = new JsonArray();
-                }),
-            "manifest" => RewriteCachedPayloadAsync(
-                project,
-                payload => payload["manifestHash"] = new string('c', 64)),
-            "model" => RewriteCachedClaimAsync(
-                project,
-                claim => claim["model"]![0]!["value"] = "not-an-integer"),
-            _ => throw new ArgumentOutOfRangeException(nameof(mutationKind))
-        };
-    }
-
-    private static async Task RewriteCachedPayloadAsync(
-        TestProject project,
-        Action<JsonObject> mutate)
-    {
-        var path = CacheFiles(project).Single();
-        var envelope = JsonNode.Parse(
-            await File.ReadAllTextAsync(path))!.AsObject();
-        var payload = JsonNode.Parse(
-            envelope["payload"]!.GetValue<string>())!.AsObject();
-        mutate(payload);
-        var payloadJson = payload.ToJsonString(
-            WorkerProtocolJson.Options);
-        envelope["payload"] = payloadJson;
-        envelope["payloadHash"] =
-            WorkerProtocolJson.ComputeSha256(
-                System.Text.Encoding.UTF8.GetBytes(payloadJson));
-        await File.WriteAllTextAsync(
-            path,
-            envelope.ToJsonString(WorkerProtocolJson.Options));
     }
 
     private static WorkerSourceLocation TestLocation()
@@ -7381,186 +6724,6 @@ public sealed class WorkerTests
         }
     }
 
-    [Test]
-    public async Task ArtifactAuthorityRejectsFabricatedProofCoreAndUsedFlag()
-    {
-        using var project = TestProject.Create(BoundedIdentitySubjectSource);
-        var request = project.CreateRequest(cacheEnabled: false);
-        var snapshot = WorkerInputSnapshot.Load(
-            request,
-            WorkerCacheIdentity.Current,
-            CancellationToken.None);
-        var assumptionId = snapshot.CompilerManifest.Callables.Single()
-            .Clauses.First(static clause =>
-                clause.Kind == CompilerContractKind.Assume)
-            .AssumptionId;
-        var (response, authority) =
-            await VerifyAndValidateArtifactAuthorityAsync(
-                request,
-                new CapturingBackend(BackendCheckResult.Unsatisfiable([0])));
-
-        var result = response.ClaimResults.Single();
-        var originalCore = result.ProofCore.ToArray();
-        result.ProofCore = ["fabricated:999"];
-        AssertArtifactAuthorityError(
-            response, authority, "response.proof_core_authority");
-
-        result.ProofCore = originalCore;
-        var usedAssumption = result.Assumptions.Single(
-            assumption => assumption.Kind == WorkerAssumptionKind.UserAssume &&
-                assumption.Id == assumptionId);
-        usedAssumption.Used = !usedAssumption.Used;
-        AssertArtifactAuthorityError(
-            response, authority, "response.assumption_usage_authority");
-    }
-
-    [TestCase("variable")]
-    [TestCase("kind")]
-    [TestCase("value")]
-    public async Task ArtifactAuthorityBindsRefutedModelRows(string mutation)
-    {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static int Positive(int value) {
-                    Contract.Ensures(Contract.Result<int>() > 0);
-                    return value;
-                }
-            }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        var (response, authority) =
-            await VerifyAndValidateArtifactAuthorityAsync(
-                request,
-                new SpuriousModelBackend());
-
-        var row = response.ClaimResults.Single().Model.Single();
-        switch (mutation)
-        {
-            case "variable":
-                row.Variable = "parameter:999";
-                break;
-            case "kind":
-                row.Kind = nameof(IrValueKind.Boolean);
-                row.Value = "false";
-                break;
-            default:
-                row.Value = "01";
-                break;
-        }
-
-        AssertArtifactAuthorityError(
-            response, authority, "response.model_authority");
-    }
-
-    [TestCase("kind")]
-    [TestCase("capability")]
-    [TestCase("throw-hierarchy")]
-    public async Task ArtifactAuthorityBindsRefutedEffectWitness(string mutation)
-    {
-        using var project = TestProject.Create(AllocationSubjectSource);
-        var request = project.CreateRequest(cacheEnabled: false);
-        var (response, authority) =
-            await VerifyAndValidateArtifactAuthorityAsync(
-                request,
-                new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var witness = response.ClaimResults.Single().EffectWitness!;
-        switch (mutation)
-        {
-            case "kind":
-                witness.Kind = "managed-array-allocation";
-                break;
-            case "capability":
-                witness.Capabilities = WorkerEffectCapabilitySet.Reflection;
-                break;
-            default:
-                witness.ExactExceptionTypeHierarchy = ["System.Exception"];
-                witness.Effects |= WorkerEffectSet.Throws;
-                break;
-        }
-
-        AssertArtifactAuthorityError(
-            response, authority, "response.effect_witness_authority");
-    }
-
-    [Test]
-    public async Task ArtifactAuthorityBindsVacuityAndEntryCore()
-    {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static int Impossible() {
-                    Contract.Requires(false);
-                    Contract.Ensures(Contract.Result<int>() > 0);
-                    return 0;
-                }
-            }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        var (response, authority) =
-            await VerifyAndValidateArtifactAuthorityAsync(
-                request,
-                new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var result = response.ClaimResults.Single();
-        result.Vacuity = WorkerVacuityKind.None;
-        AssertArtifactAuthorityError(
-            response, authority, "response.vacuity_authority");
-
-        result.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
-        result.ProofCore = ["assume:0"];
-        AssertArtifactAuthorityError(
-            response, authority, "response.proof_core_authority");
-    }
-
-    private static void AssertArtifactAuthorityError(
-        WorkerVerifyResponse response,
-        CompilerResponseEvidenceAuthority authority,
-        string expectedCode)
-    {
-        var validation = WorkerProtocolJson.Validate(
-            response, response.InputHash, response.Manifest, authority);
-        Assert.That(
-            validation.Errors.Select(static error => error.Code),
-            Does.Contain(expectedCode));
-    }
-
-    private static CompilerResponseEvidenceAuthority CreateResponseAuthority(
-        WorkerVerifyRequest request)
-    {
-        var artifact = CompilerManifestArtifactJson.Deserialize(
-            File.ReadAllText(request.CompilerManifest.Path));
-        return new CompilerResponseEvidenceAuthority(
-            CompilerManifestArtifactJson.DecodeCallables(artifact));
-    }
-
-    private static async Task<(
-        WorkerVerifyResponse Response,
-        CompilerResponseEvidenceAuthority Authority)>
-        VerifyAndValidateArtifactAuthorityAsync(
-            WorkerVerifyRequest request,
-            ISmtBackend backend)
-    {
-        using var worker = new SharpProofWorker(backend);
-        var response = await worker.VerifyAsync(request);
-        var authority = CreateResponseAuthority(request);
-        var validation = WorkerProtocolJson.Validate(
-            response,
-            response.InputHash,
-            response.Manifest,
-            authority);
-        Assert.That(
-            validation.IsValid,
-            Is.True,
-            string.Join(
-                Environment.NewLine,
-                validation.Errors.Select(static error => error.Code)));
-        return (response, authority);
-    }
-
     private static void SetDeclaredMaxStack(
         string path,
         string methodName,
@@ -7603,27 +6766,6 @@ public sealed class WorkerTests
         bytes[methodBodyOffset + 2] = (byte)declaredMaxStack;
         bytes[methodBodyOffset + 3] = (byte)(declaredMaxStack >> 8);
         File.WriteAllBytes(path, bytes);
-    }
-
-    private static async Task WriteNullModuleReferenceRowAsync(
-        WorkerVerifyRequest request)
-    {
-        var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(request.CompilerManifest.Path));
-        var reference = artifact.Compilation.References[0];
-        reference.Kind = "Module";
-        reference.Identity = reference.Modules[0].Name;
-        reference.EmbedInteropTypes = false;
-        reference.Aliases = [];
-        reference.Modules = [null!];
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation,
-            artifact.CompilerDiagnostics,
-            artifact.MaximumExpressionDepth);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(
-            CompilerManifestArtifactJson.SerializeValidated(artifact));
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 = WorkerProtocolJson.ComputeSha256(bytes);
     }
 
     private sealed class TestProject : IDisposable

@@ -76,12 +76,9 @@ are all replay-validated `Refuted` enter the content-addressed disk cache.
 Cache keys include protocol, semantics, tool identity and canonical packaged
 worker runtime-closure digest, target framework, the exact closed compiler
 artifact and lowered IR, budgets, spec versions, and a canonical digest of the
-complete trusted spec content. Cache schema version 13 revalidates the stored
-payload against the complete current manifest, reconstructs each supported
-scalar model, checks entry assumptions and source ranges, and repeats
-whole-body replay. Proven claims, effect claims, and unsupported models are not
-cached. Strict `require-proven` runs do not consume or write this local
-semantic cache.
+complete trusted spec content. Cache schema version 14 checks the stored
+manifest hash and reuses complete `Proven`/`Refuted` postcondition results;
+effect claims and `Unknown` outcomes are not cached.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and
 reasons, and [Analysis limits](analysis-limits.md) for configured and fixed

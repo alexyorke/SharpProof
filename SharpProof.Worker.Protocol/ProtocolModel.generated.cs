@@ -15,7 +15,7 @@ public static class WorkerProtocolVersions
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 13;
+    public const int Current = 14;
 }
 
 public static class WorkerManifestVersions

@@ -245,7 +245,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 12, cache schema version 13,
+The active contract also fixes protocol version 12, cache schema version 14,
 claim-manifest schema version 4, compiler artifact schema version 18,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
@@ -268,8 +268,7 @@ failure, containment failure, and infrastructure failure make the run `Failed`
 and fail the build under every policy.
 
 Only exact-manifest, complete, postcondition-only project responses whose
-claims are all replay-validated `Refuted` can enter the semantic cache. Every
-cache hit reconstructs its scalar models and repeats whole-body replay. See
+claims are all `Proven` or `Refuted` can enter the semantic cache. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
 Postcondition replay validation has two layers: exact backend-model and

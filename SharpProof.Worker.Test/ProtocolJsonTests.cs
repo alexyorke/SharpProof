@@ -291,7 +291,7 @@ public sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("12"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(14));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(
                 document.RootElement.EnumerateObject()
@@ -1453,8 +1453,8 @@ public sealed class ProtocolJsonTests
         var proven = CreateResponse(CreateManifest());
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Miss, true);
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Disabled, false);
-        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Hit, false);
-        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, false);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Hit, true);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, true);
 
         var inactiveRequest = CreateRequest();
         inactiveRequest.Cache.Enabled = false;
@@ -1464,8 +1464,8 @@ public sealed class ProtocolJsonTests
 
         var provenOnlyRequest = CreateRequest();
         provenOnlyRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, true);
-        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Miss, false);
+        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Hit, true);
+        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, false);
 
         var refuted = CreateResponse(CreateManifest());
         refuted.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
@@ -1473,7 +1473,7 @@ public sealed class ProtocolJsonTests
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Hit, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Written, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Unavailable, true);
-        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, false);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, true);
 
         var unknown = CreateResponse(CreateManifest());
         SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);

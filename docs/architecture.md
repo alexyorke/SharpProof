@@ -219,13 +219,11 @@ successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.
-Cache schema version 13 stores only complete, postcondition-only, all-refuted
-semantic payloads. A hit is accepted only when its manifest hash and complete
-result set match the current manifest and every canonical Boolean/integer model
-can be reconstructed against the hydrated callable. The worker rechecks entry
-assumptions and source ranges, then independently executes the whole body and
-postcondition before reuse. Proven claims, effect claims, and unsupported
-models are not cacheable.
+Cache schema version 14 stores complete, postcondition-only responses whose
+claims are all `Proven` or `Refuted`. The key already binds the compiler
+artifact, worker binary, spec content, and budgets, so a hit whose manifest
+hash matches is reused as-is. `Unknown` outcomes and effect claims are not
+cacheable.
 
 During container verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
@@ -317,7 +315,7 @@ Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
 remain noncacheable. Under compiler artifact schema 18, worker protocol version
-12 and cache schema version 13 carry the current request and cache wire break.
+12 and cache schema version 14 carry the current request and cache wire break.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the
 same atomic publication boundary and does not participate in semantic

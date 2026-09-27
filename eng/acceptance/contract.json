@@ -72,7 +72,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 13,
+    "schemaVersion": 14,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -377,7 +377,6 @@
           "SharpProof.Ir/IrProgramCallHostExecution.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
           "SharpProof.CompilerArtifact/CompilerEffectViolationAuthority.cs",
-          "SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs",
           "SharpProof.Worker/CallableCounterexampleReplayer.cs",
           "SharpProof.Worker/EffectCounterexampleReplayer.cs"
         ]
@@ -604,10 +603,7 @@
           "eng/RoslynSymbolFacts.cs",
           "SharpProof.CompilerArtifact/CompilerCaptureAuthority.cs",
           "SharpProof.CompilerArtifact/CompilerDependencyEvidenceFormatter.cs",
-          "SharpProof.CompilerArtifact/CompilerFeatureScopeFingerprint.cs",
-          "SharpProof.CompilerArtifact/CompilerModelValues.cs",
           "SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs",
-          "SharpProof.CompilerArtifact/CompilerSourceRebinding.cs",
           "SharpProof.CompilerArtifact/CompilerSpecificationPackAuthority.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSummarySignature.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",

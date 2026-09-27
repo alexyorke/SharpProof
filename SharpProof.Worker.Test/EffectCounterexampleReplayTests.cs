@@ -238,45 +238,6 @@ public sealed class EffectCounterexampleReplayTests
         }
     }
 
-    [Test]
-    public void ResponseAuthorityRejectsAllocationOnlyEnforcePureRefutation()
-    {
-        var fixture = CreateFixture(
-            CompilerEffectReplayEventKind.ManagedObjectAllocation);
-        fixture.Evidence.ContractKind =
-            WorkerEffectContractKind.EnforcePure;
-        AssertAllocationReplayUnknown(fixture);
-
-        var response = new WorkerVerifyResponse
-        {
-            CallableResults = [new WorkerCallableResult
-            {
-                CallableId = fixture.Target.Entry.CallableId,
-                Assumptions = fixture.Target.Entry.Assumptions
-            }],
-            ClaimResults = [new WorkerClaimResult
-            {
-                ClaimId = fixture.Evidence.ClaimId,
-                Outcome = WorkerClaimOutcome.Refuted,
-                Reason = WorkerClaimReason.None,
-                EffectCertainty =
-                    WorkerEffectEvidenceCertainty.DefiniteViolation,
-                ProofCore = [],
-                Model = [],
-                EffectWitness = fixture.Evidence.Witness,
-                Assumptions = fixture.Target.Entry.Assumptions
-            }]
-        };
-        var errors = new CompilerResponseEvidenceAuthority(
-                [fixture.Target])
-            .Validate(response)
-            .ToArray();
-
-        Assert.That(
-            errors,
-            Does.Contain("response.effect_witness_authority"));
-    }
-
     private static void AssertAllocationReplayUnknown(
         ReplayFixture fixture)
     {
@@ -586,8 +547,7 @@ public sealed class EffectCounterexampleReplayTests
                 VerificationCache.IsCacheable(
                     response,
                     response.InputHash,
-                    manifest,
-                    [fixture.Target]),
+                    manifest),
                 Is.False);
         }
     }

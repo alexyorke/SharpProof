@@ -25,20 +25,6 @@ internal static class CompilerSourceLocationAuthority
         return WorkerProtocolJson.IsNoneLocation(value);
     }
 
-    internal static bool HasValidLineMap(
-        CompilerSyntaxTreeSnapshot? tree,
-        CancellationToken cancellationToken = default)
-    {
-        return TryValidateLineMap(
-            tree,
-            sourceStart: null,
-            sourceLength: 0,
-            out _,
-            out _,
-            out _,
-            cancellationToken);
-    }
-
     private static bool TryValidateLineMap(
         CompilerSyntaxTreeSnapshot? tree,
         int? sourceStart,

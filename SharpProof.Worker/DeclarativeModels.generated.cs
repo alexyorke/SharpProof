@@ -105,13 +105,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
 internal sealed partial class VerificationCache
 {
-    private sealed partial record CacheEnvelope(
+    private sealed partial record CacheEntry(
         int SchemaVersion,
         string InputHash,
-        string PayloadHash,
-        string Payload
-    );
-    private sealed partial record CachePayload(
         string ManifestHash,
         WorkerCallableResult[] CallableResults,
         WorkerClaimResult[] ClaimResults

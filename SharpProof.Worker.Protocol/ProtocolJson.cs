@@ -220,19 +220,6 @@ public static partial class WorkerProtocolJson
             null);
     }
 
-    internal static WorkerProtocolValidationResult Validate(
-        WorkerVerifyResponse? response, string expectedInputHash,
-        WorkerClaimManifest? expectedManifest,
-        IWorkerResponseEvidenceAuthority evidenceAuthority,
-        CancellationToken cancellationToken = default)
-    {
-        RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
-        _ = ArgumentNullGuard.NotNull(evidenceAuthority, nameof(evidenceAuthority));
-        return ValidateResponse(
-            response, expectedInputHash, expectedManifest, null, null, null,
-            evidenceAuthority: evidenceAuthority,
-            cancellationToken: cancellationToken);
-    }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
@@ -246,38 +233,13 @@ public static partial class WorkerProtocolJson
             expectedManifest,
             expectedRequest,
             expectedVersions,
-            terminationGraceMilliseconds,
-            null,
-            default);
-    }
-
-    internal static WorkerProtocolValidationResult ValidateForRequest(
-        WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
-        WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
-        WorkerVersionSummary expectedVersions,
-        IWorkerResponseEvidenceAuthority evidenceAuthority,
-        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
-        CancellationToken cancellationToken = default)
-    {
-        _ = ArgumentNullGuard.NotNull(evidenceAuthority, nameof(evidenceAuthority));
-        return ValidateForRequestCore(
-            response,
-            expectedRequestHash,
-            expectedInputHash,
-            expectedManifest,
-            expectedRequest,
-            expectedVersions,
-            terminationGraceMilliseconds,
-            evidenceAuthority,
-            cancellationToken);
+            terminationGraceMilliseconds);
     }
 
     private static WorkerProtocolValidationResult ValidateForRequestCore(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
-        WorkerVersionSummary expectedVersions, int terminationGraceMilliseconds,
-        IWorkerResponseEvidenceAuthority? evidenceAuthority,
-        CancellationToken cancellationToken)
+        WorkerVersionSummary expectedVersions, int terminationGraceMilliseconds)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
@@ -302,7 +264,7 @@ public static partial class WorkerProtocolJson
         return ValidateResponse(
             response, expectedInputHash, expectedManifest,
             expectedRequestHash, expectedRequest, expectedVersions,
-            maximumElapsedMilliseconds, evidenceAuthority, cancellationToken);
+            maximumElapsedMilliseconds);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -357,9 +319,7 @@ public static partial class WorkerProtocolJson
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
         WorkerVersionSummary? expectedVersions,
-        long? maximumElapsedMilliseconds = null,
-        IWorkerResponseEvidenceAuthority? evidenceAuthority = null,
-        CancellationToken cancellationToken = default)
+        long? maximumElapsedMilliseconds = null)
     {
         var errors = new Validator();
         if (response == null)
@@ -408,7 +368,7 @@ public static partial class WorkerProtocolJson
             response.ClaimResults,
             manifestIndexes,
             errors,
-            out var allClaimResultsRefuted);
+            out var allClaimResultsDecided);
         ValidateRun(
             response,
             callables,
@@ -447,29 +407,9 @@ public static partial class WorkerProtocolJson
                 response,
                 expectedRequest,
                 allCallableResultsComplete,
-                allClaimResultsRefuted,
+                allClaimResultsDecided,
                 allManifestClaimsPostconditions,
                 errors);
-        }
-
-        if (evidenceAuthority != null)
-        {
-            try
-            {
-                foreach (var code in evidenceAuthority.Validate(response, cancellationToken)
-                             .Where(static code => !string.IsNullOrWhiteSpace(code))
-                             .Distinct(s_ordinal))
-                {
-                    errors.Add(code);
-                }
-            }
-            catch (Exception exception) when (
-                exception is ArgumentException or InvalidDataException or
-                InvalidOperationException or KeyNotFoundException or
-                NullReferenceException)
-            {
-                errors.Add("response.evidence_authority");
-            }
         }
 
         return errors.Result;
@@ -479,7 +419,7 @@ public static partial class WorkerProtocolJson
         WorkerVerifyResponse response,
         WorkerVerifyRequest request,
         bool allCallableResultsComplete,
-        bool allClaimResultsRefuted,
+        bool allClaimResultsDecided,
         bool allManifestClaimsPostconditions,
         Validator errors)
     {
@@ -488,9 +428,7 @@ public static partial class WorkerProtocolJson
             return;
         }
         var status = response.Summary.CacheStatus;
-        var inactive = !request.Cache.Enabled ||
-            request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
-        if (inactive)
+        if (!request.Cache.Enabled)
         {
             errors.Check(status == WorkerCacheStatus.Disabled,
                 "response.cache_request_mismatch");
@@ -506,7 +444,7 @@ public static partial class WorkerProtocolJson
             ClaimResults: { Length: > 0 }
         } &&
             allCallableResultsComplete &&
-            allClaimResultsRefuted &&
+            allClaimResultsDecided &&
             allManifestClaimsPostconditions;
         var valid = status switch
         {
@@ -514,8 +452,7 @@ public static partial class WorkerProtocolJson
             WorkerCacheStatus.Rejected =>
                 response.RunStatus == WorkerRunStatus.Failed &&
                 response.FailureReason == WorkerRunFailureReason.MalformedResult,
-            WorkerCacheStatus.Miss => !storableShape,
-            WorkerCacheStatus.Unavailable => true,
+            WorkerCacheStatus.Miss or WorkerCacheStatus.Unavailable => true,
             WorkerCacheStatus.Disabled =>
                 response.RunStatus != WorkerRunStatus.Complete,
             _ => false
@@ -716,17 +653,18 @@ public static partial class WorkerProtocolJson
         WorkerClaimResult[]? values,
         ManifestIdentityIndexes manifestIndexes,
         Validator errors,
-        out bool allResultsRefuted)
+        out bool allResultsDecided)
     {
         var valid = ValidateResultSet(values,
             manifestIndexes.Claims.Select(static value => value.ClaimId),
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
-        allResultsRefuted = values is { Length: > 0 } &&
+        allResultsDecided = values is { Length: > 0 } &&
             valid.Length == values.Length;
         foreach (var value in valid)
         {
-            allResultsRefuted &= value.Outcome == WorkerClaimOutcome.Refuted;
+            allResultsDecided &= value.Outcome is
+                WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted;
             ValidateClaimResult(value, manifestIndexes, errors);
         }
 

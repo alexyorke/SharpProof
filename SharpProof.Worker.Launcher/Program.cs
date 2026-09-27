@@ -20,27 +20,6 @@ internal static class Program
     private const string RefutedContractDiagnosticCode =
         VerifierDiagnosticCodes.RefutedContract;
 
-    private static IrValue? ReplayRegisteredSpecCall(
-        CompilerCallablePreparation target,
-        IrCallInstruction call,
-        IrValue? receiver,
-        ImmutableArray<IrValue> arguments)
-    {
-        if (target.Body is not { } body ||
-            !body.SpecCalls.TryGetValue(call.Id, out var prepared))
-        {
-            return null;
-        }
-
-        return ApiSpecReplayCallHost.TryInvoke(
-            target.Factory,
-            prepared.CallIdentity,
-            prepared.WitnessIdentifier,
-            call,
-            receiver,
-            arguments);
-    }
-
     internal static async Task<int> Main(string[] args)
     {
         if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
@@ -81,7 +60,6 @@ internal static class Program
         byte[] artifactBytes;
         string expectedInputHash;
         WorkerVersionSummary expectedVersions;
-        CompilerResponseEvidenceAuthority responseAuthority;
         WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
@@ -112,9 +90,6 @@ internal static class Program
             expectedVersions = ComputeExpectedVersions(
                 runtimeSnapshot,
                 workerVersion.ProductVersion);
-            responseAuthority = new CompilerResponseEvidenceAuthority(
-                CompilerManifestArtifactJson.DecodeCallables(artifact),
-                ReplayRegisteredSpecCall);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
@@ -217,7 +192,6 @@ internal static class Program
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse,
             arguments.TerminationGraceMilliseconds,
-            responseAuthority,
             exitCode);
         if (!validResponse)
         {
@@ -229,7 +203,6 @@ internal static class Program
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse,
                 arguments.TerminationGraceMilliseconds,
-                responseAuthority,
                 exitCode);
         }
         if (validResponse)
@@ -237,7 +210,7 @@ internal static class Program
             try
             {
                 PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
-                    expectedVersions, validatedResponse!, responseAuthority);
+                    expectedVersions, validatedResponse!);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
@@ -450,7 +423,6 @@ internal static class Program
         WorkerVersionSummary? expectedVersions,
         out bool validResponse, out WorkerVerifyResponse? validatedResponse,
         int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
-        IWorkerResponseEvidenceAuthority? responseAuthority = null,
         int? workerExitCode = null)
     {
         validResponse = false;
@@ -473,16 +445,6 @@ internal static class Program
         if (expectedManifest == null || expectedInputHash == null)
         {
             validation = WorkerProtocolJson.Validate(response);
-        }
-        else if (responseAuthority is { } authority)
-        {
-            validation = WorkerProtocolJson.ValidateForRequest(
-                response, WorkerProtocolJson.ComputeRequestHash(request),
-                expectedInputHash, expectedManifest, request,
-                expectedVersions ?? throw new InvalidOperationException(
-                    "Expected runtime provenance is unavailable."),
-                authority,
-                terminationGraceMilliseconds);
         }
         else
         {
@@ -690,8 +652,7 @@ internal static class Program
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
-        WorkerVerifyResponse response,
-        IWorkerResponseEvidenceAuthority responseAuthority)
+        WorkerVerifyResponse response)
     {
         if (arguments.PublishRequestPath == null)
         {
@@ -714,7 +675,6 @@ internal static class Program
                 response, response.RequestHash, expectedInputHash,
                 artifact.Manifest, request,
                 expectedVersions,
-                responseAuthority,
                 arguments.TerminationGraceMilliseconds).IsValid)
         {
             throw new IOException("The worker response binding is invalid.");
@@ -1254,8 +1214,6 @@ internal sealed partial class LauncherArguments
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path);
         artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        CompilerSourceRebinding.Validate(artifact);
         return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
     }
 

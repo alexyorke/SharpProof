@@ -10,7 +10,6 @@ public sealed class SharpProofWorker : IDisposable
     private readonly Func<ISmtBackend>? _backendFactory;
     private readonly uint? _configuredQueryRlimit;
     private readonly Func<long>? _readConsumedResourceCount;
-    private readonly VerificationCacheTestHooks? _cacheTestHooks;
     private readonly Channel<byte>? _injectedBackendRunGate;
     private bool _disposed;
     // An injected backend cannot be renewed after interruption.  Once a run
@@ -18,22 +17,14 @@ public sealed class SharpProofWorker : IDisposable
     // potentially poisoned instance to a later request.
     private bool _injectedBackendPoisoned;
     public SharpProofWorker(ISmtBackend backend) : this(
-        backend, ReadResources(backend), null)
+        backend, ReadResources(backend))
     {
     }
     internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount)
-        : this(backend, readConsumedResourceCount, null)
-    {
-    }
-    internal SharpProofWorker(
-        ISmtBackend backend,
-        Func<long>? readConsumedResourceCount,
-        VerificationCacheTestHooks? cacheTestHooks)
     {
         ArgumentNullException.ThrowIfNull(backend);
         _backend = backend;
         _readConsumedResourceCount = readConsumedResourceCount;
-        _cacheTestHooks = cacheTestHooks;
         _injectedBackendRunGate = CreateInjectedBackendRunGate();
     }
     internal SharpProofWorker(Func<ISmtBackend> backendFactory)
@@ -195,9 +186,6 @@ public sealed class SharpProofWorker : IDisposable
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
             var manifest = snapshot.CompilerManifest.Manifest;
-            var responseAuthority = new CompilerResponseEvidenceAuthority(
-                targets,
-                CallableCounterexampleReplayer.ReplayRegisteredSpecCall);
             WorkerVerifyResponse Assemble(WorkerRunStatus status, WorkerRunFailureReason reason,
                 IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
                 WorkerCacheStatus resultCacheStatus, IEnumerable<WorkerProtocolError>? errors = null)
@@ -234,7 +222,6 @@ public sealed class SharpProofWorker : IDisposable
                 var cached = await cache.TryReadAsync(
                     snapshot.InputHash,
                     manifest,
-                    targets,
                     request.Budgets,
                     projectBoundary.Token).ConfigureAwait(false);
                 projectBoundary.Token.ThrowIfCancellationRequested();
@@ -250,9 +237,7 @@ public sealed class SharpProofWorker : IDisposable
                     if (WorkerProtocolJson.Validate(
                             cachedResponse,
                             snapshot.InputHash,
-                            manifest,
-                            responseAuthority,
-                            projectBoundary.Token).IsValid)
+                            manifest).IsValid)
                     {
                         return cachedResponse;
                     }
@@ -430,9 +415,7 @@ public sealed class SharpProofWorker : IDisposable
             var responseValidation = WorkerProtocolJson.Validate(
                 response,
                 snapshot.InputHash,
-                manifest,
-                responseAuthority,
-                projectBoundary.Token);
+                manifest);
             if (!responseValidation.IsValid)
             {
                 var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
@@ -446,9 +429,7 @@ public sealed class SharpProofWorker : IDisposable
             if (cache != null && VerificationCache.IsCacheable(
                     response,
                     snapshot.InputHash,
-                    manifest,
-                    targets,
-                    projectBoundary.Token))
+                    manifest))
             {
                 var written = await cache.TryWriteAsync(
                     response, snapshot.InputHash, manifest, projectBoundary.Token).ConfigureAwait(false);
@@ -498,10 +479,10 @@ public sealed class SharpProofWorker : IDisposable
         return gate;
     }
 
-    private VerificationCache? CreateCacheIfEnabled(
+    private static VerificationCache? CreateCacheIfEnabled(
         WorkerVerifyRequest request, string projectDirectory, out WorkerCacheStatus status)
     {
-        if (!request.Cache.Enabled || request.VerifyPolicy == WorkerVerifyPolicy.RequireProven)
+        if (!request.Cache.Enabled)
         {
             status = WorkerCacheStatus.Disabled;
             return null;
@@ -514,8 +495,7 @@ public sealed class SharpProofWorker : IDisposable
                 projectDirectory);
             return new VerificationCache(
                 directory,
-                request.Cache.MaximumBytes,
-                _cacheTestHooks);
+                request.Cache.MaximumBytes);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
         {
