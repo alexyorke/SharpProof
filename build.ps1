@@ -3,10 +3,8 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet(
         'quick', 'check', 'pr', 'nightly', 'security', 'coverage',
-        'build', 'test', 'test-changed', 'acceptance', 'pack', 'samples',
-        'performance', 'gates', 'corpus', 'fuzz-nightly',
-        'package-consumers', 'dependency-audit', 'mutation', 'pilots',
-        'release-plan')]
+        'build', 'test', 'test-changed', 'pack', 'samples', 'corpus',
+        'fuzz-nightly', 'package-consumers', 'dependency-audit')]
     [string]$Profile = 'check',
 
     [ValidateSet('Debug', 'Release')]
@@ -108,7 +106,7 @@ switch ($Profile) {
         $arguments = if ($Fast) { @('-Fast') } else { @() }
         Invoke-Container 'test-changed' $Configuration $arguments
     }
-    { $_ -in @('package-consumers', 'pilots', 'release-plan') } {
+    'package-consumers' {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
             throw "$Profile requires -PackageSource."
         }

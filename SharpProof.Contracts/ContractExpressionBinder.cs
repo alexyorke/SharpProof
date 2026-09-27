@@ -157,10 +157,6 @@ internal readonly struct ExpressionBindingResult(
         return new(null, failure, ImmutableHashSet<IrVarId>.Empty);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Unsupported binding result is an immutable failure sentinel.")]
     internal static ExpressionBindingResult Unsupported
     {
         get;

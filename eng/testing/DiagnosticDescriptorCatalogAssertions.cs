@@ -28,8 +28,7 @@ internal static class DiagnosticDescriptorCatalogAssertions
                 output.GetProperty("name").GetString()),
             Is.EqualTo([
                 "analyzer",
-                "contractForGenerator",
-                "metaAnalyzer"
+                "contractForGenerator"
             ]));
         var output = outputs.Single(candidate =>
             candidate.GetProperty("name").GetString() == outputName);

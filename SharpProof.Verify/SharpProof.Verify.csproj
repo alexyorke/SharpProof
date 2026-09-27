@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" />
@@ -11,8 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />
-    <InternalsVisibleTo Include="SharpProof.Fuzz" />
     <InternalsVisibleTo Include="SharpProof.Verify.Test" />
-    <InternalsVisibleTo Include="SharpProof.Worker" />
   </ItemGroup>
 </Project>

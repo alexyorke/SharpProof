@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
     <DefineConstants>$(DefineConstants);SHARPPROOF_HOST_INVOCATION_TOKENS</DefineConstants>
   </PropertyGroup>
   <ItemGroup>

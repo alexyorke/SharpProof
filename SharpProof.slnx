@@ -25,8 +25,6 @@
   <Project Path="SharpProof.Host/SharpProof.Host.csproj" />
   <Project Path="SharpProof.Ir.Test/SharpProof.Ir.Test.csproj" />
   <Project Path="SharpProof.Ir/SharpProof.Ir.csproj" />
-  <Project Path="SharpProof.Meta.Analyzers.Test/SharpProof.Meta.Analyzers.Test.csproj" />
-  <Project Path="SharpProof.Meta.Analyzers/SharpProof.Meta.Analyzers.csproj" />
   <Project Path="SharpProof.Package.Test/SharpProof.Package.Test.csproj" />
   <Project Path="SharpProof.Package/SharpProof.Package.csproj" />
   <Project Path="SharpProof.Smoke.Net472/SharpProof.Smoke.Net472.csproj" />

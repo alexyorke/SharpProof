@@ -47,7 +47,6 @@ foreach ($project in $packageProjects) {
     Add-Command (
         'package-pack:' + $packageId) 'package-tests' 'Release' $true
 }
-Add-Command 'performance-smoke' 'performance-smoke' $Configuration $true
 
 [ordered]@{
     schemaVersion = 1

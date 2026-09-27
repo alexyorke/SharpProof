@@ -36,8 +36,6 @@ $TimeoutSeconds = Resolve-SharpProofSolutionTestTimeoutSeconds `
     -WasSpecified $PSBoundParameters.ContainsKey('TimeoutSeconds')
 $parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
-$architectureParallelRunSettings = Join-Path `
-    $repositoryRoot 'eng/test/architecture-parallel.runsettings'
 $semanticSolutionFilter = Join-Path `
     $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
 $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
@@ -144,60 +142,6 @@ foreach ($priorTimingPath in $(if ($Fast) {
 $mainParallelism = [Math]::Max(
     1,
     [Math]::Floor($parallelism / 2))
-$architectureClassPrefix = 'SharpProof.ArchitectureTest.'
-$architectureCoverageHotspot =
-    $architectureClassPrefix +
-    'CoverageScriptTests.AuthenticatedCoverageRejectsReportMutations'
-$architectureFixtures = @(
-    'AcceptanceScriptTests',
-    'ArchitectureTests',
-    'BoundaryEnforcementTests',
-    'BuildSchedulingTests',
-    'ChangedTestSelectionTests',
-    'ContainedPathAuthorityTests',
-    'ContainerAuthorityScriptTests',
-    'ContainerSourceCleanlinessTests',
-    'CoverageScriptTests',
-    'DeclarativeModelGenerationTests',
-    'DependencyAutomationTests',
-    'DevCheckCommandPlanTests',
-    'DocumentationSupportContractTests',
-    'FuzzRunnerEvidenceTests',
-    'FuzzRunnerEvidenceProcessSafetyTests',
-    'GeneratedCodeAnalysisConfigurationTests',
-    'GeneratedFileHelperTests',
-    'LoopScriptCaseSensitivityTests',
-    'NativeTestBootstrapTests',
-    'OpenCodePluginDependencyTests',
-    'PackageDependencyAuthorityTests',
-    'PilotAuthorityTests',
-    'ProcessRunnerTests',
-    'ProductionInventoryAuthorityTests',
-    'PublicationDestinationAuthorityTests',
-    'PublicationPlanIdentityTests',
-    'PublicationPlanTopologyTests',
-    'ReleaseAuthorityClosureTests',
-    'ReleaseConfigurationScriptTests',
-    'ReleaseCoverageBaselineTests',
-    'ReleaseJsonAuthorityTests',
-    'ReleaseQualificationMatrixTests',
-    'ReleaseTagValidationTests',
-    'ReleaseVersionAuthorityTests',
-    'SharedTestInfrastructureTests',
-    'StandaloneGateEvidenceTests',
-    'VerifierPublicationTransactionTests'
-)
-$architectureFixtureSlots = @{
-    BoundaryEnforcementTests = 4
-    CoverageScriptTests = 8
-    DocumentationSupportContractTests = 4
-    PackageDependencyAuthorityTests = 4
-    ProductionInventoryAuthorityTests = 8
-    PublicationDestinationAuthorityTests = 4
-    PublicationPlanIdentityTests = 4
-    ReleaseAuthorityClosureTests = 8
-    ReleaseCoverageBaselineTests = 8
-}
 $architectureShardingEnabled =
     $ArchitectureOnly -or (
         -not $coverageEnabled -and
@@ -310,54 +254,16 @@ if (-not $ArchitectureOnly) {
     }
 }
 if ($architectureShardingEnabled) {
-    $architectureProject = Join-Path $repositoryRoot (
-        'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
-    foreach ($fixture in $architectureFixtures) {
-        if ($fixture -ceq 'CoverageScriptTests') {
-            $tasks.Add([pscustomobject]@{
-                Name = 'architecture-coveragescripttests-hotspot'
-                Target = $architectureProject
-                Filter = "(FullyQualifiedName~$architectureCoverageHotspot)&(" +
-                    $semanticFilter + ')'
-                ProjectParallelism = 0
-                IsolateOutput = $false
-                Slots = [Math]::Min($parallelism, 8)
-                RunSettings = $architectureParallelRunSettings
-                DefaultEstimatedMilliseconds = 20000L
-            })
-            $tasks.Add([pscustomobject]@{
-                Name = 'architecture-coveragescripttests-remainder'
-                Target = $architectureProject
-                Filter = '(FullyQualifiedName~' + $architectureClassPrefix +
-                    $fixture + ".)&(FullyQualifiedName!~$architectureCoverageHotspot)&(" +
-                    $semanticFilter + ')'
-                ProjectParallelism = 0
-                IsolateOutput = $false
-                Slots = [Math]::Min($parallelism, 8)
-                RunSettings = $architectureParallelRunSettings
-                DefaultEstimatedMilliseconds = 20000L
-            })
-            continue
-        }
-        $requestedSlots = if (
-            $architectureFixtureSlots.ContainsKey($fixture)) {
-            [int]$architectureFixtureSlots[$fixture]
-        }
-        else {
-            1
-        }
-        $slots = [Math]::Min($parallelism, $requestedSlots)
-        $tasks.Add([pscustomobject]@{
-            Name = 'architecture-' + $fixture.ToLowerInvariant()
-            Target = $architectureProject
-            Filter = '(FullyQualifiedName~' + $architectureClassPrefix +
-                $fixture + '.)&(' + $semanticFilter + ')'
-            ProjectParallelism = 0
-            IsolateOutput = $false
-            Slots = $slots
-            DefaultEstimatedMilliseconds = [long]($requestedSlots * 10000)
-        })
-    }
+    $tasks.Add([pscustomobject]@{
+        Name = 'architecture'
+        Target = Join-Path $repositoryRoot (
+            'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
+        Filter = $semanticFilter
+        ProjectParallelism = 0
+        IsolateOutput = $false
+        Slots = 1
+        DefaultEstimatedMilliseconds = 10000L
+    })
 }
 foreach ($task in $tasks) {
     $task | Add-Member -NotePropertyName EstimatedMilliseconds `

@@ -66,16 +66,8 @@ public sealed record EffectSummary
             (throws, termination, completeness, uncertainty, analysisIncompleteReason);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Immutable EffectSummary value singleton with get-only state.")]
     public static EffectSummary Bottom { get; } = new(true);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Immutable EffectSummary value singleton with get-only state.")]
     public static EffectSummary Empty
     {
         get;
@@ -85,10 +77,6 @@ public sealed record EffectSummary
         EffectThrowSet.Empty, EffectTermination.Terminates,
         EffectCompleteness.Complete);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Immutable EffectSummary value singleton with get-only state.")]
     public static EffectSummary Top
     {
         get;
@@ -163,10 +151,6 @@ public sealed record EffectSummary
 
 public sealed class EffectSummaryDomain : ClosedAbstractDomain<EffectSummary>
 {
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "EffectSummaryDomain has no mutable instance state.")]
     public static EffectSummaryDomain Instance { get; } = new();
 
     private EffectSummaryDomain()

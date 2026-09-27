@@ -34,7 +34,7 @@ Worker                -> CompilerArtifact, Dataflow, Host, Ir, Smt, Specs,
 Worker.Launcher       -> CompilerArtifact, Host, Ir, Specs, Worker.Protocol
 ```
 
-Build-only references to `SharpProof.Meta.Analyzers` are omitted. Frontend's
+Frontend's
 Attributes edge has `ReferenceOutputAssembly=false`; it establishes build
 order so the exact Attributes assembly identity can be embedded without adding
 a runtime assembly dependency. The architecture suite compares every direct

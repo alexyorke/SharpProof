@@ -60,7 +60,7 @@ public sealed class UserAssumedJustification(SourceLocationId location) : ProofJ
 
 public sealed class Assumption
 {
-    internal Assumption(
+    public Assumption(
         IrFactory factory,
         IrTerm predicate,
         ProofJustification justification)
@@ -82,8 +82,9 @@ public sealed class Assumption
 
 public sealed partial class Goal
 {
-    internal static Goal CreateInternalConsistency(IrFactory factory)
+    public static Goal CreateInternalConsistency(IrFactory factory)
     {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         return new(
             factory,
             factory.Boolean(false),

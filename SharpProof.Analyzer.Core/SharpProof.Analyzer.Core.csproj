@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
-    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
     <AssemblyName>SharpProof.Analyzer.Core</AssemblyName>
     <RootNamespace>SharpProof</RootNamespace>
   </PropertyGroup>

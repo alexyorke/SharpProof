@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Reflection;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -255,9 +254,6 @@ public sealed class PostconditionObligationBuilderTests
         IrTerm predicate,
         ProofJustification justification)
     {
-        return (Assumption)typeof(Assumption)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single()
-            .Invoke([factory, predicate, justification]);
+        return new Assumption(factory, predicate, justification);
     }
 }

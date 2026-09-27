@@ -117,10 +117,6 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
     }
 
     public static EffectThrowSet Empty => default;
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Unknown throw-set singleton stores no mutable membership cache.")]
     public static EffectThrowSet Unknown { get; } = new([], true);
 
     public ImmutableArray<INamedTypeSymbol> Types => _types.IsDefault ? [] : _types;

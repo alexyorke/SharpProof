@@ -31,7 +31,6 @@
     "SharpProof.Ir/IrModel.generated.cs",
     "SharpProof.Ir/IrOperatorCatalog.generated.cs",
     "SharpProof.Ir/IrPrinterProjections.generated.cs",
-    "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs",
     "SharpProof.Specs/DeclarativeModels.generated.cs",
     "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
     "SharpProof.Specs/RelationalSpecPackCatalog.generated.cs",

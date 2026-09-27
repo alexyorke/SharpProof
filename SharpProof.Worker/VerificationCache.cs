@@ -16,10 +16,6 @@ internal sealed partial class VerificationCache(
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Capacity comparer is a stateless immutable ordering singleton.")]
     private static readonly Comparer<(
         DateTime LastWriteTimeUtc,
         string Name)> CapacityPriorityComparer = Comparer<(

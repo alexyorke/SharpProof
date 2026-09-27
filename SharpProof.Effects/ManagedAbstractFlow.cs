@@ -1875,10 +1875,6 @@ internal sealed class ManagedAbstractFlow
 
     private sealed class FlowDomain : CanonicalAbstractDomain<ManagedFlowState>
     {
-        [System.Diagnostics.CodeAnalysis.SuppressMessage(
-            "SharpProof.Soundness",
-            "SPMETA002",
-            Justification = "ManagedFlowState.FlowDomain has no mutable instance state.")]
         internal static FlowDomain Instance { get; } = new();
         public override ManagedFlowState Bottom => ManagedFlowState.Bottom;
         public override ManagedFlowState Top => ManagedFlowState.Top;
@@ -2321,10 +2317,6 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow, IMethodSymbol?
 internal sealed class ManagedFlowState
 {
     private static readonly ManagedKeyComparer Comparer = ManagedKeyComparer.Instance;
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "NoValues is an empty immutable dictionary sentinel with no object keys or mutable entries.")]
     private static readonly ImmutableDictionary<object, ManagedAbstractValue> NoValues =
         ImmutableDictionary.Create<object, ManagedAbstractValue>(Comparer);
     private readonly ImmutableDictionary<object, ManagedAbstractValue>? _values;
@@ -2338,20 +2330,8 @@ internal sealed class ManagedFlowState
         _hasUntrackedAlias = hasUntrackedAlias;
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "ManagedFlowState instances are immutable canonical value sentinels.")]
     internal static ManagedFlowState Bottom { get; } = new(null);
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "ManagedFlowState instances are immutable canonical value sentinels.")]
     internal static ManagedFlowState Empty { get; } = new(NoValues);
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "ManagedFlowState instances are immutable canonical value sentinels.")]
     internal static ManagedFlowState Top { get; } = new(NoValues, hasUntrackedAlias: true);
     internal bool IsBottom => _values == null;
 

@@ -1,5 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <PackageReference Include="Polly" Version="8.7.0" />
-  </ItemGroup>
-</Project>

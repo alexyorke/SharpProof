@@ -80,7 +80,6 @@
                         '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Ir.Test' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Specs.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
@@ -90,8 +89,7 @@
              Link="RepositoryRoot.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Specs.Test' OR
@@ -101,7 +99,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Gates.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
@@ -119,7 +116,6 @@
                         '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Effects.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Fuzz' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Specs.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Testing' OR
@@ -129,7 +125,6 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Fuzz' OR
-                            '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers.Test' OR
                             '$(MSBuildProjectName)' == 'SharpProof.Testing'">
     <DefineConstants>$(DefineConstants);SHARPPROOF_PLATFORM_REFERENCES_ONLY</DefineConstants>
   </PropertyGroup>
@@ -162,8 +157,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers.Test'">
+                        '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\DiagnosticDescriptorCatalogAssertions.cs"
              Link="DiagnosticDescriptorCatalogAssertions.cs" />
   </ItemGroup>

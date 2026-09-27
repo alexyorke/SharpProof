@@ -26,9 +26,4 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(SharpProofUsesMetaAnalyzer)' == 'true'">
-    <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
-  </ItemGroup>
 </Project>

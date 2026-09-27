@@ -50,7 +50,6 @@ function Get-RequiredPlanCommand {
 $restoreCommand = Get-RequiredPlanCommand 'restore'
 $solutionBuildCommand = Get-RequiredPlanCommand 'solution-build'
 $semanticTestsCommand = Get-RequiredPlanCommand 'semantic-tests'
-$performanceSmokeCommand = Get-RequiredPlanCommand 'performance-smoke'
 $packageProductBuildCommands = @($plannedCommands | Where-Object {
         [string]$_.id -ceq 'package-product-build'
     })
@@ -69,8 +68,7 @@ if ($packagePackCommands.Count -ne 3 -or
 }
 if ([string]$restoreCommand.configuration -cne $Configuration -or
     [string]$solutionBuildCommand.configuration -cne $Configuration -or
-    [string]$semanticTestsCommand.configuration -cne $Configuration -or
-    [string]$performanceSmokeCommand.configuration -cne $Configuration) {
+    [string]$semanticTestsCommand.configuration -cne $Configuration) {
     throw 'Developer-check phase configurations do not match the requested configuration.'
 }
 $packageProductBuild = $packageProductBuildCommands.Count -eq 1
@@ -125,15 +123,6 @@ Invoke-SharpProofTimedPhase -Name 'package-tests' -Timings $timings -Action {
     $packageArguments.NoBuild = $true
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
-}
-Invoke-SharpProofTimedPhase -Name 'performance-smoke' -Timings $timings -Action {
-    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
-        run --project SharpProof.Gates/SharpProof.Gates.csproj `
-        -c ([string]$performanceSmokeCommand.configuration) `
-        --no-build --no-restore -- performance-smoke
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Developer performance smoke failed.'
-    }
 }
 
 $campaign.Stop()

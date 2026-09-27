@@ -76,10 +76,6 @@ internal static class ContractForSymbolMatcher
     {
         internal IMethodSymbol? Method { get; } = method;
         internal ContractBindingFailure Failure { get; } = failure;
-        [System.Diagnostics.CodeAnalysis.SuppressMessage(
-            "SharpProof.Soundness",
-            "SPMETA002",
-            Justification = "None companion resolution is an immutable value sentinel.")]
         internal static CompanionResolution None { get; } = new(null, ContractBindingFailure.None);
         internal static CompanionResolution Success(IMethodSymbol method)
         {

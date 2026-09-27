@@ -98,9 +98,8 @@ The implementation remains the authority for enumerated surfaces:
 
 | Document | Status | Role |
 |---|---|---|
-| [Exhaustive code-usefulness audit](code-usefulness-audit.md) | Dated evidence | Records the fixed 838-file baseline, line-level coverage ledger, accepted cleanup, rejected leads, metrics, and validation. |
-| [Acceptance contract](../eng/acceptance/README.md) | Active | Defines the release checks for the 1.0 preview. |
-| [Release gates](../SharpProof.Gates/README.md) | Active | Documents the corpus, metamorphic, performance, and cancellation runners. |
+| [Release process](../eng/release/README.md) | Active | Describes how packages are packed, consumer-tested, and published. |
+| [Release gates](../SharpProof.Gates/README.md) | Active | Documents the analyzer corpus snapshot gate. |
 | [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
 | [2026-08-08 relational interprocedural verification](soundness-notes/2026-08-08-relational-interprocedural-verification.md) | Dated evidence | Records the bounded source, exact implementation-IL, and audited-pack relation boundary and its executable evidence. |
 | [2026-07-30 allocation effect replay](soundness-notes/2026-07-30-allocation-effect-replay.md) | Dated evidence | Records the independently interpreted allocation-effect refutation boundary and executable evidence. |
@@ -174,14 +173,8 @@ stable 1.0 governance is separate. Current behavior and limits are recorded in
 
 ## Maintenance
 
-Markdown is hand-maintained. `scripts/Test-SharpProofReadme.ps1` validates
-code-derived versions, acceptance-contract versions, configuration values,
-diagnostics, API-spec IDs, worker properties, protocol enums, local links,
-anchors, XML and PowerShell fences, line endings, and BOM policy; the analyzer
-test suite compiles every maintained C# fence. The script does not
-generate these files. When behavior changes, update the relevant source-owned
-table first, then update the coverage, diagnostic, limit, or reason reference
-that mirrors it. Dated soundness notes remain subject to link and file-format
-checks but are excluded from current-version drift checks. Archived agent notes
-under eng/agent-notes/archive/ are historical audit material and are not an
-active work queue.
+Markdown is hand-maintained; the analyzer test suite compiles every maintained
+C# fence. When behavior changes, update the relevant source-owned table first,
+then update the coverage, diagnostic, limit, or reason reference that mirrors
+it. Dated soundness notes are historical and are not updated for later
+versions.

@@ -2,10 +2,6 @@ namespace SharpProof.Ir;
 
 public sealed class IrProgramBuilder(IrFactory factory)
 {
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "SharpProof.Soundness",
-        "SPMETA002",
-        Justification = "Every reference uses Interlocked.Increment(ref s_nextScope).")]
     private static long s_nextScope;
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));

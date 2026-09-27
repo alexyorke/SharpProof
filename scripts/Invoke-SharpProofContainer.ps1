@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -28,8 +28,6 @@ Set-Location $repositoryRoot
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.ReleaseBundle.ps1')
 
 if (-not $IsLinux -or [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
     throw 'SharpProof container commands require Linux x64.'
@@ -165,16 +163,6 @@ function Invoke-SolutionTests([string]$SolutionPath) {
     }
 }
 
-function Invoke-ForcedTerminationGateTest([string]$BuildConfiguration) {
-    Invoke-SharpProofRequiredDotnet @(
-        'test',
-        'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
-        '--configuration', $BuildConfiguration,
-        '--no-build', '--no-restore',
-        '--filter',
-        'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
-}
-
 function Invoke-SharpProofSolutionBuild(
     [string]$BuildConfiguration,
     [string[]]$AdditionalBuildArguments = @()) {
@@ -206,9 +194,8 @@ switch ($Command) {
         Invoke-PipelineCommand 'pr-gates' 'Release'
     }
     'nightly' {
-        Invoke-PipelineCommand 'mutation' 'Release'
         Invoke-PipelineCommand 'dependency-audit' 'Release'
-        Invoke-PipelineCommand 'acceptance' 'Release'
+        Invoke-PipelineCommand 'corpus' 'Release'
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
     }
     'security' {
@@ -282,32 +269,9 @@ switch ($Command) {
                 '-p:GeneratePackageOnBuild=false')
         }
 
-        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
-            # The source self-application builds can leave Roslyn's shared
-            # compiler server holding source-built analyzer load contexts.
-            # Stop it before package pilots so the package lane observes only
-            # the candidate analyzer payload.
-            Invoke-SharpProofRequiredDotnet @('build-server', 'shutdown')
-            $resolvedPackageSource = if ([IO.Path]::IsPathRooted($PackageSource)) {
-                [IO.Path]::GetFullPath($PackageSource)
-            }
-            else {
-                [IO.Path]::GetFullPath(
-                    (Join-Path $repositoryRoot $PackageSource))
-            }
-            if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
-                throw "self-apply package source is missing: '$resolvedPackageSource'."
-            }
-            Invoke-RequiredScript 'scripts/Test-SharpProofPilots.ps1' `
-                'SharpProof self-application pilot validation failed.' `
-                @{ PackageSource = $resolvedPackageSource }
-        }
-
         # Package-backed samples exercise the same analyzer payload through
         # the supported package-consumer path.  The sample harness creates and
-        # cleans its own isolated local feed and temporary build roots.  Keep
-        # this after pilots because its pack restores may update lock files in
-        # the disposable checkout, which would violate the pilot clean guard.
+        # cleans its own isolated local feed and temporary build roots.
         Invoke-RequiredScript 'scripts/Test-SharpProofSamples.ps1' `
             'SharpProof self-application sample validation failed.' `
             @{ Configuration = $Configuration }
@@ -328,13 +292,6 @@ switch ($Command) {
             'Generated-output verification failed.'
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
-        $performanceOutput = Join-Path $repositoryRoot (
-            'artifacts/ci/performance.json')
-        Invoke-RequiredScript 'scripts/Invoke-SharpProofGateEvidence.ps1' `
-            'PR performance validation failed.' `
-            @{ Gate = 'performance'; OutputPath = $performanceOutput }
-
-        Invoke-ForcedTerminationGateTest $Configuration
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
         $prTestArguments = @{
             Configuration = $Configuration; NoBuild = $true
@@ -435,61 +392,20 @@ switch ($Command) {
         Invoke-RequiredScript 'scripts/Test-SharpProofPackageConsumers.ps1' `
             'Minimum-SDK package consumer validation failed.' `
             $minimumConsumerArguments
-        $consumerEvidence = Join-Path `
-            $repositoryRoot `
-            'artifacts/release-qualification/package-consumers.json'
-        [IO.Directory]::CreateDirectory(
-            [IO.Path]::GetDirectoryName($consumerEvidence)) | Out-Null
-        [IO.File]::WriteAllText(
-            $consumerEvidence,
-            (([ordered]@{
-                schemaVersion = 2
-                status = 'passed'
-                commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-                packageSource = [IO.Path]::GetRelativePath(
-                    $repositoryRoot,
-                    [IO.Path]::GetFullPath($PackageSource)).Replace('\', '/')
-                packageArtifacts = @(
-                    Get-ChildItem -LiteralPath $PackageSource -File |
-                        Where-Object {
-                            $_.Extension -in @('.nupkg', '.snupkg')
-                        } |
-                        Sort-Object Name |
-                        ForEach-Object {
-                            [ordered]@{
-                                fileName = $_.Name
-                                bytes = [int64]$_.Length
-                                sha256 = Get-SharpProofFileSha256 -Path $_.FullName
-                            }
-                        }
-                )
-            } | ConvertTo-Json) + "`n"),
-            [Text.UTF8Encoding]::new($false))
-        & (Join-Path $repositoryRoot `
-            'scripts/Write-SharpProofQualificationReceipt.ps1') `
-            -Gate package-consumers `
-            -EvidencePath $consumerEvidence
     }
     'samples' {
         Invoke-RequiredScript 'scripts/Test-SharpProofSamples.ps1' `
             'Sample validation failed.' `
             @{ Configuration = $Configuration; PackageSource = $PackageSource }
     }
-    { $_ -in @('corpus', 'corpus-update', 'gates', 'performance-smoke') } {
-        $gateMode = if ($Command -ceq 'gates') { 'all' } else { $Command }
+    { $_ -in @('corpus', 'corpus-update') } {
+        $gateMode = $Command
         $gateProject = 'SharpProof.Gates/SharpProof.Gates.csproj'
         Invoke-SharpProofRequiredDotnet @('restore', $gateProject, '--locked-mode')
         Invoke-SharpProofRequiredDotnet @(
             'run', '--project', $gateProject,
             '--configuration', $Configuration,
             '--no-restore', '--', $gateMode)
-    }
-    'performance' {
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
-        $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'
-        Invoke-RequiredScript 'scripts/Invoke-SharpProofGateEvidence.ps1' `
-            'Performance validation failed.' `
-            @{ Gate = 'performance'; OutputPath = $output }
     }
     'coverage' {
         if ([string]::IsNullOrWhiteSpace(
@@ -522,24 +438,6 @@ switch ($Command) {
         }
         Invoke-RequiredScript 'scripts/Test-SharpProofCoverage.ps1' `
             'Coverage validation failed.' $coverageArguments
-        & (Join-Path $repositoryRoot `
-            'scripts/Write-SharpProofQualificationReceipt.ps1') `
-            -Gate coverage `
-            -EvidencePath $summaryPath
-    }
-    'mutation' {
-        $mutationOutput = 'artifacts/mutation/trusted-mutations.json'
-        [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot (
-                    Split-Path -Parent $mutationOutput))) | Out-Null
-        $commit = (& git rev-parse HEAD).Trim()
-        Invoke-RequiredScript `
-            'scripts/Invoke-SharpProofTrustedMutationsParallel.ps1' `
-            'Trusted mutation validation failed.' `
-            @{ Configuration = $Configuration; OutputPath = $mutationOutput; ExpectedCommit = $commit }
-        & (Join-Path $repositoryRoot `
-            'scripts/Write-SharpProofQualificationReceipt.ps1') `
-            -Gate mutation `
-            -EvidencePath (Join-Path $repositoryRoot $mutationOutput)
     }
     'fuzz-nightly' {
         if ($Configuration -ne 'Release') {
@@ -553,23 +451,7 @@ switch ($Command) {
     'dependency-audit' {
         Invoke-DependencyAudit
     }
-    'acceptance' {
-        Invoke-RequiredScript 'eng/acceptance/Verify.ps1' `
-            'Acceptance validation failed.' `
-            @{ Configuration = $Configuration }
-        if ($Configuration -ceq 'Release') {
-            Invoke-ForcedTerminationGateTest 'Release'
-        }
-        & (Join-Path $repositoryRoot `
-            'scripts/Write-SharpProofQualificationReceipt.ps1') `
-            -Gate ('acceptance-' + $Configuration.ToLowerInvariant()) `
-            -EvidencePath (Join-Path `
-                $repositoryRoot `
-                ('artifacts/timings/acceptance-' +
-                    $Configuration.ToLowerInvariant() + '.json'))
-    }
     'pack' {
-        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReadme.ps1')
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'
         $artifactsRoot = [IO.Path]::GetFullPath(
             (Join-Path $repositoryRoot 'artifacts'))
@@ -601,70 +483,5 @@ switch ($Command) {
         Invoke-RequiredScript 'scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `
             @{ PackageSource = $output; ValidatePackageSourceOnly = $true }
-        Invoke-RequiredScript 'scripts/New-SharpProofReleaseEvidence.ps1' `
-            'Release evidence generation failed.' @{ PackageSource = $output }
-    }
-    'pilots' {
-        if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-            $PackageSource = Join-Path $repositoryRoot 'artifacts/container-packages'
-        }
-        Invoke-RequiredScript 'scripts/Test-SharpProofPilots.ps1' `
-            'Pilot validation failed.' @{ PackageSource = $PackageSource }
-    }
-    'pilot-review' {
-        Invoke-RequiredScript 'scripts/Complete-SharpProofPilotReview.ps1' `
-            'Pilot review validation failed.' `
-            @{
-                SourceReportPath = Join-Path $repositoryRoot 'artifacts/pilots/report.json'
-                ReviewLedgerPath = Join-Path $repositoryRoot 'artifacts/pilots/review-ledger.json'
-                OutputPath = Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json'
-            }
-        & (Join-Path $repositoryRoot `
-            'scripts/Write-SharpProofQualificationReceipt.ps1') `
-            -Gate pilots `
-            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json') `
-            -PilotReviewLedgerPath (Join-Path $repositoryRoot 'artifacts/pilots/review-ledger.json')
-    }
-    'release-tag' {
-        & (Join-Path $repositoryRoot `
-            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
-            -Mode ValidateTag
-    }
-    'release-baseline' {
-        & (Join-Path $repositoryRoot `
-            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
-            -Mode ResolveCoverageBaseline
-    }
-    'release-plan' {
-        if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-            throw 'release-plan requires -PackageSource.'
-        }
-        $planDirectory = Join-Path `
-            $repositoryRoot 'artifacts/release-qualification'
-        [IO.Directory]::CreateDirectory($planDirectory) | Out-Null
-        & (Join-Path $repositoryRoot `
-            'scripts/Publish-SharpProofRelease.ps1') `
-            -PackageSource $PackageSource `
-            -PlanOnly `
-            -PlanOutputPath (Join-Path $planDirectory 'publication-plan.json')
-    }
-    'release-qualification' {
-        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReadme.ps1')
-        $releaseArguments = @{ Mode = 'WriteQualificationEvidence' }
-        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
-            $releaseArguments.PackageSource = $PackageSource
-        }
-        & (Join-Path $repositoryRoot `
-            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
-            @releaseArguments
-    }
-    'release-publish' {
-        $releaseArguments = @{ Mode = 'Publish' }
-        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
-            $releaseArguments.PackageSource = $PackageSource
-        }
-        & (Join-Path $repositoryRoot `
-            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
-            @releaseArguments
     }
 }

@@ -571,7 +571,7 @@ internal sealed partial class SharpProofAnalyzerEngine
     }
 
     // Decomposed deliberately: ToDisplayString and other string-based symbol
-    // identity are banned in this layer (RS0030 / SPMETA001), so the namespace
+    // identity are banned in this layer (RS0030), so the namespace
     // is matched structurally rather than compared against
     // ContractApiMetadata.AttributesNamespace as a string.
     private static bool IsSharpProofAttributesNamespace(

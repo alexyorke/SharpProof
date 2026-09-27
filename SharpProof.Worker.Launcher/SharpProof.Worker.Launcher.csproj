@@ -4,7 +4,6 @@
     <TargetFramework>net9.0</TargetFramework>
     <StartupHookSupport>false</StartupHookSupport>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />

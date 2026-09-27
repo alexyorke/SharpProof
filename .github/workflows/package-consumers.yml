@@ -1,4 +1,4 @@
-name: Package, consumers, and release qualification
+name: Package, consumers, and release
 
 on:
   push:
@@ -7,19 +7,6 @@ on:
       - "v*"
   pull_request:
   workflow_dispatch:
-    inputs:
-      pilot_review_source_run_id:
-        description: >-
-          Successful tag-push run ID containing the pilot report and exact packages.
-          Leave both review inputs blank for a non-release run.
-        required: false
-        type: string
-      pilot_review_ledger:
-        description: >-
-          JSON from the completed review-ledger template. Required with the source
-          run ID to resume release qualification.
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -41,97 +28,36 @@ jobs:
       contents: read
 
   package:
-    name: Pack exact container artifacts
+    name: Pack container artifacts
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
+      - name: Check the tag matches the checked-in package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          prefix="$(sed -n 's:.*<SharpProofVersionPrefix>\(.*\)</SharpProofVersionPrefix>.*:\1:p' SharpProof.Release.props)"
+          template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' SharpProof.Release.props)"
+          version="${template//\$(SharpProofVersionPrefix)/$prefix}"
+          test "v${version}" = "${GITHUB_REF_NAME}"
+
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
 
-      - name: Validate the original pilot-review source run
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN_ID: ${{ inputs.pilot_review_source_run_id }}
-          EXPECTED_SHA: ${{ github.sha }}
-          EXPECTED_TAG: ${{ github.ref_name }}
-          GH_REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          if [[ ! "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
-            echo "The pilot-review source run ID must be a positive integer." >&2
-            exit 1
-          fi
-          source_run="$(gh api "repos/$GH_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
-          workflow_id="$(gh api "repos/$GH_REPOSITORY/actions/workflows/package-consumers.yml" --jq .id)"
-          jq -e \
-            --arg sha "$EXPECTED_SHA" \
-            --arg tag "$EXPECTED_TAG" \
-            --arg workflow_id "$workflow_id" \
-            '.head_sha == $sha and .head_branch == $tag and
-             .event == "push" and .conclusion == "success" and
-             (.workflow_id | tostring) == $workflow_id' \
-            <<<"$source_run" >/dev/null
+      - name: Pack and validate the package graph
+        run: docker compose run --rm tooling pack -Configuration Release
 
-      - name: Download the reviewed run's exact package bytes
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: pilot-review-packages-${{ github.sha }}
-          path: artifacts/container-packages
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.pilot_review_source_run_id }}
-          github-token: ${{ github.token }}
-
-      - name: Validate release tag and checked-in version in-container
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: >-
-          docker compose run --rm
-          -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_SHA
-          tooling release-tag
-
-      - name: Pack, inventory, and validate the exact graph
-        if: >-
-          github.event_name != 'workflow_dispatch' ||
-          inputs.pilot_review_source_run_id == '' ||
-          inputs.pilot_review_ledger == ''
-        run: >-
-          docker compose run --rm tooling pack
-          -Configuration Release
-
-      - name: Upload exact NuGet artifacts
+      - name: Upload NuGet artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
           path: artifacts/container-packages/*
           if-no-files-found: error
           overwrite: true
-
-      - name: Upload reusable exact packages for pilot review
-        if: >-
-          github.event_name == 'push' &&
-          startsWith(github.ref, 'refs/tags/v') &&
-          github.repository == 'alexyorke/SharpProof'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pilot-review-packages-${{ github.sha }}
-          path: artifacts/container-packages/*
-          if-no-files-found: error
-          overwrite: true
-          retention-days: 90
 
   container-verifier:
     name: Canonical Linux analyzer and verifier consumers
@@ -150,25 +76,9 @@ jobs:
           -Configuration Release
           -PackageSource nupkgs
 
-      - name: Upload package-consumer qualification evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: package-consumer-qualification-${{ github.run_id }}-${{ github.sha }}
-          path: |
-            artifacts/release-qualification/package-consumers.json
-            artifacts/release-qualification/qualification-receipts/package-consumers.json
-          if-no-files-found: error
-          overwrite: true
-
   portable-consumers:
-    name: Portable exact-package consumer (${{ matrix.os }})
-    if: >-
-      ((github.event_name == 'push') ||
-       (github.event_name == 'workflow_dispatch' &&
-        inputs.pilot_review_source_run_id != '' &&
-        inputs.pilot_review_ledger != '')) &&
-      startsWith(github.ref, 'refs/tags/v') &&
-      github.repository == 'alexyorke/SharpProof'
+    name: Portable package consumer (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: package
     strategy:
       fail-fast: false
@@ -187,286 +97,57 @@ jobs:
         with:
           name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
           path: nupkgs
-      - name: Run portable-consumer against exact packages
+      - name: Run the portable consumer against the packed packages
         run: >-
           pwsh scripts/Test-SharpProofPortableConsumer.ps1
           -PackageSource nupkgs -OsFamily ${{ matrix.family }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: portable-receipt-${{ matrix.family }}-${{ github.run_id }}-${{ github.sha }}
-          path: artifacts/release-qualification
-          if-no-files-found: error
-          overwrite: true
 
-  release-qualification:
-    name: Qualify the exact release SHA in-container
-    outputs:
-      qualified: ${{ steps.mark-qualified.outputs.qualified }}
+  publish:
+    name: Publish packages
+    concurrency:
+      group: sharpproof-publish-${{ github.ref_name }}
+      cancel-in-progress: false
     if: >-
-      ((github.event_name == 'push') ||
-       (github.event_name == 'workflow_dispatch' &&
-        inputs.pilot_review_source_run_id != '' &&
-        inputs.pilot_review_ledger != '')) &&
       startsWith(github.ref, 'refs/tags/v') &&
       github.repository == 'alexyorke/SharpProof'
     needs:
+      - security
       - package
       - container-verifier
-      - security
       - portable-consumers
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-
-      - name: Download package-consumer qualification evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: package-consumer-qualification-${{ github.run_id }}-${{ github.sha }}
-          path: artifacts/release-qualification
-
-      - name: Download the original unreviewed pilot report
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: pilot-review-report-${{ github.sha }}
-          path: .
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.pilot_review_source_run_id }}
-          github-token: ${{ github.token }}
-
-      - name: Write the submitted pilot-review ledger
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        env:
-          PILOT_REVIEW_LEDGER: ${{ inputs.pilot_review_ledger }}
-        run: |
-          pwsh -NoLogo -NoProfile -Command '
-            $path = Join-Path $PWD "artifacts/pilots/review-ledger.json"
-            [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path)) | Out-Null
-            [IO.File]::WriteAllText($path, $env:PILOT_REVIEW_LEDGER, [Text.UTF8Encoding]::new($false))
-          '
-
-      - name: Require an annotated exact tag in-container
-        run: >-
-          docker compose run --rm
-          -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_SHA
-          tooling release-tag
-
-      - name: Resolve the allowlisted release coverage baseline in-container
-        run: >-
-          docker compose run --rm
-          -e GITHUB_REF_NAME -e GITHUB_SHA
-          tooling release-baseline
-
-      - name: Export the container-resolved coverage baseline
-        run: cat artifacts/release-qualification/coverage.env >> "$GITHUB_ENV"
-
-      - name: Run exact-commit acceptance
-        run: >-
-          docker compose run --rm tooling acceptance
-          -Configuration Release
-
-      - name: Run exact-commit Debug solution gate
-        run: >-
-          docker compose run --rm tooling acceptance
-          -Configuration Debug
-
-      - name: Certify live release configuration
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          pwsh ./scripts/Test-SharpProofReleaseConfiguration.ps1
-          -OutputPath artifacts/release-qualification/release-configuration.json
-
-      - name: Bind release-configuration receipt
-        run: >-
-          pwsh ./scripts/Write-SharpProofQualificationReceipt.ps1
-          -Gate release-configuration
-          -EvidencePath artifacts/release-qualification/release-configuration.json
-
-      - name: Download portable OS receipts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: portable-receipt-*-${{ github.run_id }}-${{ github.sha }}
-          path: artifacts/release-qualification
-          merge-multiple: true
-
-      - name: Run exact-commit trusted mutations
-        run: >-
-          docker compose run --rm tooling mutation
-          -Configuration Release
-
-      - name: Enforce full release-delta coverage
-        run: >-
-          docker compose run --rm
-          -e SHARPPROOF_COVERAGE_COMPARISON_REF
-          tooling coverage -Configuration Release
-
-      - name: Run five exact-package pilots
-        if: github.event_name == 'push'
-        run: >-
-          docker compose run --rm tooling pilots
-          -PackageSource nupkgs
-
-      - name: Create the pilot-review ledger template
-        if: github.event_name == 'push'
-        run: >-
-          pwsh scripts/New-SharpProofPilotReviewLedger.ps1
-          -SourceReportPath artifacts/pilots/report.json
-          -OutputPath artifacts/pilots/review-ledger.template.json
-
-      - name: Upload the pilot-review handoff
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pilot-review-report-${{ github.sha }}
-          path: |
-            artifacts/pilots/report.json
-            artifacts/pilots/review-ledger.template.json
-            eng/pilots/*/obj/Release/net8.0/SharpProof/request.json
-            eng/pilots/*/obj/Release/net8.0/SharpProof/result.json
-            eng/pilots/*/obj/Release/net8.0/SharpProof/compiler-manifest.json
-            eng/pilots/*/obj/Release/net8.0/SharpProof/result.sarif
-          if-no-files-found: error
-          overwrite: true
-          retention-days: 90
-
-      - name: Explain the human pilot-review handoff
-        if: github.event_name == 'push'
-        env:
-          SOURCE_RUN_ID: ${{ github.run_id }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_SHA: ${{ github.sha }}
-        run: |
-          {
-            echo "## Human pilot review required"
-            echo
-            echo "The pilot report is unreviewed, so this run did not qualify or publish the release."
-            echo "Download the `pilot-review-report-${RELEASE_SHA}` artifact, inspect `report.json`, and fill every disposition in `review-ledger.template.json` with `TruePositive` or `FalsePositive`."
-            echo "Then dispatch this workflow on tag `${RELEASE_TAG}` with source run ID `${SOURCE_RUN_ID}` and the completed ledger JSON. The resume validates the run, reuses its exact package bytes and pilot report, and only then runs qualification and publication."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Complete human pilot review and write its receipt
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        run: docker compose run --rm tooling pilot-review
-
-      - name: Produce publication dry-run evidence
-        run: >-
-          docker compose run --rm tooling release-plan
-          -PackageSource nupkgs
-
-      - name: Bind qualification to container inputs and package artifacts
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        run: >-
-          docker compose run --rm
-          -e GITHUB_REF_NAME -e GITHUB_SHA
-          tooling release-qualification -PackageSource nupkgs
-
-      - name: Mark the reviewed release qualified for publication
-        id: mark-qualified
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.pilot_review_source_run_id != '' &&
-          inputs.pilot_review_ledger != ''
-        run: echo "qualified=true" >> "$GITHUB_OUTPUT"
-
-      - name: Upload exact-SHA qualification evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: release-qualification-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/release-qualification
-          if-no-files-found: error
-          retention-days: 90
-
-  publish-private-preview:
-    name: Promote preview.1 to the private feed
-    concurrency:
-      group: sharpproof-publish-${{ github.ref_name }}
-      cancel-in-progress: false
-    if: >-
-      needs.release-qualification.outputs.qualified == 'true' &&
-      github.ref_name == 'v1.0.0-preview.1' &&
-      github.repository == 'alexyorke/SharpProof'
-    needs: release-qualification
-    runs-on: ubuntu-latest
-    environment: nuget.private-preview
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-      - name: Validate private-feed configuration
-        env:
-          NUGET_PRIVATE_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
-          NUGET_PRIVATE_SOURCE: ${{ vars.NUGET_PRIVATE_SOURCE }}
-        run: |
-          test -n "${NUGET_PRIVATE_SOURCE}"
-          test -n "${NUGET_PRIVATE_API_KEY}"
-      - name: Publish already-qualified private-preview bytes in-container
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
-          NUGET_READ_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
-          NUGET_SOURCE: ${{ vars.NUGET_PRIVATE_SOURCE }}
-        run: >-
-          docker compose run --rm
-          -e GITHUB_REF_NAME -e NUGET_SOURCE -e NUGET_API_KEY -e NUGET_READ_API_KEY
-          tooling release-publish -PackageSource nupkgs
-
-  publish:
-    name: Promote qualified packages to public NuGet
-    concurrency:
-      group: sharpproof-publish-${{ github.ref_name }}
-      cancel-in-progress: false
-    if: >-
-      needs.release-qualification.outputs.qualified == 'true' &&
-      (github.ref_name == 'v1.0.0-preview.2' ||
-       github.ref_name == 'v1.0.0-rc.1' ||
-       github.ref_name == 'v1.0.0') &&
-      github.repository == 'alexyorke/SharpProof'
-    needs: release-qualification
-    runs-on: ubuntu-latest
-    environment: nuget.org
+    environment: ${{ github.ref_name == 'v1.0.0-preview.1' && 'nuget.private-preview' || 'nuget.org' }}
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-      - name: Validate public-feed configuration
-        env:
-          NUGET_USER: ${{ vars.NUGET_USER }}
-        run: test -n "${NUGET_USER}"
+          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
+          path: nupkgs
+
       - name: Exchange GitHub OIDC token for a temporary NuGet key
+        if: github.ref_name != 'v1.0.0-preview.1'
         id: nuget-login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ vars.NUGET_USER }}
-      - name: Publish already-qualified package and symbol bytes in-container
+
+      - name: Push packages and symbols
         env:
-          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
-          NUGET_SOURCE: https://api.nuget.org/v3/index.json
-        run: >-
-          docker compose run --rm
-          -e GITHUB_REF_NAME -e NUGET_SOURCE -e NUGET_API_KEY
-          tooling release-publish -PackageSource nupkgs
+          NUGET_API_KEY: >-
+            ${{ github.ref_name == 'v1.0.0-preview.1' &&
+                secrets.NUGET_PRIVATE_API_KEY ||
+                steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_SOURCE: >-
+            ${{ github.ref_name == 'v1.0.0-preview.1' &&
+                vars.NUGET_PRIVATE_SOURCE ||
+                'https://api.nuget.org/v3/index.json' }}
+        run: |
+          set -euo pipefail
+          test -n "${NUGET_SOURCE}"
+          test -n "${NUGET_API_KEY}"
+          dotnet nuget push "nupkgs/*.nupkg" \
+            --source "${NUGET_SOURCE}" \
+            --api-key "${NUGET_API_KEY}" \
+            --skip-duplicate
