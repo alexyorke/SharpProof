@@ -2809,7 +2809,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task LoopsAbstainWhileDirectAcyclicSourceCallsAreProven()
+    public async Task LoopsAndDirectSourceCallsAreProven()
     {
         using var project = TestProject.Create(
             """
@@ -2851,10 +2851,8 @@ public sealed class WorkerTests
                 StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                loop.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(loop.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(call.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(call.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
@@ -4444,6 +4442,98 @@ public sealed class WorkerTests
                 value.Variable == "parameter:0").Value,
             Is.EqualTo(byte.MaxValue.ToString(
                 System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [Test]
+    public async Task CutLoopsProveExitFactsAndReplayRealCounterexamples()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int CountUp(int limit) {
+                    Contract.Requires(limit >= 0);
+                    Contract.Ensures(Contract.Result<int>() >= limit);
+                    var index = 0;
+                    while (index < limit) {
+                        index++;
+                    }
+                    return index;
+                }
+                public static int CountUpExactly(int limit) {
+                    Contract.Requires(limit >= 0);
+                    Contract.Ensures(Contract.Result<int>() == limit);
+                    var index = 0;
+                    while (index < limit) {
+                        index++;
+                    }
+                    return index;
+                }
+                public static int StopsAtTen() {
+                    Contract.Ensures(Contract.Result<int>() == 11);
+                    var index = 0;
+                    while (index < 10) {
+                        index++;
+                    }
+                    return index;
+                }
+                public static int Nested(int rows, int columns) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    var count = 0;
+                    for (var row = 0; row < rows; row++) {
+                        for (var column = 0; column < columns; column++) {
+                            count = 1;
+                        }
+                    }
+                    return count;
+                }
+                public static bool Breaks(bool stop) {
+                    Contract.Ensures(Contract.Result<bool>());
+                    var found = false;
+                    while (true) {
+                        if (stop) {
+                            found = true;
+                            break;
+                        }
+                        stop = true;
+                    }
+                    return found;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        WorkerClaimResult Claim(string method)
+        {
+            return response.ClaimResults.Single(record =>
+                GetCallableId(response, record).StartsWith(
+                    "M:Subject." + method,
+                    StringComparison.Ordinal) &&
+                GetCallableId(response, record)["M:Subject.".Length + method.Length] is '(' or '~');
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            // The loop exit condition alone gives index >= limit.
+            Assert.That(Claim("CountUp").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            // Equality needs the invariant index <= limit, which loop cutting
+            // does not infer; the abstract counterexample does not replay.
+            Assert.That(Claim("CountUpExactly").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                Claim("CountUpExactly").Reason,
+                Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            // The concrete loop returns 10, so the counterexample replays.
+            Assert.That(Claim("StopsAtTen").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            // count is only ever assigned 0 or 1, so that range survives the
+            // cut of both loops.
+            Assert.That(Claim("Nested").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("Breaks").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
     }
 
     [Test]

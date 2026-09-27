@@ -1115,7 +1115,7 @@ internal static class CompilerLoweredArtifact
         if (!Visit(program.Entry))
         {
             throw new InvalidDataException(
-                "A lowered program body is cyclic or exceeds its reachable block limit.");
+                "A lowered program body is malformed or exceeds its reachable block limit.");
         }
 
         foreach (var block in program.Blocks)
@@ -1130,9 +1130,10 @@ internal static class CompilerLoweredArtifact
 
         bool Visit(IrBlockId blockId)
         {
-            if (colors.TryGetValue(blockId, out var color))
+            // Loops are allowed; the worker cuts them at their headers.
+            if (colors.ContainsKey(blockId))
             {
-                return color == 2;
+                return true;
             }
 
             if (++reachable > maximumReachableBlocks ||

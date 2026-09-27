@@ -110,7 +110,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public void LeadingGotoCannotSelectAnUnreachableReturnBeforeAReachableLoop()
+    public void LeadingGotoSkipsAnUnreachableReturnAndCutsTheReachableLoop()
     {
         var preparation = Prepare(
             """
@@ -136,10 +136,13 @@ public sealed class CompilerCallableLowererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
             Assert.That(
-                preparation.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                preparation.Body!.Program!.Blocks.SelectMany(static block => block.Instructions)
+                    .OfType<IrReturnInstruction>()
+                    .Select(static returned => returned.Value)
+                    .OfType<IrIntegerTerm>(),
+                Is.Empty);
         }
     }
 
@@ -463,9 +466,6 @@ public sealed class CompilerCallableLowererTests
         }
     }
 
-    [TestCase(
-        "while (value > 0) { value--; }\nreturn value;",
-        TestName = "RequiresOnlyLoopIsTypedIncomplete")]
     [TestCase(
         "return UnsupportedCall(value);",
         TestName = "RequiresOnlyUnsupportedCallIsTypedIncomplete")]

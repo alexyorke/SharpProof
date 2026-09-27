@@ -216,7 +216,7 @@ internal sealed class CompilerCallableLowerer
             operation => ContainsElidedClause(operation, elidedClauseSites));
         var lowering = selected.Lowering;
         if (!lowering.IsExact ||
-            !TryValidateAcyclicBody(lowering.Program, lowering.Program.Entry, cancellationToken) ||
+            !TryValidateBody(lowering.Program, cancellationToken) ||
             !TryCreateParameterBindings(
                 target, contracts, lowering.Variables, out var parameterBindings))
         {
@@ -608,49 +608,21 @@ internal sealed class CompilerCallableLowerer
         return false;
     }
 
-    private static bool TryValidateAcyclicBody(IrProgram program, IrBlockId start, CancellationToken cancellationToken)
+    // Bounded and reducible: the worker cuts each loop at its header.
+    private static bool TryValidateBody(IrProgram program, CancellationToken cancellationToken)
     {
-        var colors = new Dictionary<IrBlockId, int>();
-        var reachable = 0;
-        var instructions = 0;
-        return Visit(start);
-
-        bool Visit(IrBlockId blockId)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (colors.TryGetValue(blockId, out var color))
+        var cut = IrBlockOrder.TryCutLoops(
+            program,
+            _ =>
             {
-                return color == 2;
-            }
-
-            if (++reachable > MaximumBodyBlocks)
-            {
-                return false;
-            }
-
-            colors.Add(blockId, 1);
-            var block = program.GetBlock(blockId);
-            if (block.Instructions.Length > CompilerPreparedBody.MaximumInstructions - instructions)
-            {
-                return false;
-            }
-
-            instructions += block.Instructions.Length;
-            var successors = IrInstructionFacts.TryGetSuccessors(block.Terminator);
-            if (successors is { } known)
-            {
-                if (known.First is { } first && !Visit(first))
-                {
-                    return false;
-                }
-                if (known.Second is { } second && !Visit(second))
-                {
-                    return false;
-                }
-            }
-            colors[blockId] = 2;
-            return true;
-        }
+                cancellationToken.ThrowIfCancellationRequested();
+                return true;
+            },
+            out _);
+        return cut != null &&
+            cut.Order.Length <= MaximumBodyBlocks &&
+            cut.Order.Sum(block => (long)program.GetBlock(block).Instructions.Length) <=
+                CompilerPreparedBody.MaximumInstructions;
     }
 
     private static bool TryCreateParameterBindings(ManifestCallableTarget target, BoundMethodContracts contracts,

@@ -25,7 +25,8 @@ internal static partial class CallableCounterexampleReplayer
                 CompilerCallableReplayStatus.Refuted => WorkerClaimReason.None,
                 CompilerCallableReplayStatus.PostconditionUndefined =>
                     WorkerClaimReason.PostconditionMayBeUndefined,
-                CompilerCallableReplayStatus.UnsupportedRegisteredCall =>
+                CompilerCallableReplayStatus.UnsupportedRegisteredCall or
+                    CompilerCallableReplayStatus.NotReplayable =>
                     WorkerClaimReason.CounterexampleNotReplayable,
                 _ => WorkerClaimReason.CounterexampleReplayFailed
             };

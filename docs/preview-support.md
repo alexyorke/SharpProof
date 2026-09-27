@@ -54,7 +54,7 @@ public-key token is not an authenticity claim.
 - ARM64 verifier containers, including emulation as qualification evidence.
 - UNC, NFS, CIFS/SMB, SSHFS, mapped-network, or cross-host publication.
 - Hostile concurrent host filesystem mutation.
-- Loops or recursion in worker verification, mutable-heap reasoning, virtual
+- Recursion in worker verification, mutable-heap reasoning, virtual
   dispatch, and general source-callee verification beyond the direct acyclic
   scalar relational-summary boundary.
 

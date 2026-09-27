@@ -157,7 +157,8 @@ complete diagnostic table and examples in
 
 The portable analyzer does not load Z3. The worker handles bounded Boolean and
 integer obligations, exact compiler-produced whole-body CFG/IR, selected API
-specifications, and bounded relational summaries. Loops, recursion, virtual
+specifications, and bounded relational summaries. Loops are cut at their
+headers, so exit conditions prove without user invariants. Recursion, virtual
 dispatch, mutable-heap reasoning, general sequence reasoning, and unsupported
 language forms remain Unknown or visible abstentions. The authoritative
 capability matrix is [docs/coverage-and-limits.md](docs/coverage-and-limits.md).

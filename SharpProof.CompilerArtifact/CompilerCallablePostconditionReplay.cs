@@ -9,11 +9,16 @@ internal enum CompilerCallableReplayStatus
     Refuted,
     PostconditionUndefined,
     UnsupportedRegisteredCall,
+    // The counterexample came from a loop-cut abstraction and the concrete
+    // run does not reproduce it.
+    NotReplayable,
     Failed
 }
 
 internal static class CompilerCallablePostconditionReplay
 {
+    private const int MaximumLoopReplaySteps = 1_000_000;
+
     internal static CompilerCallableReplayStatus Replay(
         CompilerCallablePreparation target,
         ImmutableDictionary<IrVarId, IrValue> model,
@@ -32,6 +37,7 @@ internal static class CompilerCallablePostconditionReplay
         var final = model.ToBuilder();
         var results = target.Variables.Where(static variable =>
             variable.Role == CompilerVariableRole.Result).ToArray();
+        var hasLoops = false;
         if (body.Kind == CompilerPreparedBodyKind.Program)
         {
             if (body.Program is not { } program ||
@@ -59,10 +65,12 @@ internal static class CompilerCallablePostconditionReplay
                 return CompilerCallableReplayStatus.Failed;
             }
 
+            hasLoops = IrBlockOrder.TryCutLoops(program, static _ => true, out _)
+                is { BackEdges.IsEmpty: false };
             var execution = new IrProgramInterpreter(factory).Execute(
                 program,
                 initial.ToImmutable(),
-                (int)maximumSteps,
+                hasLoops ? MaximumLoopReplaySteps : (int)maximumSteps,
                 callHost,
                 cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned)
@@ -74,7 +82,9 @@ internal static class CompilerCallablePostconditionReplay
                 } && (body.SpecCalls.ContainsKey(call.Id) ||
                       body.SummaryCalls.ContainsKey(call.Id))
                     ? CompilerCallableReplayStatus.UnsupportedRegisteredCall
-                    : CompilerCallableReplayStatus.Failed;
+                    : hasLoops
+                        ? CompilerCallableReplayStatus.NotReplayable
+                        : CompilerCallableReplayStatus.Failed;
             }
 
             foreach (var binding in body.ParameterBindings)
@@ -152,6 +162,8 @@ internal static class CompilerCallablePostconditionReplay
         return evaluated.Status == IrEvaluationStatus.Value &&
                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false }
             ? CompilerCallableReplayStatus.Refuted
-            : CompilerCallableReplayStatus.Failed;
+            : hasLoops
+                ? CompilerCallableReplayStatus.NotReplayable
+                : CompilerCallableReplayStatus.Failed;
     }
 }

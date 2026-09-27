@@ -61,6 +61,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         private readonly ImmutableArray<GuardedBodySummaryAssumption>.Builder _summaryAssumptions =
             ImmutableArray.CreateBuilder<GuardedBodySummaryAssumption>();
         private WorkerClaimReason _reason = WorkerClaimReason.None;
+        private IrLoopCut? _cut;
+        private IrBlockId _current;
+        private Dictionary<IrVarId, (long Minimum, long Maximum)?>? _ranges;
 
         internal SymbolicBodyExecution Execute()
         {
@@ -74,6 +77,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             foreach (var blockId in order)
             {
                 inputs.CancellationToken.ThrowIfCancellationRequested();
+                _current = blockId;
                 var state = Merge(blockId);
                 if (state == null)
                 {
@@ -83,6 +87,14 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     }
 
                     continue;
+                }
+                if (_cut!.Loops.TryGetValue(blockId, out var loop))
+                {
+                    state = CutLoop(blockId, loop, state.Value);
+                    if (state == null)
+                    {
+                        return Failed();
+                    }
                 }
                 if (!ExecuteBlock(inputs.Program.GetBlock(blockId), state.Value))
                 {
@@ -350,6 +362,138 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             return new FlowState(0, predicate, environment.ToImmutable());
         }
 
+        // Loop cutting: every variable the loop may assign becomes a fresh
+        // unknown at its header, so the one symbolic pass over the body
+        // covers every iteration. A variable whose every assignment is a
+        // C# integer narrowing keeps that range as an invariant.
+        private FlowState? CutLoop(
+            IrBlockId header,
+            ImmutableArray<IrBlockId> loop,
+            FlowState state)
+        {
+            var assigned = new HashSet<IrVarId>();
+            foreach (var block in loop)
+            {
+                foreach (var instruction in inputs.Program.GetBlock(block).Instructions)
+                {
+                    if (!Spend())
+                    {
+                        return null;
+                    }
+
+                    switch (instruction)
+                    {
+                        case IrAssignInstruction assign:
+                            assigned.Add(assign.Target);
+                            break;
+                        case IrCallInstruction { Target: { } target }:
+                            assigned.Add(target);
+                            break;
+                        case IrHavocInstruction havoc:
+                            assigned.UnionWith(havoc.Variables);
+                            break;
+                    }
+                }
+            }
+
+            var environment = state.Environment.ToBuilder();
+            var predicate = state.Predicate;
+            foreach (var variable in assigned.OrderBy(static variable => variable.Value))
+            {
+                if (!Spend(3))
+                {
+                    return null;
+                }
+
+                var fresh = inputs.Factory.Variable(inputs.Factory.CreateVariable(
+                    "loop-havoc:" +
+                    header.Value.ToString(CultureInfo.InvariantCulture) + ":" +
+                    variable.Value.ToString(CultureInfo.InvariantCulture),
+                    inputs.Factory.GetVariableInfo(variable).Type));
+                environment[variable] = fresh;
+                if (IntegerRange(variable) is { } range)
+                {
+                    predicate = inputs.Factory.Binary(
+                        IrBinaryOperator.AndAlso,
+                        predicate,
+                        inputs.Factory.Binary(
+                            IrBinaryOperator.AndAlso,
+                            inputs.Factory.Binary(
+                                IrBinaryOperator.GreaterThanOrEqual,
+                                fresh,
+                                inputs.Factory.Integer(range.Minimum)),
+                            inputs.Factory.Binary(
+                                IrBinaryOperator.LessThanOrEqual,
+                                fresh,
+                                inputs.Factory.Integer(range.Maximum))));
+                }
+            }
+
+            if (!Supported(predicate))
+            {
+                _reason = WorkerClaimReason.UnsupportedBody;
+                return null;
+            }
+
+            return new FlowState(0, predicate, environment.ToImmutable());
+        }
+
+        private (long Minimum, long Maximum)? IntegerRange(IrVarId variable)
+        {
+            if (_ranges == null)
+            {
+                _ranges = [];
+                foreach (var initial in inputs.InitialEnvironment)
+                {
+                    Widen(initial.Key, initial.Value is IrVariableTerm parameter &&
+                        inputs.Variables.FirstOrDefault(candidate =>
+                            candidate.Variable == parameter.Variable)?.SourceIntegerInterval
+                            is { } interval
+                        ? (interval.Minimum, interval.Maximum)
+                        : null);
+                }
+                foreach (var block in inputs.Program.Blocks)
+                {
+                    foreach (var instruction in block.Instructions)
+                    {
+                        switch (instruction)
+                        {
+                            case IrAssignInstruction assign:
+                                Widen(assign.Target, assign.Value switch
+                                {
+                                    IrIntegerTerm constant => (constant.Value, constant.Value),
+                                    IrUnaryTerm unary when IrIntegerNarrowing.TryGet(
+                                        unary.Operator, out var narrowing) =>
+                                        (narrowing.Minimum, narrowing.Maximum),
+                                    _ => null
+                                });
+                                break;
+                            case IrCallInstruction { Target: { } target }:
+                                Widen(target, null);
+                                break;
+                            case IrHavocInstruction havoc:
+                                foreach (var havocked in havoc.Variables)
+                                {
+                                    Widen(havocked, null);
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+
+            return _ranges.TryGetValue(variable, out var range) ? range : null;
+
+            void Widen(IrVarId target, (long Minimum, long Maximum)? value)
+            {
+                _ranges[target] = !_ranges.TryGetValue(target, out var existing)
+                    ? value
+                    : existing is { } left && value is { } right
+                        ? (Math.Min(left.Minimum, right.Minimum), Math.Max(left.Maximum, right.Maximum))
+                        : null;
+            }
+        }
+
         private SpecApplication? ApplySpec(
             IrCallInstruction call, CompilerPreparedSpecCall prepared,
             IReadOnlyDictionary<IrVarId, IrTerm> environment,
@@ -577,8 +721,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private ImmutableArray<IrBlockId> CreateOrder()
         {
-            var result = IrBlockOrder.TryCreateAcyclicOrder(
+            _cut = IrBlockOrder.TryCutLoops(
                 inputs.Program, Spend, out var failure);
+            var result = _cut?.Order ?? default;
             if (result.IsDefault)
             {
                 _reason = failure switch
@@ -595,7 +740,10 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             IrBlockId block, int order, IrTerm predicate,
             ImmutableDictionary<IrVarId, IrTerm> environment)
         {
-            if (predicate is IrBooleanTerm { Value: false })
+            // A cut back edge is `assume false`: the loop header already
+            // stands for every iteration.
+            if (predicate is IrBooleanTerm { Value: false } ||
+                _cut!.BackEdges.Contains((_current, block)))
             {
                 return;
             }

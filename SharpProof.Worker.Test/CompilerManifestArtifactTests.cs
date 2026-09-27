@@ -219,7 +219,7 @@ public sealed class CompilerManifestArtifactTests
                 !allowed.Contains(reason))
             .ToArray();
         Assert.That(rejected, Does.Contain(WorkerClaimReason.MethodTimeout));
-        var artifact = CreateUnsupportedLoopArtifact();
+        var artifact = CreateUnsupportedBodyArtifact();
 
         foreach (var reason in allowed)
         {
@@ -2004,7 +2004,7 @@ public sealed class CompilerManifestArtifactTests
         return CreateContractArtifact(DoesNotThrowIdentitySource);
     }
 
-    private static CompilerManifestArtifact CreateUnsupportedLoopArtifact()
+    private static CompilerManifestArtifact CreateUnsupportedBodyArtifact()
     {
         return CreateContractArtifact(
             """
@@ -2012,8 +2012,7 @@ public sealed class CompilerManifestArtifactTests
             internal static class Subject {
                 internal static int Identity(int value) {
                     Contract.Ensures(Contract.Result<int>() == value);
-                    while (value > 0) { value--; }
-                    return value;
+                    return new[] { value }[0];
                 }
             }
             """);

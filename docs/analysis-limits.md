@@ -197,8 +197,13 @@ Crossing the reachable-block or lowered-instruction bound returns `Unknown`
 with `UnsupportedBody`; exhausting the symbolic-operation budget returns
 `Unknown` with `ResourceLimit`. Neither path produces a partial proof. The
 executor merges predecessor states with symbolic path predicates instead of
-enumerating a fixed number of paths or states. Loops are rejected by the
-acyclic-body check before symbolic execution.
+enumerating a fixed number of paths or states. Loops in reducible control
+flow are cut at their headers: every variable the loop may assign becomes a
+fresh unknown (keeping its C# integer range when every assignment narrows to
+one), and back edges are dropped. A proof over the cut program therefore
+covers every iteration. A counterexample is replayed by running the real loop;
+if the concrete run does not reproduce it, the claim is `Unknown` with
+`CounterexampleNotReplayable`. Irreducible control flow abstains.
 
 The manifest discovers local functions, lambdas, anonymous methods, and the
 top-level entry point, including their directly owned postconditions. These
