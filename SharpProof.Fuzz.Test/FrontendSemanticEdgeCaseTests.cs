@@ -44,18 +44,8 @@ public sealed class FrontendSemanticEdgeCaseTests
                 "long[,] value",
                 "value.LongLength",
                 MultidimensionalSequenceValue),
-            Closed(
-                "long",
-                "long value",
-                "checked((int)value)",
-                FrontendAbstention.ConversionMayChangeValue,
-                long.MaxValue),
-            Closed(
-                "long",
-                "long value",
-                "unchecked((int)value)",
-                FrontendAbstention.ConversionMayChangeValue,
-                long.MaxValue),
+            Exact("long", "long value", "checked((int)value)", long.MaxValue),
+            Exact("long", "long value", "unchecked((int)value)", long.MaxValue),
             Closed(
                 "string?",
                 "object? value",

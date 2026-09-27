@@ -1297,7 +1297,7 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
-    public async Task UnsupportedIntIncrementControlRemainsUnknown()
+    public async Task UncheckedIntIncrementOverflowIsRefuted()
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
@@ -1326,11 +1326,13 @@ public sealed class WorkerMsBuildIntegrationTests
 
         using (Assert.EnterMultipleScope())
         {
+            // C# is unchecked by default: Increment(int.MaxValue) wraps to
+            // int.MinValue and violates the postcondition.
             Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
-            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
-                claim.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                claim.Model.Select(static value => value.Value),
+                Does.Contain(int.MaxValue.ToString(CultureInfo.InvariantCulture)));
         }
     }
 

@@ -180,8 +180,14 @@ public sealed class RoslynProgramLowerer(
                     return true;
                 case IEmptyOperation:
                     return false;
+                case IIncrementOrDecrementOperation mutation
+                    when TryLowerIncrement(block, operation, mutation):
+                    return false;
                 case IIncrementOrDecrementOperation mutation:
                     LowerUnsupportedMutation(block, operation, mutation.Target);
+                    return false;
+                case ICompoundAssignmentOperation mutation
+                    when TryLowerCompoundAssignment(block, operation, mutation):
                     return false;
                 case ICompoundAssignmentOperation mutation:
                     LowerUnsupportedMutation(
@@ -777,6 +783,53 @@ public sealed class RoslynProgramLowerer(
             }
             Abstain(operation, FrontendAbstention.UnsupportedType);
             Havoc(block, operation, IrHavocKind.Variables, target);
+        }
+
+        // x++ and x-- on an integer local: x = narrow(x +/- 1) at x's type.
+        private bool TryLowerIncrement(
+            IrBlockId block, OperationId operation, IIncrementOrDecrementOperation mutation)
+        {
+            var type = mutation.Target.Type?.SpecialType ?? SpecialType.None;
+            var @operator = mutation.Kind == OperationKind.Decrement
+                ? IrBinaryOperator.Subtract
+                : IrBinaryOperator.Add;
+            if (mutation.OperatorMethod != null || mutation.IsLifted ||
+                !CSharpScalarSemantics.IsSupportedInteger(type) ||
+                !RoslynOperationLowerer.SupportsIntegerArithmetic(@operator, type, mutation.IsChecked) ||
+                _expressions.GetReferencedVariable(mutation.Target, unwrapConversions: false) is not { } variable)
+            {
+                return false;
+            }
+
+            AssignOrHavoc(block, operation, variable, _expressions.LowerIntegerArithmetic(
+                @operator, _factory.Variable(variable), _factory.Integer(1), type, mutation.IsChecked));
+            return true;
+        }
+
+        // x op= value on an integer local with no implicit conversions. The
+        // target is read before the value is evaluated, as C# requires.
+        private bool TryLowerCompoundAssignment(
+            IrBlockId block, OperationId operation, ICompoundAssignmentOperation mutation)
+        {
+            var type = mutation.Target.Type?.SpecialType ?? SpecialType.None;
+            if (mutation.OperatorMethod != null || mutation.IsLifted ||
+                !mutation.InConversion.IsIdentity || !mutation.OutConversion.IsIdentity ||
+                mutation.Value.Type?.SpecialType != type ||
+                !CSharpScalarSemantics.IsSupportedInteger(type) ||
+                !CSharpScalarSemantics.TryGetBinary(mutation.OperatorKind, out var semantics) ||
+                !semantics.IsIntegerArithmetic ||
+                !RoslynOperationLowerer.SupportsIntegerArithmetic(semantics.IrOperator, type, mutation.IsChecked) ||
+                _expressions.GetReferencedVariable(mutation.Target, unwrapConversions: false) is not { } variable)
+            {
+                return false;
+            }
+
+            var current = CreateTemporary("compound-target", _factory.GetVariableInfo(variable).Type);
+            _builder.Assign(block, operation, current, _factory.Variable(variable));
+            var value = LowerValue(block, operation, mutation.Value);
+            AssignOrHavoc(block, operation, variable, _expressions.LowerIntegerArithmetic(
+                semantics.IrOperator, _factory.Variable(current), value, type, mutation.IsChecked));
+            return true;
         }
 
         private void LowerUnsupportedMutation(

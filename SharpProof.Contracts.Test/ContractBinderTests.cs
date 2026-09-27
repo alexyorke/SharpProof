@@ -719,7 +719,7 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void NarrowingConversionInAPostconditionFailsClosed()
+    public void NarrowingConversionInAPostconditionIsExact()
     {
         const string source =
             """
@@ -734,9 +734,9 @@ public sealed class ContractBinderTests
             """;
         var subject = ContractSubject.Create(source);
 
-        Assert.That(
-            subject.Bind("Target", "Read").Failure,
-            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
     }
 
     [Test]

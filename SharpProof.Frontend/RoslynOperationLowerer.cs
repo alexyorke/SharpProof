@@ -169,6 +169,25 @@ public sealed class RoslynOperationLowerer
         return _factory.Variable(variable);
     }
 
+    // C# integer arithmetic over exact IR operands, or null when the IR
+    // cannot model the operator at this result type and overflow context.
+    internal static bool SupportsIntegerArithmetic(
+        IrBinaryOperator @operator, SpecialType resultType, bool isChecked)
+    {
+        return resultType == SpecialType.System_Int64
+            ? isChecked || @operator is IrBinaryOperator.Divide or IrBinaryOperator.Remainder
+            : CSharpScalarSemantics.NarrowIntegerResult(@operator, resultType, isChecked) != null;
+    }
+
+    internal IrTerm LowerIntegerArithmetic(
+        IrBinaryOperator @operator, IrTerm left, IrTerm right, SpecialType resultType, bool isChecked)
+    {
+        var exact = _factory.Binary(@operator, left, right);
+        return CSharpScalarSemantics.NarrowIntegerResult(@operator, resultType, isChecked) is { } narrowing
+            ? _factory.Unary(narrowing, exact)
+            : exact;
+    }
+
     internal IrVarId? GetReferencedVariable(
         IOperation operation, bool unwrapConversions = true)
     {

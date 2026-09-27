@@ -944,6 +944,10 @@ public sealed class ScalarDifferentialMatrixTests
                     $"IntNegate{context}{index++}", context, value,
                     () => context == "checked" ? checked(-value) : unchecked(-value));
             }
+            foreach (var mutation in MutationCases(context == "checked"))
+            {
+                yield return mutation with { MethodName = mutation.MethodName + context + index++ };
+            }
             long[] sources = [long.MinValue, -129L, -1L, 0L, 255L, 65536L, 2147483648L, long.MaxValue];
             foreach (var type in new[] { "sbyte", "byte", "short", "ushort", "char", "int", "uint" })
             {
@@ -957,6 +961,49 @@ public sealed class ScalarDifferentialMatrixTests
                 }
             }
         }
+    }
+
+    // Increment, decrement, and compound assignment statements on locals.
+    private static IEnumerable<NarrowCase> MutationCases(bool isChecked)
+    {
+        var context = isChecked ? "checked" : "unchecked";
+        foreach (var value in new byte[] { 0, 254, 255 })
+        {
+            var (expected, exception, irException) = Outcome(() => IncrementByte(value, isChecked));
+            yield return new($"ByteIncrement", "byte", string.Empty, [value], expected, exception, irException,
+                Body: $"var local = value; {context} {{ local++; }} return local;");
+        }
+        foreach (var value in new short[] { short.MinValue, 0, short.MaxValue })
+        {
+            var (expected, exception, irException) = Outcome(() => DecrementShort(value, isChecked));
+            yield return new($"ShortDecrement", "short", string.Empty, [value], expected, exception, irException,
+                Body: $"var local = value; {context} {{ local--; }} return local;");
+        }
+        int[] operands = [int.MinValue, -1, 0, 1, int.MaxValue];
+        foreach (var left in operands)
+        {
+            foreach (var right in operands)
+            {
+                var (expected, exception, irException) = Outcome(() => AddThenDecrement(left, right, isChecked));
+                yield return new($"IntCompound", "int", string.Empty, [left, right], expected, exception, irException,
+                    Body: $"var local = left; {context} {{ local += right; local -= 1; }} return local;");
+            }
+        }
+    }
+
+    private static byte IncrementByte(byte value, bool isChecked)
+    {
+        return isChecked ? checked((byte)(value + 1)) : unchecked((byte)(value + 1));
+    }
+
+    private static short DecrementShort(short value, bool isChecked)
+    {
+        return isChecked ? checked((short)(value - 1)) : unchecked((short)(value - 1));
+    }
+
+    private static int AddThenDecrement(int left, int right, bool isChecked)
+    {
+        return isChecked ? checked(left + right - 1) : unchecked(left + right - 1);
     }
 
     private static long ConvertNarrow(string type, bool isChecked, long value)
@@ -1063,7 +1110,7 @@ public sealed class ScalarDifferentialMatrixTests
                     public static {{item.Type}} {{item.MethodName}}({{parameters}}) {
                     {{string.Join(Environment.NewLine, requires)}}
                     {{ensures}}
-                        return {{item.Expression}};
+                        {{item.Body ?? "return " + item.Expression + ";"}}
                     }
                 """;
         });
@@ -1102,7 +1149,8 @@ public sealed class ScalarDifferentialMatrixTests
         long? ExpectedResult,
         Type? ExpectedException,
         IrExceptionKind? ExpectedIrException,
-        string? ParameterType = null);
+        string? ParameterType = null,
+        string? Body = null);
 
     private sealed record ArithmeticCase(
         string MethodName,
