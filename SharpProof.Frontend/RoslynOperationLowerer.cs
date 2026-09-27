@@ -703,6 +703,16 @@ public sealed class RoslynOperationLowerer
                 !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
                     operation.Type?.SpecialType ?? SpecialType.None))
             {
+                if (CSharpScalarSemantics.NarrowIntegerResult(
+                        IrBinaryOperator.Subtract,
+                        operation.Type?.SpecialType ?? SpecialType.None,
+                        operation.IsChecked) is { } narrowNegation)
+                {
+                    return LoweredExpression.Exact(_owner._factory.Unary(
+                        narrowNegation,
+                        _owner._factory.Unary(semantics.IrOperator!.Value, operand.Term)));
+                }
+
                 return OpaqueOperand(
                     operation,
                     operation.Operand,
@@ -830,6 +840,23 @@ public sealed class RoslynOperationLowerer
                     !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
                         operation.Type?.SpecialType ?? SpecialType.None))
                 {
+                    if (CSharpScalarSemantics.NarrowIntegerResult(
+                            mapped,
+                            operation.Type?.SpecialType ?? SpecialType.None,
+                            operation.IsChecked) is { } narrowing)
+                    {
+                        try
+                        {
+                            return LoweredExpression.Exact(_owner._factory.Unary(
+                                narrowing,
+                                _owner._factory.Binary(mapped.Value, left.Term, right.Term)));
+                        }
+                        catch (ArgumentException)
+                        {
+                            return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
+                        }
+                    }
+
                     return OpaqueBinary(
                         operation,
                         FrontendAbstention.UnsupportedType);

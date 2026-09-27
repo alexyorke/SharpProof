@@ -273,6 +273,15 @@ public sealed class IrInterpreter(IrFactory factory)
                 Fault(IrExceptionKind.Overflow,
                     "Negating the minimum integer overflows."),
             IrUnaryOperator.Negate => Integer(-value.Integer),
+            _ when IrIntegerNarrowing.TryGet(unary.Operator, out var narrowing) =>
+                value.Kind != IrValueKind.Integer
+                    ? InvalidValue("Integer narrowing requires an integer value.")
+                    : !narrowing.Checked
+                        ? Integer(narrowing.Wrap(value.Integer))
+                        : narrowing.Contains(value.Integer)
+                            ? Integer(value.Integer)
+                            : Fault(IrExceptionKind.Overflow,
+                                "The value is outside the checked integer range."),
             _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
                 "Unsupported unary operator: " + unary.Operator + ".")
         };

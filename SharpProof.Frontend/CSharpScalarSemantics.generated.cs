@@ -233,6 +233,33 @@ internal static class CSharpScalarSemantics
         TryGetInteger(type, out var semantics) &&
         semantics.SupportsExactIrArithmetic;
 
+    // How a C# integer operator result narrower than 64 bits is formed from
+    // the exact IR value, or null when the IR cannot model it exactly. The
+    // exact 64-bit intermediate must not overflow where C# completes, and
+    // C# throws on MinValue / -1 and MinValue % -1 in every context.
+    internal static IrUnaryOperator? NarrowIntegerResult(
+        IrBinaryOperator? @operator,
+        SpecialType resultType,
+        bool isChecked)
+    {
+        if (!TryGetInteger(resultType, out var semantics) || semantics.BitWidth >= 64)
+        {
+            return null;
+        }
+
+        var narrowing = @operator switch
+        {
+            IrBinaryOperator.Remainder when semantics.IsSigned => (bool?)null,
+            IrBinaryOperator.Divide => true,
+            IrBinaryOperator.Multiply when !semantics.IsSigned &&
+                semantics.BitWidth == 32 && !isChecked => null,
+            _ => isChecked
+        };
+        return narrowing is { } useChecked
+            ? IrIntegerNarrowing.OperatorFor(semantics.BitWidth, semantics.IsSigned, useChecked)
+            : null;
+    }
+
     internal static bool TryGetUnary(
         UnaryOperatorKind kind,
         out CSharpUnarySemantics semantics) =>

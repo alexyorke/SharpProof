@@ -119,9 +119,10 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
             AssertAbstention(
                 uncheckedNegation,
                 FrontendAbstention.UncheckedOverflowSemantics);
-            AssertAbstention(
-                narrowerNegation,
-                FrontendAbstention.UnsupportedType);
+            Assert.That(narrowerNegation.IsExact, Is.True);
+            Assert.That(
+                ((IrUnaryTerm)narrowerNegation.Term).Operator,
+                Is.EqualTo(IrUnaryOperator.CheckedInt32));
             AssertAbstention(
                 unsupportedOperator,
                 FrontendAbstention.UnsupportedOperationKind);

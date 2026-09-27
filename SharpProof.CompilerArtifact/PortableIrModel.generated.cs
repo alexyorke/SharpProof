@@ -168,7 +168,19 @@ internal static class PortableIrWireCatalog
     ];
     internal static readonly ImmutableArray<IrUnaryOperator> UnaryOperators = [
         IrUnaryOperator.Not,
-        IrUnaryOperator.Negate
+        IrUnaryOperator.Negate,
+        IrUnaryOperator.CheckedSByte,
+        IrUnaryOperator.CheckedByte,
+        IrUnaryOperator.CheckedInt16,
+        IrUnaryOperator.CheckedUInt16,
+        IrUnaryOperator.CheckedInt32,
+        IrUnaryOperator.CheckedUInt32,
+        IrUnaryOperator.WrapSByte,
+        IrUnaryOperator.WrapByte,
+        IrUnaryOperator.WrapInt16,
+        IrUnaryOperator.WrapUInt16,
+        IrUnaryOperator.WrapInt32,
+        IrUnaryOperator.WrapUInt32
     ];
     internal static readonly ImmutableArray<IrBinaryOperator> BinaryOperators = [
         IrBinaryOperator.Add,

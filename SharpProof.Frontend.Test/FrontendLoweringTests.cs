@@ -845,22 +845,43 @@ public sealed class FrontendLoweringTests
             """
             public static int Target(int value) => checked(value + 1);
             """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None)
+            .SetName("OverflowAndConversionShapes_CheckedIntAddition");
+        yield return new TestCaseData(
+            """
+            public static int Target(int value) => unchecked(value + 1);
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None)
+            .SetName("OverflowAndConversionShapes_UncheckedIntAddition");
+        yield return new TestCaseData(
+            """
+            public static int Target(int left, int right) => left % right;
+            """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedType)
-            .SetName("OverflowAndConversionShapes_CheckedIntAddition");
+            .SetName("OverflowAndConversionShapes_IntRemainder");
+        yield return new TestCaseData(
+            """
+            public static uint Target(uint left, uint right) => unchecked(left * right);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType)
+            .SetName("OverflowAndConversionShapes_UncheckedUIntMultiply");
         yield return new TestCaseData(
             """
             public static int Target(int left, int right) => left / right;
             """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None)
             .SetName("OverflowAndConversionShapes_IntDivision");
         yield return new TestCaseData(
             """
             public static uint Target(uint left, uint right) => left % right;
             """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None)
             .SetName("OverflowAndConversionShapes_UIntRemainder");
         yield return new TestCaseData(
             """

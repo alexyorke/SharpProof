@@ -18,7 +18,21 @@ public enum IrTypeKind
 public enum IrUnaryOperator
 {
     Not = 0,
-    Negate = 1
+    Negate = 1,
+    // Narrow an exact integer to a C# integer type. Checked narrowing throws
+    // OverflowException outside the range; wrapping narrowing is modular.
+    CheckedSByte = 2,
+    CheckedByte = 3,
+    CheckedInt16 = 4,
+    CheckedUInt16 = 5,
+    CheckedInt32 = 6,
+    CheckedUInt32 = 7,
+    WrapSByte = 8,
+    WrapByte = 9,
+    WrapInt16 = 10,
+    WrapUInt16 = 11,
+    WrapInt32 = 12,
+    WrapUInt32 = 13
 }
 
 public enum IrBinaryOperator
@@ -48,6 +62,8 @@ internal static class IrOperatorCatalog
         {
             IrUnaryOperator.Not => (0, IrTypeKind.Boolean, "!"),
             IrUnaryOperator.Negate => (1, IrTypeKind.Integer, "-"),
+            _ when IrIntegerNarrowing.TryGet(@operator, out var narrowing) =>
+                ((int)@operator, IrTypeKind.Integer, narrowing.Token),
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }

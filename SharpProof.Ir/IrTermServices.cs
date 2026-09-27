@@ -110,6 +110,10 @@ internal static class IrTermServices
                 factory.Boolean(!value.Value),
             (IrUnaryOperator.Negate, IrIntegerTerm { Value: not long.MinValue } value) =>
                 factory.Integer(-value.Value),
+            (_, IrIntegerTerm value) when
+                IrIntegerNarrowing.TryGet(@operator, out var narrowing) &&
+                (!narrowing.Checked || narrowing.Contains(value.Value)) =>
+                factory.Integer(narrowing.Checked ? value.Value : narrowing.Wrap(value.Value)),
             _ => null
         };
     }

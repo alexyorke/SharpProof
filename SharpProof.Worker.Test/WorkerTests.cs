@@ -4447,7 +4447,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task WidthSensitiveArithmeticAndConversionsAbstain()
+    public async Task NarrowIntegerArithmeticIsExactAndConversionsAbstain()
     {
         using var project = TestProject.Create(
             """
@@ -4482,26 +4482,35 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
-        Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
-        Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
-            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(
-            response.ClaimResults
-                .Where(record => GetCallableId(response, record).Contains(
-                    "Contract(",
-                    StringComparison.Ordinal))
-                .Select(static record => record.Reason),
-            Is.All.EqualTo(
-                WorkerClaimReason.UnsupportedExpression));
-        Assert.That(
-            response.ClaimResults
-                .Where(record => GetCallableId(response, record).Contains(
-                    "Body(",
-                    StringComparison.Ordinal))
-                .Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+        WorkerClaimResult Claim(string method)
+        {
+            return response.ClaimResults.Single(record =>
+                GetCallableId(response, record).Contains(
+                    "." + method + "(",
+                    StringComparison.Ordinal));
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            // unchecked(int.MaxValue + 1) wraps to int.MinValue.
+            Assert.That(
+                Claim("UncheckedContract").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                Claim("UncheckedContract").Model.Select(static value => value.Value),
+                Does.Contain(int.MaxValue.ToString(CultureInfo.InvariantCulture)));
+            // checked(int.MaxValue + 1) throws while evaluating the postcondition.
+            Assert.That(
+                Claim("CheckedContract").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                Claim("UncheckedBody").Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(
+                Claim("CheckedBody").Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
     }
 
     [Test]

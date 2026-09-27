@@ -609,8 +609,31 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                     new EncodedValue(_owner.Own(_context.MkNot(boolean)), operand.Defined),
                 IrUnaryOperator.Negate when operand.Value is ArithExpr integer =>
                     Bounded(_owner.Own(_context.MkUnaryMinus(integer)), operand.Defined),
+                _ when IrIntegerNarrowing.TryGet(unary.Operator, out var narrowing) &&
+                    operand.Value is IntExpr narrowed =>
+                    EncodeNarrowing(narrowing, narrowed, operand.Defined),
                 _ => throw new UnsupportedIrEncodingException()
             };
+        }
+
+        // Checked narrowing is defined only inside the target range; wrapping
+        // narrowing is Euclidean modulo 2^bits shifted to the target minimum.
+        private EncodedValue EncodeNarrowing(
+            IrIntegerNarrowing narrowing, IntExpr value, BoolExpr defined)
+        {
+            var minimum = _owner.Own(_context.MkInt(narrowing.Minimum));
+            if (narrowing.Checked)
+            {
+                return new(value, _owner.Own(_context.MkAnd(
+                    defined,
+                    _owner.Own(_context.MkGe(value, minimum)),
+                    _owner.Own(_context.MkLe(value, _owner.Own(_context.MkInt(narrowing.Maximum)))))));
+            }
+
+            var offset = (IntExpr)_owner.Own(_context.MkSub(value, minimum));
+            var modulus = _owner.Own(_context.MkInt(1L << narrowing.Bits));
+            var wrapped = _owner.Own(_context.MkAdd(_owner.Own(_context.MkMod(offset, modulus)), minimum));
+            return new(wrapped, defined);
         }
 
         private EncodedValue EncodeBinary(IrBinaryTerm binary)

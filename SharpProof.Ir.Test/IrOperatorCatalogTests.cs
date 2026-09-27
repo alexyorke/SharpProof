@@ -75,7 +75,19 @@ public sealed class IrOperatorCatalogTests
             [IrUnaryOperator.Not] =
                 (0, IrTypeKind.Boolean, "!"),
             [IrUnaryOperator.Negate] =
-                (1, IrTypeKind.Integer, "-")
+                (1, IrTypeKind.Integer, "-"),
+            [IrUnaryOperator.CheckedSByte] = (2, IrTypeKind.Integer, "checked(i8)"),
+            [IrUnaryOperator.CheckedByte] = (3, IrTypeKind.Integer, "checked(u8)"),
+            [IrUnaryOperator.CheckedInt16] = (4, IrTypeKind.Integer, "checked(i16)"),
+            [IrUnaryOperator.CheckedUInt16] = (5, IrTypeKind.Integer, "checked(u16)"),
+            [IrUnaryOperator.CheckedInt32] = (6, IrTypeKind.Integer, "checked(i32)"),
+            [IrUnaryOperator.CheckedUInt32] = (7, IrTypeKind.Integer, "checked(u32)"),
+            [IrUnaryOperator.WrapSByte] = (8, IrTypeKind.Integer, "unchecked(i8)"),
+            [IrUnaryOperator.WrapByte] = (9, IrTypeKind.Integer, "unchecked(u8)"),
+            [IrUnaryOperator.WrapInt16] = (10, IrTypeKind.Integer, "unchecked(i16)"),
+            [IrUnaryOperator.WrapUInt16] = (11, IrTypeKind.Integer, "unchecked(u16)"),
+            [IrUnaryOperator.WrapInt32] = (12, IrTypeKind.Integer, "unchecked(i32)"),
+            [IrUnaryOperator.WrapUInt32] = (13, IrTypeKind.Integer, "unchecked(u32)")
         };
 
         AssertOperatorMetadata(

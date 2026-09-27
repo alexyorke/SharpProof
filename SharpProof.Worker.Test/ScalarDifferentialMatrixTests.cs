@@ -840,6 +840,211 @@ public sealed class ScalarDifferentialMatrixTests
         string TargetType,
         object[] BoundaryValues);
 
+    [Test]
+    public async Task NarrowIntegerArithmeticAgreesAcrossRuntimeIrAndSmt()
+    {
+        var cases = NarrowCases().ToArray();
+        using var project = DifferentialProject.Create(CreateNarrowSource(cases));
+        var request = project.CreateRequest();
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+        using var runtime = project.EmitRuntimeAssembly();
+        var subject = RequireRuntimeSubject(runtime.Assembly);
+        foreach (var item in cases)
+        {
+            var result = response.ClaimResults.Single(candidate =>
+                CallableId(response, candidate).Contains(
+                    "." + item.MethodName + "(",
+                    StringComparison.Ordinal));
+            var method = RequireRuntimeMethod(subject, item.MethodName);
+            var execution = ExecuteIr(project.FindCallable(item.MethodName), item.Inputs);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), item.MethodName);
+                if (item.ExpectedException == null)
+                {
+                    Assert.That(
+                        Convert.ToInt64(method.Invoke(null, item.Inputs), CultureInfo.InvariantCulture),
+                        Is.EqualTo(item.ExpectedResult),
+                        item.MethodName);
+                    AssertIntegerReturn(execution, item.ExpectedResult!.Value, item.MethodName);
+                }
+                else
+                {
+                    var thrown = Assert.Throws<TargetInvocationException>(
+                        (Action)(() => method.Invoke(null, item.Inputs)),
+                        item.MethodName);
+                    Assert.That(thrown!.InnerException, Is.TypeOf(item.ExpectedException), item.MethodName);
+                    Assert.That(execution.Exception?.Kind, Is.EqualTo(item.ExpectedIrException), item.MethodName);
+                }
+            }
+        }
+    }
+
+    // Every narrow operator the frontend models exactly, over boundary
+    // operands, with the expected outcome computed by real C# arithmetic.
+    private static IEnumerable<NarrowCase> NarrowCases()
+    {
+        int[] signed = [int.MinValue, -1, 0, 1, int.MaxValue];
+        uint[] unsigned = [0U, 1U, 2147483648U, uint.MaxValue];
+        (string Name, string Token)[] operators =
+            [("Add", "+"), ("Subtract", "-"), ("Multiply", "*"), ("Divide", "/"), ("Remainder", "%")];
+        var index = 0;
+        foreach (var context in new[] { "checked", "unchecked" })
+        {
+            foreach (var (name, token) in operators)
+            {
+                foreach (var left in signed)
+                {
+                    foreach (var right in signed)
+                    {
+                        if (name == "Remainder")
+                        {
+                            continue;
+                        }
+                        yield return Narrow(
+                            $"Int{name}{context}{index++}", "int", context, token,
+                            left, right, () => EvaluateInt(name, context == "checked", left, right));
+                    }
+                }
+                foreach (var left in unsigned)
+                {
+                    foreach (var right in unsigned)
+                    {
+                        if (name == "Multiply" && context == "unchecked")
+                        {
+                            continue;
+                        }
+                        yield return Narrow(
+                            $"UInt{name}{context}{index++}", "uint", context, token,
+                            left, right, () => EvaluateUInt(name, context == "checked", left, right));
+                    }
+                }
+            }
+            foreach (var value in signed)
+            {
+                yield return NarrowUnary(
+                    $"IntNegate{context}{index++}", context, value,
+                    () => context == "checked" ? checked(-value) : unchecked(-value));
+            }
+        }
+    }
+
+    private static long EvaluateInt(string name, bool isChecked, int left, int right)
+    {
+        return (name, isChecked) switch
+        {
+            ("Add", true) => checked(left + right),
+            ("Add", false) => unchecked(left + right),
+            ("Subtract", true) => checked(left - right),
+            ("Subtract", false) => unchecked(left - right),
+            ("Multiply", true) => checked(left * right),
+            ("Multiply", false) => unchecked(left * right),
+            ("Divide", true) => checked(left / right),
+            ("Divide", false) => unchecked(left / right),
+            _ => throw new ArgumentOutOfRangeException(nameof(name))
+        };
+    }
+
+    private static long EvaluateUInt(string name, bool isChecked, uint left, uint right)
+    {
+        return (name, isChecked) switch
+        {
+            ("Add", true) => checked(left + right),
+            ("Add", false) => unchecked(left + right),
+            ("Subtract", true) => checked(left - right),
+            ("Subtract", false) => unchecked(left - right),
+            ("Multiply", true) => checked(left * right),
+            ("Divide", _) => left / right,
+            ("Remainder", _) => left % right,
+            _ => throw new ArgumentOutOfRangeException(nameof(name))
+        };
+    }
+
+    private static NarrowCase Narrow(
+        string methodName, string type, string context, string token,
+        object left, object right, Func<long> evaluate)
+    {
+        var (expected, exception, irException) = Outcome(evaluate);
+        return new(methodName, type, $"{context}(left {token} right)", [left, right],
+            expected, exception, irException);
+    }
+
+    private static NarrowCase NarrowUnary(
+        string methodName, string context, int value, Func<long> evaluate)
+    {
+        var (expected, exception, irException) = Outcome(evaluate);
+        return new(methodName, "int", $"{context}(-value)", [value], expected, exception, irException);
+    }
+
+    private static (long? Expected, Type? Exception, IrExceptionKind? IrException) Outcome(
+        Func<long> evaluate)
+    {
+        try
+        {
+            return (evaluate(), null, null);
+        }
+        catch (OverflowException)
+        {
+            return (null, typeof(OverflowException), IrExceptionKind.Overflow);
+        }
+        catch (DivideByZeroException)
+        {
+            return (null, typeof(DivideByZeroException), IrExceptionKind.DivideByZero);
+        }
+    }
+
+    private static string CreateNarrowSource(IEnumerable<NarrowCase> cases)
+    {
+        var methods = cases.Select(static item =>
+        {
+            var names = item.Inputs.Length == 1 ? UnaryParameterNames : BinaryParameterNames;
+            var parameters = string.Join(", ", names.Select(name => item.Type + " " + name));
+            var requires = names.Select((name, index) =>
+                $"        Contract.Requires({name} == " +
+                Convert.ToString(item.Inputs[index], CultureInfo.InvariantCulture) +
+                (item.Type == "uint" ? "U" : string.Empty) + ");");
+            var ensures = item.ExpectedException == null
+                ? $"        Contract.Ensures(Contract.Result<{item.Type}>() == " +
+                  item.ExpectedResult!.Value.ToString(CultureInfo.InvariantCulture) +
+                  (item.Type == "uint" ? "U" : string.Empty) + ");"
+                : "        Contract.Ensures(false);";
+            return
+                $$"""
+                    public static {{item.Type}} {{item.MethodName}}({{parameters}}) {
+                    {{string.Join(Environment.NewLine, requires)}}
+                    {{ensures}}
+                        return {{item.Expression}};
+                    }
+                """;
+        });
+        return
+            """
+            using SharpProof.Attributes;
+
+            public static class ScalarDifferentialSubject {
+            """ +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, methods) +
+            Environment.NewLine +
+            """
+            }
+            """;
+    }
+
+    private sealed record NarrowCase(
+        string MethodName,
+        string Type,
+        string Expression,
+        object[] Inputs,
+        long? ExpectedResult,
+        Type? ExpectedException,
+        IrExceptionKind? ExpectedIrException);
+
     private sealed record ArithmeticCase(
         string MethodName,
         string Expression,
