@@ -653,7 +653,7 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
-    public void MandatoryFinallyControlFlowCannotRemainExact()
+    public void MandatoryFinallyRunsBeforeTheBranchContinues()
     {
         var lowered = Lower(
             """
@@ -666,17 +666,18 @@ public sealed class ProgramLoweringTests
         var parameter = lowered.Result.Variables.Single(static binding =>
             binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
 
+        var execution = new IrProgramInterpreter(lowered.Factory).Execute(
+            lowered.Result.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [parameter] = lowered.Factory.CreateIntegerValue(7)
+            });
+
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(lowered.Result.IsExact, Is.False);
-            Assert.That(
-                lowered.Result.Abstentions.Select(static value => value.Reason),
-                Does.Contain(FrontendAbstention.UnsupportedControlFlow));
-            Assert.That(
-                lowered.Instructions
-                    .OfType<IrHavocInstruction>()
-                    .SelectMany(static havoc => havoc.Variables),
-                Does.Contain(parameter));
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.ReturnValue?.Integer, Is.EqualTo(2));
         }
     }
 

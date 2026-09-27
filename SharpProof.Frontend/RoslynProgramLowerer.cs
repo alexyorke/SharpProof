@@ -81,6 +81,8 @@ public sealed class RoslynProgramLowerer(
         private readonly List<FrontendProgramAbstention> _abstentions = [];
         private readonly HashSet<(int Operation, FrontendAbstention Reason)> _seenAbstentions = [];
         private readonly Dictionary<IrCallInstruction, IInvocationOperation> _calls = [];
+        private readonly Dictionary<ControlFlowRegion, FinallyContinuation> _finallyContinuations = [];
+        private readonly List<(IrBlockId Block, OperationId Operation, ControlFlowRegion Region)> _finallyEnds = [];
         private int _nextTemporary;
 
         internal FrontendProgramLoweringResult Lower()
@@ -106,6 +108,10 @@ public sealed class RoslynProgramLowerer(
             foreach (var block in selected)
             {
                 LowerBlock(block);
+            }
+            foreach (var end in _finallyEnds)
+            {
+                EmitFinallyDispatch(end.Block, end.Operation, end.Region);
             }
 
             var firstReason = _abstentions.Count == 0 ? FrontendAbstention.None : _abstentions[0].Reason;
@@ -720,17 +726,35 @@ public sealed class RoslynProgramLowerer(
                 _builder.Return(block, operation);
                 return;
             }
-            if (HasMandatoryFinally(fallThrough) ||
-                HasMandatoryFinally(conditional))
+            if (fallThrough?.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling &&
+                conditional == null &&
+                EnclosingFinally(source) is { } finallyRegion)
             {
-                Abstain(operation, FrontendAbstention.UnsupportedControlFlow);
-                HavocKnownState(block, operation);
-                _builder.Return(block, operation);
+                // The end of a finally continues wherever the branch that
+                // entered it was going. The dispatch is emitted once every
+                // entering branch is known.
+                _finallyEnds.Add((block, operation, finallyRegion));
                 return;
             }
             if (fallThrough?.Semantics == ControlFlowBranchSemantics.Return)
             {
-                LowerReturn(block, operation, source.BranchValue);
+                if (!HasMandatoryFinally(fallThrough))
+                {
+                    LowerReturn(block, operation, source.BranchValue);
+                    return;
+                }
+
+                // The returned value is fixed before the finally runs.
+                var value = LowerOptionalValue(block, operation, source.BranchValue);
+                if (value != null)
+                {
+                    var saved = CreateTemporary("finally-return", value.Type);
+                    _builder.Assign(block, operation, saved, value);
+                    value = _factory.Variable(saved);
+                }
+                var exit = _builder.CreateBlock("finally-return");
+                _builder.Return(exit, operation, value);
+                _builder.Goto(block, operation, Route(fallThrough, exit, operation));
                 return;
             }
             if (IsExceptional(fallThrough?.Semantics) || IsExceptional(conditional?.Semantics))
@@ -758,8 +782,8 @@ public sealed class RoslynProgramLowerer(
                     Abstain(operation, FrontendAbstention.UnsupportedType);
                     condition = CreateHavocTemporary(block, operation, "condition", _factory.BooleanType);
                 }
-                var conditionalTarget = _blocks[conditional.Destination];
-                var fallThroughTarget = _blocks[fallThrough.Destination];
+                var conditionalTarget = Route(conditional, _blocks[conditional.Destination], operation);
+                var fallThroughTarget = Route(fallThrough, _blocks[fallThrough.Destination], operation);
                 var branchWhenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
                 _builder.Branch(block, operation, condition,
                     branchWhenTrue ? conditionalTarget : fallThroughTarget,
@@ -767,8 +791,8 @@ public sealed class RoslynProgramLowerer(
                 return;
             }
 
-            var destination = fallThrough?.Destination ?? conditional?.Destination;
-            if (destination != null)
+            var taken = fallThrough?.Destination != null ? fallThrough : conditional;
+            if (taken?.Destination is { } destination)
             {
                 if (fallThrough?.Semantics is not (null or ControlFlowBranchSemantics.Regular) ||
                     conditional?.Semantics is not (null or ControlFlowBranchSemantics.Regular))
@@ -776,7 +800,7 @@ public sealed class RoslynProgramLowerer(
                     Abstain(operation, FrontendAbstention.UnsupportedControlFlow);
                 }
 
-                _builder.Goto(block, operation, _blocks[destination]);
+                _builder.Goto(block, operation, Route(taken, _blocks[destination], operation));
                 return;
             }
 
@@ -972,6 +996,80 @@ public sealed class RoslynProgramLowerer(
                 ControlFlowBranchSemantics.Error;
         }
 
+        // A branch that leaves try regions runs their finally blocks first,
+        // innermost first. Each finally region has one continuation
+        // variable; the route records where each region should continue.
+        private IrBlockId Route(ControlFlowBranch branch, IrBlockId target, OperationId operation)
+        {
+            var regions = branch.FinallyRegions;
+            if (regions.IsDefaultOrEmpty)
+            {
+                return target;
+            }
+
+            var route = _builder.CreateBlock("finally-route");
+            for (var index = 0; index < regions.Length; index++)
+            {
+                if (!_finallyContinuations.TryGetValue(regions[index], out var continuation))
+                {
+                    continuation = new FinallyContinuation(
+                        CreateTemporary("finally-continuation", _factory.IntegerType));
+                    _finallyContinuations.Add(regions[index], continuation);
+                }
+
+                _builder.Assign(
+                    route, operation, continuation.Variable, _factory.Integer(continuation.Targets.Count));
+                continuation.Targets.Add(
+                    index + 1 < regions.Length ? FinallyEntry(regions[index + 1]) : target);
+            }
+            _builder.Goto(route, operation, FinallyEntry(regions[0]));
+            return route;
+        }
+
+        private IrBlockId FinallyEntry(ControlFlowRegion region)
+        {
+            return _blocks[_graph.Blocks[region.FirstBlockOrdinal]];
+        }
+
+        private void EmitFinallyDispatch(IrBlockId block, OperationId operation, ControlFlowRegion region)
+        {
+            if (!_finallyContinuations.TryGetValue(region, out var continuation))
+            {
+                // Only exceptional flow enters this finally, and it rethrows.
+                _builder.Assume(block, operation, _factory.Boolean(false));
+                _builder.Return(block, operation);
+                return;
+            }
+
+            var current = block;
+            var targets = continuation.Targets;
+            for (var index = 0; index < targets.Count - 1; index++)
+            {
+                var next = _builder.CreateBlock("finally-dispatch");
+                _builder.Branch(
+                    current,
+                    operation,
+                    _factory.Binary(
+                        IrBinaryOperator.Equal,
+                        _factory.Variable(continuation.Variable),
+                        _factory.Integer(index)),
+                    targets[index],
+                    next);
+                current = next;
+            }
+            _builder.Goto(current, operation, targets[targets.Count - 1]);
+        }
+
+        private static ControlFlowRegion? EnclosingFinally(BasicBlock block)
+        {
+            var region = block.EnclosingRegion;
+            while (region is { Kind: ControlFlowRegionKind.LocalLifetime })
+            {
+                region = region.EnclosingRegion;
+            }
+            return region is { Kind: ControlFlowRegionKind.Finally } ? region : null;
+        }
+
         private static bool HasMandatoryFinally(ControlFlowBranch? branch)
         {
             return branch != null && !branch.FinallyRegions.IsDefaultOrEmpty;
@@ -1038,6 +1136,17 @@ public sealed class RoslynProgramLowerer(
                 {
                     pending.Push(conditional);
                 }
+
+                foreach (var branch in new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
+                {
+                    if (branch != null && !branch.FinallyRegions.IsDefaultOrEmpty)
+                    {
+                        foreach (var region in branch.FinallyRegions)
+                        {
+                            pending.Push(_graph.Blocks[region.FirstBlockOrdinal]);
+                        }
+                    }
+                }
             }
             var blocks = _graph.Blocks;
             var ordinalOrder = true;
@@ -1072,6 +1181,12 @@ public sealed class RoslynProgramLowerer(
             }
 
             return ([.. selected], omittedHandler);
+        }
+
+        private sealed class FinallyContinuation(IrVarId variable)
+        {
+            internal IrVarId Variable { get; } = variable;
+            internal List<IrBlockId> Targets { get; } = [];
         }
 
         private sealed class LocationLowering(

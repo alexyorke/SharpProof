@@ -4614,6 +4614,98 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task FinallyBlocksRunOnEveryNormalExit()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int ReturnThroughFinally(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    var count = 0;
+                    try {
+                        return value;
+                    } finally {
+                        count = 1;
+                    }
+                }
+                public static int ReturnThroughFinallyWrongly(int value) {
+                    Contract.Ensures(Contract.Result<int>() == 7);
+                    var count = 0;
+                    try {
+                        return value;
+                    } finally {
+                        count = 1;
+                    }
+                }
+                public static int FinallyUpdatesState() {
+                    Contract.Ensures(Contract.Result<int>() == 2);
+                    var state = 0;
+                    try {
+                        state = 1;
+                    } finally {
+                        state = 2;
+                    }
+                    return state;
+                }
+                public static int ReturnedValueIsFixedFirst() {
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    var state = 0;
+                    try {
+                        state = 1;
+                        return state;
+                    } finally {
+                        state = 2;
+                    }
+                }
+                public static int Nested(bool early) {
+                    Contract.Ensures(Contract.Result<int>() == (early ? 1 : 3));
+                    var state = 0;
+                    try {
+                        try {
+                            if (early) {
+                                return 1;
+                            }
+                            state = 1;
+                        } finally {
+                            state += 1;
+                        }
+                    } finally {
+                        state += 0;
+                    }
+                    return state + 1;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        WorkerClaimResult Claim(string method)
+        {
+            return response.ClaimResults.Single(record =>
+                GetCallableId(response, record).StartsWith(
+                    "M:Subject." + method,
+                    StringComparison.Ordinal) &&
+                GetCallableId(response, record)["M:Subject.".Length + method.Length] is '(' or '~');
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(Claim("ReturnThroughFinally").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                Claim("ReturnThroughFinallyWrongly").Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(Claim("FinallyUpdatesState").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("ReturnedValueIsFixedFirst").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(Claim("Nested").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
+    [Test]
     public async Task NarrowIntegerArithmeticAndConversionsAreExact()
     {
         using var project = TestProject.Create(

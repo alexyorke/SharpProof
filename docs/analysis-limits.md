@@ -211,6 +211,14 @@ and does not evaluate the thrown operand. A body in which every path throws or
 loops forever has no modeled normal return, and its proofs are reported as
 vacuous. Throws inside `try`/`catch` still abstain.
 
+`try`/`finally` runs its finally block on every normal exit. Each finally
+region has one continuation variable: a branch leaving the `try` records where
+it was going, the finally block runs once, and its end dispatches on that
+variable. A `return` inside the `try` fixes its value before the finally runs.
+When control merges from paths where a variable was assigned on only some of
+them, the unassigned paths give it a fresh value; C# definite assignment
+guarantees they never read it.
+
 The manifest discovers local functions, lambdas, anonymous methods, and the
 top-level entry point, including their directly owned postconditions. These
 forms currently remain outside worker execution and produce

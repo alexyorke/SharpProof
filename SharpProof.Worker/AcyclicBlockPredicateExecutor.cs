@@ -337,40 +337,40 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             }
 
             var environment = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
-            foreach (var variable in values[0].Environment.Keys.OrderBy(static value => value.Value))
+            var variables = values
+                .SelectMany(static value => value.Environment.Keys)
+                .Distinct()
+                .OrderBy(static value => value.Value);
+            foreach (var variable in variables)
             {
                 if (!Spend(values.Count))
                 {
                     return null;
                 }
 
-                var first = values[0].Environment[variable];
-                var complete = true;
-                var differs = false;
-                for (var index = 1; index < values.Count; index++)
+                // A variable some predecessors never assigned is never read
+                // on those paths (C# definite assignment), so it takes a
+                // fresh value there instead of being dropped.
+                var incoming = new IrTerm[values.Count];
+                IrTerm? undefined = null;
+                for (var index = 0; index < values.Count; index++)
                 {
-                    if (!values[index].Environment.TryGetValue(
-                            variable,
-                            out var current))
-                    {
-                        complete = false;
-                        break;
-                    }
-                    differs |= current.Id != first.Id;
-                }
-                if (!complete)
-                {
-                    continue;
+                    incoming[index] = values[index].Environment.TryGetValue(variable, out var current)
+                        ? current
+                        : undefined ??= inputs.Factory.Variable(inputs.Factory.CreateVariable(
+                            "merge-undefined:" +
+                            block.Value.ToString(CultureInfo.InvariantCulture) + ":" +
+                            variable.Value.ToString(CultureInfo.InvariantCulture),
+                            inputs.Factory.GetVariableInfo(variable).Type));
                 }
 
-                IrTerm merged = first;
-                if (differs)
+                var merged = incoming[^1];
+                for (var index = values.Count - 2; index >= 0; index--)
                 {
-                    merged = values[^1].Environment[variable];
-                    for (var index = values.Count - 2; index >= 0; index--)
+                    if (incoming[index].Id != merged.Id)
                     {
-                        merged = inputs.Factory.Conditional(values[index].Predicate,
-                            values[index].Environment[variable], merged);
+                        merged = inputs.Factory.Conditional(
+                            values[index].Predicate, incoming[index], merged);
                     }
                 }
                 if (!Supported(merged))
