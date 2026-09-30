@@ -88,7 +88,7 @@ internal sealed class CompilerRelationalSummaryProvider
             compilation,
             factory,
             apiSpecs,
-            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks),
+            CompilerSpecificationPackProvider.ResolveConfiguration(specificationPacks),
             capturedTrees)
     {
     }
@@ -97,7 +97,7 @@ internal sealed class CompilerRelationalSummaryProvider
         CSharpCompilation compilation,
         IrFactory factory,
         ResolvedApiSpecTable apiSpecs,
-        CompilerSpecificationPackAuthority specificationPackAuthority,
+        CompilerSpecificationPackConfiguration specificationPackAuthority,
         CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
     {
         _compilation = ArgumentNullGuard.NotNull(
@@ -442,7 +442,7 @@ internal sealed class CompilerRelationalSummaryProvider
                 callIdentity,
                 provenance.EvidenceSha256,
                 provenance.EvidenceIdentity,
-                capturedTree?.Path ?? CompilerCaptureAuthority.NormalizePath(
+                capturedTree?.Path ?? CompilerCaptureIdentity.NormalizePath(
                     declaration.SyntaxTree.FilePath ?? string.Empty),
                 sourceTreeSha256,
                 declaration.FullSpan.Start,

@@ -1,72 +1,31 @@
-using System.ComponentModel;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Build.Framework;
-using Microsoft.Build.Utilities;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.BuildTasks;
 
-public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
+// Runs the verifier as one child process with a hard deadline. On timeout or
+// cancellation the whole process tree is killed; the verifier writes its own
+// typed result, so a killed run simply has no fresh result.
+public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
-    internal const int LauncherProcessReserveMilliseconds = 1000;
+    // The verifier enforces the project budget itself and writes a typed
+    // TimedOut result. This reserve covers process startup and publication;
+    // the task's kill is only a safety net for a hung process.
+    internal const int LauncherProcessReserveMilliseconds = 30000;
+    internal const int MaximumCapturedOutputCharacters = 1_048_576;
+    // Once the verifier exits, only a leaked descendant can keep its pipes
+    // open; the build does not wait for one.
+    internal const int OutputDrainMilliseconds = 2000;
     private const int StructuredRefutedFailureExitCode = 5;
     private const int StructuredSemanticFailureExitCode = 6;
-    // The worker launcher can legitimately spend the full publication lease
-    // timeout after its worker budget expires. Keep that wait outside the
-    // worker budget, followed by the existing bounded room for finalization
-    // and authenticated cleanup. Direct task callers retain their original
-    // deadline semantics.
-    private const int WorkerLauncherPublicationWaitMilliseconds = 30000;
-    private const int WorkerLauncherFinalizationReserveMilliseconds = 5000;
-    private const int WorkerLauncherProcessReserveMilliseconds =
-        WorkerLauncherPublicationWaitMilliseconds +
-        WorkerLauncherFinalizationReserveMilliseconds;
-    private const int CleanupAuthenticationWaitMilliseconds = 5000;
-    internal const int MaximumCapturedOutputCharacters = 1_048_576;
-    internal const int OutputDrainPollingMilliseconds = 25;
-    private const int MaximumProtocolLineCharacters = 160;
-    private const string ProcessGroupLauncher = "/usr/bin/setsid";
-    private static readonly ConcurrentDictionary<long, CleanupAnchor>
-        RetainedCleanupAnchors = new();
-    private static readonly (string Severity, string Code, string Marker)[]
-        LegacyDiagnosticMarkers =
-        [
-            ("warning", VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                $": warning {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
-            ("warning", VerifierDiagnosticCodes.AssumptionsDeclared,
-                $": warning {VerifierDiagnosticCodes.AssumptionsDeclared}: "),
-            ("error", VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                $": error {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
-            ("error", VerifierDiagnosticCodes.AssumptionsDeclared,
-                $": error {VerifierDiagnosticCodes.AssumptionsDeclared}: ")
-        ];
-    private static long s_nextCleanupAnchor;
     private readonly object _gate = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
-    private readonly ManualResetEventSlim _outputLimitSignal = new();
     private Process? _process;
-    private int _processGroupId;
-    private int _processGroupPidFd = -1;
-    private System.Threading.Tasks.TaskCompletionSource<bool>?
-        _supervisorArmedSignal;
-    private System.Threading.Tasks.Task<BoundedProcessOutput>?
-        _supervisorOutputCompletion;
-
-    internal Func<int, int>? OpenPidFdOverride { get; set; }
-    internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
-    internal Action<string>? ContainmentAuthenticationFailureOverride { get; set; }
-    internal Action? PreLaunchSetupOverride { get; set; }
-
-    internal static int RetainedCleanupAnchorCount =>
-        RetainedCleanupAnchors.Count;
 
     [Required]
     public string Executable { get; set; } = string.Empty;
@@ -91,21 +50,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     [Output]
     public bool HasStructuredError { get; set; }
 
-    internal bool HasActiveProcess
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _process != null && !_process.HasExited;
-            }
-        }
-    }
-
     public void Dispose()
     {
         _cancellationSignal.Dispose();
-        _outputLimitSignal.Dispose();
         _process?.Dispose();
     }
 
@@ -115,82 +62,33 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         Justification = "The MSBuild boundary reports every launch failure as a classified task result.")]
     public override bool Execute()
     {
-        Process? process = null;
-        var processGroupId = 0;
-        System.Threading.Tasks.Task<BoundedProcessOutput>? standardOutput = null;
-        System.Threading.Tasks.Task<BoundedProcessOutput>? standardError = null;
-        var supervisorArmedSignal =
-            new System.Threading.Tasks.TaskCompletionSource<bool>(
-                System.Threading.Tasks.TaskCreationOptions
-                    .RunContinuationsAsynchronously);
-        var supervisorCleanupSignal =
-            new System.Threading.Tasks.TaskCompletionSource<bool>(
-                System.Threading.Tasks.TaskCreationOptions
-                    .RunContinuationsAsynchronously);
-        var supervisorNonce = string.Empty;
-        var retainCleanupAnchor = false;
         HasStructuredError = false;
         ExitCode = 0;
-        var containmentFailed = false;
-        _outputLimitSignal.Reset();
+        using var process = new Process();
         try
         {
             ContainerContract.ValidateRequired();
-            var processTimeout = ComputeProcessTimeout(
+            var timeout = ComputeProcessTimeout(
                 ProjectWallTimeMilliseconds,
                 TerminationGraceMilliseconds);
-            var workerLauncherBudget = HasWorkerLauncherBudgetArguments();
-            if (workerLauncherBudget)
+            var executable = ResolveDotNetHost(Executable);
+            process.StartInfo = new ProcessStartInfo
             {
-                processTimeout = checked(processTimeout +
-                    WorkerLauncherProcessReserveMilliseconds -
-                    LauncherProcessReserveMilliseconds);
-            }
-            // The verifier launcher uses the project timeout plus termination
-            // grace as its own final deadline. Keep the full process deadline
-            // for that invocation so the reserve remains available for
-            // containment and output drain. Direct task callers do not have
-            // that inner deadline and retain the task's original timeout.
-            var verifierTimeout = workerLauncherBudget
-                ? processTimeout
-                : processTimeout - LauncherProcessReserveMilliseconds;
-            PreLaunchSetupOverride?.Invoke();
-            var resolvedExecutable = ResolveDotNetHost(Executable);
-            var executableIdentity = GetFileIdentity(resolvedExecutable);
-            var supervisorAssembly = ResolveSupervisorAssemblyRequired();
-            var supervisorIdentity = GetFileIdentity(supervisorAssembly);
-            if (GetFileIdentity(resolvedExecutable) != executableIdentity ||
-                GetFileIdentity(supervisorAssembly) != supervisorIdentity)
-            {
-                throw new InvalidOperationException(
-                    "SharpProof verifier runtime changed after validation.");
-            }
-            supervisorNonce = CreateSupervisorNonce();
-            process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = ResolveProcessGroupLauncherRequired(),
-                    WorkingDirectory = Path.GetFullPath(WorkingDirectory),
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
-                    CreateNoWindow = true
-                }
+                FileName = executable,
+                WorkingDirectory = Path.GetFullPath(WorkingDirectory),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             };
-            TrustedChildEnvironment.Apply(
-                process.StartInfo,
-                resolvedExecutable);
-            process.StartInfo.ArgumentList.Add(resolvedExecutable);
-            process.StartInfo.ArgumentList.Add(
-                supervisorAssembly);
-            process.StartInfo.ArgumentList.Add(Program.SupervisorArgument);
-            process.StartInfo.ArgumentList.Add(resolvedExecutable);
+            TrustedChildEnvironment.Apply(process.StartInfo, executable);
             foreach (var argument in Arguments)
             {
                 process.StartInfo.ArgumentList.Add(argument.ItemSpec);
             }
+
+            System.Threading.Tasks.Task<string> standardOutput;
+            System.Threading.Tasks.Task<string> standardError;
             lock (_gate)
             {
                 if (_cancellationSignal.IsSet)
@@ -203,92 +101,26 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     throw new InvalidOperationException(
                         "The SharpProof verifier process could not be started.");
                 }
-                processGroupId = process.Id;
-                int processGroupPidFd;
-                try
-                {
-                    processGroupPidFd = OpenPidFdRequired(processGroupId);
-                }
-                catch
-                {
-                    TerminateBootstrapProcess(process);
-                    throw;
-                }
                 _process = process;
-                _processGroupId = processGroupId;
-                _processGroupPidFd = processGroupPidFd;
-                _supervisorArmedSignal = supervisorArmedSignal;
-                standardOutput = ReadBoundedOutputAsync(
-                    process.StandardOutput,
-                    supervisorNonce,
-                    _outputLimitSignal,
-                    supervisorArmedSignal,
-                    supervisorCleanupSignal);
-                standardError = ReadBoundedOutputAsync(
-                    process.StandardError,
-                    supervisorNonce: null,
-                    _outputLimitSignal);
-                _supervisorOutputCompletion = standardOutput;
-                process.StandardInput.WriteLine(
-                    LinuxWorkerProcess.StartMessage + " " + supervisorNonce);
-                process.StandardInput.Close();
+                standardOutput = ReadBoundedAsync(process.StandardOutput);
+                standardError = ReadBoundedAsync(process.StandardError);
             }
-            var processStopwatch = Stopwatch.StartNew();
-            var timedOut = !WaitForExitOrCancellation(
-                process,
-                Math.Min(
-                    verifierTimeout,
-                    RemainingMilliseconds(
-                        processStopwatch,
-                        processTimeout)));
-            var canceled = _cancellationSignal.IsSet;
-            if (timedOut)
+
+            var exited = WaitForExitOrCancellation(process, timeout);
+            if (!exited)
             {
-                TerminateAfterTimeout(
-                    process,
-                    processGroupId,
-                    processStopwatch,
-                    processTimeout,
-                    ref retainCleanupAnchor,
-                    ref containmentFailed);
-                canceled = _cancellationSignal.IsSet;
-                if (!canceled && !_outputLimitSignal.IsSet)
-                {
-                    _ = process.WaitForExit(RemainingMilliseconds(
-                        processStopwatch,
-                        processTimeout));
-                }
+                Kill(process);
             }
-            var outputCompleted = WaitForOutputCompletion(
-                System.Threading.Tasks.Task.WhenAll(
-                    standardOutput,
-                    standardError),
-                RemainingMilliseconds(
-                    processStopwatch,
-                    processTimeout),
-                () => _cancellationSignal.IsSet ||
-                    _outputLimitSignal.IsSet);
-            var interrupted = _cancellationSignal.IsSet ||
-                _outputLimitSignal.IsSet;
-            if (!outputCompleted)
+            process.WaitForExit();
+            if (!System.Threading.Tasks.Task.WaitAll(
+                    [standardOutput, standardError], OutputDrainMilliseconds))
             {
-                timedOut = true;
-                TerminateAfterTimeout(
-                    process,
-                    processGroupId,
-                    processStopwatch,
-                    processTimeout,
-                    ref retainCleanupAnchor,
-                    ref containmentFailed);
+                Log.LogMessage(
+                    MessageImportance.High,
+                    "SharpProof verifier left a descendant holding its output; output was discarded.");
             }
-            var outputResult = standardOutput.IsCompletedSuccessfully
-                ? standardOutput.Result
-                : null;
-            var errorResult = standardError.IsCompletedSuccessfully
-                ? standardError.Result
-                : null;
-            var output = outputResult?.Text ?? string.Empty;
-            var error = errorResult?.Text ?? string.Empty;
+            var output = standardOutput.IsCompletedSuccessfully ? standardOutput.Result : string.Empty;
+            var error = standardError.IsCompletedSuccessfully ? standardError.Result : string.Empty;
             if (!string.IsNullOrWhiteSpace(output))
             {
                 Log.LogMessage(MessageImportance.High, "{0}", output);
@@ -297,48 +129,16 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 LogStandardError(error);
             }
-            if (_outputLimitSignal.IsSet ||
-                outputResult?.LimitExceeded == true ||
-                errorResult?.LimitExceeded == true)
-            {
-                Log.LogError(
-                    "SharpProof verifier output exceeded the bounded " +
-                    "diagnostic capture limit.");
-            }
-            var supervisorArmed = outputResult?.SupervisorArmed == true ||
-                supervisorArmedSignal.Task.IsCompletedSuccessfully;
-            var authenticationRequired = supervisorArmed ||
-                process.HasExited &&
-                process.ExitCode != LinuxProcessControlConstants.EnvironmentFailureExitCode;
-            var deferAuthentication =
-                canceled ||
-                ShouldDeferSupervisorAuthentication(
-                    authenticationRequired,
-                    outputCompleted);
-            if (deferAuthentication)
-            {
-                retainCleanupAnchor = true;
-            }
-            else if (!RequireSupervisorCleanupReceipt(
-                    outputResult?.CleanupAuthenticated == true,
-                    authenticationRequired))
-            {
-                containmentFailed = true;
-            }
-            ExitCode = containmentFailed
+
+            ExitCode = _cancellationSignal.IsSet
                 ? -1
-                : timedOut
-                    ? LinuxProcessControlConstants.TimeoutExitCode
-                    : process.ExitCode;
+                : exited
+                    ? process.ExitCode
+                    : LinuxProcessControlConstants.TimeoutExitCode;
         }
         catch (Exception exception)
         {
-            var contained = TryTerminate(
-                process,
-                processGroupId,
-                LauncherProcessReserveMilliseconds);
-            retainCleanupAnchor = !contained &&
-                process is { HasExited: false };
+            Kill(process);
             ExitCode = -1;
             Log.LogMessage(
                 MessageImportance.High,
@@ -347,763 +147,45 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         }
         finally
         {
-            var processGroupPidFd = -1;
             lock (_gate)
             {
-                if (ReferenceEquals(_process, process))
-                {
-                    _process = null;
-                    _processGroupId = 0;
-                    processGroupPidFd = _processGroupPidFd;
-                    _processGroupPidFd = -1;
-                    _supervisorArmedSignal = null;
-                    _supervisorOutputCompletion = null;
-                }
+                _process = null;
             }
-            if (processGroupPidFd >= 0)
-            {
-                if (retainCleanupAnchor && process != null)
-                {
-                    Action<string>? authenticationFailure =
-                        _cancellationSignal.IsSet
-                            ? null
-                            : HandleContainmentAuthenticationFailure;
-                    RetainCleanupAnchor(
-                        process,
-                        processGroupPidFd,
-                        standardOutput,
-                        standardError,
-                        supervisorNonce,
-                        supervisorCleanupSignal.Task,
-                        authenticationFailure);
-                    process = null;
-                }
-                else
-                {
-                    _ = LinuxNativeMethods.Close(processGroupPidFd);
-                }
-            }
-            process?.Dispose();
         }
-        // The launcher reserves exits 5 and 6 for completed semantic
-        // failures. A diagnostic observed before any other nonzero exit is
-        // partial and must not suppress the target's infrastructure error.
+
+        // Exits 5 and 6 are completed semantic failures. A diagnostic seen
+        // before any other nonzero exit is partial and must not suppress the
+        // target's infrastructure error.
         HasStructuredError &=
             ExitCode is StructuredRefutedFailureExitCode or
                 StructuredSemanticFailureExitCode;
         return true;
     }
 
-    internal static string CreateSupervisorNonce()
+    public void Cancel()
     {
-        return Convert.ToHexString(
-            RandomNumberGenerator.GetBytes(32));
-    }
-
-    internal static bool WaitForOutputCompletion(
-        System.Threading.Tasks.Task outputCompletion,
-        int timeoutMilliseconds,
-        Func<bool> isInterrupted,
-        Func<int, bool>? waitOverride = null)
-    {
-        ArgumentNullException.ThrowIfNull(outputCompletion);
-        ArgumentNullException.ThrowIfNull(isInterrupted);
-        if (timeoutMilliseconds <= 0)
+        Process? process;
+        lock (_gate)
         {
-            return outputCompletion.IsCompleted;
+            _cancellationSignal.Set();
+            process = _process;
         }
-
-        return WaitForPolling(
-            timeoutMilliseconds,
-            () => outputCompletion.IsCompleted
-                ? true
-                : isInterrupted()
-                    ? false
-                    : null,
-            slice => waitOverride == null
-                ? outputCompletion.Wait(slice)
-                : waitOverride(slice),
-            static () => true,
-            () => outputCompletion.IsCompleted);
-    }
-
-    internal static SupervisorReadiness WaitForSupervisorReadiness(
-        System.Threading.Tasks.Task armed,
-        System.Threading.Tasks.Task outputCompletion,
-        Func<bool> hasExited,
-        int timeoutMilliseconds,
-        Func<int, bool>? waitOverride = null)
-    {
-        ArgumentNullException.ThrowIfNull(armed);
-        ArgumentNullException.ThrowIfNull(outputCompletion);
-        ArgumentNullException.ThrowIfNull(hasExited);
-        return WaitForPolling(
-            timeoutMilliseconds,
-            () =>
-            {
-                if (armed.IsCompletedSuccessfully)
-                {
-                    return SupervisorReadiness.Armed;
-                }
-                if (hasExited() && outputCompletion.IsCompletedSuccessfully)
-                {
-                    return armed.IsCompletedSuccessfully
-                        ? SupervisorReadiness.Armed
-                        : SupervisorReadiness.ExitedBeforeArmed;
-                }
-                return null;
-            },
-            slice =>
-            {
-                _ = waitOverride == null
-                    ? armed.Wait(slice)
-                    : waitOverride(slice);
-                return false;
-            },
-            static () => SupervisorReadiness.Armed,
-            static () => SupervisorReadiness.NotReady);
-    }
-
-    private static T WaitForPolling<T>(
-        int timeoutMilliseconds,
-        Func<T?> state,
-        Func<int, bool> wait,
-        Func<T> onWaitCompletion,
-        Func<T> onTimeout)
-        where T : struct
-    {
-        var stopwatch = Stopwatch.StartNew();
-        while (true)
+        if (process != null)
         {
-            var current = state();
-            if (current.HasValue)
-            {
-                return current.Value;
-            }
-
-            var remaining = RemainingMilliseconds(
-                stopwatch,
-                timeoutMilliseconds);
-            if (remaining <= 0)
-            {
-                return onTimeout();
-            }
-
-            if (wait(Math.Min(OutputDrainPollingMilliseconds, remaining)))
-            {
-                return onWaitCompletion();
-            }
+            Kill(process);
         }
     }
-
-    internal static bool ShouldDeferSupervisorAuthentication(
-        bool authenticationRequired,
-        bool outputCompleted)
-    {
-        return authenticationRequired && !outputCompleted;
-    }
-
-    internal static async System.Threading.Tasks.Task<BoundedProcessOutput>
-        ReadBoundedOutputAsync(
-            TextReader reader,
-            string? supervisorNonce,
-            ManualResetEventSlim outputLimitSignal,
-            System.Threading.Tasks.TaskCompletionSource<bool>?
-                supervisorArmedSignal = null,
-            System.Threading.Tasks.TaskCompletionSource<bool>?
-                supervisorCleanupSignal = null)
-    {
-        var captured = new StringBuilder();
-        var protocolLine = new StringBuilder();
-        var protocolLineTooLong = false;
-        var limitExceeded = false;
-        var supervisorArmed = false;
-        var cleanupAuthenticated = false;
-        var buffer = new char[4096];
-        while (true)
-        {
-            var count = await reader.ReadAsync(
-                buffer,
-                0,
-                buffer.Length).ConfigureAwait(false);
-            if (count == 0)
-            {
-                break;
-            }
-            var remaining = MaximumCapturedOutputCharacters -
-                captured.Length;
-            if (remaining > 0)
-            {
-                captured.Append(buffer, 0, Math.Min(remaining, count));
-            }
-            if (count > remaining)
-            {
-                limitExceeded = true;
-                outputLimitSignal.Set();
-            }
-            if (supervisorNonce == null)
-            {
-                continue;
-            }
-            for (var index = 0; index < count; index++)
-            {
-                var character = buffer[index];
-                if (character == '\n')
-                {
-                    if (!protocolLineTooLong)
-                    {
-                        var line = protocolLine.ToString();
-                        if (line.EndsWith('\r'))
-                        {
-                            line = line[..^1];
-                        }
-                        RecordSupervisorAuthentication(
-                            line,
-                            LinuxWorkerProcess.ArmedMessage,
-                            supervisorNonce,
-                            ref supervisorArmed,
-                            supervisorArmedSignal);
-                        RecordSupervisorAuthentication(
-                            line,
-                            LinuxWorkerProcess.CleanupMessage,
-                            supervisorNonce,
-                            ref cleanupAuthenticated,
-                            supervisorCleanupSignal);
-                    }
-                    protocolLine.Clear();
-                    protocolLineTooLong = false;
-                    continue;
-                }
-                if (!protocolLineTooLong)
-                {
-                    if (protocolLine.Length < MaximumProtocolLineCharacters)
-                    {
-                        protocolLine.Append(character);
-                    }
-                    else
-                    {
-                        protocolLine.Clear();
-                        protocolLineTooLong = true;
-                    }
-                }
-            }
-        }
-        return new BoundedProcessOutput(
-            captured.ToString(),
-            limitExceeded,
-            supervisorArmed,
-            cleanupAuthenticated);
-    }
-
-    private static void RecordSupervisorAuthentication(
-        string line,
-        string message,
-        string supervisorNonce,
-        ref bool authenticated,
-        System.Threading.Tasks.TaskCompletionSource<bool>? signal)
-    {
-        if (!string.Equals(
-                line,
-                message + " " + supervisorNonce,
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        authenticated = true;
-        signal?.TrySetResult(true);
-    }
-
-    internal bool RequireSupervisorCleanupReceipt(
-        bool cleanupAuthenticated,
-        bool authenticationRequired)
-    {
-        if (!authenticationRequired || cleanupAuthenticated)
-        {
-            return true;
-        }
-        HandleContainmentAuthenticationFailure(
-            "The SharpProof verifier containment supervisor exited " +
-            "without an authenticated cleanup receipt.");
-        return false;
-    }
-
-    private void HandleContainmentAuthenticationFailure(string message)
-    {
-        if (ContainmentAuthenticationFailureOverride is { } handler)
-        {
-            handler(message);
-            return;
-        }
-        Environment.FailFast(message);
-    }
-
-    internal static void RetainCleanupAnchorForTest(Process process)
-    {
-        RetainCleanupAnchor(process, -1, null, null, null, null);
-    }
-
-    internal static void RetainCleanupAnchorForTest(
-        Process process,
-        System.Threading.Tasks.Task<string>? standardOutput,
-        string? supervisorNonce,
-        Action<string>? authenticationFailure)
-    {
-        var boundedOutput = standardOutput == null
-            ? null
-            : ConvertTestOutputAsync(standardOutput, supervisorNonce);
-        RetainCleanupAnchor(
-            process,
-            -1,
-            boundedOutput,
-            null,
-            supervisorNonce,
-            null,
-            authenticationFailure);
-    }
-
-    private static async System.Threading.Tasks.Task<BoundedProcessOutput>
-        ConvertTestOutputAsync(
-            System.Threading.Tasks.Task<string> output,
-            string? supervisorNonce)
-    {
-        var text = await output.ConfigureAwait(false);
-        using var reader = new StringReader(text);
-        using var outputLimitSignal = new ManualResetEventSlim();
-        return await ReadBoundedOutputAsync(
-            reader, supervisorNonce, outputLimitSignal).ConfigureAwait(false);
-    }
-
-    private static void RetainCleanupAnchor(
-        Process process,
-        int processGroupPidFd,
-        System.Threading.Tasks.Task<BoundedProcessOutput>? standardOutput,
-        System.Threading.Tasks.Task<BoundedProcessOutput>? standardError,
-        string? supervisorNonce = null,
-        System.Threading.Tasks.Task? supervisorCleanupSignal = null,
-        Action<string>? authenticationFailure = null)
-    {
-        if (supervisorNonce is null)
-        {
-            authenticationFailure = null;
-        }
-        var token = Interlocked.Increment(ref s_nextCleanupAnchor);
-        var anchor = new CleanupAnchor(
-            process,
-            processGroupPidFd,
-            standardOutput,
-            standardError,
-            supervisorCleanupSignal,
-            authenticationFailure);
-        if (!RetainedCleanupAnchors.TryAdd(token, anchor))
-        {
-            throw new InvalidOperationException(
-                "SharpProof could not retain its cleanup anchor.");
-        }
-        ObserveFault(anchor.StandardOutput);
-        ObserveFault(anchor.StandardError);
-        _ = ObserveCleanupAnchorAsync(token, anchor);
-    }
-
-    private static async System.Threading.Tasks.Task
-        ObserveCleanupAnchorAsync(long token, CleanupAnchor anchor)
-    {
-        try
-        {
-            await anchor.Process.WaitForExitAsync().ConfigureAwait(false);
-            if (anchor.AuthenticationFailure != null)
-            {
-                var authenticated = anchor.StandardOutput != null &&
-                    await AwaitCleanupAuthenticationAfterSupervisorExit(
-                        anchor.StandardOutput,
-                        anchor.SupervisorCleanupSignal).ConfigureAwait(false);
-                if (!authenticated)
-                {
-                    anchor.AuthenticationFailure(
-                        "The retained SharpProof verifier containment " +
-                        "supervisor exited without an authenticated " +
-                        "cleanup receipt.");
-                }
-            }
-        }
-        catch (InvalidOperationException) { }
-        finally
-        {
-            if (anchor.ProcessGroupPidFd >= 0)
-            {
-                _ = LinuxNativeMethods.Close(anchor.ProcessGroupPidFd);
-            }
-            anchor.Process.Dispose();
-            _ = RetainedCleanupAnchors.TryRemove(token, out _);
-        }
-    }
-
-    private static async System.Threading.Tasks.Task<bool>
-        AwaitCleanupAuthenticationAfterSupervisorExit(
-            System.Threading.Tasks.Task<BoundedProcessOutput> output,
-            System.Threading.Tasks.Task? supervisorCleanupSignal)
-    {
-        var delay = System.Threading.Tasks.Task.Delay(
-            CleanupAuthenticationWaitMilliseconds);
-        var completed = supervisorCleanupSignal == null
-            ? await System.Threading.Tasks.Task.WhenAny(output, delay)
-                .ConfigureAwait(false)
-            : await System.Threading.Tasks.Task.WhenAny(
-                output,
-                supervisorCleanupSignal,
-                delay).ConfigureAwait(false);
-        if (supervisorCleanupSignal != null &&
-            ReferenceEquals(completed, supervisorCleanupSignal))
-        {
-            return true;
-        }
-        if (!ReferenceEquals(completed, output) ||
-            !output.IsCompletedSuccessfully)
-        {
-            return false;
-        }
-        var outputResult = await output.ConfigureAwait(false);
-        return outputResult.SupervisorArmed &&
-            outputResult.CleanupAuthenticated;
-    }
-
-    private static void ObserveFault(
-        System.Threading.Tasks.Task<BoundedProcessOutput>? task)
-    {
-        if (task == null)
-        {
-            return;
-        }
-        _ = task.ContinueWith(
-            static completed => _ = completed.Exception,
-            CancellationToken.None,
-            TaskContinuationOptions.OnlyOnFaulted |
-                TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-    }
-
-    private sealed record CleanupAnchor(
-        Process Process,
-        int ProcessGroupPidFd,
-        System.Threading.Tasks.Task<BoundedProcessOutput>? StandardOutput,
-        System.Threading.Tasks.Task<BoundedProcessOutput>? StandardError,
-        System.Threading.Tasks.Task? SupervisorCleanupSignal,
-        Action<string>? AuthenticationFailure);
-
-    internal sealed record BoundedProcessOutput(
-        string Text,
-        bool LimitExceeded,
-        bool SupervisorArmed,
-        bool CleanupAuthenticated);
 
     internal static int ComputeProcessTimeout(
         int projectWallTimeMilliseconds,
         int terminationGraceMilliseconds)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(
-            projectWallTimeMilliseconds,
-            1);
-        ArgumentOutOfRangeException.ThrowIfLessThan(
-            terminationGraceMilliseconds,
-            1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(projectWallTimeMilliseconds, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(terminationGraceMilliseconds, 1);
         return checked(
             projectWallTimeMilliseconds +
             terminationGraceMilliseconds +
             LauncherProcessReserveMilliseconds);
-    }
-
-    private static int RemainingMilliseconds(
-        Stopwatch stopwatch,
-        int timeoutMilliseconds)
-    {
-        var remaining = timeoutMilliseconds - stopwatch.ElapsedMilliseconds;
-        return remaining <= 0
-            ? 0
-            : (int)Math.Min(remaining, int.MaxValue);
-    }
-
-    private void TerminateAfterTimeout(
-        Process process,
-        int processGroupId,
-        Stopwatch processStopwatch,
-        int processTimeout,
-        ref bool retainCleanupAnchor,
-        ref bool containmentFailed)
-    {
-        var processWasAlive = !process.HasExited;
-        var contained = TryTerminate(
-            process,
-            processGroupId,
-            RemainingMilliseconds(processStopwatch, processTimeout));
-        retainCleanupAnchor |= processWasAlive;
-        containmentFailed |= !contained;
-    }
-
-    private bool WaitForExitOrCancellation(
-        Process process,
-        int timeoutMilliseconds)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        while (!_cancellationSignal.IsSet && !_outputLimitSignal.IsSet)
-        {
-            var remaining = RemainingMilliseconds(
-                stopwatch,
-                timeoutMilliseconds);
-            if (remaining == 0)
-            {
-                return process.HasExited;
-            }
-            if (process.WaitForExit(
-                    Math.Min(remaining, OutputDrainPollingMilliseconds)))
-            {
-                return true;
-            }
-        }
-        return process.HasExited;
-    }
-
-    private static string ResolveProcessGroupLauncherRequired()
-    {
-        if (!File.Exists(ProcessGroupLauncher))
-        {
-            throw new InvalidOperationException(
-                "SharpProof could not establish the verifier process boundary.");
-        }
-        return LinuxPathIdentity.Canonicalize(ProcessGroupLauncher);
-    }
-
-    private bool HasWorkerLauncherBudgetArguments()
-    {
-        if (Arguments.Length < 4 ||
-            !IsWorkerLauncherPath(Arguments[0].ItemSpec) ||
-            !string.Equals(
-                Arguments[1].ItemSpec,
-                WorkerInvocationArguments.Command,
-                StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        for (var index = 2; index + 1 < Arguments.Length; index += 2)
-        {
-            if (string.Equals(
-                    Arguments[index].ItemSpec,
-                    "--project-wall-ms",
-                    StringComparison.Ordinal) &&
-                int.TryParse(
-                    Arguments[index + 1].ItemSpec,
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out var projectWallTimeMilliseconds) &&
-                projectWallTimeMilliseconds == ProjectWallTimeMilliseconds)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsWorkerLauncherPath(string path)
-    {
-        try
-        {
-            var assemblyDirectory = Path.GetDirectoryName(
-                typeof(RunVerifier).Assembly.Location);
-            if (assemblyDirectory == null)
-            {
-                return false;
-            }
-            var candidate = Path.GetFullPath(path);
-            var trusted = Path.Combine(
-                assemblyDirectory,
-                "SharpProof.Worker.Launcher.dll");
-            return string.Equals(candidate, trusted, StringComparison.Ordinal) ||
-                string.Equals(
-                    Path.GetFileName(candidate),
-                    Path.GetFileName(trusted),
-                    StringComparison.Ordinal) &&
-                File.Exists(candidate);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-        catch (NotSupportedException)
-        {
-            return false;
-        }
-        catch (PathTooLongException)
-        {
-            return false;
-        }
-        catch (IOException)
-        {
-            return false;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
-    private static string ResolveSupervisorAssemblyRequired()
-    {
-        var assembly = typeof(RunVerifier).Assembly.Location;
-        if (!File.Exists(assembly) ||
-            !File.Exists(Path.ChangeExtension(
-                assembly,
-                ".runtimeconfig.json")))
-        {
-            throw new InvalidOperationException(
-                "SharpProof could not establish the verifier supervisor.");
-        }
-        return LinuxPathIdentity.Canonicalize(assembly);
-    }
-
-    private static void TerminateBootstrapProcess(Process process)
-    {
-        try
-        {
-            process.Kill(entireProcessTree: true);
-            _ = process.WaitForExit(1000);
-        }
-        catch (InvalidOperationException) { }
-        catch (Win32Exception) { }
-    }
-
-    private bool TryTerminate(
-        Process? process,
-        int processGroupId,
-        int terminationWaitMilliseconds)
-    {
-        if (TryTerminateOverride is { } terminateOverride)
-        {
-            return terminateOverride(
-                process,
-                processGroupId,
-                terminationWaitMilliseconds);
-        }
-        if (process == null)
-        {
-            return true;
-        }
-        lock (_gate)
-        {
-            if (!ReferenceEquals(_process, process) ||
-                _processGroupId != processGroupId ||
-                _processGroupPidFd < 0)
-            {
-                return true;
-            }
-
-            var terminationStopwatch = Stopwatch.StartNew();
-            if (_supervisorArmedSignal == null ||
-                _supervisorOutputCompletion == null)
-            {
-                HandleContainmentAuthenticationFailure(
-                    "SharpProof verifier supervisor readiness was not " +
-                    "published before termination.");
-                return false;
-            }
-            var readiness = WaitForSupervisorReadiness(
-                _supervisorArmedSignal.Task,
-                _supervisorOutputCompletion,
-                () => process.HasExited,
-                Math.Min(
-                    terminationWaitMilliseconds,
-                    LauncherProcessReserveMilliseconds));
-            if (readiness == SupervisorReadiness.ExitedBeforeArmed)
-            {
-                return process.ExitCode ==
-                    LinuxProcessControlConstants.EnvironmentFailureExitCode;
-            }
-            if (readiness != SupervisorReadiness.Armed)
-            {
-                HandleContainmentAuthenticationFailure(
-                    "SharpProof verifier supervisor readiness could not be " +
-                    "authenticated before termination.");
-                return false;
-            }
-
-            var terminateSent = SendPidFdSignal(
-                _processGroupPidFd,
-                LinuxProcessControlConstants.SignalTerminate) == 0;
-            var boundedWait = Math.Min(
-                RemainingMilliseconds(
-                    terminationStopwatch,
-                    terminationWaitMilliseconds),
-                LauncherProcessReserveMilliseconds);
-            if (terminateSent && boundedWait > 0 &&
-                process.WaitForExit(boundedWait))
-            {
-                return process.ExitCode !=
-                    LinuxProcessControlConstants.EnvironmentFailureExitCode;
-            }
-            if (terminateSent && !process.HasExited)
-            {
-                // The supervisor remains the subreaper while it retries its
-                // individually bounded cleanup batches. The caller retains
-                // the live supervisor as a cleanup anchor; killing it here
-                // would reparent session-escaping descendants beyond the
-                // containment boundary.
-                return true;
-            }
-            var cleanup = VerifierProcessSupervisor.StopDescendants(
-                processGroupId,
-                Math.Min(RemainingMilliseconds(
-                    terminationStopwatch,
-                    terminationWaitMilliseconds),
-                    LauncherProcessReserveMilliseconds),
-                supervisorPidFd: _processGroupPidFd);
-            if (SendPidFdSignal(
-                    _processGroupPidFd,
-                    LinuxProcessControlConstants.SignalStop) == 0)
-            {
-                // The stopped session leader keeps this process-group identity
-                // live while the group-directed signal is delivered.
-                _ = LinuxProcessControl.Kill(
-                    -processGroupId,
-                    LinuxProcessControlConstants.SignalKill);
-                _ = SendPidFdSignal(
-                    _processGroupPidFd,
-                    LinuxProcessControlConstants.SignalKill);
-            }
-            else if (Marshal.GetLastPInvokeError() !=
-                         LinuxProcessControlConstants.ProcessNotFound)
-            {
-                _ = SendPidFdSignal(
-                    _processGroupPidFd,
-                    LinuxProcessControlConstants.SignalKill);
-            }
-            return cleanup.Complete;
-        }
-    }
-
-    private int OpenPidFdRequired(int processId)
-    {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            throw new PlatformNotSupportedException(
-                "SharpProof verifier containment requires Linux amd64.");
-        }
-        var descriptor = OpenPidFdOverride?.Invoke(processId) ??
-            checked((int)LinuxNativeMethods.OpenPidFd(processId));
-        if (descriptor < 0)
-        {
-            throw new InvalidOperationException(
-                "SharpProof could not pin the verifier process boundary " +
-                $"(errno {Marshal.GetLastPInvokeError()}).");
-        }
-        return descriptor;
-    }
-
-    private static int SendPidFdSignal(int descriptor, int signal)
-    {
-        return checked((int)LinuxNativeMethods.SendPidFdSignal(
-            descriptor,
-            signal));
     }
 
     internal void LogStandardError(string standardError)
@@ -1111,141 +193,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         using var reader = new StringReader(standardError);
         while (reader.ReadLine() is { } line)
         {
-            VerifierDiagnostic diagnostic;
-            if (VerifierDiagnosticTransport.TryDeserialize(
-                    line,
-                    out var structured))
+            if (VerifierDiagnosticTransport.TryDeserialize(line, out var diagnostic))
             {
-                diagnostic = structured;
+                LogStructuredDiagnostic(diagnostic);
             }
-            else if (!TryParseLegacyDiagnostic(
-                         line,
-                         out diagnostic))
+            else if (!string.IsNullOrWhiteSpace(line))
             {
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    Log.LogMessage(MessageImportance.High, "{0}", line);
-                }
-                continue;
-            }
-
-            LogStructuredDiagnostic(diagnostic);
-        }
-    }
-
-    private void LogStructuredDiagnostic(VerifierDiagnostic diagnostic)
-    {
-        if (diagnostic.Severity == "error")
-        {
-            HasStructuredError = true;
-            Log.LogError(
-                string.Empty,
-                diagnostic.Code,
-                string.Empty,
-                diagnostic.File,
-                diagnostic.Line,
-                diagnostic.Column,
-                0,
-                0,
-                diagnostic.Message);
-            return;
-        }
-
-        Log.LogWarning(
-            string.Empty,
-            diagnostic.Code,
-            string.Empty,
-            diagnostic.File,
-            diagnostic.Line,
-            diagnostic.Column,
-            0,
-            0,
-            diagnostic.Message);
-    }
-
-    private static bool TryParseLegacyDiagnostic(
-        string line,
-        out VerifierDiagnostic diagnostic)
-    {
-        diagnostic = null!;
-        var selectedIndex = -1;
-        foreach (var candidate in LegacyDiagnosticMarkers)
-        {
-            var marker = line.LastIndexOf(
-                candidate.Marker,
-                StringComparison.Ordinal);
-            while (marker > 0)
-            {
-                var location = line.Substring(0, marker);
-                if (marker > selectedIndex &&
-                    TryParseLocation(
-                        location,
-                        out var file,
-                        out var lineNumber,
-                        out var columnNumber))
-                {
-                    selectedIndex = marker;
-                    diagnostic = new VerifierDiagnostic(
-                        candidate.Severity,
-                        candidate.Code,
-                        file,
-                        lineNumber,
-                        columnNumber,
-                        line.Substring(marker + candidate.Marker.Length));
-                    break;
-                }
-                marker = line.LastIndexOf(
-                    candidate.Marker,
-                    marker - 1,
-                    StringComparison.Ordinal);
+                Log.LogMessage(MessageImportance.High, "{0}", line);
             }
         }
-        return selectedIndex >= 0;
-    }
-
-    private static bool TryParseLocation(
-        string location,
-        out string file,
-        out int lineNumber,
-        out int columnNumber)
-    {
-        file = string.Empty;
-        lineNumber = 0;
-        columnNumber = 0;
-        if (string.Equals(location, "SharpProof", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (!location.EndsWith(')'))
-        {
-            return false;
-        }
-        var openParenthesis = location.LastIndexOf('(');
-        var comma = location.LastIndexOf(',');
-        if (openParenthesis <= 0 || comma <= openParenthesis ||
-            !int.TryParse(
-                location.AsSpan(
-                    openParenthesis + 1,
-                    comma - openParenthesis - 1),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out lineNumber) ||
-            !int.TryParse(
-                location.AsSpan(
-                    comma + 1,
-                    location.Length - comma - 2),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out columnNumber))
-        {
-            lineNumber = 0;
-            columnNumber = 0;
-            return false;
-        }
-
-        file = location.Substring(0, openParenthesis);
-        return true;
     }
 
     internal static string ResolveDotNetHost(string executable)
@@ -1260,15 +216,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             throw new InvalidOperationException(
                 "SharpProof verifier could not identify its current dotnet muxer.");
         var trusted = ValidateDotNetInstallation(currentHost);
-        if (string.Equals(
-                executable,
-                "dotnet",
-                StringComparison.Ordinal))
+        if (string.Equals(executable, "dotnet", StringComparison.Ordinal))
         {
             return trusted;
         }
         var configured = ValidateDotNetInstallation(executable);
-        if (!LinuxPathIdentity.AreSameExistingFile(configured, trusted))
+        if (!string.Equals(configured, trusted, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "SharpProof verifier host must match the trusted current dotnet muxer.");
@@ -1276,45 +229,78 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         return configured;
     }
 
-    public void Cancel()
+    private bool WaitForExitOrCancellation(Process process, int timeoutMilliseconds)
     {
-        Process? process;
-        int processGroupId;
-        lock (_gate)
+        var deadline = Stopwatch.StartNew();
+        while (!process.WaitForExit(50))
         {
-            _cancellationSignal.Set();
-            process = _process;
-            processGroupId = _processGroupId;
+            if (_cancellationSignal.IsSet ||
+                deadline.ElapsedMilliseconds >= timeoutMilliseconds)
+            {
+                return false;
+            }
         }
-        if (process == null)
-        {
-            return;
-        }
-        _ = TryTerminate(
-            process,
-            processGroupId,
-            LauncherProcessReserveMilliseconds);
+        return true;
     }
 
-    internal enum SupervisorReadiness
+    private static void Kill(Process process)
     {
-        Armed,
-        ExitedBeforeArmed,
-        NotReady
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or
+                System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+        }
+    }
+
+    private static async System.Threading.Tasks.Task<string> ReadBoundedAsync(TextReader reader)
+    {
+        var captured = new StringBuilder();
+        var buffer = new char[4096];
+        int count;
+        while ((count = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+        {
+            var room = MaximumCapturedOutputCharacters - captured.Length;
+            if (room > 0)
+            {
+                captured.Append(buffer, 0, Math.Min(room, count));
+            }
+        }
+        return captured.ToString();
+    }
+
+    private void LogStructuredDiagnostic(VerifierDiagnostic diagnostic)
+    {
+        if (diagnostic.Severity == "error")
+        {
+            HasStructuredError = true;
+            Log.LogError(
+                string.Empty, diagnostic.Code, string.Empty, diagnostic.File,
+                diagnostic.Line, diagnostic.Column, 0, 0, diagnostic.Message);
+            return;
+        }
+
+        Log.LogWarning(
+            string.Empty, diagnostic.Code, string.Empty, diagnostic.File,
+            diagnostic.Line, diagnostic.Column, 0, 0, diagnostic.Message);
     }
 
     private static string ValidateDotNetInstallation(string candidate)
     {
         if (!Path.IsPathRooted(candidate) ||
-            !string.Equals(
-                Path.GetFileName(candidate),
-                "dotnet",
-                StringComparison.Ordinal))
+            !string.Equals(Path.GetFileName(candidate), "dotnet", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "SharpProof verifier host must name the direct dotnet muxer.");
         }
-        var resolved = LinuxPathIdentity.Canonicalize(candidate);
+        var resolved = Path.GetFullPath(
+            new FileInfo(candidate).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? candidate);
         var directoryPath = Path.GetDirectoryName(resolved);
         if (!File.Exists(resolved) ||
             string.IsNullOrEmpty(directoryPath) ||
@@ -1323,16 +309,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             throw new InvalidOperationException(
                 "SharpProof verifier host must be a complete dotnet installation.");
         }
-        LinuxPathIdentity.Canonicalize(
-            Path.Combine(directoryPath, "host", "fxr"));
         return resolved;
     }
-
-    private static string GetFileIdentity(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return SharpProof.Worker.Protocol.ProtocolHashEncoding
-            .ComputeSha256Hex(stream);
-    }
-
 }

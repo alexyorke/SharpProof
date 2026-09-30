@@ -12,18 +12,18 @@ internal sealed class CompilerSpecificationPackProvider
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
         IEnumerable<string>? enabledPacks)
-        : this(factory, ResolveAuthority(enabledPacks))
+        : this(factory, ResolveConfiguration(enabledPacks))
     {
     }
 
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
-        CompilerSpecificationPackAuthority authority)
+        CompilerSpecificationPackConfiguration authority)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         var catalog = RelationalSpecPackCatalogData.Catalog;
-        if (!CompilerSpecificationPackAuthorityValidation.IsValid(
+        if (!CompilerSpecificationPackSelection.IsValid(
                 authority.SpecificationPackIds,
                 authority.SpecificationPackCatalogVersion,
                 authority.SpecificationPackCatalogSha256) ||
@@ -70,12 +70,12 @@ internal sealed class CompilerSpecificationPackProvider
         _methods = methods.ToImmutable();
     }
 
-    internal static CompilerSpecificationPackAuthority ResolveAuthority(
+    internal static CompilerSpecificationPackConfiguration ResolveConfiguration(
         IEnumerable<string>? enabledPacks)
     {
         var catalog = RelationalSpecPackCatalogData.Catalog;
         var selected = CanonicalizeSelection(enabledPacks, catalog);
-        return new CompilerSpecificationPackAuthority
+        return new CompilerSpecificationPackConfiguration
         {
             SpecificationPackIds = selected,
             SpecificationPackCatalogVersion = catalog.Version,
@@ -145,7 +145,7 @@ internal sealed class CompilerSpecificationPackProvider
             return false;
         }
 
-        var prefix = CompilerSpecificationPackAuthorityValidation.GetSummaryPrefix(
+        var prefix = CompilerSpecificationPackSelection.GetSummaryPrefix(
             CompilerSummaryOrigin.SpecificationPack)!;
         var parameters = memberInfo.ParameterTypes
             .Select((type, ordinal) => _factory.CreateVariable(

@@ -8,6 +8,121 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class SarifProjectionTests
 {
+    [TestCase("/../../workspace/consumer/./src/../Subject.cs", "file:///workspace/consumer/Subject.cs")]
+    [TestCase("/workspace/consumer/src/../../Subject.cs", "file:///workspace/Subject.cs")]
+    public void AbsoluteMappedPathsResolveDotSegments(string path, string expected)
+    {
+        var response = new WorkerVerifyResponse
+        {
+            Manifest = new WorkerClaimManifest
+            {
+                Claims = [new WorkerClaimManifestEntry { ClaimId = "claim", Kind = WorkerClaimKind.Postcondition,
+                    Location = new WorkerSourceLocation { Path = path, Line = 1, Column = 1 } }]
+            },
+            ClaimResults = [new WorkerClaimResult { ClaimId = "claim", Outcome = WorkerClaimOutcome.Proven }]
+        };
+        using var document = JsonDocument.Parse(SarifProjection.Serialize(new WorkerVerifyRequest(), response, "/workspace/consumer"));
+        var uri = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+            .GetProperty("locations")[0].GetProperty("physicalLocation").GetProperty("artifactLocation")
+            .GetProperty("uri").GetString();
+        Assert.That(new Uri(new Uri("file:///workspace/consumer/"), uri!).AbsoluteUri, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void RelativeProjectRootCannotAnchorSarifSources()
+    {
+        Assert.That(Assert.Throws<ArgumentException>((Action)(() =>
+            SarifProjection.Serialize(new WorkerVerifyRequest(), new WorkerVerifyResponse(), "relative/project")))!.ParamName,
+            Is.EqualTo("path"));
+    }
+
+    [TestCase(WorkerEffectContractKind.ZeroAllocations)]
+    [TestCase(WorkerEffectContractKind.AllowedCapabilities)]
+    [TestCase(WorkerEffectContractKind.AllowedExceptions)]
+    [TestCase(WorkerEffectContractKind.EffectContract)]
+    public void EffectPresentationRetainsItsContractKind(WorkerEffectContractKind kind)
+    {
+        Assert.That(LauncherPresentation.ClaimKind(new WorkerClaimManifestEntry
+        {
+            Kind = WorkerClaimKind.Effect,
+            EffectContractKind = kind
+        }), Is.EqualTo("effect:" + kind));
+    }
+
+    [TestCase(WorkerClaimOutcome.Proven, WorkerVerifyPolicy.Advisory, WorkerVacuityKind.None, "pass", "none")]
+    [TestCase(WorkerClaimOutcome.Proven, WorkerVerifyPolicy.Advisory, WorkerVacuityKind.ContradictoryPreconditions, "review", "none")]
+    [TestCase(WorkerClaimOutcome.Refuted, WorkerVerifyPolicy.Advisory, WorkerVacuityKind.None, "fail", "error")]
+    [TestCase(WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.Advisory, WorkerVacuityKind.None, "review", "none")]
+    [TestCase(WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.WarnOnUnknown, WorkerVacuityKind.None, "fail", "warning")]
+    [TestCase(WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.RequireProven, WorkerVacuityKind.None, "fail", "error")]
+    public void ClaimPresentationPreservesPolicyVacuityAndEvidence(
+        WorkerClaimOutcome outcome, WorkerVerifyPolicy policy, WorkerVacuityKind vacuity,
+        string kind, string level)
+    {
+        var location = new WorkerSourceLocation { Path = "Subject.cs", Start = 0, Length = 1, Line = 2, Column = 3 };
+        var claim = new WorkerClaimManifestEntry
+        {
+            ClaimId = "claim",
+            CallableId = "C.M",
+            Kind = WorkerClaimKind.Postcondition,
+            Evidence = WorkerClaimEvidence.DirectClause,
+            Location = location
+        };
+        var manifest = new WorkerClaimManifest
+        {
+            Claims = [claim],
+            Callables = [new WorkerCallableManifestEntry { CallableId = "C.M", ClaimIds = ["claim"], Location = location }]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var result = new WorkerClaimResult
+        {
+            ClaimId = "claim",
+            Outcome = outcome,
+            Vacuity = vacuity,
+            Reason = outcome == WorkerClaimOutcome.Unknown ? WorkerClaimReason.UnsupportedExpression : WorkerClaimReason.None,
+            ProofCore = outcome == WorkerClaimOutcome.Proven ? ["il-summary:Lib.M"] : []
+        };
+        if (outcome == WorkerClaimOutcome.Refuted)
+        {
+            result.EffectWitness = new WorkerEffectViolationWitness
+            {
+                Kind = "write",
+                Detail = "observable state",
+                Location = new WorkerSourceLocation
+                {
+                    Path = "Witness.cs",
+                    Line = 7,
+                    Column = 8
+                }
+            };
+        }
+        using var document = JsonDocument.Parse(SarifProjection.Serialize(
+            new WorkerVerifyRequest { VerifyPolicy = policy },
+            new WorkerVerifyResponse { Manifest = manifest, ClaimResults = [result] }, "/source"));
+        var projected = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(projected.GetProperty("kind").GetString(), Is.EqualTo(kind));
+            Assert.That(projected.GetProperty("level").GetString(), Is.EqualTo(level));
+            Assert.That(projected.GetProperty("partialFingerprints").GetProperty("sharpProofSemanticId/v1").GetString(), Is.EqualTo("claim"));
+            var message = projected.GetProperty("message").GetProperty("text").GetString();
+            if (outcome == WorkerClaimOutcome.Proven)
+            {
+                Assert.That(message, Does.Contain("compile-time referenced binary is the runtime binary"));
+            }
+            if (vacuity != WorkerVacuityKind.None)
+            {
+                Assert.That(message, Does.Contain("vacuous: " + vacuity));
+            }
+            if (result.EffectWitness != null)
+            {
+                Assert.That(message, Does.Contain("observable state at Witness.cs:7:8"));
+                Assert.That(projected.GetProperty("locations")[0].GetProperty("physicalLocation")
+                    .GetProperty("region").GetProperty("startLine").GetInt32(), Is.EqualTo(7));
+            }
+        }
+    }
+
     [Test]
     public void RelativeCompilerMappedPathIsEscapedAndAnchoredToProjectRoot()
     {

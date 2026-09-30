@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Build.Framework;
-using Microsoft.Build.Utilities;
 using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
@@ -45,144 +44,56 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
     protected override bool ExecuteCore(CancellationToken cancellationToken)
     {
         ContainerContract.ValidateRequired();
-        var resolvedPaths = new Dictionary<string, string>(
-            StringComparer.Ordinal);
         string ResolvePath(string path)
         {
-            if (resolvedPaths.TryGetValue(path, out var resolved))
-            {
-                return resolved;
-            }
-
-            resolved = ResolveProjectRelativePath(ProjectDirectory, path);
-            resolvedPaths.Add(path, resolved);
-            return resolved;
+            return ResolveProjectRelativePath(ProjectDirectory, path);
         }
 
-        var outputPaths = Present(ResultPath, SarifPath)
-            .Select(ResolvePath)
-            .ToArray();
-        var publicationPaths = Present(
-                RequestPath,
-                ResultPath,
-                ManifestPath,
-                SarifPath)
-            .Select(ResolvePath)
-            .ToArray();
-        var publicationMarkerPaths = publicationPaths
-            .Select(LinuxPathIdentity.PublicationMarkerPath)
-            .ToArray();
-        var publicationMutationPaths = outputPaths
-            .Concat(publicationMarkerPaths)
-            .ToArray();
-        var compilerOutputPaths = CompilerOutputPaths
-            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
-            .Select(static item => item.ItemSpec)
-            .Select(ResolvePath)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        var aliasesOutput = outputPaths
-            .Distinct(StringComparer.Ordinal)
-            .Count() != outputPaths.Length ||
-            Pairs(outputPaths).Any(static pair =>
-                LinuxPathIdentity.AreSameExistingFile(pair[0], pair[1]));
-        var resolvedLauncherPath = ResolvePath(LauncherPath);
-        var toolPaths = Present(WorkerPath, LauncherPath)
-            .SelectMany(static path => new[]
-            {
-                path,
-                Path.ChangeExtension(path, ".deps.json"),
-                Path.ChangeExtension(path, ".runtimeconfig.json")
-            })
-            .Concat(LauncherRuntimePaths(resolvedLauncherPath));
-        var resolvedWorkerPath = ResolvePath(WorkerPath);
-        var workerDirectory = Path.GetDirectoryName(resolvedWorkerPath);
-        var workerTreeExists = File.Exists(resolvedWorkerPath) ||
-            File.Exists(Path.ChangeExtension(resolvedWorkerPath, ".deps.json")) ||
-            File.Exists(Path.ChangeExtension(
-                resolvedWorkerPath,
-                ".runtimeconfig.json"));
+        var outputPaths = Present(ResultPath, SarifPath).Select(ResolvePath).ToArray();
         var inputPaths = Present(
                 RequestPath,
                 ManifestPath,
                 InvocationRequestPath,
                 InvocationResultPath,
-                InvocationManifestPath)
+                InvocationManifestPath,
+                WorkerPath,
+                LauncherPath,
+                WorkerProtocolPath)
             .Select(ResolvePath)
             .ToArray();
-        var publicationInputConflictPaths = publicationPaths
-            .Concat(publicationMarkerPaths)
-            .Concat(inputPaths)
+        var compilerOutputPaths = CompilerOutputPaths
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
+            .Select(item => ResolvePath(item.ItemSpec))
             .ToArray();
-        var resolvedToolPaths = toolPaths
-            .Append(WorkerProtocolPath)
+        var workerFile = string.IsNullOrWhiteSpace(WorkerPath) ? null : ResolvePath(WorkerPath);
+        var workerDirectory = workerFile != null && File.Exists(workerFile)
+            ? Path.GetDirectoryName(workerFile)
+            : null;
+        var cachePath = string.IsNullOrWhiteSpace(CachePath) ? null : ResolvePath(CachePath!);
+        var publicationPaths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
             .Select(ResolvePath)
-            .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var protectedPaths = inputPaths
-            .Concat(resolvedToolPaths)
-            .ToArray();
-        var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
-            ? null
-            : ResolvePath(CachePath!);
-        var aliasesFileIdentity = publicationMutationPaths.Any(output =>
-            protectedPaths.Any(input => !string.Equals(
-                    output,
-                    input,
-                    StringComparison.Ordinal) &&
-                LinuxPathIdentity.AreSameExistingFile(output, input)));
-        var aliasesInput = aliasesFileIdentity ||
-            Pairs(inputPaths).Any(static pair =>
-                LinuxPathIdentity.PathsConflict(pair[0], pair[1])) ||
-            publicationMutationPaths.Any(output => protectedPaths.Any(input =>
-                LinuxPathIdentity.PathsConflict(output, input)));
-        var aliasesWorkerTree = workerTreeExists &&
-            !string.IsNullOrWhiteSpace(workerDirectory) &&
-            publicationInputConflictPaths.Any(path =>
-                LinuxPathIdentity.PathsConflict(
-                    path,
-                    workerDirectory));
-        var aliasesCache = resolvedCachePath != null &&
-            (publicationInputConflictPaths.Any(path =>
-                LinuxPathIdentity.PathsConflict(
-                    path,
-                    resolvedCachePath)) ||
-             workerTreeExists &&
-             !string.IsNullOrWhiteSpace(workerDirectory) &&
-             LinuxPathIdentity.PathsConflict(
-                 resolvedCachePath,
-                 workerDirectory));
-        var aliasesCompilerOutput = publicationInputConflictPaths.Any(
-            publication => compilerOutputPaths.Any(compilerOutput =>
-                string.Equals(
-                    publication,
-                    compilerOutput,
-                    StringComparison.Ordinal) ||
-                LinuxPathIdentity.AreSameExistingFile(
-                    publication,
-                    compilerOutput)));
 
-        if (aliasesOutput)
+        if (outputPaths.Distinct(StringComparer.Ordinal).Count() != outputPaths.Length)
         {
             Log.LogError("SharpProof output paths must be distinct.");
         }
-        if (aliasesFileIdentity)
-        {
-            Log.LogError("SharpProof output aliases a protected file identity.");
-        }
-        if (aliasesInput)
+        if (outputPaths.Intersect(inputPaths, StringComparer.Ordinal).Any())
         {
             Log.LogError("SharpProof output paths must not alias input paths.");
         }
-        if (aliasesWorkerTree)
+        if (workerDirectory != null &&
+            publicationPaths.Any(path => IsWithin(path, workerDirectory)))
         {
             Log.LogError("SharpProof output paths must not be inside the worker runtime.");
         }
-        if (aliasesCache)
+        if (cachePath != null &&
+            (publicationPaths.Any(path => IsWithin(path, cachePath) || IsWithin(cachePath, path)) ||
+             workerDirectory != null && IsWithin(cachePath, workerDirectory)))
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
         }
-        if (aliasesCompilerOutput)
+        if (publicationPaths.Intersect(compilerOutputPaths, StringComparer.Ordinal).Any())
         {
             Log.LogError(
                 "SharpProof publication paths must not alias compiler-owned outputs.");
@@ -192,46 +103,21 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             return false;
         }
 
-        try
+        foreach (var path in outputPaths)
         {
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       publicationPaths,
-                       TimeSpan.FromSeconds(30),
-                       cancellationToken))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(path))
             {
-                foreach (var path in outputPaths)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    LinuxPathIdentity.DeleteIfUnprotected(path, protectedPaths);
-                }
+                File.Delete(path);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-        return !Log.HasLoggedErrors;
+        return true;
     }
 
-    private static IEnumerable<string[]> Pairs(string[] paths)
+    private static bool IsWithin(string path, string directory)
     {
-        for (var left = 0; left < paths.Length; left++)
-        {
-            for (var right = left + 1; right < paths.Length; right++)
-            {
-                yield return [paths[left], paths[right]];
-            }
-        }
-    }
-
-    private static IEnumerable<string> LauncherRuntimePaths(
-        string resolvedLauncherPath)
-    {
-        var directory = Path.GetDirectoryName(resolvedLauncherPath) ??
-            throw new InvalidOperationException(
-                "The SharpProof launcher path has no directory.");
-        return
-            LauncherRuntimeCompanionInventory.FileNames.Select(
-                file => Path.Combine(directory, file));
+        var root = Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar;
+        return string.Equals(path, directory, StringComparison.Ordinal) ||
+            path.StartsWith(root, StringComparison.Ordinal);
     }
 }

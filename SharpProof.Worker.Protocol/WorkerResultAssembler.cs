@@ -33,7 +33,6 @@ internal static class WorkerResultAssembler
     {
         var callables = callableResults.ToArray();
         var claims = claimResults.ToArray();
-        var summary = Summarize(callables, claims);
         var response = new WorkerVerifyResponse
         {
             RequestHash = requestHash ?? EmptyInputHash,
@@ -45,11 +44,6 @@ internal static class WorkerResultAssembler
             ClaimResults = claims,
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = callables.Length,
-                ClaimCount = claims.Length,
-                OutcomeCounts = summary.OutcomeCounts,
-                ReasonCounts = summary.ReasonCounts,
-                Assumptions = summary.Assumptions,
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 CacheStatus = cacheStatus,
                 Versions = versions ?? new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
@@ -89,6 +83,19 @@ internal static class WorkerResultAssembler
         var claims = (manifest.Claims ?? [])
             .OfType<WorkerClaimManifestEntry>()
             .ToArray();
+        var runErrors = errors?.ToArray() ?? [];
+        if (callables.Length == 0 && claims.Length == 0 && runErrors.Length == 0 &&
+            failureReason == WorkerRunFailureReason.None &&
+            status is WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled)
+        {
+            runErrors = [new WorkerProtocolError
+            {
+                Code = status == WorkerRunStatus.TimedOut ? WorkerProtocolErrorCodes.WorkerTimeout : "worker.canceled",
+                Message = status == WorkerRunStatus.TimedOut
+                    ? "The project timed out before selected callable evidence was published."
+                    : "The worker was canceled before selected callable evidence was published."
+            }];
+        }
         var assumptionsByCallable = new Dictionary<
             string, WorkerAssumptionEvidence[]>(StringComparer.Ordinal);
         foreach (var callable in callables)
@@ -129,147 +136,28 @@ internal static class WorkerResultAssembler
                     ? []
                     : assumptions
             }),
-            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
+            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, runErrors, requestHash, versions);
     }
 
-    internal static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims,
-        out bool conflictingKinds)
+    internal static bool HasConflictingAssumptionKinds(
+        WorkerCallableResult[] callables, WorkerClaimResult[] claims)
     {
-        var assumptions = new Dictionary<string, AssumptionAggregate>(
-            StringComparer.Ordinal);
-        foreach (var callable in callables)
+        var kinds = new Dictionary<string, WorkerAssumptionKind>(StringComparer.Ordinal);
+        foreach (var assumption in callables.SelectMany(static value => value.Assumptions ?? [])
+            .Concat(claims.SelectMany(static value => value.Assumptions ?? [])))
         {
-            AddAssumptionEvidence(assumptions, callable.Assumptions);
-        }
-
-        foreach (var claim in claims)
-        {
-            AddAssumptionEvidence(assumptions, claim.Assumptions);
-        }
-
-        var summary = CreateAssumptionSummary(assumptions);
-        conflictingKinds = summary.ConflictingAssumptionKinds;
-        return summary.Assumptions;
-    }
-
-    private static (
-        WorkerClaimOutcomeCount[] OutcomeCounts,
-        WorkerClaimReasonCount[] ReasonCounts,
-        WorkerAssumptionSummary Assumptions) Summarize(
-        WorkerCallableResult[] callables,
-        WorkerClaimResult[] claims)
-    {
-        var accumulator = new SummaryAccumulator();
-        foreach (var callable in callables)
-        {
-            accumulator.AddAssumptions(callable.Assumptions);
-        }
-
-        foreach (var claim in claims)
-        {
-            accumulator.AddClaim(claim);
-        }
-
-        return accumulator.CreateSnapshot();
-    }
-
-    private sealed class SummaryAccumulator
-    {
-        private readonly Dictionary<WorkerClaimOutcome, int> _outcomes = [];
-        private readonly Dictionary<WorkerClaimReason, int> _reasons = [];
-        private readonly Dictionary<string, AssumptionAggregate> _assumptions =
-            new(StringComparer.Ordinal);
-
-        internal void AddClaim(WorkerClaimResult claim)
-        {
-            Increment(_outcomes, claim.Outcome);
-            Increment(_reasons, claim.Reason);
-            AddAssumptions(claim.Assumptions);
-        }
-
-        internal void AddAssumptions(IEnumerable<WorkerAssumptionEvidence>? assumptions)
-        {
-            AddAssumptionEvidence(_assumptions, assumptions);
-        }
-
-        internal (
-            WorkerClaimOutcomeCount[] OutcomeCounts,
-            WorkerClaimReasonCount[] ReasonCounts,
-            WorkerAssumptionSummary Assumptions) CreateSnapshot()
-        {
-            var assumptionSummary = CreateAssumptionSummary(_assumptions);
-
-            return (
-                [.. _outcomes.Select(static pair => new WorkerClaimOutcomeCount
-                {
-                    Outcome = pair.Key,
-                    Count = pair.Value
-                })],
-                [.. _reasons.Select(static pair => new WorkerClaimReasonCount
-                {
-                    Reason = pair.Key,
-                    Count = pair.Value
-                })],
-                assumptionSummary.Assumptions);
-        }
-
-        private static void Increment<TKey>(Dictionary<TKey, int> counts, TKey key)
-            where TKey : notnull
-        {
-            counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
-        }
-    }
-
-    private static void AddAssumptionEvidence(
-        Dictionary<string, AssumptionAggregate> assumptions,
-        IEnumerable<WorkerAssumptionEvidence>? values)
-    {
-        foreach (var value in values ?? [])
-        {
-            if (value is null || string.IsNullOrWhiteSpace(value.Id))
+            if (assumption == null || string.IsNullOrWhiteSpace(assumption.Id))
             {
                 continue;
             }
-
-            if (assumptions.TryGetValue(value.Id, out var existing))
+            if (kinds.TryGetValue(assumption.Id, out var kind) && kind != assumption.Kind)
             {
-                existing.Used |= value.Used;
-                existing.ConflictingKinds |= existing.FirstKind != value.Kind;
-                assumptions[value.Id] = existing;
+                return true;
             }
-            else
-            {
-                assumptions.Add(value.Id, new AssumptionAggregate(value.Kind, value.Used));
-            }
+            kinds[assumption.Id] = assumption.Kind;
         }
+        return false;
     }
-
-    private static (
-        WorkerAssumptionSummary Assumptions,
-        bool ConflictingAssumptionKinds) CreateAssumptionSummary(
-        Dictionary<string, AssumptionAggregate> assumptions)
-    {
-        var summary = new WorkerAssumptionSummary();
-        var conflictingKinds = false;
-        foreach (var aggregate in assumptions.Values)
-        {
-            summary.Total++;
-            summary.Used += aggregate.Used ? 1 : 0;
-            summary.User += aggregate.FirstKind == WorkerAssumptionKind.UserAssume ? 1 : 0;
-            summary.Trusted += aggregate.FirstKind == WorkerAssumptionKind.TrustedBoundary ? 1 : 0;
-            conflictingKinds |= aggregate.ConflictingKinds;
-        }
-
-        return (summary, conflictingKinds);
-    }
-
-    private struct AssumptionAggregate(WorkerAssumptionKind firstKind, bool used)
-    {
-        internal WorkerAssumptionKind FirstKind = firstKind;
-        internal bool Used = used;
-        internal bool ConflictingKinds;
-    }
-
     internal static WorkerClaimManifest EmptyManifest()
     {
         var manifest = new WorkerClaimManifest();
@@ -421,6 +309,12 @@ internal static class WorkerResultAssembler
         if (owned.Length == 0 &&
             !(runStatus == WorkerRunStatus.Failed && hasErrors))
         {
+            if (callable.Coverage == WorkerCallableCoverage.Incomplete &&
+                ((runStatus == WorkerRunStatus.TimedOut && callable.Reason == WorkerCallableCoverageReason.ProjectTimeout) ||
+                 (runStatus == WorkerRunStatus.Canceled && callable.Reason == WorkerCallableCoverageReason.Canceled)))
+            {
+                return true;
+            }
             return (callable.Coverage, callable.Reason) is
                 (WorkerCallableCoverage.Complete,
                     WorkerCallableCoverageReason.None)

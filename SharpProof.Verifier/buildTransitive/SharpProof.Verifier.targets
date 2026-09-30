@@ -5,7 +5,7 @@
     <_SharpProofWorkerPathConfigured>$([System.String]::Copy('$(SharpProofWorkerPath)').Trim())</_SharpProofWorkerPathConfigured>
     <_SharpProofLauncherPathConfigured>$([System.String]::Copy('$(SharpProofLauncherPath)').Trim())</_SharpProofLauncherPathConfigured>
     <SharpProofWorkerPath Condition="'$(_SharpProofWorkerPathConfigured)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.dll</SharpProofWorkerPath>
-    <SharpProofLauncherPath Condition="'$(_SharpProofLauncherPathConfigured)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.Launcher.dll</SharpProofLauncherPath>
+    <SharpProofLauncherPath Condition="'$(_SharpProofLauncherPathConfigured)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.dll</SharpProofLauncherPath>
     <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
     <_SharpProofWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofWorkerProtocolPath>

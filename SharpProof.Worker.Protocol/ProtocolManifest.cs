@@ -52,9 +52,7 @@ public static partial class WorkerProtocolJson
         WorkerClaimManifest manifest)
     {
         _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
-        using var writer = ManifestWriter.CreateHashWriter();
-        WriteManifestPayload(manifest, writer);
-        return writer.FinishHash();
+        return ComputeSha256(System.Text.Encoding.UTF8.GetBytes(CreateManifestPayload(manifest)));
     }
 
     public static void SealManifest(WorkerClaimManifest manifest)

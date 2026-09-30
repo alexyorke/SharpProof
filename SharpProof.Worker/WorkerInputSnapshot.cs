@@ -29,19 +29,11 @@ internal sealed partial record WorkerInputSnapshot
                     : ManifestUnavailable,
                 exception);
         }
-        var digest = WorkerProtocolJson.ComputeSha256(manifestBytes);
-        cancellationToken.ThrowIfCancellationRequested();
-        CompilerManifestArtifact manifest;
+        ValidatedArtifact artifact;
         try
         {
-            if (digest != request.CompilerManifest.Sha256)
-            {
-                throw new InvalidDataException();
-            }
-
-            manifest = CompilerManifestArtifactJson.Deserialize(
-                new UTF8Encoding(false, true).GetString(manifestBytes),
-                cancellationToken);
+            artifact = ArtifactValidator.Decode(manifestBytes,
+                request.CompilerManifest.Sha256, cancellationToken);
         }
         catch (Exception exception) when (exception is
             JsonException or InvalidDataException or DecoderFallbackException)
@@ -49,11 +41,7 @@ internal sealed partial record WorkerInputSnapshot
             throw new IOException(ManifestInvalid, exception);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var inputHash = CompilerArtifactInputHash.Compute(request, manifestBytes, cacheIdentity.ToolIdentity,
-            cacheIdentity.ToolVersion, cacheIdentity.WorkerBinarySha256, cacheIdentity.ApiSpecIdentity,
-            cacheIdentity.ApiSpecVersion, cacheIdentity.ApiSpecContentSha256);
-        cancellationToken.ThrowIfCancellationRequested();
-        return new WorkerInputSnapshot(manifest, inputHash);
+        return ArtifactValidator.Bind(request, artifact, cacheIdentity);
     }
 }
 

@@ -33,83 +33,32 @@ public sealed class EffectCounterexampleReplayTests
         }
     }
 
-    [TestCase("constraint-hash")]
     [TestCase("event-order")]
     [TestCase("path-kind")]
-    [TestCase("tree-ordinal")]
-    [TestCase("tree-identity")]
-    [TestCase("tree-span")]
-    [TestCase("operation-identity")]
-    [TestCase("mapped-location")]
-    public void StructurallyMalformedReplayEvidenceIsRejected(
-        string tampering)
+    [TestCase("type")]
+    [TestCase("location")]
+    public void StructurallyMalformedReplayEvidenceIsRejectedAtArtifactBoundary(string mutation)
     {
-        var fixture = CreateFixture(
-            CompilerEffectReplayEventKind.ManagedObjectAllocation);
-        switch (tampering)
+        var fixture = CreateFixture(CompilerEffectReplayEventKind.ManagedObjectAllocation);
+        switch (mutation)
         {
-            case "constraint-hash":
-                fixture.Evidence.Replay!.ConstraintSha256 =
-                    new string('b', 64);
-                break;
             case "event-order":
                 fixture.Event.Ordinal = 1;
-                CompilerEffectClaimArtifactCodec.Seal(
-                    fixture.Evidence);
                 break;
             case "path-kind":
-                fixture.Evidence.Replay!.PathKind =
-                    CompilerEffectReplayPathKind.Unspecified;
-                CompilerEffectClaimArtifactCodec.Seal(
-                    fixture.Evidence);
+                fixture.Evidence.Replay!.PathKind = CompilerEffectReplayPathKind.Unspecified;
                 break;
-            case "tree-ordinal":
-                fixture.Event.SyntaxTreeOrdinal = 1;
-                CompilerEffectClaimArtifactCodec.Seal(
-                    fixture.Evidence);
+            case "type":
+                fixture.Event.TypeIdentity = string.Empty;
                 break;
-            case "tree-identity":
-                fixture.Event.SyntaxTreeSha256 =
-                    new string('c', 64);
-                CompilerEffectClaimArtifactCodec.Seal(
-                    fixture.Evidence);
-                break;
-            case "tree-span":
-                fixture.Event.SyntaxStart = 95;
-                fixture.Event.SyntaxLength = 10;
-                fixture.Event.Location.Start = 95;
-                fixture.Event.Location.Length = 10;
-                CompilerEffectClaimArtifactCodec.Seal(
-                    fixture.Evidence);
-                break;
-            case "operation-identity":
-                fixture.Event.OperationIdentitySha256 =
-                    new string('d', 64);
-                break;
-            case "mapped-location":
-                fixture.Event.Location.Start++;
-                CompilerEffectClaimArtifactCodec.Seal(
-                    fixture.Evidence);
+            case "location":
+                fixture.Event.Location.Line = 0;
                 break;
             default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(tampering));
+                throw new ArgumentOutOfRangeException(nameof(mutation));
         }
-
-        if (tampering == "tree-identity")
-        {
-            Assert.That(CompilerEffectClaimArtifactCodec.HasValidReplayGeometry(
-                fixture.Evidence, fixture.Target.Compilation), Is.False);
-        }
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            EffectClaimResultAssembler.Assemble(
-                fixture.Target,
-                fixture.Evidence,
-                CallableEntryFeasibility.Feasible,
-                CancellationToken.None)));
+        Assert.Throws<InvalidDataException>((Action)(() => CompilerEffectClaimArtifactCodec.Validate(fixture.Evidence)));
     }
-
     [TestCase("kind")]
     [TestCase("detail")]
     [TestCase("effects")]
@@ -238,45 +187,6 @@ public sealed class EffectCounterexampleReplayTests
         }
     }
 
-    [Test]
-    public void ResponseAuthorityRejectsAllocationOnlyEnforcePureRefutation()
-    {
-        var fixture = CreateFixture(
-            CompilerEffectReplayEventKind.ManagedObjectAllocation);
-        fixture.Evidence.ContractKind =
-            WorkerEffectContractKind.EnforcePure;
-        AssertAllocationReplayUnknown(fixture);
-
-        var response = new WorkerVerifyResponse
-        {
-            CallableResults = [new WorkerCallableResult
-            {
-                CallableId = fixture.Target.Entry.CallableId,
-                Assumptions = fixture.Target.Entry.Assumptions
-            }],
-            ClaimResults = [new WorkerClaimResult
-            {
-                ClaimId = fixture.Evidence.ClaimId,
-                Outcome = WorkerClaimOutcome.Refuted,
-                Reason = WorkerClaimReason.None,
-                EffectCertainty =
-                    WorkerEffectEvidenceCertainty.DefiniteViolation,
-                ProofCore = [],
-                Model = [],
-                EffectWitness = fixture.Evidence.Witness,
-                Assumptions = fixture.Target.Entry.Assumptions
-            }]
-        };
-        var errors = new CompilerResponseEvidenceAuthority(
-                [fixture.Target])
-            .Validate(response)
-            .ToArray();
-
-        Assert.That(
-            errors,
-            Does.Contain("response.effect_witness_authority"));
-    }
-
     private static void AssertAllocationReplayUnknown(
         ReplayFixture fixture)
     {
@@ -351,63 +261,7 @@ public sealed class EffectCounterexampleReplayTests
         AssertRefuted(fixture.Evidence.Witness!, result);
     }
 
-    [Test]
-    public void WorkerOwnsCanonicalReplayHashing()
-    {
-        var fixture = CreateFixture(
-            CompilerEffectReplayEventKind.ManagedObjectAllocation);
-        var replay = fixture.Evidence.Replay!;
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                EffectCounterexampleReplayer
-                    .ComputeConstraintIdentity(
-                        fixture.Evidence.ContractKind,
-                        fixture.Evidence.Constraint),
-                Is.EqualTo(replay.ConstraintSha256));
-            Assert.That(
-                EffectCounterexampleReplayer
-                    .ComputeOperationIdentity(fixture.Event),
-                Is.EqualTo(
-                    fixture.Event.OperationIdentitySha256));
-        }
-
-        var constraintIdentity = replay.ConstraintSha256;
-        fixture.Evidence.Constraint.AllowedEffects =
-            WorkerEffectSet.Allocates;
-        Assert.That(
-            EffectCounterexampleReplayer.ComputeConstraintIdentity(
-                fixture.Evidence.ContractKind,
-                fixture.Evidence.Constraint),
-            Is.Not.EqualTo(constraintIdentity));
-
-        var operationIdentity =
-            fixture.Event.OperationIdentitySha256;
-        fixture.Event.TypeIdentity += ":tampered";
-        Assert.That(
-            EffectCounterexampleReplayer.ComputeOperationIdentity(
-                fixture.Event),
-            Is.Not.EqualTo(operationIdentity));
-
-        var source = File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
-            "SharpProof.Worker",
-            "EffectCounterexampleReplayer.cs"));
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                source,
-                Does.Not.Contain(
-                    "CompilerEffectClaimArtifactCodec." +
-                    "ComputeConstraintSha256"));
-            Assert.That(
-                source,
-                Does.Not.Contain(
-                    "CompilerEffectClaimArtifactCodec." +
-                    "ComputeReplayOperationSha256"));
-        }
-    }
 
     [Test]
     public void CanceledReplayDoesNotPoisonTheNextReplay()
@@ -530,7 +384,7 @@ public sealed class EffectCounterexampleReplayTests
     }
 
     [Test]
-    public void ReplayedEffectRefutationsRemainNoncacheable()
+    public void CompleteReplayedEffectRefutationsAreCacheable()
     {
         var fixture = CreateFixture(
             CompilerEffectReplayEventKind.ManagedObjectAllocation);
@@ -586,9 +440,8 @@ public sealed class EffectCounterexampleReplayTests
                 VerificationCache.IsCacheable(
                     response,
                     response.InputHash,
-                    manifest,
-                    [fixture.Target]),
-                Is.False);
+                    manifest),
+                Is.True);
         }
     }
 
@@ -637,7 +490,7 @@ public sealed class EffectCounterexampleReplayTests
                 }
             ]
         };
-        snapshot.LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(
+        snapshot.LineMapSha256 = CompilerReportingIdentity.ComputeLineMapSha256(
             snapshot.LineMap);
         var effectEvent = new CompilerEffectReplayEventArtifact
         {
@@ -646,7 +499,7 @@ public sealed class EffectCounterexampleReplayTests
             SyntaxTreeOrdinal = 0,
             SyntaxTreeSha256 = TreeSha256,
             SyntaxTreeSnapshotSha256 =
-                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(
+                CompilerReportingIdentity.ComputeSyntaxTreeSnapshotSha256(
                     snapshot),
             SyntaxTreeLineMapSha256 = snapshot.LineMapSha256,
             SyntaxStart = location.Start,

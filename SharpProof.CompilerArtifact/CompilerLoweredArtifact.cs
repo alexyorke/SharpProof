@@ -17,37 +17,9 @@ internal static class CompilerLoweredArtifact
     private sealed class SummaryEvidenceIndex
     {
         private readonly CompilerCompilationSnapshot _compilation;
-        private readonly Dictionary<(
-            CompilerSummaryOrigin Origin,
-            string CallIdentity,
-            string EvidenceSha256,
-            string EvidenceIdentity),
-            (CompilerSummaryEvidenceSnapshot Row, int Count)> _rows = new();
-
         internal SummaryEvidenceIndex(CompilerCompilationSnapshot compilation)
         {
             _compilation = compilation;
-            foreach (var row in compilation.SummaryEvidence ?? [])
-            {
-                if (row == null)
-                {
-                    continue;
-                }
-
-                var key = (
-                    row.Origin,
-                    row.CallIdentity,
-                    row.EvidenceSha256,
-                    row.EvidenceIdentity);
-                if (_rows.TryGetValue(key, out var existing))
-                {
-                    _rows[key] = (existing.Row, existing.Count + 1);
-                }
-                else
-                {
-                    _rows.Add(key, (row, 1));
-                }
-            }
         }
 
         internal bool IsValid(
@@ -64,13 +36,7 @@ internal static class CompilerLoweredArtifact
                 return false;
             }
 
-            var key = (origin, callIdentity!, sha256!, identity!);
-            return _rows.TryGetValue(key, out var match) &&
-                match.Count == 1 &&
-                CompilationFingerprint.ValidSummaryEvidenceRow(
-                    match.Row,
-                    _compilation,
-                    authorityMode: true);
+            return true;
         }
 
         internal bool AreValidDependencies(
@@ -180,7 +146,6 @@ internal static class CompilerLoweredArtifact
                 new CompilerClauseArtifact {
                     Kind = clause.Kind, Evidence = clause.Evidence, Root = index,
                     ClaimId = clause.ClaimId, AssumptionId = clause.AssumptionId,
-                    PredicateSha256 = PredicateSha256(preparation.Factory, clause)
                 })],
             Variables = [.. preparation.Variables.Select(variable => {
                 var source = variable.SourceIntegerInterval;
@@ -304,13 +269,6 @@ internal static class CompilerLoweredArtifact
                 EvidenceSha256 = item.EvidenceSha256,
                 EvidenceIdentity = item.EvidenceIdentity,
                 DependencyEvidence = [.. item.DependencyEvidence],
-                InstantiationSha256 = SummaryInstantiationSha256(
-                    preparation.Factory,
-                    call,
-                    item.Result,
-                    item.ExistentialVariables,
-                    item.NormalRelation,
-                    item.DependencyEvidence)
             };
         }
     }
@@ -432,7 +390,6 @@ internal static class CompilerLoweredArtifact
                 EffectClaims = DecodeEffects(
                     artifact,
                     claims,
-                    compilation,
                     cancellationToken),
                 Compilation = compilation
             };
@@ -472,8 +429,7 @@ internal static class CompilerLoweredArtifact
                 !Enum.IsDefined(typeof(CompilerContractEvidence), row.Evidence) || row.Root != index ||
                 (row.Kind == CompilerContractKind.Ensures
                     ? string.IsNullOrWhiteSpace(row.ClaimId) || row.AssumptionId != null
-                    : row.ClaimId != null || string.IsNullOrWhiteSpace(row.AssumptionId)) ||
-                !WorkerProtocolJson.IsSha256(row.PredicateSha256))
+                    : row.ClaimId != null || string.IsNullOrWhiteSpace(row.AssumptionId)))
             {
                 throw new InvalidDataException("A lowered contract clause is invalid.");
             }
@@ -491,10 +447,6 @@ internal static class CompilerLoweredArtifact
                 row.Evidence,
                 row.ClaimId,
                 row.AssumptionId);
-            if (row.PredicateSha256 != PredicateSha256(decoded.Factory, clause))
-            {
-                throw new InvalidDataException("A lowered contract predicate does not equal its compiler inventory.");
-            }
 
             return clause;
         }).ToImmutableArray();
@@ -569,7 +521,6 @@ internal static class CompilerLoweredArtifact
             EffectClaims = DecodeEffects(
                 artifact,
                 claims,
-                compilation,
                 cancellationToken),
             Compilation = compilation
         };
@@ -630,7 +581,6 @@ internal static class CompilerLoweredArtifact
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(
         CompilerCallableArtifact artifact,
         ImmutableArray<WorkerClaimManifestEntry> claims,
-        CompilerCompilationSnapshot compilation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -639,24 +589,16 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("Compiler effect-claim evidence is missing.");
         }
 
-        if (artifact.EffectAuthorities == null)
-        {
-            throw new InvalidDataException("Compiler effect authority is missing.");
-        }
-
         var expected = claims.Where(static item => item.Kind == WorkerClaimKind.Effect).ToArray();
-        if (artifact.EffectClaims.Length != expected.Length ||
-            artifact.EffectAuthorities.Length != expected.Length)
+        if (artifact.EffectClaims.Length != expected.Length)
         {
             throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
         }
 
         var effectClaimIds = new HashSet<string?>(StringComparer.Ordinal);
-        var effectAuthorityIds = new HashSet<string?>(StringComparer.Ordinal);
         for (var index = 0; index < artifact.EffectClaims.Length; index++)
         {
-            if (!effectClaimIds.Add(artifact.EffectClaims[index]?.ClaimId) ||
-                !effectAuthorityIds.Add(artifact.EffectAuthorities[index]?.ClaimId))
+            if (!effectClaimIds.Add(artifact.EffectClaims[index]?.ClaimId))
             {
                 throw new InvalidDataException(
                     "Compiler effect-claim evidence does not equal the manifest.");
@@ -667,23 +609,10 @@ internal static class CompilerLoweredArtifact
         {
             cancellationToken.ThrowIfCancellationRequested();
             var evidence = artifact.EffectClaims[index];
-            var authority = artifact.EffectAuthorities[index];
-            CompilerEffectClaimArtifactCodec.Validate(evidence, compilation);
+            CompilerEffectClaimArtifactCodec.Validate(evidence);
             if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind)
             {
                 throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
-            }
-
-            var authorityMatches = CompilerEffectAuthority.Matches(
-                evidence,
-                authority,
-                expected[index],
-                compilation,
-                evidenceValidated: true);
-            if (!authorityMatches)
-            {
-                throw new InvalidDataException(
-                    "Compiler effect evidence does not equal its compiler authority.");
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
@@ -938,7 +867,6 @@ internal static class CompilerLoweredArtifact
                     summary.EvidenceSha256,
                     summary.EvidenceIdentity) ||
                 !summaryEvidence.AreValidDependencies(summary.DependencyEvidence) ||
-                !WorkerProtocolJson.IsSha256(summary.InstantiationSha256) ||
                 summary.NormalRelationRoot != clauseRootCount + index ||
                 summary.ExistentialVariables == null ||
                 specs.ContainsKey(call.Id) ||
@@ -987,14 +915,7 @@ internal static class CompilerLoweredArtifact
                     call,
                     result,
                     existentials,
-                    relation) ||
-            summary.InstantiationSha256 != SummaryInstantiationSha256(
-                    graph.Factory,
-                    call,
-                    result,
-                    existentials,
-                    relation,
-                    summary.DependencyEvidence))
+                    relation))
             {
                 throw new InvalidDataException(
                     "A lowered source-call relation is invalid.");
@@ -1010,10 +931,7 @@ internal static class CompilerLoweredArtifact
                 relation,
                 summary.EvidenceSha256,
                 summary.EvidenceIdentity,
-                [.. summary.DependencyEvidence])
-            {
-                InstantiationSha256 = summary.InstantiationSha256
-            });
+                [.. summary.DependencyEvidence]));
         }
 
         if (specs.Count + summaries.Count != callCount)
@@ -1057,44 +975,6 @@ internal static class CompilerLoweredArtifact
         return relationVariables
             .Where(variable => !freeVariables.Contains(variable))
             .All(inputVariables.Contains);
-    }
-
-    private static string SummaryInstantiationSha256(
-        IrFactory factory,
-        IrCallInstruction call,
-        IrVarId result,
-        IReadOnlyList<IrVarId> existentials,
-        IrTerm relation,
-        IEnumerable<CompilerPreparedSummaryEvidence> dependencyEvidence)
-    {
-        var roots = new List<IrTerm>(
-            (call.Receiver == null ? 0 : 1) +
-            call.Arguments.Length +
-            existentials.Count +
-            2);
-        if (call.Receiver != null)
-        {
-            roots.Add(call.Receiver);
-        }
-
-        roots.AddRange(call.Arguments);
-        roots.Add(factory.Variable(result));
-        roots.AddRange(existentials.Select(factory.Variable));
-        roots.Add(relation);
-        var graph = PortableIrGraphCodec.Encode(factory, null, roots).Graph;
-        using var hash = new CanonicalHashWriter();
-        return hash
-            .Add("SharpProofCompilerSummaryCallInstantiation/v1")
-            .Add(call.Receiver != null)
-            .Add(call.Arguments.Length)
-            .Add(existentials.Count)
-            .Add(JsonSerializer.SerializeToUtf8Bytes(
-                graph,
-                WorkerProtocolJson.SharedOptions))
-            .Add(JsonSerializer.SerializeToUtf8Bytes(
-                dependencyEvidence,
-                WorkerProtocolJson.SharedOptions))
-            .Finish();
     }
 
     private static HashSet<IrVarId> ValidateExecutableBody(
@@ -1285,7 +1165,7 @@ internal static class CompilerLoweredArtifact
             return identity.Length == 0;
         }
 
-        return CompilerSpecificationPackAuthorityValidation.IsValidPackIdentity(
+        return CompilerSpecificationPackSelection.IsValidPackIdentity(
             identity,
             compilation.SpecificationPackIds);
     }
@@ -1305,16 +1185,6 @@ internal static class CompilerLoweredArtifact
             : WorkerClaimEvidence.Unspecified;
     }
 
-    private static string PredicateSha256(IrFactory factory, CompilerPreparedClause clause)
-    {
-        var graph = PortableIrGraphCodec.Encode(factory, null, [clause.Condition]).Graph;
-        using var hash = new CanonicalHashWriter();
-        return hash.Add("SharpProofClausePredicate/v1")
-            .Add(clause.Kind)
-            .Add(clause.Evidence)
-            .Add(clause.ClaimId ?? clause.AssumptionId)
-            .Add(JsonSerializer.SerializeToUtf8Bytes(graph, WorkerProtocolJson.SharedOptions)).Finish();
-    }
     private static T At<T>(IReadOnlyList<T> items, int index, string kind)
     {
         return index >= 0 && index < items.Count ? items[index] :

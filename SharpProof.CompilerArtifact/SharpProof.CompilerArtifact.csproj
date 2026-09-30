@@ -18,7 +18,6 @@
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
     <InternalsVisibleTo Include="SharpProof.Package.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>

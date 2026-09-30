@@ -1,11 +1,8 @@
 # SharpProof diagnostics
 
-The authoritative descriptor catalog is
-`eng/diagnostics/diagnostic-descriptors.v1.json`. The checked-in
-`*DiagnosticDescriptors.generated.cs` files in the analyzer, `ContractFor`
-generator, and soundness meta-analyzer are compiled projections.
-Run `.\scripts\Generate-DiagnosticDescriptors.ps1` after catalog changes; CI
-uses `-Verify` to reject stale projections.
+Diagnostic descriptors are declared in the hand-maintained
+`*DiagnosticDescriptors.generated.cs` files in the analyzer and the
+`ContractFor` generator.
 
 The portable `SharpProof` package defaults to advisory analysis with both
 feature groups:

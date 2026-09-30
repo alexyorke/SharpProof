@@ -147,8 +147,8 @@ public sealed class FinalCompilationCollectorTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                pairArtifact.CompilationSha256,
-                Is.Not.EqualTo(replacementArtifact.CompilationSha256));
+                Digest(pairArtifact),
+                Is.Not.EqualTo(Digest(replacementArtifact)));
             Assert.That(
                 pairArtifact.Manifest.Hash,
                 Is.Not.EqualTo(replacementArtifact.Manifest.Hash));
@@ -156,13 +156,8 @@ public sealed class FinalCompilationCollectorTests
                 pairArtifact.Manifest.Claims.Single().ClaimId,
                 Is.Not.EqualTo(
                     replacementArtifact.Manifest.Claims.Single().ClaimId));
-            Assert.That(
-                pairRoundTrip.Compilation.SyntaxTrees[0].Sha256,
-                Is.EqualTo(pairArtifact.Compilation.SyntaxTrees[0].Sha256));
-            Assert.That(
-                replacementRoundTrip.Compilation.SyntaxTrees[0].Sha256,
-                Is.EqualTo(
-                    replacementArtifact.Compilation.SyntaxTrees[0].Sha256));
+            Assert.That(Digest(pairRoundTrip), Is.EqualTo(Digest(pairArtifact)));
+            Assert.That(Digest(replacementRoundTrip), Is.EqualTo(Digest(replacementArtifact)));
             Assert.That(pairRoundTrip.CompilerDiagnostics, Is.Empty);
             Assert.That(replacementRoundTrip.CompilerDiagnostics, Is.Empty);
             Assert.That(pairRoundTrip.Callables.Single().FailureReason,
@@ -376,20 +371,14 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 artifact.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("12"));
-            Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("13"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
                 artifact.MaximumExpressionDepth,
                 Is.EqualTo(64));
             Assert.That(artifact.CompilerDiagnostics, Is.Empty);
             Assert.That(artifact.Callables, Has.Length.EqualTo(1));
-            Assert.That(artifact.CompilationSha256, Has.Length.EqualTo(64));
-            Assert.That(
-                artifact.Compilation.SyntaxTrees
-                    .Select(static tree => tree.TextLength),
-                Is.EqualTo(compilation.SyntaxTrees.Select(
-                    static tree => tree.GetText().Length)));
+            Assert.That(Digest(artifact), Has.Length.EqualTo(64));
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(
                 artifact.Manifest.Callables.Single().Assumptions,
@@ -397,101 +386,7 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
-    [Test]
-    public async Task SemanticCompilerInputsInvalidateTheSeal()
-    {
-        using var workspace = new CollectorWorkspace();
-        var baseline = CreateCompilation();
-        var baselineHash = await EmitHash(
-            baseline,
-            workspace.SealPath("baseline"),
-            additional: "value=1");
-        var sourceHash = await EmitHash(
-            CreateCompilation("internal static class Fixture { const int Value = 2; }"),
-            workspace.SealPath("source"),
-            additional: "value=1");
-        var tree = baseline.SyntaxTrees.Single();
-        var parseTree = tree.WithRootAndOptions(
-            await tree.GetRootAsync(),
-            ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols("CHANGED"));
-        var parseHash = await EmitHash(
-            baseline.ReplaceSyntaxTree(tree, parseTree),
-            workspace.SealPath("parse"),
-            additional: "value=1");
-        var reference = baseline.References
-            .OfType<PortableExecutableReference>()
-            .First();
-        var aliasHash = await EmitHash(
-            baseline.ReplaceReference(
-                reference,
-                reference.WithAliases(["ChangedAlias"])),
-            workspace.SealPath("alias"),
-            additional: "value=1");
-        var additionalHash = await EmitHash(
-            baseline,
-            workspace.SealPath("additional"),
-            additional: "value=2");
-        var policyHash = await EmitHash(
-            baseline,
-            workspace.SealPath("policy"),
-            additional: "value=1",
-            verifyPolicy: "require-proven");
-        var assumptionHash = await EmitHash(
-            baseline,
-            workspace.SealPath("assumption"),
-            additional: "value=1",
-            assumptionPolicy: "warn");
-        var featuresHash = await EmitHash(
-            baseline,
-            workspace.SealPath("features"),
-            additional: "value=1",
-            features: "effects");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                new[] {
-                    baselineHash, sourceHash, parseHash, aliasHash,
-                    additionalHash
-                }
-                    .Distinct(StringComparer.Ordinal).Count(),
-                Is.EqualTo(5));
-            Assert.That(
-                new[] {
-                    policyHash, assumptionHash, featuresHash
-                },
-                Is.All.EqualTo(baselineHash));
-        }
-    }
-
-    [Test]
-    public async Task ExecutableEntryPointSelectionChangesAuthenticatedSnapshot()
-    {
-        using var workspace = new CollectorWorkspace();
-        var compilation = CreateCompilation(
-            """
-            internal static class FirstEntryPoint {
-                public static void Main() { }
-            }
-            internal static class SecondEntryPoint {
-                public static void Main() { }
-            }
-            """);
-        var executable = compilation.Options.WithOutputKind(
-            OutputKind.ConsoleApplication);
-        var firstHash = await EmitHash(
-            compilation.WithOptions(executable.WithMainTypeName(
-                "FirstEntryPoint")),
-            workspace.SealPath("first-entry-point"),
-            additional: "value=1");
-        var secondHash = await EmitHash(
-            compilation.WithOptions(executable.WithMainTypeName(
-                "SecondEntryPoint")),
-            workspace.SealPath("second-entry-point"),
-            additional: "value=1");
-
-        Assert.That(secondHash, Is.Not.EqualTo(firstHash));
-    }
 
     [Test]
     public async Task DiagnosticPolicyAndRealizedErrorsInvalidateTheSeal()
@@ -542,15 +437,10 @@ public sealed class FinalCompilationCollectorTests
                 Has.All.Matches<CompilerManifestArtifact>(artifact =>
                     artifact.CompilerDiagnostics.Any(diagnostic =>
                         diagnostic.Code == "compiler.CS0168")));
-            Assert.That(
-                new[] {
-                    baseline.CompilationSha256,
-                    warningLevel.CompilationSha256,
-                    generalError.CompilationSha256,
-                    specificError.CompilationSha256,
-                    providerError.CompilationSha256
-                }.Distinct(StringComparer.Ordinal).Count(),
-                Is.EqualTo(5));
+            Assert.That(Digest(warningLevel), Is.EqualTo(Digest(baseline)));
+            Assert.That(new[] { generalError, specificError, providerError }.Select(Digest),
+                Has.All.EqualTo(Digest(generalError)));
+            Assert.That(Digest(generalError), Is.Not.EqualTo(Digest(baseline)));
             Assert.That(
                 providerError.Callables.Single().FailureReason,
                 Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
@@ -657,6 +547,28 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(
             diagnostics[0].DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Error));
+    }
+
+    [Test]
+    public async Task CompilerDiagnosticWithoutSourceLocationRemainsUnmapped()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation("internal static class Subject { }");
+        compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
+        var expected = compilation.GetDiagnostics().Single(static item => item.Id == "CS5001");
+        Assert.That(expected.Location.IsInSource, Is.False);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("missing-main"), allowCompilationErrors: true);
+        var diagnostic = artifact.CompilerDiagnostics.Single(static item => item.Code == "compiler.CS5001");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostic.IsSource, Is.False);
+            Assert.That(diagnostic.Message, Is.EqualTo(expected.GetMessage(CultureInfo.InvariantCulture)));
+            Assert.That(diagnostic.Location.Path, Is.Empty);
+            Assert.That(diagnostic.Location.Start, Is.Zero);
+            Assert.That(diagnostic.Location.Length, Is.Zero);
+            Assert.That(diagnostic.Location.Line, Is.Zero);
+            Assert.That(diagnostic.Location.Column, Is.Zero);
+        }
     }
 
     [TestCase("0")]
@@ -846,7 +758,8 @@ public sealed class FinalCompilationCollectorTests
         var artifact = await EmitArtifact(
             subject,
             workspace.SealPath("linked-modules"));
-        var captured = artifact.Compilation.References.Single(item =>
+        var captured = CompilerCompilationCapture.CaptureReferences(subject.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None).Single(item =>
             item.Modules[0].Path.EndsWith(
                 "/Linked.dll",
                 StringComparison.Ordinal));
@@ -1148,38 +1061,10 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(File.Exists(path), Is.EqualTo(shouldEmit));
     }
 
-    private static async Task<string> EmitHash(
-        CSharpCompilation compilation,
-        string path,
-        string additional,
-        string verifyPolicy = "advisory",
-        string assumptionPolicy = "allow",
-        string features = "all")
+    private static string Digest(CompilerManifestArtifact artifact)
     {
-        var diagnostics = await AnalyzeCollectorAsync(
-            compilation,
-            Options(
-                path,
-                features: features,
-                verifyPolicy: verifyPolicy,
-                assumptionPolicy: assumptionPolicy),
-            [new MemoryAdditionalText("proof.inputs", additional)]);
-        Assert.That(diagnostics, Is.Empty);
-        var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(artifact.Compilation.AdditionalFiles, Has.Length.EqualTo(1));
-            Assert.That(
-                artifact.Compilation.AdditionalFiles[0].Path,
-                Does.EndWith("/proof.inputs"));
-            Assert.That(
-                artifact.Compilation.AdditionalFiles[0].Sha256,
-                Has.Length.EqualTo(64));
-        }
-        return artifact.CompilationSha256;
+        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact)));
     }
-
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
         string path,

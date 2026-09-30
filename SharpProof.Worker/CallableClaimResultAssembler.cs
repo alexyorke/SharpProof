@@ -6,7 +6,6 @@ internal static class CallableClaimResultAssembler
         ProofOutcome outcome,
         IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
         IReadOnlyDictionary<ProofJustification, string> userAssumptionIds,
-        WorkerClaimReason replayFailure,
         WorkerVacuityKind vacuity,
         IReadOnlySet<string>? effectClaimIds = null)
     {
@@ -59,15 +58,6 @@ internal static class CallableClaimResultAssembler
                     projectAssumptions: false);
                 record.Vacuity = vacuity;
                 record.ProofCore = [.. proofCore];
-                break;
-            case RefutedOutcome when replayFailure != WorkerClaimReason.None:
-                record = Create(
-                    target,
-                    claimId,
-                    WorkerClaimOutcome.Unknown,
-                    replayFailure,
-                    effectCertainty,
-                    projectAssumptions: false);
                 break;
             case RefutedOutcome refuted:
                 record = Create(

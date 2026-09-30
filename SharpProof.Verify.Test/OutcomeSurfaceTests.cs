@@ -17,7 +17,8 @@ public sealed class OutcomeSurfaceTests
             [nameof(AbstentionReason.CounterexampleReplayFailed)] = 9,
             [nameof(AbstentionReason.PostconditionMayBeUndefined)] = 10,
             [nameof(AbstentionReason.InternalConsistencyMayBeUndefined)] = 11,
-            [nameof(AbstentionReason.SolverIncomplete)] = 12
+            [nameof(AbstentionReason.SolverIncomplete)] = 12,
+            [nameof(AbstentionReason.CounterexampleNotReplayable)] = 13
         };
         var actual = Enum.GetValues<AbstentionReason>()
             .ToDictionary(

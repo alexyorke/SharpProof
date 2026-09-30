@@ -38,6 +38,7 @@ internal static class CorpusGate
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
+        var wallTime = System.Diagnostics.Stopwatch.StartNew();
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
         var cases = CorpusCatalog.CreateCases(openSourceDocument);
         var openSourceCases = cases
@@ -251,6 +252,10 @@ internal static class CorpusGate
             supportedOpenSourceMethodCount,
             failures);
         var observationCount = observations.Length;
+        if (wallTime.Elapsed > TimeSpan.FromMinutes(5))
+        {
+            failures.Add($"Corpus wall time {wallTime.Elapsed.TotalSeconds:F1}s exceeds the 300s budget.");
+        }
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,

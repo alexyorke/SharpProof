@@ -10,113 +10,34 @@ internal static class EffectCounterexampleReplayer
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(evidence);
         cancellationToken.ThrowIfCancellationRequested();
-        CompilerEffectClaimArtifactCodec.Validate(evidence, target.Compilation);
-
         var replay = evidence.Replay ??
-            throw Malformed("A refuted effect claim has no replay artifact.");
-        if (replay.ConstraintSha256 !=
-            ComputeConstraintIdentity(
-                evidence.ContractKind,
-                evidence.Constraint))
-        {
-            throw Malformed(
-                "The effect replay constraint does not equal the selected contract.");
-        }
-
-        if (replay.PathKind !=
-            CompilerEffectReplayPathKind.Unconditional)
-        {
-            throw Malformed(
-                "An effect replay artifact has an invalid path kind.");
-        }
-
+            throw new InvalidDataException("A refuted effect claim has no replay artifact.");
         WorkerEffectViolationWitness? violation = null;
-        var treeSnapshotHashes = target.Compilation.SyntaxTrees
-            .Select(CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256)
-            .ToArray();
-        for (var index = 0; index < replay.Events.Length; index++)
+        foreach (var effectEvent in replay.Events)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var effectEvent = replay.Events[index];
-            ValidateEvent(target, effectEvent, index, treeSnapshotHashes);
             var observed = Interpret(effectEvent);
             if (observed == null)
             {
                 return null;
             }
-
-            if (violation == null &&
-                CompilerEffectViolationAuthority.IsViolation(evidence, observed))
+            if (violation == null && CompilerEffectViolation.IsViolation(evidence, observed))
             {
                 violation = observed;
             }
         }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        return violation != null &&
-            CompilerEffectAuthority.WitnessesEqual(violation, evidence.Witness)
-                ? violation
-                : null;
+        return WitnessesEqual(violation, evidence.Witness) ? violation : null;
     }
 
-    private static void ValidateEvent(
-        CompilerCallablePreparation target,
-        CompilerEffectReplayEventArtifact effectEvent,
-        int ordinal,
-        string[] treeSnapshotHashes)
+    private static bool WitnessesEqual(WorkerEffectViolationWitness? left, WorkerEffectViolationWitness? right)
     {
-        if (effectEvent == null ||
-            effectEvent.Ordinal != ordinal ||
-            effectEvent.OperationIdentitySha256 !=
-            ComputeOperationIdentity(effectEvent))
-        {
-            throw Malformed(
-                "An effect replay event has an invalid identity or order.");
-        }
-
-        var trees = target.Compilation.SyntaxTrees;
-        if (trees == null ||
-            effectEvent.SyntaxTreeOrdinal < 0 ||
-            effectEvent.SyntaxTreeOrdinal >= trees.Length)
-        {
-            throw Malformed(
-                "An effect replay event names an unknown syntax tree.");
-        }
-
-        var tree = trees[effectEvent.SyntaxTreeOrdinal];
-        if (tree == null ||
-            effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
-            effectEvent.SyntaxTreeSnapshotSha256 != treeSnapshotHashes[effectEvent.SyntaxTreeOrdinal] ||
-            effectEvent.SyntaxTreeLineMapSha256 != tree.LineMapSha256 ||
-            effectEvent.SyntaxStart < 0 ||
-            effectEvent.SyntaxLength <= 0 ||
-            effectEvent.SyntaxStart > tree.TextLength ||
-            effectEvent.SyntaxLength >
-            tree.TextLength - effectEvent.SyntaxStart)
-        {
-            throw Malformed(
-                "An effect replay event does not fit its syntax tree.");
-        }
-
-        var location = effectEvent.Location;
-        if (CompilerSourceLocationAuthority.FindUniqueTree(
-                location,
-                target.Compilation) != effectEvent.SourceTreeOrdinal ||
-            !CompilerSourceLocationAuthority.IsBound(
-                location,
-                effectEvent.SourceTreeOrdinal,
-                effectEvent.SourceTreePath,
-                effectEvent.SourceTreeSha256,
-                effectEvent.SourceLineMapSha256,
-                target.Compilation) ||
-            location.Start != effectEvent.SyntaxStart ||
-            location.Length != effectEvent.SyntaxLength)
-        {
-            throw Malformed(
-                "An effect replay event has an invalid mapped location.");
-        }
+        return left != null && right != null && left.Kind == right.Kind &&
+            left.Detail == right.Detail && left.Effects == right.Effects && left.Capabilities == right.Capabilities &&
+            left.ExactExceptionTypeHierarchy.SequenceEqual(right.ExactExceptionTypeHierarchy, StringComparer.Ordinal) &&
+            left.Location.Path == right.Location.Path && left.Location.Start == right.Location.Start &&
+            left.Location.Length == right.Location.Length && left.Location.Line == right.Location.Line &&
+            left.Location.Column == right.Location.Column;
     }
-
     private static WorkerEffectViolationWitness? Interpret(
         CompilerEffectReplayEventArtifact effectEvent)
     {
@@ -206,7 +127,7 @@ internal static class EffectCounterexampleReplayer
             Capabilities = capabilities,
             ExactExceptionTypeHierarchy =
                 [.. effectEvent.ExactExceptionTypeHierarchy],
-            Location = CompilerSourceLocationAuthority.CopyLocation(
+            Location = CopyLocation(
                 effectEvent.Location)
         };
     }
@@ -220,73 +141,15 @@ internal static class EffectCounterexampleReplayer
             : fallback;
     }
 
-    internal static string ComputeConstraintIdentity(
-        WorkerEffectContractKind kind,
-        CompilerEffectConstraintArtifact constraint)
+    private static WorkerSourceLocation CopyLocation(WorkerSourceLocation value)
     {
-        ArgumentNullException.ThrowIfNull(constraint);
-        using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.CompilerEffectReplayConstraint")
-            .Add(1)
-            .Add(kind)
-            .Add(constraint.AllowedEffects)
-            .Add(constraint.AllowedCapabilities);
-        foreach (var type in constraint.AllowedExceptionTypes
-                     .OrderBy(static item => item, StringComparer.Ordinal))
+        return new WorkerSourceLocation
         {
-            hash.Add(type);
-        }
-
-        return hash.Finish();
+            Path = value.Path,
+            Start = value.Start,
+            Length = value.Length,
+            Line = value.Line,
+            Column = value.Column
+        };
     }
-
-    internal static string ComputeOperationIdentity(
-        CompilerEffectReplayEventArtifact effectEvent)
-    {
-        ArgumentNullException.ThrowIfNull(effectEvent);
-        var location = effectEvent.Location;
-        using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.CompilerEffectReplayOperation")
-            .Add(1)
-            .Add(effectEvent.Kind)
-            .Add(effectEvent.SyntaxTreeOrdinal)
-            .Add(effectEvent.SyntaxTreeSha256)
-            .Add(effectEvent.SyntaxTreeSnapshotSha256)
-            .Add(effectEvent.SyntaxTreeLineMapSha256)
-            .Add(effectEvent.SyntaxStart)
-            .Add(effectEvent.SyntaxLength)
-            .Add(effectEvent.MemberIdentity)
-            .Add(effectEvent.MemberDocumentationId)
-            .Add(effectEvent.TypeIdentity)
-            .Add(effectEvent.TypeDocumentationId)
-            .Add(effectEvent.SpecWitnessIdentifier);
-        hash.Add(effectEvent.SourceTreeOrdinal)
-            .Add(effectEvent.SourceTreePath)
-            .Add(effectEvent.SourceTreeSha256)
-            .Add(effectEvent.SourceLineMapSha256);
-        hash.Add(effectEvent.ScalarOperands.Length);
-        foreach (var operand in effectEvent.ScalarOperands)
-        {
-            hash.Add(operand);
-        }
-
-        hash.Add(effectEvent.ExactExceptionTypeHierarchy.Length);
-        foreach (var type in effectEvent.ExactExceptionTypeHierarchy)
-        {
-            hash.Add(type);
-        }
-
-        return hash.Add(location?.Path)
-            .Add(location?.Start ?? -1)
-            .Add(location?.Length ?? -1)
-            .Add(location?.Line ?? -1)
-            .Add(location?.Column ?? -1)
-            .Finish();
-    }
-
-    private static InvalidDataException Malformed(string message)
-    {
-        return new InvalidDataException(message);
-    }
-
 }

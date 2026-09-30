@@ -435,7 +435,7 @@ source, implementation-IL, or audited-pack dependency provenance, plus the
 admitted unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
 their source-tree identities and spans. Worker protocol version 12 and semantic
-cache schema version 13 carry the current wire break. Relational-summary schema
+cache schema version 14 carry the current wire break. Relational-summary schema
 version 2 and specification-pack schema version 1 govern the new evidence. The
 artifact further carries compiler error
 diagnostics and mapped locations, handwritten and generated tree hashes, raw

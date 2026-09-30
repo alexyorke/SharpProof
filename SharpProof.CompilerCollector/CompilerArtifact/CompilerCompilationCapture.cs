@@ -139,7 +139,7 @@ internal static class CompilerCompilationCapture
             "The project directory and target framework are required.");
         }
 
-        var normalizedProject = CompilerCaptureAuthority.NormalizePath(
+        var normalizedProject = CompilerCaptureIdentity.NormalizePath(
             projectDirectory);
         var options = compilation.Options;
         if (additionalFiles.IsDefault)
@@ -165,13 +165,13 @@ internal static class CompilerCompilationCapture
             AssemblyName = compilation.AssemblyName ?? throw new InvalidOperationException("The assembly name is unavailable."),
             AssemblyIdentity = compilation.Assembly.Identity.ToString(),
             TargetFramework = targetFramework,
-            CompilerVersion = CompilerCaptureAuthority.CaptureVersion(
+            CompilerVersion = CompilerCaptureIdentity.CaptureVersion(
                 typeof(Compilation)),
-            CompilerMvid = CompilerCaptureAuthority.CaptureMvid(
+            CompilerMvid = CompilerCaptureIdentity.CaptureMvid(
                 typeof(Compilation)),
-            CSharpCompilerVersion = CompilerCaptureAuthority.CaptureVersion(
+            CSharpCompilerVersion = CompilerCaptureIdentity.CaptureVersion(
                 typeof(CSharpCompilation)),
-            CSharpCompilerMvid = CompilerCaptureAuthority.CaptureMvid(
+            CSharpCompilerMvid = CompilerCaptureIdentity.CaptureMvid(
                 typeof(CSharpCompilation)),
             Options = new CompilerCompilationOptionsSnapshot
             {
@@ -247,7 +247,7 @@ internal static class CompilerCompilationCapture
         })];
         return new CompilerSyntaxTreeSnapshot
         {
-            Path = CompilerCaptureAuthority.NormalizePath(
+            Path = CompilerCaptureIdentity.NormalizePath(
                 string.IsNullOrEmpty(tree.FilePath)
                     ? "<compiler-generated>"
                     : tree.FilePath),
@@ -255,7 +255,7 @@ internal static class CompilerCompilationCapture
             Encoding = text.Encoding?.WebName ?? string.Empty,
             ChecksumAlgorithm = text.ChecksumAlgorithm.ToString(),
             RoslynChecksum = HashEncoding.ToLowerHex(text.GetChecksum()),
-            LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
+            LineMapSha256 = CompilerReportingIdentity.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
             LineMap = lineMap,
             LanguageVersion = parse.LanguageVersion.ToString(),
@@ -388,7 +388,7 @@ internal static class CompilerCompilationCapture
             {
                 Name = fileName,
                 Mvid = fileMvid.ToString("D"),
-                Path = CompilerCaptureAuthority.NormalizePath(modulePath),
+                Path = CompilerCaptureIdentity.NormalizePath(modulePath),
                 Sha256 = Hash(stream, cancellationToken),
                 SizeBytes = sizeBytes
             });
@@ -445,7 +445,7 @@ internal static class CompilerCompilationCapture
         var text = GetStableAdditionalText(file, cancellationToken);
         return new CompilerAdditionalFileSnapshot
         {
-            Path = CompilerCaptureAuthority.NormalizePath(path),
+            Path = CompilerCaptureIdentity.NormalizePath(path),
             Sha256 = ComputeTextSha256(text)
         };
     }

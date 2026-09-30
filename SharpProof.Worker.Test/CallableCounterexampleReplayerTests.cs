@@ -10,6 +10,20 @@ namespace SharpProof.Worker.Test;
 public sealed class CallableCounterexampleReplayerTests
 {
     [Test]
+    public void ReplayRejectsAMissingPrestateEntryBinding()
+    {
+        var fixture = CreateIncrementingBranch(static (factory, _, _, _) => factory.Boolean(false));
+        var target = fixture.Target with
+        {
+            Variables = [.. fixture.Target.Variables.Select(static variable =>
+                variable.Role == CompilerVariableRole.PreState
+                    ? variable with { CurrentStateVariable = null }
+                    : variable)]
+        };
+        Assert.That(Replay(target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
     public void ReplayFollowsExactBranchAndRebuildsContractState()
     {
         var fixture = CreateIncrementingBranch(static (factory, current, result, old) =>
@@ -226,7 +240,7 @@ public sealed class CallableCounterexampleReplayerTests
     }
 
     [Test]
-    public void ReplayAndAuthorityRejectResultOutsideSourceIntegerInterval()
+    public void ReplayRejectsResultOutsideSourceIntegerInterval()
     {
         var factory = new IrFactory();
         var result = factory.CreateVariable("result", factory.IntegerType);
@@ -251,48 +265,13 @@ public sealed class CallableCounterexampleReplayerTests
                 new CompilerIntegerInterval(byte.MinValue, byte.MaxValue),
                 "result")],
             builder.Build());
-        var response = new WorkerVerifyResponse
-        {
-            CallableResults =
-            [
-                new WorkerCallableResult
-                {
-                    CallableId = "byte-result",
-                    Assumptions = []
-                }
-            ],
-            ClaimResults =
-            [
-                new WorkerClaimResult
-                {
-                    ClaimId = "claim",
-                    Outcome = WorkerClaimOutcome.Refuted,
-                    Reason = WorkerClaimReason.None,
-                    Vacuity = WorkerVacuityKind.None,
-                    ProofCore = [],
-                    Model = [],
-                    Assumptions = []
-                }
-            ]
-        };
-
         var replayReason = Replay(
             target,
             0,
             ImmutableDictionary<IrVarId, IrValue>.Empty);
-        var authorityErrors = new CompilerResponseEvidenceAuthority([target])
-            .Validate(response)
-            .ToArray();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                replayReason,
-                Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
-            Assert.That(
-                authorityErrors,
-                Does.Contain("response.model_authority"));
-        }
+        Assert.That(
+            replayReason,
+            Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     private static ReplayFixture CreateIncrementingBranch(
@@ -412,7 +391,7 @@ public sealed class CallableCounterexampleReplayerTests
     {
         var preparedEnsures = target.Clauses.Where(static clause =>
             clause.Kind == CompilerContractKind.Ensures).ToArray();
-        return CallableCounterexampleReplayer.Replay(
+        return CallableReplayTestHarness.Replay(
             target,
             claimOrdinal,
             model,

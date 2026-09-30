@@ -25,7 +25,15 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofSourceDocument.ps1')
+function Get-OrdinalSortedUniqueStrings {
+    param([AllowEmptyCollection()][string[]]$Values)
+
+    $sorted = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($value in @($Values)) { [void]$sorted.Add($value) }
+    return @($sorted)
+}
+
 function Test-ClearlyNonSemanticSourceLine {
     param(
         [Parameter(Mandatory = $true)]
@@ -49,6 +57,21 @@ function Test-ClearlyNonSemanticSourceLine {
     return $withoutBlockComments.Length -eq 0 -or
         $withoutBlockComments -in @('{', '}') -or
         $withoutBlockComments.StartsWith('//', [StringComparison]::Ordinal)
+}
+
+function Test-HasAddedSemanticSourceLines {
+    param(
+        [AllowEmptyCollection()][string[]]$SourceLines,
+        [AllowEmptyCollection()][int[]]$AddedLines
+    )
+
+    foreach ($number in $AddedLines) {
+        if ($number -le 0 -or $number -gt $SourceLines.Count -or
+            -not (Test-ClearlyNonSemanticSourceLine -Line $SourceLines[$number - 1])) {
+            return $true
+        }
+    }
+    return $false
 }
 
 function Resolve-DurableComparisonCommit {
@@ -320,33 +343,8 @@ function Resolve-CoverageSourcePath {
         [string[]]$SourceRoots
     )
 
-    $normalizedFileName = $FileName.Replace('\', '/')
-    $candidates = [Collections.Generic.List[string]]::new()
-    if ([IO.Path]::IsPathRooted($normalizedFileName)) {
-        $candidates.Add([IO.Path]::GetFullPath($normalizedFileName))
-    }
-    else {
-        $candidates.Add([IO.Path]::GetFullPath(
-            (Join-Path $repositoryRoot $normalizedFileName)))
-        foreach ($sourceRoot in $SourceRoots) {
-            if (-not [string]::IsNullOrWhiteSpace($sourceRoot)) {
-                $normalizedSourceRoot = $sourceRoot.Replace('\', '/')
-                $candidates.Add([IO.Path]::GetFullPath(
-                    (Join-Path $normalizedSourceRoot $normalizedFileName)))
-            }
-        }
-    }
-    foreach ($candidate in $candidates) {
-        if ($candidate.StartsWith(
-                $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::Ordinal) -and
-            (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            return $candidate.Substring($repositoryRoot.Length + 1).
-                Replace('\', '/')
-        }
-    }
-    throw (
-        "Coverage report source document is foreign or missing: '$FileName'.")
+    return Resolve-SharpProofSourceDocument -RepositoryRoot $repositoryRoot `
+        -DocumentPath $FileName -SourceRoots $SourceRoots
 }
 
 $reportFiles = [Collections.Generic.List[object]]::new()
@@ -708,6 +706,27 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             # them as missing coverage or silently dropping them.
             continue
         }
+        $sourcePath = Join-Path $repositoryRoot (
+            $changedPath.Replace(
+                '/',
+                [string][IO.Path]::DirectorySeparatorChar))
+        $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
+            @(Get-Content -LiteralPath $sourcePath)
+        }
+        else {
+            @()
+        }
+        $addedLines = if ($changedLines.ContainsKey($changedPath)) {
+            @($changedLines[$changedPath])
+        }
+        else {
+            @()
+        }
+        if (-not (Test-HasAddedSemanticSourceLines -SourceLines $sourceLines -AddedLines $addedLines)) {
+            # Keep the changed path in reporting, but deletion-only and
+            # added-trivia-only changes have no new executable line to credit.
+            continue
+        }
         if (-not $changedLines.ContainsKey($changedPath) -or
             $changedLines[$changedPath].Count -eq 0 -or
             -not $lineHits.ContainsKey($changedPath)) {
@@ -725,16 +744,6 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             continue
         }
         $fileHits = $lineHits[$changedPath]
-        $sourcePath = Join-Path $repositoryRoot (
-            $changedPath.Replace(
-                '/',
-                [string][IO.Path]::DirectorySeparatorChar))
-        $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
-            @(Get-Content -LiteralPath $sourcePath)
-        }
-        else {
-            @()
-        }
         foreach ($number in $changedLines[$changedPath]) {
             if ($number -gt 0 -and $number -le $sourceLines.Count -and
                 (Test-ClearlyNonSemanticSourceLine `

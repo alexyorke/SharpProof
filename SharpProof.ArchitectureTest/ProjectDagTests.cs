@@ -37,8 +37,7 @@ public sealed class ProjectDagTests
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
                 "SharpProof.ContractForGenerator",
-                "SharpProof.Worker",
-                "SharpProof.Worker.Launcher"
+                "SharpProof.Worker"
             ],
             ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
@@ -51,11 +50,6 @@ public sealed class ProjectDagTests
                 "SharpProof.Dataflow",
                 "SharpProof.Host",
                 "SharpProof.Smt"
-            ],
-            ["SharpProof.Worker.Launcher"] = [
-                "SharpProof.CompilerArtifact",
-                "SharpProof.Host",
-                "SharpProof.Specs"
             ],
             ["SharpProof.Worker.Protocol"] = [],
         };
@@ -110,7 +104,6 @@ public sealed class ProjectDagTests
     }
 
     [TestCase("SharpProof.Worker")]
-    [TestCase("SharpProof.Worker.Launcher")]
     public void WorkerRuntimeClosureIsCompilerNeutral(string root)
     {
         var closure = new HashSet<string>(StringComparer.Ordinal);

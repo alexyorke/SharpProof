@@ -16,26 +16,17 @@ runs:
       with:
         name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
         path: nupkgs
-    - name: Set up Buildx for the pinned Linux amd64 toolchain
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
     - name: Build the pinned Linux amd64 toolchain
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-      env:
-        SHARPPROOF_TOOLING_CACHE_SCOPE: >-
-          sharpproof-tooling-${{ hashFiles(
-            'eng/container/Dockerfile',
-            'eng/container/toolchain.json',
-            'eng/container/*.ps1',
-            'eng/container/*.sh') }}
-      with:
-        context: .
-        file: eng/container/Dockerfile
-        target: toolchain
-        platforms: linux/amd64
-        load: true
-        tags: ${{ env.COMPOSE_PROJECT_NAME }}-tooling:local
-        build-args: |
-          USER_UID=1000
-          USER_GID=1000
-        cache-from: type=gha,scope=${{ env.SHARPPROOF_TOOLING_CACHE_SCOPE }}
-        cache-to: type=gha,mode=max,ignore-error=true,scope=${{ env.SHARPPROOF_TOOLING_CACHE_SCOPE }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker buildx build \
+          --platform linux/amd64 \
+          --file eng/container/Dockerfile \
+          --target toolchain \
+          --load \
+          --tag "${COMPOSE_PROJECT_NAME}-tooling:local" \
+          --build-arg USER_UID=1000 \
+          --build-arg USER_GID=1000 \
+          --progress plain \
+          .

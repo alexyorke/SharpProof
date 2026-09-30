@@ -1,9 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <StartupHookSupport>false</StartupHookSupport>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- MSBuild loads the task from its folder; ship package dependencies beside it. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Framework"

@@ -33,8 +33,6 @@ namespace SharpProof.Package.Test
     [NonParallelizable]
     public sealed class RuntimeEnvironmentIsolationTests
     {
-        [TestCase("SharpProof.BuildTasks")]
-        [TestCase("SharpProof.Worker.Launcher")]
         [TestCase("SharpProof.Worker")]
         public async Task ProductRuntimeExecutablesDoNotLoadStartupHooks(
             string project)
@@ -114,20 +112,20 @@ namespace SharpProof.Package.Test
                 "test -z \"${LD_AUDIT+x}\" && " +
                 "test -z \"${SHARPPROOF_UNTRUSTED+x}\"";
 
-            using var process = LinuxWorkerProcess.StartWithEnvironment(
-                "/bin/sh",
-                ["-c", script],
-                temporary.FullName,
-                inheritedEnvironment);
-            var completion = process.WaitForExit(
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(6));
-
-            using (Assert.EnterMultipleScope())
+            var startInfo = new System.Diagnostics.ProcessStartInfo("/bin/sh")
             {
-                Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
-                Assert.That(completion.ExitCode, Is.Zero);
-            }
+                UseShellExecute = false,
+                WorkingDirectory = temporary.FullName
+            };
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add(script);
+            TrustedChildEnvironment.Apply(
+                startInfo,
+                validatedDotNetHostPath: null,
+                name => inheritedEnvironment.GetValueOrDefault(name));
+            using var process = System.Diagnostics.Process.Start(startInfo)!;
+            Assert.That(process.WaitForExit(TimeSpan.FromSeconds(5)), Is.True);
+            Assert.That(process.ExitCode, Is.Zero);
         }
 
         [Test]

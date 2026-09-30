@@ -16,7 +16,7 @@ internal static class CompilerDependencyEvidenceFormatter
 
         var values = evidence.Select(item =>
         {
-            var prefix = CompilerSpecificationPackAuthorityValidation
+            var prefix = CompilerSpecificationPackSelection
                 .GetSummaryPrefix(item.Origin);
             if (prefix == null)
             {

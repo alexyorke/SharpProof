@@ -503,12 +503,6 @@ try {
         return $null
     }
 
-    $containmentSlots = if ($parallelism -ge 16) {
-        [Math]::Ceiling($parallelism / 4.0)
-    }
-    else {
-        [Math]::Ceiling($parallelism / 2.0)
-    }
     $shards = [Collections.Generic.List[object]]::new()
     if (-not $useDefaultShardPlan) {
         $shards.Add([pscustomobject]@{
@@ -637,10 +631,8 @@ try {
             -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
             -BucketCount $packageLayoutBucketCount)
         $fixtureClasses = @(
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|VerifierProcessSupervisorBug202Tests|DependencyAuditScriptTests|LauncherArgumentTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
-            'FinalCompilationProbeTests',
-            'LinuxWorkerProcessContainmentTests',
-            'ReleasePublicationScriptTests')
+            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+            'FinalCompilationProbeTests')
         $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
         foreach ($name in @($workerClass, $packageLayoutClass,
@@ -721,57 +713,21 @@ try {
                 }
                 })
         }
-        $buildTaskClass = 'SharpProof.Package.Test.BuildTaskTests'
-        $isolatedBuildTaskMethods = @(
-            'OversizedVerifierOutputTriggersPromptBoundedContainment',
-            'VerifierExecutionRetainsLiveIncompleteCleanupAnchor',
-            'VerifierTaskBoundsTheWholeLauncherProcess',
-            'VerifierPreLaunchSetupDoesNotConsumeCleanupReserve')
-        $remainingBuildTaskFilter = "FullyQualifiedName~$buildTaskClass"
-        foreach ($method in $isolatedBuildTaskMethods) {
-            $remainingBuildTaskFilter +=
-                "&FullyQualifiedName!~$buildTaskClass.$method"
-        }
-        $isolatedBuildTaskFilter = @($isolatedBuildTaskMethods | ForEach-Object {
-                "FullyQualifiedName~$buildTaskClass.$_"
-            }) -join '|'
+        $buildTaskFilter = 'FullyQualifiedName~SharpProof.Package.Test.BuildTaskTests'
         $shards.Add([pscustomobject]@{
-            Name = 'postflight-buildtask-main'
-            Filter = $remainingBuildTaskFilter
+            Name = 'postflight-buildtask'
+            Filter = $buildTaskFilter
             EstimatedMilliseconds =
                 $(if ($null -ne ($historicalMilliseconds =
                         Get-SharpProofHistoricalFilterMilliseconds `
-                            $remainingBuildTaskFilter)) {
+                            $buildTaskFilter)) {
                     $historicalMilliseconds
                 }
                 else {
                     10000L
                 })
-            # Keep the fresh dotnet test host required by BuildTaskTests, but
-            # schedule this independent process by duration, not as a tail
-            # after every integration shard has started.
+            # BuildTaskTests needs a fresh dotnet test host.
             Slots = 1
-            Exclusive = $true
-        })
-        $shards.Add([pscustomobject]@{
-            Name = 'postflight-buildtask-containment'
-            Filter = $isolatedBuildTaskFilter
-            EstimatedMilliseconds =
-                $(if ($null -ne ($historicalMilliseconds =
-                        Get-SharpProofHistoricalFilterMilliseconds `
-                            $isolatedBuildTaskFilter)) {
-                    $historicalMilliseconds
-                }
-                else {
-                    8000L
-                })
-            # These deadline-sensitive tests need headroom. Keep the
-            # half-machine reservation at CI width, but use a quarter-machine
-            # reservation on wide local waves so worker shards can enter the
-            # first wave instead of waiting behind containment setup.
-            Slots = [Math]::Max(
-                1,
-                $containmentSlots)
             Exclusive = $true
         })
         foreach ($bucket in $packageLayoutBuckets) {

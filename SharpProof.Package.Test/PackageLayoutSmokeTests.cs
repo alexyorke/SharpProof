@@ -93,7 +93,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
-        "tools/collector/RelationalSpecPackCatalog.json",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
@@ -122,7 +121,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/Microsoft.Z3.dll",
         "tools/net9/SharpProof.BuildTasks.deps.json",
         "tools/net9/SharpProof.BuildTasks.dll",
-        "tools/net9/SharpProof.BuildTasks.runtimeconfig.json",
         "tools/net9/SharpProof.CompilerArtifact.dll",
         "tools/net9/SharpProof.Dataflow.dll",
         "tools/net9/SharpProof.Host.dll",
@@ -132,9 +130,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/SharpProof.Verify.dll",
         "tools/net9/SharpProof.Worker.deps.json",
         "tools/net9/SharpProof.Worker.dll",
-        "tools/net9/SharpProof.Worker.Launcher.deps.json",
-        "tools/net9/SharpProof.Worker.Launcher.dll",
-        "tools/net9/SharpProof.Worker.Launcher.runtimeconfig.json",
         "tools/net9/SharpProof.Worker.Protocol.dll",
         "tools/net9/SharpProof.Worker.runtimeconfig.json",
         "tools/net9/System.Collections.Immutable.dll",
@@ -1112,7 +1107,7 @@ public sealed class PackageLayoutSmokeTests
         using var result = JsonDocument.Parse(
             await File.ReadAllTextAsync(workspace.ResultPath));
         JsonAssert.Equal(result.RootElement, "runStatus", "Complete");
-        JsonAssert.Equal(result.RootElement, "summary.cacheStatus", "Miss");
+        JsonAssert.Equal(result.RootElement, "summary.cacheStatus", "Written");
         var claims = result.RootElement
             .GetProperty("claimResults")
             .EnumerateArray()
@@ -1183,22 +1178,6 @@ public sealed class PackageLayoutSmokeTests
                    await File.ReadAllTextAsync(
                        workspace.CompilerManifestPath)))
         {
-            var syntaxTreePaths = manifest.RootElement
-                .GetProperty("compilation")
-                .GetProperty("syntaxTrees")
-                .EnumerateArray()
-                .Select(static tree =>
-                    tree.GetProperty("path").GetString() ?? string.Empty)
-                .ToArray();
-            Assert.That(
-                syntaxTreePaths.Any(static path =>
-                    path.Replace('\\', '/').EndsWith(
-                        "/shared source/LinkedSubject.cs",
-                        StringComparison.OrdinalIgnoreCase)),
-                Is.True,
-                "The final compiler artifact must retain the linked " +
-                "file's physical source identity.");
-
             var claims = manifest.RootElement
                 .GetProperty("manifest")
                 .GetProperty("claims")
@@ -2246,8 +2225,7 @@ public sealed class PackageLayoutSmokeTests
             Does.Contain(
                 "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
         foreach (var dependencies in new[] {
-                     "tools/net9/SharpProof.Worker.deps.json",
-                     "tools/net9/SharpProof.Worker.Launcher.deps.json"
+                     "tools/net9/SharpProof.Worker.deps.json"
                  })
         {
             Assert.That(

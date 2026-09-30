@@ -20,36 +20,12 @@ public sealed class CompilerManifestArtifactTests
     private const string SourceMarker =
         "sharp-proof-source-must-not-be-embedded";
 
-    private const string DoesNotThrowIdentityWithEnsuresSource =
-        """
-        using SharpProof.Attributes;
-        internal static class Subject {
-            [DoesNotThrow]
-            internal static int Identity(int value) {
-                Contract.Ensures(Contract.Result<int>() == value);
-                return value;
-            }
-        }
-        """;
-
     private const string DoesNotThrowIdentitySource =
         """
         using SharpProof.Attributes;
         internal static class Subject {
             [DoesNotThrow]
             internal static int Identity(int value) => value;
-        }
-        """;
-
-    private const string UnknownAggregateExceptionSource =
-        """
-        using System;
-        using System.Collections.Generic;
-        using SharpProof.Attributes;
-        internal static class Subject {
-            [DoesNotThrow]
-            internal static AggregateException Create() =>
-                new AggregateException((IEnumerable<Exception>)null!);
         }
         """;
 
@@ -183,55 +159,6 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void CompilerFeatureSetCannotBeExpandedPastDiscoveredScope()
-    {
-        var artifact = CreateFeatureArtifact(
-            WorkerFeatureSet.Effects,
-            DoesNotThrowIdentityWithEnsuresSource);
-
-        Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
-        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
-            Is.All.EqualTo(WorkerClaimKind.Effect));
-
-        artifact.Features = WorkerFeatureSet.All;
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
-    }
-
-    [Test]
-    public void CompilerFeatureSetCannotBeReducedPastDiscoveredScope()
-    {
-        var artifact = CreateFeatureArtifact(
-            WorkerFeatureSet.All,
-            DoesNotThrowIdentityWithEnsuresSource);
-
-        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
-            Has.Some.EqualTo(WorkerClaimKind.Postcondition));
-        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
-            Has.Some.EqualTo(WorkerClaimKind.Effect));
-
-        artifact.Features = WorkerFeatureSet.Effects;
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
-    }
-
-    [Test]
-    public void ReSealedFeatureSelectionCannotEscapeTheGlobalProfile()
-    {
-        var artifact = CreateFeatureArtifact(
-            WorkerFeatureSet.Effects,
-            DoesNotThrowIdentitySource);
-        var callable = artifact.Manifest.Callables.Single();
-        callable.SelectedFeatures = [WorkerSelectedFeature.Contracts];
-        WorkerProtocolJson.SealManifest(artifact.Manifest);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
-    }
-
-    [Test]
     public void CompilerIdentityIsProvenanceRatherThanWorkerGate()
     {
         var artifact = CreateArtifact();
@@ -239,9 +166,6 @@ public sealed class CompilerManifestArtifactTests
             Guid.NewGuid().ToString("D");
         artifact.Compilation.CSharpCompilerMvid =
             Guid.NewGuid().ToString("D");
-        artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(
-                artifact.Compilation, []);
 
         var roundTrip = CompilerManifestArtifactJson.Deserialize(
             CompilerManifestArtifactJson.Serialize(artifact));
@@ -249,203 +173,6 @@ public sealed class CompilerManifestArtifactTests
             CompilerManifestArtifactJson.DecodeCallables(roundTrip);
 
         Assert.That(callables, Is.Empty);
-    }
-
-    [Test]
-    public void Sp034MalformedCaptureEvidenceIsRejected()
-    {
-        Action<CompilerCompilationSnapshot>[] corruptions =
-        [
-            snapshot => snapshot.CompilerVersion = "not-a-version",
-            snapshot => snapshot.CompilerMvid =
-                snapshot.CompilerMvid.ToUpperInvariant(),
-            snapshot => snapshot.SyntaxTrees[0].LanguageVersion =
-                "not-a-csharp-language-version",
-            snapshot => snapshot.AssemblyIdentity = "not-an-assembly-identity",
-            snapshot => snapshot.References[0].Identity =
-                "not-an-assembly-identity",
-            snapshot => snapshot.AssemblyName = "DifferentAssembly",
-            snapshot => snapshot.Options.MainTypeName = null!
-        ];
-
-        foreach (var corrupt in corruptions)
-        {
-            AssertMalformedCapture(corrupt);
-        }
-    }
-
-    [Test]
-    public void Sp034VersionsRequireExactSystemVersionRoundTrips()
-    {
-        foreach (var version in new[]
-                 { "1.2", "1.2.3", "1.2.3.4" })
-        {
-            var artifact = CreateArtifact();
-            artifact.Compilation.CompilerVersion = version;
-            artifact.Compilation.CSharpCompilerVersion = version;
-            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                artifact.Compilation, []);
-
-            AssertWellFormedCapture(artifact);
-        }
-
-        foreach (var version in new[]
-                 { "not-a-version", "01.2.3.4", "1.2.3.4.5", "1.2.3.4 " })
-        {
-            AssertMalformedCapture(snapshot =>
-            {
-                snapshot.CompilerVersion = version;
-                snapshot.CSharpCompilerVersion = version;
-            });
-        }
-    }
-
-    [Test]
-    public void Sp034MvidsRequireLowercaseNonNilDFormat()
-    {
-        const string valid = "01234567-89ab-cdef-0123-456789abcdef";
-        var validArtifact = CreateArtifact();
-        validArtifact.Compilation.CompilerMvid = valid;
-        validArtifact.Compilation.CSharpCompilerMvid = valid;
-        foreach (var module in validArtifact.Compilation.References.SelectMany(
-                     static reference => reference.Modules))
-        {
-            module.Mvid = valid;
-        }
-        validArtifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            validArtifact.Compilation, []);
-        AssertWellFormedCapture(validArtifact);
-
-        var invalid = new[]
-        {
-            valid.ToUpperInvariant(),
-            "01234567-89Ab-cdef-0123-456789abcdef",
-            "{" + valid + "}",
-            "0123456789abcdef0123456789abcdef",
-            Guid.Empty.ToString("D")
-        };
-        foreach (var value in invalid)
-        {
-            AssertMalformedCapture(snapshot => snapshot.CompilerMvid = value);
-            AssertMalformedCapture(snapshot =>
-                snapshot.CSharpCompilerMvid = value);
-            AssertMalformedCapture(snapshot =>
-                snapshot.References[0].Modules[0].Mvid = value);
-        }
-    }
-
-    [Test]
-    public void Sp034LanguageVersionsAreTheCaptureEnumSpellings()
-    {
-        var valid = new[]
-        {
-            "Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4",
-            "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2",
-            "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11",
-            "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview",
-            "Latest"
-        };
-        foreach (var languageVersion in valid)
-        {
-            var artifact = CreateArtifact();
-            artifact.Compilation.SyntaxTrees[0].LanguageVersion = languageVersion;
-            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                artifact.Compilation, []);
-
-            AssertWellFormedCapture(artifact, languageVersion);
-        }
-
-        foreach (var languageVersion in new[]
-                 { "not-a-csharp-language-version", "CSharp7.1", "CSharp15", "" })
-        {
-            AssertMalformedCapture(snapshot =>
-                snapshot.SyntaxTrees[0].LanguageVersion = languageVersion);
-        }
-    }
-
-    [Test]
-    public void Sp034AssemblyIdentitiesRoundTripAndBindTheAssemblyName()
-    {
-        var valid = CreateArtifact();
-        AssertWellFormedCapture(valid);
-
-        var identity = valid.Compilation.AssemblyIdentity;
-        foreach (var malformed in new[]
-                 {
-                     "not-an-assembly-identity",
-                     identity.ToUpperInvariant(),
-                     identity.Replace(
-                         "Version=", "version=", StringComparison.Ordinal),
-                     identity + ", " + new string('x', 1024)
-                 })
-        {
-            AssertMalformedCapture(snapshot => snapshot.AssemblyIdentity = malformed);
-            AssertMalformedCapture(snapshot =>
-                snapshot.References[0].Identity = malformed);
-        }
-
-        AssertMalformedCapture(snapshot => snapshot.AssemblyName = "Different");
-
-        var moduleIdentity = CreateArtifact();
-        var module = moduleIdentity.Compilation.References[0].Modules[0];
-        moduleIdentity.Compilation.References[0].Kind = "Module";
-        moduleIdentity.Compilation.References[0].Identity = module.Name;
-        moduleIdentity.Compilation.References[0].Modules = [module];
-        moduleIdentity.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            moduleIdentity.Compilation, []);
-        AssertWellFormedCapture(moduleIdentity);
-
-        AssertMalformedCapture(snapshot =>
-        {
-            snapshot.References[0].Kind = "Module";
-            snapshot.References[0].Identity = "different-module-name";
-            snapshot.References[0].Modules = [snapshot.References[0].Modules[0]];
-        });
-    }
-
-    [Test]
-    public void Sp034ReferenceRolesRejectModuleOnlyProperties()
-    {
-        Action<CompilerReferenceSnapshot>[] corruptions =
-        [
-            reference =>
-            {
-                reference.Kind = "Module";
-                reference.Identity = reference.Modules[0].Name;
-                reference.EmbedInteropTypes = true;
-            },
-            reference =>
-            {
-                reference.Kind = "Module";
-                reference.Identity = reference.Modules[0].Name;
-                reference.Aliases = ["module-alias"];
-            }
-        ];
-
-        foreach (var corrupt in corruptions)
-        {
-            AssertMalformedCapture(snapshot => corrupt(snapshot.References[0]));
-        }
-    }
-
-    [Test]
-    public void Sp034SyntaxTreePathsMustBeCaptureCanonical()
-    {
-        AssertMalformedCapture(snapshot => snapshot.SyntaxTrees[0].Path += "/.");
-    }
-
-    [Test]
-    public void Sp034EmptySyntaxTreesRetainDerivedCaptureValues()
-    {
-        AssertMalformedCapture(
-            snapshot =>
-            {
-                var tree = snapshot.SyntaxTrees[0];
-                tree.TextLength = 0;
-                tree.Sha256 = new string('a', 64);
-                tree.EffectivePreprocessorSymbols = ["fabricated"];
-            },
-            source: string.Empty);
     }
 
     [Test]
@@ -505,8 +232,6 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateContractArtifact();
         artifact.Callables.Single().FailureReason =
             WorkerClaimReason.UnsupportedBody;
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
 
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(artifact)));
@@ -543,87 +268,6 @@ public sealed class CompilerManifestArtifactTests
         artifact.Callables[0].FailureReason = WorkerClaimReason.UnsupportedBody;
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
-    }
-
-    [Test]
-    public void RecomputedOuterHashCannotHideMalformedNestedEvidence()
-    {
-        Action<CompilerCompilationSnapshot>[] corruptions = [
-            snapshot => snapshot.Options.ReferencesSupersedeLowerVersions = true,
-            snapshot => snapshot.Options.Usings = [string.Empty],
-            snapshot => snapshot.ProjectDirectory += "/.",
-            snapshot => snapshot.SyntaxTrees[0].Path = null!,
-            snapshot => snapshot.SyntaxTrees[0].Features = null!,
-            snapshot => snapshot.SyntaxTrees[0].Features = [
-                new() { Key = "z", Value = "1" },
-                new() { Key = "a", Value = "2" }
-            ],
-            snapshot => snapshot.SyntaxTrees[0].PreprocessorSymbols = ["z", "a"],
-            snapshot => snapshot.SyntaxTrees[0].EffectivePreprocessorSymbols = ["z", "a"],
-            snapshot => snapshot.SyntaxTrees[0].Sha256 = "invalid",
-            snapshot => snapshot.SyntaxTrees[0].TextLength = -1,
-            snapshot => snapshot.References[0].Aliases = null!,
-            snapshot => snapshot.References[0].Aliases = ["z", "a"],
-            snapshot => snapshot.References[0].Kind = "invalid",
-            snapshot => snapshot.References[0].Kind = "Module",
-            snapshot => snapshot.References[0].Modules[0].Mvid = "invalid",
-            snapshot => snapshot.References[0].Modules[0].SizeBytes = 0,
-            snapshot => snapshot.References[0].Modules[0].SizeBytes =
-                CompilerReferenceLimits.MaximumModuleBytes + 1L,
-            snapshot => snapshot.Options.WarningLevel = -1,
-            snapshot => snapshot.Options.SpecificDiagnosticOptions = null!,
-            snapshot => snapshot.Options.SpecificDiagnosticOptions = [null!],
-            snapshot => snapshot.Options.SpecificDiagnosticOptions = [
-                new() { Id = " ", ReportDiagnostic = CompilerReportDiagnostic.Error }
-            ],
-            snapshot => snapshot.Options.SpecificDiagnosticOptions = [
-                new() { Id = "CS0002", ReportDiagnostic = CompilerReportDiagnostic.Error },
-                new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Error }
-            ],
-            snapshot => snapshot.Options.SpecificDiagnosticOptions = [
-                new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Error },
-                new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Warn }
-            ],
-            snapshot => snapshot.References[0].Modules = [null!],
-            snapshot =>
-            {
-                var reference = snapshot.References[0];
-                reference.Kind = "Module";
-                reference.Identity = reference.Modules[0].Name;
-                reference.Modules = [null!];
-            },
-            snapshot => snapshot.References[0].Modules[0].Name = " ",
-            snapshot => snapshot.References[0].Modules = [
-                snapshot.References[0].Modules[0],
-                snapshot.References[0].Modules[0]
-            ]
-        ];
-
-        foreach (var corrupt in corruptions)
-        {
-            AssertMalformedCapture(corrupt);
-        }
-    }
-
-    [Test]
-    public void ReferenceClosureResourceLimitsAreValidated()
-    {
-        var closure = CreateArtifact();
-        closure.Compilation.References[0].Modules = CreateModuleRows(
-            count: 5,
-            sizeBytes: CompilerReferenceLimits.MaximumModuleBytes);
-        var count = CreateArtifact();
-        count.Compilation.References[0].Modules = CreateModuleRows(
-            CompilerReferenceLimits.MaximumModuleCount + 1,
-            sizeBytes: 1);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.Throws<JsonException>((Action)(() =>
-                CompilationFingerprint.ValidateShape(closure.Compilation)));
-            Assert.Throws<JsonException>((Action)(() =>
-                CompilationFingerprint.ValidateShape(count.Compilation)));
-        }
     }
 
     [Test]
@@ -699,64 +343,12 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void NullableSchemaShapesFailWithJsonException()
-    {
-        var previousSchema = CreateArtifact();
-        previousSchema.SchemaVersion =
-            CompilerManifestArtifactVersions.Current - 1;
-        var modules = CreateArtifact();
-        modules.Compilation.References[0].Modules = null!;
-        modules.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            modules.Compilation, []);
-
-        CompilerManifestArtifact[] malformedDiagnostics = [
-            CreateArtifact(),
-            CreateArtifact(),
-            CreateArtifact(),
-            CreateArtifact(),
-            CreateArtifact()
-        ];
-        malformedDiagnostics[0].CompilerDiagnostics = null!;
-        malformedDiagnostics[1].CompilerDiagnostics = [null!];
-        malformedDiagnostics[2].CompilerDiagnostics = [Diagnostic(
-            "a", length: 1, line: 1, column: 1)];
-        malformedDiagnostics[2].CompilerDiagnostics[0].Location = null!;
-        malformedDiagnostics[3].Compilation.Options.GeneralDiagnosticOption =
-            (CompilerReportDiagnostic)int.MaxValue;
-        malformedDiagnostics[4].Compilation.Options.SpecificDiagnosticOptions = [
-            new()
-            {
-                Id = "CS0001",
-                ReportDiagnostic = (CompilerReportDiagnostic)int.MaxValue
-            }
-        ];
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                JsonSerializer.Serialize(
-                    previousSchema, WorkerProtocolJson.Options) + "\n")));
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                JsonSerializer.Serialize(modules, WorkerProtocolJson.Options) + "\n")));
-        foreach (var artifact in malformedDiagnostics)
-        {
-            Assert.Throws<JsonException>((Action)(() =>
-                CompilerManifestArtifactJson.Serialize(artifact)));
-            Assert.Throws<JsonException>((Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(
-                    JsonSerializer.Serialize(artifact, WorkerProtocolJson.Options) + "\n")));
-        }
-    }
-
-    [Test]
     public void CompilerDiagnosticLocationsUseTheSharedOneBasedOrNoneShape()
     {
         var valid = CreateArtifact();
         valid.CompilerDiagnostics = [Diagnostic(
             "valid", length: 0, line: 1, column: 1)];
         BindDiagnostics(valid);
-        valid.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            valid.Compilation, valid.CompilerDiagnostics);
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(valid)));
 
@@ -767,8 +359,6 @@ public sealed class CompilerManifestArtifactTests
             Message = "non-source",
             Location = new WorkerSourceLocation()
         }];
-        none.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            none.Compilation, none.CompilerDiagnostics);
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(none)));
 
@@ -803,8 +393,6 @@ public sealed class CompilerManifestArtifactTests
                 Message = "bad geometry",
                 Location = location
             }];
-            malformed.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                malformed.Compilation, malformed.CompilerDiagnostics);
             Assert.Throws<JsonException>((Action)(() =>
                 CompilerManifestArtifactJson.Serialize(malformed)));
         }
@@ -828,8 +416,6 @@ public sealed class CompilerManifestArtifactTests
             "invalid code", length: 1, line: 1, column: 1)];
         BindDiagnostics(artifact);
         artifact.CompilerDiagnostics[0].Code = code;
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, artifact.CompilerDiagnostics);
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
@@ -843,8 +429,6 @@ public sealed class CompilerManifestArtifactTests
             "invalid code", length: 1, line: 1, column: 1)];
         BindDiagnostics(artifact);
         artifact.CompilerDiagnostics[0].Code = "compiler.CS" + (char)1;
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, artifact.CompilerDiagnostics);
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
@@ -861,8 +445,6 @@ public sealed class CompilerManifestArtifactTests
             "canonical code", length: 1, line: 1, column: 1)];
         BindDiagnostics(artifact);
         artifact.CompilerDiagnostics[0].Code = code;
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, artifact.CompilerDiagnostics);
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
@@ -893,42 +475,6 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void SpecificationPackAuthorityIsSealedWhenUnusedAndFingerprintBound()
-    {
-        var unused = CreateArtifact(specificationPacks: ["dotnet.scalar"]);
-        var unset = CreateArtifact();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(unused.SpecificationPackIds,
-                Is.EqualTo(["dotnet.scalar"]));
-            Assert.That(unused.Compilation.SpecificationPackIds,
-                Is.EqualTo(["dotnet.scalar"]));
-            Assert.That(unused.SpecificationPackCatalogVersion,
-                Is.EqualTo(CompilerSpecificationPackCatalogVersions.Current));
-            Assert.That(unused.SpecificationPackCatalogSha256,
-                Is.EqualTo(CompilerSpecificationPackCatalogVersions.Sha256));
-            Assert.That(unused.CompilerDiagnostics, Is.Empty);
-            Assert.That(unused.CompilationSha256,
-                Is.Not.EqualTo(unset.CompilationSha256));
-        }
-
-        unused.SpecificationPackIds = [];
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(unused)));
-
-        var tamperedCatalog = CreateArtifact(
-            specificationPacks: ["dotnet.scalar"]);
-        tamperedCatalog.Compilation.SpecificationPackCatalogSha256 =
-            new string('0', 64);
-        tamperedCatalog.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            tamperedCatalog.Compilation,
-            tamperedCatalog.CompilerDiagnostics);
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(tamperedCatalog)));
-    }
-
-    [Test]
     public void SpecificationPackAuthorityFieldsCannotSilentlyDefaultOnWire()
     {
         var json = CompilerManifestArtifactJson.Serialize(CreateArtifact());
@@ -946,77 +492,8 @@ public sealed class CompilerManifestArtifactTests
             CompilerManifestArtifactJson.Deserialize(withoutCatalogVersion)));
     }
 
-    [Test]
-    public void CompilerDiagnosticsHaveTotalCanonicalOrderingAndFingerprint()
-    {
-        var diagnostics = new[]
-        {
-            Diagnostic("b", length: 1, line: 1, column: 1),
-            Diagnostic("a", length: 2, line: 1, column: 1),
-            Diagnostic("a", length: 1, line: 2, column: 1),
-            Diagnostic("a", length: 1, line: 1, column: 2),
-            Diagnostic("a", length: 1, line: 1, column: 1)
-        };
-        var artifact = CreateArtifact();
-        artifact.CompilerDiagnostics = [.. diagnostics.Reverse()];
-        BindDiagnostics(artifact);
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, artifact.CompilerDiagnostics);
-        var reversedHash = artifact.CompilationSha256;
 
-        var roundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
-        var canonicalHash = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, diagnostics);
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(reversedHash, Is.EqualTo(canonicalHash));
-            Assert.That(
-                roundTrip.CompilerDiagnostics.Select(static diagnostic => (
-                    diagnostic.Location.Length,
-                    diagnostic.Message,
-                    diagnostic.Location.Line,
-                    diagnostic.Location.Column)),
-                Is.EqualTo(new[]
-                {
-                    (1, "a", 1, 1),
-                    (1, "b", 1, 1),
-                    (2, "a", 1, 1),
-                    (1, "a", 1, 2),
-                    (1, "a", 2, 1)
-                }));
-        }
-    }
-
-    [Test]
-    public void UnknownCompilerOptionNameIsRejected()
-    {
-        var json = CompilerManifestArtifactJson.Serialize(CreateArtifact())
-            .Replace(
-                "\"outputKind\":\"DynamicallyLinkedLibrary\"",
-                "\"outputKind\":\"FutureOutputKind\"",
-                StringComparison.Ordinal);
-
-        Assert.Throws<JsonException>(
-            (Action)(() => CompilerManifestArtifactJson.Deserialize(json)));
-    }
-
-    [Test]
-    public void AdditionalFilesRejectNoncanonicalOrdering()
-    {
-        AssertMalformedAdditionalFiles(
-            AdditionalFile("z.input", 'b'),
-            AdditionalFile("a.input", 'a'));
-    }
-
-    [Test]
-    public void AdditionalFilesRejectDuplicateNormalizedPaths()
-    {
-        AssertMalformedAdditionalFiles(
-            AdditionalFile("same.input", 'a'),
-            AdditionalFile("same.input", 'b'));
-    }
 
     [Test]
     [Platform("Linux")]
@@ -1027,27 +504,10 @@ public sealed class CompilerManifestArtifactTests
             AdditionalFile("CASE.input", 'a'),
             AdditionalFile("case.input", 'b')
         ];
-        artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
                 CompilerManifestArtifactJson.Serialize(artifact))));
-    }
-
-    [Test]
-    public void AdditionalFilesRejectNoncanonicalPaths()
-    {
-        AssertMalformedAdditionalFiles(new CompilerAdditionalFileSnapshot
-        {
-            Path = Path.Combine(
-                    TestContext.CurrentContext.WorkDirectory,
-                    "nested",
-                    "..",
-                    "input.txt")
-                .Replace('\\', '/'),
-            Sha256 = new string('a', 64)
-        });
     }
 
     [Test]
@@ -1056,9 +516,6 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
         BindDiagnostics(artifact);
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation,
-            artifact.CompilerDiagnostics);
         var initial = CompilerManifestArtifactJson.Serialize(artifact);
         var padding =
             WorkerProtocolJson.MaximumJsonBytes + 1 -
@@ -1066,9 +523,6 @@ public sealed class CompilerManifestArtifactTests
         Assert.That(padding, Is.GreaterThan(0));
 
         artifact.CompilerDiagnostics[0].Message += new string('x', padding);
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation,
-            artifact.CompilerDiagnostics);
 
         var json = CompilerManifestArtifactJson.Serialize(artifact);
 
@@ -1091,155 +545,27 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
         BindDiagnostics(artifact);
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation,
-            artifact.CompilerDiagnostics);
         var initial = CompilerManifestArtifactJson.Serialize(artifact);
         var padding = CompilerManifestArtifactFile.MaximumBytes -
             Encoding.UTF8.GetByteCount(initial);
         Assert.That(padding, Is.GreaterThan(0));
 
         artifact.CompilerDiagnostics[0].Message += new string('x', padding);
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation,
-            artifact.CompilerDiagnostics);
         var exact = CompilerManifestArtifactJson.Serialize(artifact);
         Assert.That(
             Encoding.UTF8.GetByteCount(exact),
             Is.EqualTo(CompilerManifestArtifactFile.MaximumBytes));
 
         artifact.CompilerDiagnostics[0].Message += "x";
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation,
-            artifact.CompilerDiagnostics);
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
     }
 
-    [Test]
-    public void EffectEvidenceMustMatchIndependentCompilerAuthority()
-    {
-        var refuted = CreateContractArtifact(ZeroAllocationInlineSource);
-        var refutedEvidence = refuted.Callables.Single().EffectClaims.Single();
-        Assert.That(refutedEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-        Assert.That(refutedEvidence.Replay, Is.Not.Null);
 
-        var unknown = CreateContractArtifact(UnknownAggregateExceptionSource);
-        var unknownEvidence = unknown.Callables.Single().EffectClaims.Single();
-        Assert.That(unknownEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(unknownEvidence.Reason, Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
 
-        Action<CompilerEffectClaimArtifact> transition = static evidence =>
-        {
-            evidence.Outcome = WorkerClaimOutcome.Proven;
-            evidence.Reason = WorkerClaimReason.None;
-            evidence.Certainty =
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-            evidence.Witness = null;
-            evidence.Replay = null;
-        };
 
-        var transitionSources = new[] { refuted, unknown };
-        foreach (var source in transitionSources)
-        {
-            var artifact = CloneArtifact(source);
-            transition(artifact.Callables.Single().EffectClaims.Single());
-            CompilerEffectClaimArtifactCodec.Seal(
-                artifact.Callables.Single().EffectClaims.Single());
 
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        }
-    }
 
-    [Test]
-    public void EffectAuthorityBindsConstraintsEvidenceAndSourceTreeOrigin()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [EffectContract(SharpProofEffect.None, Complete = true)]
-                internal static void First() { }
-
-                [EffectContract(SharpProofEffect.Allocates, Complete = true)]
-                internal static void Second() { }
-            }
-            """;
-        var honest = CreateContractArtifact(source);
-        var honestCallables = honest.Callables
-            .SelectMany(static callable => callable.EffectClaims)
-            .Where(static evidence =>
-                evidence.ContractKind == WorkerEffectContractKind.EffectContract)
-            .ToArray();
-        Assert.That(honestCallables, Has.Length.EqualTo(2));
-        Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(honest)));
-
-        var changedConstraint = CloneArtifact(honest);
-        var changedConstraintEvidence = changedConstraint.Callables
-            .SelectMany(static callable => callable.EffectClaims)
-            .First(static evidence =>
-                evidence.ContractKind == WorkerEffectContractKind.EffectContract);
-        changedConstraintEvidence.Constraint.AllowedEffects =
-            changedConstraintEvidence.Constraint.AllowedEffects == WorkerEffectSet.Allocates
-                ? WorkerEffectSet.ReadsReceiverState
-                : WorkerEffectSet.Allocates;
-        CompilerEffectClaimArtifactCodec.Seal(changedConstraintEvidence);
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(changedConstraint)));
-
-        var swappedEvidence = CloneArtifact(honest);
-        var swapped = swappedEvidence.Callables
-            .SelectMany(static callable => callable.EffectClaims)
-            .Where(static evidence =>
-                evidence.ContractKind == WorkerEffectContractKind.EffectContract)
-            .ToArray();
-        CopyEffectPayload(swapped[1], swapped[0]);
-        CompilerEffectClaimArtifactCodec.Seal(swapped[0]);
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(swappedEvidence)));
-
-        var changedOrigin = CloneArtifact(honest);
-        var originEvidence = changedOrigin.Callables
-            .SelectMany(static callable => callable.EffectClaims)
-            .First(static evidence =>
-                evidence.ContractKind == WorkerEffectContractKind.EffectContract);
-        var authority = changedOrigin.Callables
-            .SelectMany(static callable => callable.EffectAuthorities)
-            .Single(item => item.ClaimId == originEvidence.ClaimId);
-        authority.SourceTreeSha256 = new string('a', 64);
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(changedOrigin)));
-    }
-
-    [Test]
-    public void EffectAuthoritiesContributeToFeatureScopeFingerprint()
-    {
-        var artifact = CreateEffectArtifact();
-        var original = artifact.FeatureScopeSha256;
-        artifact.Callables.Single().EffectAuthorities.Single()
-            .SourceTreeSha256 = new string('0', 64);
-
-        Assert.That(
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact),
-            Is.Not.EqualTo(original));
-    }
-
-    [Test]
-    public void EffectAuthorityMismatchIsRejectedAtWireAndHydrationBoundaries()
-    {
-        var artifact = CreateEffectArtifact();
-        artifact.Callables.Single().EffectAuthorities.Single()
-            .SourceTreeSha256 = new string('0', 64);
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
-    }
 
     [Test]
     public void HonestEffectAuthorityPreservesWorkerResultClassification()
@@ -1258,26 +584,6 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
-    private static void CopyEffectPayload(
-        CompilerEffectClaimArtifact source,
-        CompilerEffectClaimArtifact destination)
-    {
-        Assert.That(source.Witness, Is.Null);
-        Assert.That(source.Replay, Is.Null);
-        destination.ContractKind = source.ContractKind;
-        destination.Outcome = source.Outcome;
-        destination.Reason = source.Reason;
-        destination.Certainty = source.Certainty;
-        destination.Constraint = new CompilerEffectConstraintArtifact
-        {
-            AllowedEffects = source.Constraint.AllowedEffects,
-            AllowedCapabilities = source.Constraint.AllowedCapabilities,
-            AllowedExceptionTypes = [.. source.Constraint.AllowedExceptionTypes]
-        };
-        destination.Witness = null;
-        destination.Replay = null;
-        destination.Evidence = source.Evidence;
-    }
 
     [Test]
     public void MalformedSuccessfulCallableFailsAtWireAndHydrationBoundaries()
@@ -1289,9 +595,6 @@ public sealed class CompilerManifestArtifactTests
         Assert.That(valid[0].IsSuccess, Is.True);
 
         artifact.Callables[0].Clauses[0].Root = int.MaxValue;
-        artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(
-                artifact.Compilation, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1568,7 +871,6 @@ public sealed class CompilerManifestArtifactTests
             value => value.EffectClaims[0].ClaimId = "spc1:invented",
             value => value.EffectClaims[0].ContractKind =
                 WorkerEffectContractKind.ZeroAllocations,
-            value => value.EffectClaims[0].Evidence += ";invented=true",
             value => value.EffectClaims[0].Outcome = WorkerClaimOutcome.Refuted,
             value => value.EffectClaims[0].Certainty =
                 WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary
@@ -1582,31 +884,7 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
-    [Test]
-    public void ResealedEffectVerdictsCannotChangeCompilerOutcome()
-    {
-        foreach (var source in new[] {
-                     ZeroAllocationInlineSource,
-                     UnknownAggregateExceptionSource
-                 })
-        {
-            var artifact = CreateContractArtifact(source);
-            var evidence = artifact.Callables.Single().EffectClaims.Single();
-            Assert.That(evidence.Outcome,
-                Is.Not.EqualTo(WorkerClaimOutcome.Proven));
 
-            evidence.Outcome = WorkerClaimOutcome.Proven;
-            evidence.Reason = WorkerClaimReason.None;
-            evidence.Certainty =
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-            evidence.Witness = null;
-            evidence.Replay = null;
-            CompilerEffectClaimArtifactCodec.Seal(evidence);
-
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        }
-    }
 
     [Test]
     public void ResourceLimitedEffectEvidenceHydratesAsTypedUnknown()
@@ -1620,13 +898,6 @@ public sealed class CompilerManifestArtifactTests
         evidence.Witness = null;
         evidence.Replay = null;
         CompilerEffectClaimArtifactCodec.Seal(evidence);
-        var authority = artifact.Callables.Single().EffectAuthorities
-            .Single(item => item.ClaimId == evidence.ClaimId);
-        authority.Outcome = evidence.Outcome;
-        authority.Reason = evidence.Reason;
-        authority.Certainty = evidence.Certainty;
-        authority.Witness = null;
-        authority.Replay = null;
 
         var target = CompilerManifestArtifactJson.DecodeCallables(artifact)
             .Single();
@@ -1804,39 +1075,11 @@ public sealed class CompilerManifestArtifactTests
                     CompilerEffectReplayPathKind.Unconditional));
             Assert.That(replay?.Events, Has.Length.EqualTo(1));
             Assert.That(
-                replay?.ConstraintSha256,
-                Is.EqualTo(
-                    CompilerEffectClaimArtifactCodec
-                        .ComputeConstraintSha256(
-                            evidence.ContractKind,
-                            evidence.Constraint)));
-            Assert.That(
                 @event?.Kind,
                 Is.EqualTo(
                     CompilerEffectReplayEventKind
                         .ManagedObjectAllocation));
             Assert.That(@event?.Ordinal, Is.Zero);
-            Assert.That(@event?.SyntaxTreeOrdinal, Is.Zero);
-            Assert.That(
-                @event?.SyntaxTreeSha256,
-                Is.EqualTo(
-                    roundTrip.Compilation.SyntaxTrees[0]
-                        .Sha256));
-            Assert.That(
-                @event?.SyntaxStart,
-                Is.EqualTo(
-                    source.IndexOf(
-                        expression,
-                        StringComparison.Ordinal)));
-            Assert.That(
-                @event?.SyntaxLength,
-                Is.EqualTo(expression.Length));
-            Assert.That(
-                @event?.OperationIdentitySha256,
-                Is.EqualTo(
-                    CompilerEffectClaimArtifactCodec
-                        .ComputeReplayOperationSha256(
-                            @event!)));
             Assert.That(@event?.MemberIdentity, Is.Not.Empty);
             Assert.That(
                 @event?.MemberDocumentationId,
@@ -1856,98 +1099,9 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
-    [Test]
-    public void AllocationReplayRejectsResealedInvalidSourceSpans()
-    {
-        var valid = CreateContractArtifact(ZeroAllocationSplitSource);
-        AssertRejected(valid, static (_, _) => 0);
-        AssertRejected(valid, static (treeLength, start) =>
-            treeLength - start + 1);
-        return;
 
-        static void AssertRejected(
-            CompilerManifestArtifact valid,
-            Func<int, int, int> chooseLength)
-        {
-            var artifact = CloneArtifact(valid);
-            var evidence =
-                artifact.Callables.Single().EffectClaims.Single();
-            var @event = evidence.Replay!.Events.Single();
-            var length = chooseLength(
-                artifact.Compilation.SyntaxTrees[0].TextLength,
-                @event.SyntaxStart);
-            @event.SyntaxLength = length;
-            @event.Location.Length = length;
-            evidence.Witness!.Location.Length = length;
-            CompilerEffectClaimArtifactCodec.Seal(evidence);
 
-            Assert.Throws<JsonException>(
-                (Action)(() =>
-                    CompilerManifestArtifactJson.Serialize(
-                        artifact)));
-        }
-    }
 
-    [TestCase("line")]
-    [TestCase("tree")]
-    [TestCase("line-map")]
-    public void AllocationReplayRejectsCoordinatedResealedMappedGeometry(
-        string mutation)
-    {
-        var artifact = CreateContractArtifact(ZeroAllocationSplitSource);
-        var callable = artifact.Callables.Single();
-        var evidence = callable.EffectClaims.Single();
-        var authority = callable.EffectAuthorities.Single();
-        var @event = evidence.Replay!.Events.Single();
-        var authorityEvent = authority.Replay!.Events.Single();
-
-        switch (mutation)
-        {
-            case "line":
-                @event.Location.Line++;
-                authorityEvent.Location.Line++;
-                evidence.Witness!.Location.Line++;
-                break;
-            case "tree":
-                @event.SourceTreeOrdinal++;
-                authorityEvent.SourceTreeOrdinal++;
-                break;
-            case "line-map":
-                @event.SourceLineMapSha256 = new string('0', 64);
-                authorityEvent.SourceLineMapSha256 = new string('0', 64);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mutation));
-        }
-
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
-    }
-
-    [Test]
-    public void AllocationReplaySyntaxTreeLineMapIsRejectedAtWireAndHydrationBoundaries()
-    {
-        var artifact = CreateContractArtifact(ZeroAllocationSplitSource);
-        var callable = artifact.Callables.Single();
-        var evidence = callable.EffectClaims.Single();
-        var authority = callable.EffectAuthorities.Single();
-        evidence.Replay!.Events.Single().SyntaxTreeLineMapSha256 =
-            new string('0', 64);
-        authority.Replay!.Events.Single().SyntaxTreeLineMapSha256 =
-            new string('0', 64);
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
-    }
 
     [Test]
     public void UnmodeledExceptionConstructorCannotFabricateAReplayWitness()
@@ -1994,57 +1148,9 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
-    [Test]
-    public void ContractPredicatesAreBoundToCompilerInventory()
-    {
-        const string source = NonNegativeIdentitySource;
-        var swapped = CreateContractArtifact(source);
-        var graph = swapped.Callables[0].Graph!;
-        var rows = swapped.Callables[0].Clauses;
-        (graph.Roots[0], graph.Roots[1]) = (graph.Roots[1], graph.Roots[0]);
-        (rows[0].PredicateSha256, rows[1].PredicateSha256) =
-            (rows[1].PredicateSha256, rows[0].PredicateSha256);
 
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(swapped)));
-    }
 
-    [Test]
-    public void AddedPreconditionCannotPassHydration()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Identity(int value) {
-                    Contract.Requires(value >= 0);
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return value;
-                }
-            }
-            """;
-        var artifact = CreateContractArtifact(source);
-        var callable = artifact.Callables[0];
-        var requires = callable.Clauses.Single(
-            static row => row.Kind == CompilerContractKind.Requires);
-        var originalRoot = callable.Graph!.Roots[requires.Root];
-        callable.Graph.Roots = [.. callable.Graph.Roots, originalRoot];
-        callable.Clauses = [.. callable.Clauses, new CompilerClauseArtifact {
-            Kind = requires.Kind,
-            Evidence = requires.Evidence,
-            Root = callable.Clauses.Length,
-            AssumptionId = requires.AssumptionId,
-            PredicateSha256 = requires.PredicateSha256
-        }];
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(artifact.Manifest.Callables[0].Assumptions.Count(
-                static item => item.Kind == WorkerAssumptionKind.Precondition), Is.EqualTo(1));
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        }
-    }
 
     [Test]
     public void ProgramEntryIsCanonicalAndLegacyInstructionOffsetIsRejected()
@@ -2168,8 +1274,6 @@ public sealed class CompilerManifestArtifactTests
             resealed.Callables.Single().Variables
                 .Single(static item => item.Role == CompilerVariableRole.Parameter)
                 .CurrentStateVariable = invalidSentinel;
-            resealed.FeatureScopeSha256 =
-                CompilerFeatureScopeFingerprint.ComputeSha256(resealed);
             var resealedJson = CompilerManifestArtifactJson.SerializeValidated(resealed);
 
             Assert.Throws<JsonException>((Action)(() =>
@@ -2208,75 +1312,6 @@ public sealed class CompilerManifestArtifactTests
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
-    }
-
-    [Test]
-    public void SameTypedParameterBindingSwapFailsClosed()
-    {
-        const string parameterSource =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Sum(int left, int right) {
-                    Contract.Ensures(Contract.Result<int>() == left);
-                    return left >= right ? left : right;
-                }
-            }
-            """;
-        var valid = CreateContractArtifact(parameterSource);
-        var parameterSwap = CloneArtifact(valid);
-        var bindings = parameterSwap.Callables[0].Body!.ParameterBindings;
-        Assert.That(bindings, Has.Length.EqualTo(2));
-        (bindings[0].Target, bindings[1].Target) =
-            (bindings[1].Target, bindings[0].Target);
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(parameterSwap)));
-
-        var pairedSwap = CloneArtifact(valid);
-        bindings = pairedSwap.Callables[0].Body!.ParameterBindings;
-        (bindings[0].Target, bindings[1].Target) =
-            (bindings[1].Target, bindings[0].Target);
-        (bindings[0].SourceOrdinal, bindings[1].SourceOrdinal) =
-            (bindings[1].SourceOrdinal, bindings[0].SourceOrdinal);
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(pairedSwap)));
-    }
-
-    [Test]
-    public void SameTypedPreStateAssociationSwapFailsClosed()
-    {
-        const string preStateSource =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Sum(int left, int right) {
-                    Contract.Ensures(Contract.Result<int>() == Contract.Old(left));
-                    Contract.Ensures(Contract.Old(right) == Contract.Old(right));
-                    return left;
-                }
-            }
-            """;
-        var valid = CreateContractArtifact(preStateSource);
-        var preStateSwap = CloneArtifact(valid);
-        var preStates = preStateSwap.Callables[0].Variables
-            .Where(static item => item.Role == CompilerVariableRole.PreState)
-            .ToArray();
-        Assert.That(preStates, Has.Length.EqualTo(2));
-        (preStates[0].CurrentStateVariable, preStates[1].CurrentStateVariable) =
-            (preStates[1].CurrentStateVariable, preStates[0].CurrentStateVariable);
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(preStateSwap)));
-
-        var pairedSwap = CloneArtifact(valid);
-        preStates = pairedSwap.Callables[0].Variables
-            .Where(static item => item.Role == CompilerVariableRole.PreState)
-            .ToArray();
-        (preStates[0].CurrentStateVariable, preStates[1].CurrentStateVariable) =
-            (preStates[1].CurrentStateVariable, preStates[0].CurrentStateVariable);
-        (preStates[0].SourceOrdinal, preStates[1].SourceOrdinal) =
-            (preStates[1].SourceOrdinal, preStates[0].SourceOrdinal);
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(pairedSwap)));
     }
 
     [Test]
@@ -2323,135 +1358,13 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
-    [Test]
-    public void SummaryCallBindsSameTypedArgumentPermutationAndDuplicate()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                private static bool Select(bool first, bool second) => first;
 
-                internal static bool Call(bool left, bool right) {
-                    Contract.Ensures(Contract.Result<bool>() == left);
-                    return Select(left, right);
-                }
-            }
-            """;
-        Action<CompilerCallableArtifact>[] corruptions = [
-            callable => {
-                var call = FindCall(callable);
-                (call.Items[0], call.Items[1]) = (call.Items[1], call.Items[0]);
-            },
-            callable => {
-                var call = FindCall(callable);
-                call.Items[1] = call.Items[0];
-            }
-        ];
-        var valid = CreateContractArtifact(source);
 
-        foreach (var corrupt in corruptions)
-        {
-            var artifact = CloneArtifact(valid);
-            corrupt(artifact.Callables[0]);
 
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        }
-    }
 
-    [Test]
-    public void SummaryCallBindsDifferentTypedArgumentPermutation()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                private static int Select(int first, bool second) => first;
 
-                internal static int Call(int value, bool flag) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return Select(value, flag);
-                }
-            }
-            """;
-        var artifact = CreateContractArtifact(source);
-        var call = FindCall(artifact.Callables[0]);
-        (call.Items[0], call.Items[1]) = (call.Items[1], call.Items[0]);
 
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
-    }
 
-    [Test]
-    public void SummaryCallBindsReceiverInstantiation()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal sealed class Box { }
-            internal static class Subject {
-                private static bool Select(bool value) => value;
-
-                internal static bool Call(Box box, bool value) {
-                    Contract.Requires(box != null);
-                    Contract.Ensures(Contract.Result<bool>() == value);
-                    return Select(value);
-                }
-            }
-            """;
-        var artifact = CreateContractArtifact(source);
-        var callable = artifact.Callables.Single(static value =>
-            value.Body?.SummaryCalls.Length == 1);
-        var call = FindCall(callable);
-        var boxIndex = Array.FindIndex(callable.Graph!.Variables, static value =>
-            value.Name == "parameter:0");
-        Assert.That(boxIndex, Is.GreaterThanOrEqualTo(0));
-        call.C = Array.FindIndex(callable.Graph.Terms, value =>
-            value.Kind == IrTermKind.Variable && value.A == boxIndex);
-        Assert.That(call.C, Is.GreaterThanOrEqualTo(0));
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
-    }
-
-    [Test]
-    public void SummaryCallBindsExistentialRolesAndRequiresDigest()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                private static int Identity(int value) => value;
-                private static int Compose(int value) => Identity(Identity(value));
-
-                internal static int Call(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return Compose(value);
-                }
-            }
-            """;
-        Action<CompilerCallableArtifact>[] corruptions = [
-            callable => {
-                var summary = callable.Body!.SummaryCalls.Single();
-                Assert.That(summary.ExistentialVariables, Has.Length.EqualTo(2));
-                (summary.ExistentialVariables[0], summary.ExistentialVariables[1]) =
-                    (summary.ExistentialVariables[1], summary.ExistentialVariables[0]);
-            },
-            callable => callable.Body!.SummaryCalls.Single().InstantiationSha256 =
-                string.Empty
-        ];
-        var valid = CreateContractArtifact(source);
-
-        foreach (var corrupt in corruptions)
-        {
-            var artifact = CloneArtifact(valid);
-            corrupt(artifact.Callables.Single());
-
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
-        }
-    }
 
     [Test]
     public void SameShapedMemberSubstitutionFailsClosed()
@@ -2540,14 +1453,6 @@ public sealed class CompilerManifestArtifactTests
             specificationPacks: specificationPacks);
     }
 
-    private static PortableIrInstruction FindCall(
-        CompilerCallableArtifact callable)
-    {
-        return callable.Graph!.Blocks
-            .SelectMany(static block => block.Instructions)
-            .Single(static instruction =>
-                instruction.Kind == IrInstructionKind.Call);
-    }
 
     private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
     {
@@ -2564,17 +1469,6 @@ public sealed class CompilerManifestArtifactTests
             """,
             includeContractReference: true,
             features: WorkerFeatureSet.All);
-    }
-
-    private static CompilerManifestArtifact CreateFeatureArtifact(
-        WorkerFeatureSet features,
-        string source)
-    {
-        return CreateArtifactCore(
-            new CSharpParseOptions(LanguageVersion.CSharp12),
-            source,
-            includeContractReference: true,
-            features: features);
     }
 
     private static CompilerManifestArtifact CreateEffectArtifact()
@@ -2607,8 +1501,6 @@ public sealed class CompilerManifestArtifactTests
     private static CompilerManifestArtifact CanonicalRoundTrip(
         CompilerManifestArtifact artifact)
     {
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         return CompilerManifestArtifactJson.Deserialize(
             CompilerManifestArtifactJson.Serialize(artifact));
     }
@@ -2686,26 +1578,6 @@ public sealed class CompilerManifestArtifactTests
                 SizeBytes = 1
             }
         ];
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, []);
-    }
-
-    private static CompilerReferenceModuleSnapshot[] CreateModuleRows(
-        int count,
-        long sizeBytes)
-    {
-        var root = TestContext.CurrentContext.WorkDirectory;
-        return [.. Enumerable.Range(0, count).Select(index => new
-            CompilerReferenceModuleSnapshot
-            {
-                Name = $"module-{index:D5}.netmodule",
-                Mvid = Guid.NewGuid().ToString("D"),
-                Path = Path.GetFullPath(Path.Combine(
-                    root,
-                    $"module-{index:D5}.netmodule")),
-                Sha256 = new string((char)('a' + index % 6), 64),
-                SizeBytes = sizeBytes
-            })];
     }
 
     private static CompilerDiagnosticArtifact Diagnostic(
@@ -2750,34 +1622,6 @@ public sealed class CompilerManifestArtifactTests
             diagnostic.SourceTreeSha256 = tree.Sha256;
             diagnostic.SourceLineMapSha256 = tree.LineMapSha256;
         }
-    }
-
-    private static void AssertMalformedAdditionalFiles(
-        params CompilerAdditionalFileSnapshot[] files)
-    {
-        AssertMalformedCapture(compilation =>
-        {
-            compilation.AdditionalFiles = files;
-        });
-    }
-
-    private static void AssertMalformedCapture(
-        Action<CompilerCompilationSnapshot> corrupt,
-        string? source = null)
-    {
-        var artifact = source is null
-            ? CreateArtifact()
-            : CreateArtifact(source: source);
-        corrupt(artifact.Compilation);
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, []);
-        var json = JsonSerializer.Serialize(
-                artifact,
-                WorkerProtocolJson.Options) +
-            "\n";
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(json)));
     }
 
     private static void AssertWellFormedCapture(

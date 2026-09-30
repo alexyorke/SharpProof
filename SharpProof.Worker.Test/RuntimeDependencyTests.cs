@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 public sealed class RuntimeDependencyTests
 {
     [Test]
-    public void WorkerAndLauncherAssembliesHaveCompilerNeutralRuntimeClosures()
+    public void WorkerAssemblyHasCompilerNeutralRuntimeClosure()
     {
         var forbidden = new HashSet<string>([
             "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
@@ -24,8 +24,6 @@ public sealed class RuntimeDependencyTests
         }
 
         Enqueue(typeof(SharpProofWorker).Assembly);
-        Enqueue(Assembly.LoadFrom(Path.Combine(
-            AppContext.BaseDirectory, "SharpProof.Worker.Launcher.dll")));
         while (pending.Count != 0)
         {
             var assembly = pending.Dequeue();

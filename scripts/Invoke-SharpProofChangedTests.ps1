@@ -238,11 +238,7 @@ $testProjects = @($projects.Values | Where-Object {
         $_.RelativePath -match '(^|/)SharpProof\.[^/]+\.Test/' -or
         $_.RelativePath -match '(^|/)SharpProof\.ArchitectureTest/'
     })
-$validationConsumersByPath = @{
-    'SharpProof.DeclarativeModels.catalog.json' = @(
-        'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
-    )
-}
+$validationConsumersByPath = @{}
 $explicitValidationProjects = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 $changedProjectPaths = [Collections.Generic.HashSet[string]]::new(

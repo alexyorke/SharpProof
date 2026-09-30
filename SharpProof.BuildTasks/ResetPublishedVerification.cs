@@ -1,5 +1,4 @@
 using Microsoft.Build.Framework;
-using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
@@ -22,12 +21,15 @@ public sealed class ResetPublishedVerification : CancelableBuildTask
     {
         try
         {
-            LinuxPathIdentity.ResetPublicationSet(
-                Present(RequestPath, ResultPath, ManifestPath, SarifPath)
-                    .Select(path => ResolveProjectRelativePath(
-                        ProjectDirectory,
-                        path)),
-                TimeSpan.FromSeconds(30), cancellationToken);
+            foreach (var path in Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+                         .Select(path => ResolveProjectRelativePath(ProjectDirectory, path)))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
             return true;
         }
         catch (OperationCanceledException)

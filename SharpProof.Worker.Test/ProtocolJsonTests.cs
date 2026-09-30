@@ -281,7 +281,7 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
-    public void VersionNineRequestCarriesOnlyArtifactAndRuntimeControls()
+    public void RequestCarriesOnlyArtifactAndRuntimeControls()
     {
         var request = CreateRequest();
         var json = WorkerProtocolJson.SerializeRequest(request);
@@ -290,9 +290,9 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("12"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
-            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("13"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(15));
+            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(5));
             Assert.That(
                 document.RootElement.EnumerateObject()
                     .Select(static property => property.Name),
@@ -402,25 +402,22 @@ public sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("12"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("13"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
                 roundTrip.Manifest.Callables[0].Assumptions
                     .Select(static assumption => assumption.Kind),
                 Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
-            Assert.That(roundTrip.Compilation.SyntaxTrees, Has.Length.EqualTo(1));
-            Assert.That(
-                roundTrip.Compilation.SyntaxTrees[0].Sha256,
-                Does.Match("^[0-9a-f]{64}$"));
-            Assert.That(roundTrip.CompilationSha256, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(roundTrip.Compilation.SyntaxTrees, Is.Empty);
+            Assert.That(ArtifactDigest.Compute(Encoding.UTF8.GetBytes(json)), Does.Match("^[0-9a-f]{64}$"));
             Assert.That(WorkerProtocolJson.ManifestsEqual(
                 roundTrip.Manifest, manifest), Is.True);
         }
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json.Replace(
-                "\"schemaVersion\":4",
-                "\"schemaVersion\":4,\"schemaVersion\":4",
+                $"\"schemaVersion\":{CompilerManifestArtifactVersions.Current}",
+                $"\"schemaVersion\":{CompilerManifestArtifactVersions.Current},\"schemaVersion\":{CompilerManifestArtifactVersions.Current}",
                 StringComparison.Ordinal))));
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json.Replace(
@@ -491,8 +488,8 @@ public sealed class ProtocolJsonTests
             Assert.That(
                 forward.Hash,
                 Is.EqualTo(
-                    "5ac4df9ec5bec9ba006ab877dda2ea3c" +
-                    "185ef76eea7743f2322b353399599b59"));
+                    "7a4cca2b446b003e604399ab019a0e3c" +
+                    "5ecf3f6908e60020840074e9982d9f77"));
         }
     }
 
@@ -1095,10 +1092,7 @@ public sealed class ProtocolJsonTests
             (responseJson, static root => root["claimResults"]![0]!.AsObject(), "outcome"),
             (responseJson, static root => root["claimResults"]![0]!["effectWitness"]!.AsObject(), "kind"),
             (responseJson, static root => root["claimResults"]![0]!["model"]![0]!.AsObject(), "variable"),
-            (responseJson, static root => root["summary"]!.AsObject(), "callableCount"),
-            (responseJson, static root => root["summary"]!["outcomeCounts"]![0]!.AsObject(), "outcome"),
-            (responseJson, static root => root["summary"]!["reasonCounts"]![0]!.AsObject(), "reason"),
-            (responseJson, static root => root["summary"]!["assumptions"]!.AsObject(), "total"),
+            (responseJson, static root => root["summary"]!.AsObject(), "cacheStatus"),
             (responseJson, static root => root["summary"]!["versions"]!.AsObject(), "protocolVersion"),
             (responseJson, static root => root["summary"]!["budgets"]!.AsObject(), "queryRlimit"),
             (responseJson, static root => root["errors"]![0]!.AsObject(), "code")
@@ -1117,7 +1111,7 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
-    public void StrictProtocolShapeRejectsNoncanonicalNestedTokensAndOrdering()
+    public void ProtocolJsonRejectsMissingUnknownAndMistypedProperties()
     {
         var responseJson = WorkerProtocolJson.SerializeResponse(
             CreateShapeCoverageResponse());
@@ -1129,22 +1123,10 @@ public sealed class ProtocolJsonTests
             $"\"schemaVersion\":{WorkerManifestVersions.Current}",
             $"\"schemaVersion\":\"{WorkerManifestVersions.Current}\"",
             StringComparison.Ordinal);
-        var enumCaseVariant = responseJson.Replace(
-            "\"outcome\":\"Proven\"",
-            "\"outcome\":\"proven\"",
-            StringComparison.Ordinal);
-
         var extra = JsonNode.Parse(responseJson)!.AsObject();
         extra["manifest"]!.AsObject()["futureField"] = true;
-        var nullElement = JsonNode.Parse(responseJson)!.AsObject();
-        nullElement["manifest"]!["callables"]!.AsArray().Insert(0, null);
         var arraySwap = JsonNode.Parse(responseJson)!.AsObject();
         arraySwap["summary"]!.AsObject()["budgets"] = new JsonArray();
-        var reordered = JsonNode.Parse(responseJson)!.AsObject();
-        var manifest = reordered["manifest"]!.AsObject();
-        var schemaVersion = manifest["schemaVersion"]!.DeepClone();
-        Assert.That(manifest.Remove("schemaVersion"), Is.True);
-        manifest["schemaVersion"] = schemaVersion;
 
         using (Assert.EnterMultipleScope())
         {
@@ -1152,17 +1134,33 @@ public sealed class ProtocolJsonTests
             {
                 caseVariant,
                 numericString,
-                enumCaseVariant,
                 extra.ToJsonString(),
-                nullElement.ToJsonString(),
-                arraySwap.ToJsonString(),
-                reordered.ToJsonString()
+                arraySwap.ToJsonString()
             })
             {
                 Assert.Throws<JsonException>((Action)(() =>
                     WorkerProtocolJson.DeserializeResponse(invalid)));
             }
         }
+    }
+
+    [Test]
+    public void ProtocolJsonAcceptsUnorderedObjectsAndValidatesNullElementsSemantically()
+    {
+        var responseJson = WorkerProtocolJson.SerializeResponse(CreateResponse(CreateManifest()));
+        var root = JsonNode.Parse(responseJson)!.AsObject();
+        var manifest = root["manifest"]!.AsObject();
+        var schema = manifest["schemaVersion"]!.DeepClone();
+        manifest.Remove("schemaVersion");
+        manifest["schemaVersion"] = schema;
+        var response = WorkerProtocolJson.DeserializeResponse(root.ToJsonString())!;
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+        root["manifest"]!["callables"]!.AsArray().Insert(0, null);
+        response = WorkerProtocolJson.DeserializeResponse(root.ToJsonString())!;
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
+        Assert.Throws<JsonException>((Action)(() => WorkerProtocolJson.DeserializeResponse(
+            responseJson.Insert(1, $"\"protocolVersion\":\"{WorkerProtocolVersions.Current}\","))));
     }
 
     [Test]
@@ -1452,9 +1450,9 @@ public sealed class ProtocolJsonTests
         var activeRequest = CreateRequest();
         var proven = CreateResponse(CreateManifest());
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Miss, true);
-        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Disabled, false);
-        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Hit, false);
-        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, false);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Disabled, true);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Hit, true);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, true);
 
         var inactiveRequest = CreateRequest();
         inactiveRequest.Cache.Enabled = false;
@@ -1464,8 +1462,8 @@ public sealed class ProtocolJsonTests
 
         var provenOnlyRequest = CreateRequest();
         provenOnlyRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Hit, true);
         AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, true);
-        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Miss, false);
 
         var refuted = CreateResponse(CreateManifest());
         refuted.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
@@ -1473,7 +1471,7 @@ public sealed class ProtocolJsonTests
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Hit, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Written, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Unavailable, true);
-        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, false);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, true);
 
         var unknown = CreateResponse(CreateManifest());
         SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
@@ -1483,8 +1481,8 @@ public sealed class ProtocolJsonTests
         unknown.Summary = CreateSummary(unknown);
         AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Miss, true);
         AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Unavailable, true);
-        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Hit, false);
-        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Written, false);
+        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Hit, true);
+        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Written, true);
 
         var earlyFailureManifest = CreateManifest();
         earlyFailureManifest.Callables = [];
@@ -1671,10 +1669,9 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
-    public void SummaryAndOutcomePayloadMustMatchClaimResults()
+    public void OutcomePayloadMustMatchClaimResults()
     {
         var response = CreateResponse(CreateManifest());
-        response.Summary.ClaimCount = 0;
         response.ClaimResults[0].Model = [
             new WorkerModelValue {
                 Variable = "parameter:0",
@@ -1685,51 +1682,9 @@ public sealed class ProtocolJsonTests
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
-            "summary.totals",
             "response.claim_payload");
     }
 
-    [Test]
-    public void SummaryCountBucketsMustHaveUniqueKinds()
-    {
-        var manifest = CreateManifest();
-        var first = manifest.Claims[0];
-        manifest.Callables[0].ClaimIds = [.. manifest.Callables[0].ClaimIds, "claim.identity.1"];
-        manifest.Claims = [.. manifest.Claims, new WorkerClaimManifestEntry {
-            ClaimId = "claim.identity.1",
-            CallableId = first.CallableId,
-            Ordinal = 1,
-            Kind = first.Kind,
-            Evidence = first.Evidence,
-            Location = new WorkerSourceLocation {
-                Path = first.Location.Path,
-                Start = first.Location.Start,
-                Length = first.Location.Length,
-                Line = first.Location.Line,
-                Column = first.Location.Column
-            }
-        }];
-        WorkerProtocolJson.SealManifest(manifest);
-        var response = CreateResponse(manifest);
-        SetUnknown(response, WorkerClaimReason.UnsupportedBody, index: 1);
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason = WorkerCallableCoverageReason.SemanticUnknown;
-        response.Summary = CreateSummary(response);
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-
-        response.Summary.OutcomeCounts = [
-            new WorkerClaimOutcomeCount { Outcome = WorkerClaimOutcome.Proven, Count = 1 },
-            new WorkerClaimOutcomeCount { Outcome = WorkerClaimOutcome.Proven, Count = 1 }
-        ];
-        AssertErrorCode(WorkerProtocolJson.Validate(response), "summary.outcomes");
-
-        response.Summary = CreateSummary(response);
-        response.Summary.ReasonCounts = [
-            new WorkerClaimReasonCount { Reason = WorkerClaimReason.None, Count = 1 },
-            new WorkerClaimReasonCount { Reason = WorkerClaimReason.None, Count = 1 }
-        ];
-        AssertErrorCode(WorkerProtocolJson.Validate(response), "summary.reasons");
-    }
 
     [Test]
     public void ManifestRequiresDenseOrdinalsAndExactCallableMembership()
@@ -1806,8 +1761,6 @@ public sealed class ProtocolJsonTests
         missingManifest.Manifest = null!;
         var missingSummary = CreateResponse(CreateManifest());
         missingSummary.Summary = null!;
-        var missingAssumptions = CreateResponse(CreateManifest());
-        missingAssumptions.Summary.Assumptions = null!;
         var expectedManifest = CreateManifest();
         expectedManifest.SchemaVersion = int.MaxValue;
 
@@ -1819,9 +1772,6 @@ public sealed class ProtocolJsonTests
             AssertContainsErrorCode(
                 WorkerProtocolJson.Validate(missingSummary),
                 "response.summary");
-            AssertContainsErrorCode(
-                WorkerProtocolJson.Validate(missingAssumptions),
-                "summary.assumptions");
             AssertContainsErrorCode(WorkerProtocolJson.Validate(
                         CreateResponse(CreateManifest()),
                         InputHash,
@@ -1903,33 +1853,6 @@ public sealed class ProtocolJsonTests
             "response.elapsed_unrepresentable");
     }
 
-    [TestCase(101, 300001L)]
-    [TestCase(200, 300100L)]
-    [TestCase(1000, 300900L)]
-    public void RequestBoundElapsedTimeUsesTheActualLauncherGrace(
-        int terminationGraceMilliseconds,
-        long exactMaximum)
-    {
-        var request = CreateRequest();
-        var manifest = CreateManifest();
-        var response = CreateResponse(manifest);
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        response.Summary.ElapsedMilliseconds = exactMaximum;
-
-        var exact = WorkerProtocolJson.ValidateForRequest(
-            response, response.RequestHash, InputHash, manifest, request,
-            CreateExpectedVersions(), terminationGraceMilliseconds);
-        Assert.That(exact.IsValid, Is.True,
-            string.Join(Environment.NewLine,
-                exact.Errors.Select(static error => error.Code)));
-
-        response.Summary.ElapsedMilliseconds++;
-        var over = WorkerProtocolJson.ValidateForRequest(
-            response, response.RequestHash, InputHash, manifest, request,
-            CreateExpectedVersions(), terminationGraceMilliseconds);
-        AssertErrorCode(over, "response.elapsed_request_envelope");
-    }
-
     [Test]
     public void RequestElapsedEnvelopeRejectsInvalidAuthority()
     {
@@ -1949,6 +1872,180 @@ public sealed class ProtocolJsonTests
             Is.EqualTo((long)int.MaxValue +
                 WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds -
                 WorkerExecutionEnvelope.CleanupReserveMilliseconds));
+
+        request.Budgets.MethodWallTimeMilliseconds = 0;
+        Assert.That(Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(request, 1000)))!.ParamName,
+            Is.EqualTo("request"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void RequestBoundValidationRejectsInvalidExpectedAuthority(bool invalidRuntime)
+    {
+        var request = CreateRequest();
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var versions = CreateExpectedVersions();
+        var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        response.RequestHash = requestHash;
+        if (invalidRuntime)
+        {
+            versions.WorkerVersion = string.Empty;
+        }
+        else
+        {
+            requestHash = new string('0', 64);
+        }
+        Assert.That(Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerProtocolJson.ValidateForRequest(response, requestHash, response.InputHash,
+                manifest, request, versions)))!.ParamName,
+            Is.EqualTo(invalidRuntime ? "expectedVersions" : "expectedRequest"));
+    }
+
+    [TestCase(WorkerRunStatus.TimedOut, false)]
+    [TestCase(WorkerRunStatus.Canceled, false)]
+    [TestCase(WorkerRunStatus.TimedOut, true)]
+    [TestCase(WorkerRunStatus.Canceled, true)]
+    public void ClaimlessInterruptionRetainsItsBoundStatusAndCannotBeCached(WorkerRunStatus status, bool hasCallable)
+    {
+        var request = CreateRequest();
+        var manifest = hasCallable ? CreateManifest() : WorkerResultAssembler.EmptyManifest();
+        if (hasCallable)
+        {
+            manifest.Callables[0].ClaimIds = [];
+            manifest.Claims = [];
+            WorkerProtocolJson.SealManifest(manifest);
+        }
+        var versions = CreateExpectedVersions();
+        var inputHash = new string('c', 64);
+        var response = WorkerResultAssembler.CreateIncomplete(inputHash,
+            WorkerProtocolJson.ComputeRequestHash(request), manifest, request.Budgets,
+            status, WorkerRunFailureReason.None,
+            status == WorkerRunStatus.Canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout,
+            status == WorkerRunStatus.Canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+            versions: versions);
+        var roundtrip = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+                inputHash, manifest, request, versions).IsValid, Is.True);
+            Assert.That(roundtrip.RunStatus, Is.EqualTo(status));
+            Assert.That(roundtrip.Manifest.Claims, Is.Empty);
+            Assert.That(roundtrip.ClaimResults, Is.Empty);
+            Assert.That(roundtrip.Errors.Select(static error => error.Code), Is.EqualTo(hasCallable ? [] : new[]
+            {
+                status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout
+            }));
+            Assert.That(VerificationCache.IsCacheable(roundtrip, inputHash, manifest), Is.False);
+        }
+        var originalError = new WorkerProtocolError
+        {
+            Code = status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout,
+            Message = "The actual interrupted operation's context."
+        };
+        var contextual = WorkerResultAssembler.CreateIncomplete(inputHash, response.RequestHash,
+            manifest, request.Budgets, status, WorkerRunFailureReason.None,
+            WorkerCallableCoverageReason.ProjectTimeout, WorkerClaimReason.ProjectTimeout,
+            errors: [originalError], versions: versions);
+        Assert.That(contextual.Errors, Is.EqualTo(new[] { originalError }));
+        roundtrip.RunStatus = WorkerRunStatus.Complete;
+        Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+            inputHash, manifest, request, versions).IsValid, Is.False);
+        if (hasCallable)
+        {
+            roundtrip.RunStatus = status;
+            roundtrip.CallableResults[0].Reason = status == WorkerRunStatus.Canceled
+                ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.Canceled;
+            Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+                inputHash, manifest, request, versions).IsValid, Is.False);
+        }
+        contextual.Errors = [originalError, new WorkerProtocolError
+        {
+            Code = status == WorkerRunStatus.Canceled ? WorkerProtocolErrorCodes.WorkerTimeout : "worker.canceled",
+            Message = "Contradictory interruption evidence."
+        }];
+        Assert.That(WorkerProtocolJson.ValidateForRequest(contextual, response.RequestHash,
+            inputHash, manifest, request, versions).IsValid, Is.False);
+    }
+
+    [Test]
+    public async Task CacheRejectsIncompleteEvidenceAndUnreadableEntries()
+    {
+        using var directory = new TempDirectory("sharpproof-cache-validation-");
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var cache = new VerificationCache(directory.FullName, 100_000);
+        Assert.That(await cache.TryWriteAsync(response, response.InputHash, manifest, CancellationToken.None), Is.True);
+        var path = Path.Combine(directory.FullName, response.InputHash + VerificationCache.CacheFileSuffix);
+        var entry = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        entry["claimResults"]![0]!["reason"] = "ProjectTimeout";
+        await File.WriteAllTextAsync(path, entry.ToJsonString());
+        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, CancellationToken.None), Is.Null);
+        Assert.That(File.Exists(path), Is.False, "A complete cache envelope cannot admit interrupted claim evidence.");
+        await File.WriteAllBytesAsync(path, [0xff]);
+        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, CancellationToken.None), Is.Null);
+        Assert.That(cache.LastReadUnavailable, Is.True);
+    }
+
+    [TestCase(WorkerRunStatus.TimedOut)]
+    [TestCase(WorkerRunStatus.Canceled)]
+    public void InterruptionProjectsEverySelectedCallableIncludingClaimlessDeclarations(WorkerRunStatus status)
+    {
+        var request = CreateRequest();
+        var manifest = CreateManifest();
+        var claimless = new WorkerCallableManifestEntry
+        {
+            CallableId = "M:Subject.NoPostcondition(System.Int64)",
+            SelectedFeatures = [WorkerSelectedFeature.Contracts],
+            SelectionReasons = [WorkerSelectionReason.ExplicitAnnotation],
+            Location = manifest.Callables[0].Location,
+            ClaimIds = []
+        };
+        manifest.Callables = [.. manifest.Callables, claimless];
+        WorkerProtocolJson.SealManifest(manifest);
+        var versions = CreateExpectedVersions();
+        var response = WorkerResultAssembler.CreateIncomplete(InputHash,
+            WorkerProtocolJson.ComputeRequestHash(request), manifest, request.Budgets,
+            status, WorkerRunFailureReason.None,
+            status == WorkerRunStatus.Canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout,
+            status == WorkerRunStatus.Canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+            versions: versions);
+        var roundtrip = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+                InputHash, manifest, request, versions).IsValid, Is.True);
+            Assert.That(roundtrip.CallableResults.Select(static item => item.CallableId), Is.EquivalentTo(manifest.Callables.Select(static item => item.CallableId)));
+            Assert.That(roundtrip.ClaimResults.Select(static item => item.ClaimId), Is.EqualTo(manifest.Claims.Select(static item => item.ClaimId)));
+            Assert.That(VerificationCache.IsCacheable(roundtrip, InputHash, manifest), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task CacheEvictionKeepsTheNewestCompleteEntryAndUnrelatedFiles()
+    {
+        using var directory = new TempDirectory("sharpproof-cache-eviction-");
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var cache = new VerificationCache(directory.FullName, 100_000);
+        var firstHash = new string('a', 64);
+        var secondHash = new string('b', 64);
+        Assert.That(await cache.TryWriteAsync(response, firstHash, manifest, CancellationToken.None), Is.True);
+        var firstPath = Path.Combine(directory.FullName, firstHash + VerificationCache.CacheFileSuffix);
+        File.SetLastWriteTimeUtc(firstPath, DateTime.UtcNow.AddDays(-1));
+        var maximumBytes = new FileInfo(firstPath).Length + 1;
+        var unrelated = Path.Combine(directory.FullName, "unrelated.json");
+        await File.WriteAllTextAsync(unrelated, "preserve");
+        cache = new VerificationCache(directory.FullName, maximumBytes);
+        Assert.That(await cache.TryWriteAsync(response, secondHash, manifest, CancellationToken.None), Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(firstPath), Is.False);
+            Assert.That(File.Exists(Path.Combine(directory.FullName, secondHash + VerificationCache.CacheFileSuffix)), Is.True);
+            Assert.That(await File.ReadAllTextAsync(unrelated), Is.EqualTo("preserve"));
+            Assert.That(Directory.GetFiles(directory.FullName, "*" + VerificationCache.CacheFileSuffix).Sum(static path => new FileInfo(path).Length), Is.LessThanOrEqualTo(maximumBytes));
+        }
     }
 
     [Test]
@@ -1960,7 +2057,7 @@ public sealed class ProtocolJsonTests
         var unknownEnum = CreateManifest();
         unknownEnum.Claims[0].Kind = (WorkerClaimKind)int.MaxValue;
 
-        var enumError = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+        Assert.Throws<JsonException>((Action)(() =>
             WorkerProtocolJson.ComputeManifestHash(unknownEnum)));
         var hashError = Assert.Throws<ArgumentException>((Action)(() =>
             WorkerProtocolJson.Validate(
@@ -1970,7 +2067,6 @@ public sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(nullIdentityHash, Does.Match("^[0-9a-f]{64}$"));
-            Assert.That(enumError!.ParamName, Is.EqualTo("value"));
             Assert.That(hashError!.ParamName, Is.EqualTo("expectedInputHash"));
         }
     }
@@ -2248,22 +2344,6 @@ public sealed class ProtocolJsonTests
             ClaimResults = claimResults,
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = size,
-                ClaimCount = size,
-                OutcomeCounts = [
-                    new WorkerClaimOutcomeCount
-                    {
-                        Outcome = WorkerClaimOutcome.Proven,
-                        Count = size
-                    }
-                ],
-                ReasonCounts = [
-                    new WorkerClaimReasonCount
-                    {
-                        Reason = WorkerClaimReason.None,
-                        Count = size
-                    }
-                ],
                 CacheStatus = WorkerCacheStatus.Miss,
                 Versions = CreateExpectedVersions()
             }
@@ -2396,49 +2476,10 @@ public sealed class ProtocolJsonTests
     }
 
     private static WorkerVerificationSummary CreateSummary(
-        WorkerVerifyResponse response)
+        WorkerVerifyResponse _)
     {
-        var assumptions = response.ClaimResults
-            .Where(static claim => claim != null)
-            .SelectMany(static claim => claim.Assumptions ?? [])
-            .Concat(response.CallableResults
-                .Where(static callable => callable != null)
-                .SelectMany(static callable => callable.Assumptions ?? []))
-            .Where(static assumption => assumption != null)
-            .GroupBy(static assumption => assumption.Id, StringComparer.Ordinal)
-            .ToArray();
         return new WorkerVerificationSummary
         {
-            CallableCount = response.CallableResults.Count(
-                static callable => callable != null),
-            ClaimCount = response.ClaimResults.Count(
-                static claim => claim != null),
-            OutcomeCounts = [.. response.ClaimResults
-                .Where(static claim => claim != null)
-                .GroupBy(static claim => claim.Outcome)
-                .OrderBy(static group => group.Key)
-                .Select(static group => new WorkerClaimOutcomeCount {
-                    Outcome = group.Key,
-                    Count = group.Count()
-                })],
-            ReasonCounts = [.. response.ClaimResults
-                .Where(static claim => claim != null)
-                .GroupBy(static claim => claim.Reason)
-                .OrderBy(static group => group.Key)
-                .Select(static group => new WorkerClaimReasonCount {
-                    Reason = group.Key,
-                    Count = group.Count()
-                })],
-            Assumptions = new WorkerAssumptionSummary
-            {
-                Total = assumptions.Length,
-                Used = assumptions.Count(static group =>
-                    group.Any(static value => value.Used)),
-                User = assumptions.Count(static group =>
-                    group.First().Kind == WorkerAssumptionKind.UserAssume),
-                Trusted = assumptions.Count(static group =>
-                    group.First().Kind == WorkerAssumptionKind.TrustedBoundary)
-            },
             CacheStatus = WorkerCacheStatus.Miss,
             Versions = CreateExpectedVersions()
         };

@@ -29,7 +29,6 @@
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj" />
     <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj" />
   </ItemGroup>
 </Project>

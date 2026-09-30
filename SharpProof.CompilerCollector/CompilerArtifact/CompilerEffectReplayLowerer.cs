@@ -470,10 +470,10 @@ internal static class CompilerEffectReplayLowerer
         var syntaxTree = capturedTrees[treeOrdinal];
         treeSha256 = syntaxTree.Sha256;
         treeLineMapSha256 = syntaxTree.LineMapSha256;
-        treeSnapshotSha256 = CompilationFingerprint
+        treeSnapshotSha256 = CompilerReportingIdentity
             .ComputeSyntaxTreeSnapshotSha256(syntaxTree);
 
-        sourceTreeOrdinal = CompilerSourceLocationAuthority.FindUniqueTree(
+        sourceTreeOrdinal = CompilerSourceCoordinates.FindUniqueTree(
             location,
             capturedTrees,
             cancellationToken);

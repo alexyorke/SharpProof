@@ -64,6 +64,99 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    public void UnknownReasonRatchetEnforcesSupportAndEveryUnknownCeiling()
+    {
+        var ratchet = new CorpusUnknownReasonRatchet(5, 3, 2,
+            new Dictionary<string, int>(StringComparer.Ordinal) { ["known"] = 1 }
+                .ToImmutableDictionary(StringComparer.Ordinal));
+        var failures = ImmutableArray.CreateBuilder<string>();
+        CorpusGate.ValidateUnknownReasonRatchet(ratchet,
+            [new CorpusUnknownReasonCount("known", 2), new CorpusUnknownReasonCount("new", 1)],
+            3, 4, 2, failures);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failures, Has.Count.EqualTo(5));
+            Assert.That(failures, Has.Some.Contains("minimum of 5 cases to 4"));
+            Assert.That(failures, Has.Some.Contains("minimum of 3 methods to 2"));
+            Assert.That(failures, Has.Some.Contains("maximum 2 to 3"));
+            Assert.That(failures, Has.Some.Contains("'known' regressed"));
+            Assert.That(failures, Has.Some.Contains("new unreviewed Unknown reason 'new'"));
+        }
+        failures.Clear();
+        CorpusGate.ValidateUnknownReasonRatchet(ratchet,
+            [new CorpusUnknownReasonCount("known", 1)], 2, 5, 3, failures);
+        Assert.That(failures, Is.Empty);
+    }
+
+    [TestCase("schema", "Unsupported OSS corpus schema")]
+    [TestCase("sources", "at least one upstream source")]
+    [TestCase("files", "pinned upstream source files")]
+    [TestCase("count", "methods;")]
+    [TestCase("source-id", "refers to unknown source")]
+    [TestCase("duplicate-file", "Duplicate OSS corpus source file")]
+    [TestCase("content-hash", "source file hash does not match")]
+    [TestCase("method-id", "contiguous and sorted")]
+    [TestCase("method-file", "refers to missing source")]
+    [TestCase("range", "invalid line range")]
+    [TestCase("location", "Duplicate OSS corpus source location")]
+    [TestCase("declaration", "declaration hash does not match")]
+    [TestCase("name", "name does not match")]
+    [TestCase("mode", "must run in effects mode")]
+    [TestCase("support", "explicit support classification")]
+    [TestCase("url", "invalid repository URL")]
+    [TestCase("commit", "pin a full Git commit")]
+    [TestCase("license", "unsupported license")]
+    [TestCase("missing-license", "license file is missing")]
+    [TestCase("license-hash", "license hash does not match")]
+    public void OssCatalogRejectsIndividuallyCorruptedPinnedEvidence(string field, string message)
+    {
+        var repository = RepositoryLayout.FindRoot();
+        var document = OpenSourceCorpusCatalog.Load(repository);
+        using var temporary = new TempDirectory("SharpProof.Gates.Test-catalog-");
+        var corpus = Path.Combine(temporary.FullName, "SharpProof.Gates", "Corpus");
+        Directory.CreateDirectory(corpus);
+        foreach (var source in document.Sources)
+        {
+            var destination = Path.Combine(corpus, source.LicenseFile);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(Path.Combine(repository, "SharpProof.Gates", "Corpus", source.LicenseFile), destination);
+        }
+        var manifestPath = Path.Combine(corpus, "oss-methods.json");
+        File.WriteAllText(manifestPath, JsonSerializer.Serialize(document));
+        Assert.That(JsonSerializer.Serialize(OpenSourceCorpusCatalog.Load(temporary.FullName)), Is.EqualTo(JsonSerializer.Serialize(document)));
+        var sourceEntry = document.Sources[0];
+        var file = document.Files[0];
+        var method = document.Methods[0];
+        document = field switch
+        {
+            "schema" => document with { SchemaVersion = 0 },
+            "sources" => document with { Sources = [] },
+            "files" => document with { Files = [] },
+            "count" => document with { Methods = [] },
+            "source-id" => document with { Files = document.Files.SetItem(0, file with { SourceId = "missing" }) },
+            "duplicate-file" => document with { Files = document.Files.Add(file) },
+            "content-hash" => document with { Files = document.Files.SetItem(0, file with { ContentSha256 = new string('0', 64) }) },
+            "method-id" => document with { Methods = document.Methods.SetItem(0, method with { Id = "OSS9999" }) },
+            "method-file" => document with { Methods = document.Methods.SetItem(0, method with { Path = "missing.cs" }) },
+            "range" => document with { Methods = document.Methods.SetItem(0, method with { StartLine = 0 }) },
+            "location" => document with { Methods = document.Methods.SetItem(1, method with { Id = document.Methods[1].Id }) },
+            "declaration" => document with { Methods = document.Methods.SetItem(0, method with { DeclarationSha256 = new string('0', 64) }) },
+            "name" => document with { Methods = document.Methods.SetItem(0, method with { MethodName = "WrongName" }) },
+            "mode" => document with { Methods = document.Methods.SetItem(0, method with { Mode = "contracts" }) },
+            "support" => document with { Methods = document.Methods.SetItem(0, method with { Support = (CorpusSupport)int.MaxValue }) },
+            "url" => document with { Sources = document.Sources.SetItem(0, sourceEntry with { Repository = "http://example.com/source" }) },
+            "commit" => document with { Sources = document.Sources.SetItem(0, sourceEntry with { Commit = "short" }) },
+            "license" => document with { Sources = document.Sources.SetItem(0, sourceEntry with { LicenseSpdx = "unreviewed" }) },
+            "missing-license" => document with { Sources = document.Sources.SetItem(0, sourceEntry with { LicenseFile = "missing.txt" }) },
+            "license-hash" => document with { Sources = document.Sources.SetItem(0, sourceEntry with { LicenseSha256 = new string('0', 64) }) },
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+        File.WriteAllText(manifestPath, JsonSerializer.Serialize(document));
+        Assert.That(Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusCatalog.Load(temporary.FullName)))!.Message, Does.Contain(message));
+    }
+
+    [Test]
     public void CorpusFileCountIncludesSourceIdentity()
     {
         var methods = new[]
@@ -830,7 +923,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 message,
                 Is.EqualTo(
-                    "Call to 'Positive' violates precondition '(v3 > 0)'"));
+                    "Call to 'Positive' violates precondition 'value > 0'"));
             Assert.That(silentUnknown[1], Is.EqualTo("SilentUnknown"));
             Assert.That(silentUnknown[2], Is.EqualTo("Unknown"));
             Assert.That(silentUnknown[3], Is.Empty);

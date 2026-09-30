@@ -54,9 +54,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 12,
-    "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 18,
+    "protocolVersion": 13,
+    "manifestSchemaVersion": 5,
+    "compilerArtifactSchemaVersion": 19,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -72,13 +72,15 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 13,
+    "schemaVersion": 15,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
   "trustedKernel": {
     "paths": [
       "SharpProof.Verify/ProofKernel.cs",
+      "SharpProof.Verify/CallableReplayContext.cs",
+      "SharpProof.Verify/CallableReplayValidator.cs",
       "SharpProof.Verify/Evidence.cs",
       "SharpProof.Verify/Outcomes.cs"
     ]
@@ -128,7 +130,7 @@
         "paths": [
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
-          "SharpProof.CompilerArtifact/CompilerEffectAuthority.cs",
+          "SharpProof.Worker/ArtifactValidator.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
@@ -163,7 +165,8 @@
           "SharpProof.Worker/CallableVerifier.cs",
           "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
-          "SharpProof.Worker/SharpProofWorker.cs"
+          "SharpProof.Worker/SharpProofWorker.cs",
+          "SharpProof.Worker/WorkerHost.cs"
         ]
       },
       {
@@ -197,9 +200,6 @@
       {
         "name": "apiSpecificationCatalog",
         "paths": [
-          "SharpProof.Specs/DefaultApiSpecCatalog.json",
-          "SharpProof.Specs/RelationalSpecPackCatalog.json",
-          "scripts/Generate-ApiSpecCatalog.ps1",
           "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
           "SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
@@ -207,8 +207,6 @@
       {
         "name": "scalarSemanticsCatalog",
         "paths": [
-          "SharpProof.Frontend/CSharpScalarSemantics.json",
-          "scripts/Generate-CSharpScalarSemantics.ps1",
           "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
           "SharpProof.Ir/IrOperatorCatalog.generated.cs"
         ]
@@ -216,8 +214,6 @@
       {
         "name": "contractApiCatalog",
         "paths": [
-          "SharpProof.Frontend/ContractApi.catalog.json",
-          "scripts/Generate-ContractApiCatalog.ps1",
           "SharpProof.Frontend/ContractApiMetadata.generated.cs",
           "SharpProof.Attributes/Contract.cs",
           "SharpProof.Attributes/ContractForAttribute.cs",
@@ -237,16 +233,12 @@
       {
         "name": "analyzerDiagnosticCatalog",
         "paths": [
-          "SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json",
-          "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
           "SharpProof.Analyzer.Core/AnalyzerDiagnosticCatalog.generated.cs"
         ]
       },
       {
         "name": "diagnosticDescriptorCatalog",
         "paths": [
-          "eng/diagnostics/diagnostic-descriptors.v1.json",
-          "scripts/Generate-DiagnosticDescriptors.ps1",
           "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
           "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs"
         ]
@@ -254,48 +246,27 @@
       {
         "name": "projectionCatalog",
         "paths": [
-          "SharpProof.Projection.catalog.json",
-          "scripts/Generate-ProjectionCatalog.ps1",
           "SharpProof.Verify/VerificationProjections.generated.cs",
           "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
           "SharpProof.Contracts/ContractProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
           "SharpProof.Effects/EffectProjections.generated.cs",
-          "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
-          "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
+          "SharpProof.Frontend/CompilerIdentityProjections.generated.cs",
+          "SharpProof.Worker/Launcher/LauncherProjections.generated.cs"
         ]
       },
       {
         "name": "launcherArgumentCatalog",
         "paths": [
-          "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
-          "scripts/Generate-LauncherArguments.ps1",
-          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
-          "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
-          "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
-        ]
-      },
-      {
-        "name": "generatedOutputPolicy",
-        "paths": [
-          "eng/generated/approved-outputs.v1.json",
-          "scripts/GeneratedFileHelpers.ps1",
-          "scripts/CSharpSourceMetrics.ps1"
-        ]
-      },
-      {
-        "name": "mutationEvidencePolicy",
-        "paths": [
-          "scripts/SharpProof.MutationEvidence.psm1"
+          "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs",
+          "SharpProof.Worker/Launcher/LauncherArguments.generated.cs"
         ]
       },
       {
         "name": "declarativeModelsCatalog",
         "paths": [
-          "SharpProof.DeclarativeModels.catalog.json",
-          "scripts/Generate-DeclarativeModels.ps1",
           "SharpProof.Analyzer.Core/DeclarativeModels.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
           "SharpProof.Specs/DeclarativeModels.generated.cs",
@@ -311,32 +282,24 @@
       {
         "name": "boundContractModelCatalog",
         "paths": [
-          "SharpProof.Contracts/BoundContractModel.schema.json",
-          "scripts/Generate-BoundContractModel.ps1",
           "SharpProof.Contracts/BoundContractModel.generated.cs"
         ]
       },
       {
         "name": "effectContractCatalog",
         "paths": [
-          "SharpProof.Effects/EffectContractMappings.catalog.json",
-          "scripts/Generate-EffectContractMappings.ps1",
           "SharpProof.Effects/EffectContractMappings.generated.cs"
         ]
       },
       {
         "name": "operationSupportCatalog",
         "paths": [
-          "SharpProof.Frontend/OperationSupport.catalog.json",
-          "scripts/Generate-OperationSupportCatalog.ps1",
           "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
         ]
       },
       {
         "name": "irModelCatalog",
         "paths": [
-          "SharpProof.Ir/IrModel.schema.json",
-          "scripts/Generate-IrModel.ps1",
           "SharpProof.Ir/IrIdentifierAliases.cs",
           "SharpProof.Ir/ScopedIrId.cs",
           "SharpProof.Ir/ArgumentNullGuard.cs",
@@ -347,8 +310,6 @@
       {
         "name": "compilerWireCatalog",
         "paths": [
-          "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
-          "scripts/Generate-CompilerArtifactModel.ps1",
           "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]
@@ -410,9 +371,8 @@
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.Ir/IrProgramCallHostExecution.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
-          "SharpProof.CompilerArtifact/CompilerEffectViolationAuthority.cs",
-          "SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs",
-          "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+          "SharpProof.CompilerArtifact/CompilerEffectViolation.cs",
+          "SharpProof.Worker/CallableReplayContextBuilder.cs",
           "SharpProof.Worker/EffectCounterexampleReplayer.cs"
         ]
       },
@@ -432,7 +392,6 @@
           "SharpProof.Effects/TrustedBoundaryPolicy.cs",
           "SharpProof.Frontend/FrontendSubset.cs",
           "SharpProof.Frontend/OperationSubsetClassifier.cs",
-          "SharpProof.Worker.Launcher/Program.cs",
           "SharpProof.Worker/CallableVerificationPolicy.cs",
           "scripts/Get-SharpProofProductionInventory.ps1",
           "scripts/Get-SharpProofTcbPaths.ps1",
@@ -445,7 +404,10 @@
         "name": "resultAssembly",
         "paths": [
           "SharpProof.Worker/CallableClaimResultAssembler.cs",
-          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
+          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
+          "SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
+          "SharpProof.Worker/Launcher/LauncherProjections.cs",
+          "SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },
       {
@@ -455,8 +417,9 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceLocationProjection.cs",
           "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
-          "SharpProof.CompilerArtifact/CompilationFingerprint.cs",
-          "SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs"
+          "SharpProof.CompilerArtifact/ArtifactDigest.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceCoordinates.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerReportingIdentity.cs"
         ]
       },
       {
@@ -470,9 +433,6 @@
       {
         "name": "protocolValidation",
         "paths": [
-          "SharpProof.Worker/Program.cs",
-          "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
-          "scripts/Generate-ProtocolModel.ps1",
           "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
@@ -497,15 +457,12 @@
         "paths": [
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
-          "SharpProof.BuildTasks/Program.cs",
           "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
-          "SharpProof.BuildTasks/VerifierProcessSupervisor.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
           "SharpProof.Host/ContainerNativeLibrary.cs",
-          "SharpProof.Host/LinuxPathIdentity.cs",
-          "SharpProof.Host/LinuxWorkerProcess.cs"
+          "SharpProof.Worker/Launcher/LauncherProgram.cs"
         ],
         "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
       },
@@ -571,7 +528,6 @@
           "scripts/SharpProof.PackageIdentity.psm1",
           "scripts/Read-SharpProofSdkPolicy.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
-          "scripts/Test-SharpProofGeneratedOutputs.ps1",
           "scripts/Test-SharpProofSamples.ps1",
           "scripts/Test-SharpProofSymbolPackages.ps1",
           "scripts/SharpProof.SymbolPackageValidator.cs",
@@ -606,7 +562,8 @@
         "paths": [
           "eng/fuzz/retained-seeds.json",
           "scripts/Invoke-SharpProofFuzzCampaign.ps1",
-          "scripts/Resolve-SharpProofContainedPath.ps1"
+          "scripts/Resolve-SharpProofContainedPath.ps1",
+          "scripts/Resolve-SharpProofSourceDocument.ps1"
         ]
       },
       {
@@ -627,8 +584,7 @@
       {
         "name": "partialTypeSourceClosure",
         "paths": [
-          "SharpProof.Analyzer.Core/RequiresCallSiteCandidate.Cache.cs",
-          "SharpProof.Worker.Launcher/LauncherProjections.cs"
+          "SharpProof.Analyzer.Core/RequiresCallSiteCandidate.Cache.cs"
         ],
         "rationale": "These files complete partial types that already have trusted declarations in other source files."
       },
@@ -639,13 +595,10 @@
           "eng/RoslynCfgFactory.cs",
           "eng/RoslynCfgThrowFacts.cs",
           "eng/RoslynSymbolFacts.cs",
-          "SharpProof.CompilerArtifact/CompilerCaptureAuthority.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "SharpProof.CompilerArtifact/CompilerDependencyEvidenceFormatter.cs",
-          "SharpProof.CompilerArtifact/CompilerFeatureScopeFingerprint.cs",
-          "SharpProof.CompilerArtifact/CompilerModelValues.cs",
           "SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs",
-          "SharpProof.CompilerArtifact/CompilerSourceRebinding.cs",
-          "SharpProof.CompilerArtifact/CompilerSpecificationPackAuthority.cs",
+          "SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSummarySignature.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",
           "SharpProof.Contracts/BoundContracts.cs",

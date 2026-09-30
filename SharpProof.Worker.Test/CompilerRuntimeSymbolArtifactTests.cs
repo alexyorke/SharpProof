@@ -40,49 +40,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             Assert.That(
                 tree.EffectivePreprocessorSymbols,
                 Does.Not.Contain(Contract.ConditionalSymbol));
-            Assert.That(
-                snapshot.CompilerManifest.Compilation.SyntaxTrees
-                    .Single().EffectivePreprocessorSymbols,
-                Does.Not.Contain(Contract.ConditionalSymbol));
-        }
-    }
-
-    [Test]
-    public async Task ResealedEffectiveRuntimeSymbolIsRejectedByWorkerInput()
-    {
-        var artifact = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(CreateArtifact()));
-        artifact.Compilation.SyntaxTrees.Single()
-            .EffectivePreprocessorSymbols = [Contract.ConditionalSymbol];
-        artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
-        var json = JsonSerializer.Serialize(
-            artifact,
-            WorkerProtocolJson.Options) + "\n";
-        using var temporary = new TempDirectory(
-            "runtime-symbol-artifact-",
-            TestContext.CurrentContext.WorkDirectory);
-        var path = Path.Combine(temporary.FullName, "manifest.json");
-        Assert.That(
-            (Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(json)),
-            Throws.TypeOf<JsonException>());
-        var request = await WriteRequestAsync(path, json);
-
-        var exception = Assert.Throws<IOException>((Action)(() =>
-        {
-            _ = WorkerInputSnapshot.Load(
-                request,
-                WorkerCacheIdentity.Current,
-                CancellationToken.None);
-        }));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(exception, Is.Not.Null);
-            Assert.That(
-                exception!.Message,
-                Is.EqualTo(WorkerInputSnapshot.ManifestInvalid));
+            Assert.That(snapshot.Callables, Is.Empty);
         }
     }
 

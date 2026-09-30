@@ -1,20 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);SHARPPROOF_HOST_INVOCATION_TOKENS</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\eng\container\toolchain.json"
                       LogicalName="SharpProof.Host.toolchain.json" />
-    <Compile Include="..\SharpProof.Worker.Protocol\WorkerInvocationArguments.generated.cs"
-             Link="WorkerInvocationArguments.generated.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Package.Test" />
     <InternalsVisibleTo Include="SharpProof.BuildTasks" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
 </Project>
