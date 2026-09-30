@@ -21,14 +21,16 @@ public sealed class BoundTotalContractClause
 
 public sealed class TotalContractBindingResult
 {
-    internal TotalContractBindingResult(ImmutableArray<BoundTotalContractClause> clauses, ContractBindingFailure failure)
+    internal TotalContractBindingResult(ImmutableArray<BoundTotalContractClause> clauses, ContractBindingFailure failure, object origin)
     {
         Clauses = clauses;
         Failure = failure;
+        Origin = origin;
     }
     public ImmutableArray<BoundTotalContractClause> Clauses { get; }
     public ContractBindingFailure Failure { get; }
     public bool IsSuccess => Failure == ContractBindingFailure.None;
+    internal object Origin { get; }
 }
 
 public sealed partial class ContractBinder
@@ -96,11 +98,11 @@ public sealed partial class ContractBinder
         {
             context.ExcludeSpecificationCall(occurrence.Invocation);
         }
-        return new(clauses.ToImmutable(), ContractBindingFailure.None);
+        return new(clauses.ToImmutable(), ContractBindingFailure.None, context.Origin);
 
-        static TotalContractBindingResult Fail(ContractBindingFailure failure)
+        TotalContractBindingResult Fail(ContractBindingFailure failure)
         {
-            return new([], failure);
+            return new([], failure, context.Origin);
         }
     }
 }

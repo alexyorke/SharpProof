@@ -1,0 +1,86 @@
+using System.Numerics;
+
+namespace SharpProof.Worker;
+
+internal sealed class PassiveCallableVcPlan
+{
+    private readonly PassiveCallableCandidate _candidate;
+    private readonly ImmutableArray<Assumption> _entry;
+    private readonly ImmutableArray<Assumption> _body;
+    private readonly ImmutableArray<IrTerm> _goals;
+    private readonly ImmutableArray<IrVarId> _model;
+    private readonly ImmutableDictionary<ProofJustification, string> _labels;
+    private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
+
+    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder)
+    {
+        _candidate = builder.Candidate;
+        _entry = builder.EntryAssumptions;
+        _body = builder.Facts;
+        _goals = builder.Goals;
+        _model = builder.Model;
+        _labels = builder.Labels;
+        _assumes = builder.Assumes;
+    }
+
+    internal IrFactory Factory => _candidate.Factory;
+    internal int EnsuresCount => _goals.Length;
+    internal string CallableId => _candidate.CallableId;
+
+    internal VerificationQuery EntryQuery()
+    {
+        return new(Factory, _entry, Goal.CreateInternalConsistency(Factory), [.. _candidate.Parameters.Select(parameter => parameter.Entry)]);
+    }
+
+    internal VerificationQuery EnsuresQuery(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory, _goals[ordinal],
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(ordinal)), _model);
+    }
+
+    internal CallableReplayContext Replay(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
+        var old = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId?>();
+        foreach (var parameter in _candidate.Parameters)
+        {
+            bindings[parameter.Entry] = parameter.Entry;
+            bindings[parameter.Current] = parameter.Current;
+            old[parameter.Old] = parameter.Entry;
+        }
+        var clause = _candidate.Ensures[ordinal];
+        return new(_candidate.Program, false, bindings.ToImmutable(), old.ToImmutable(),
+            _candidate.Result is { } result ? [result] : [], clause.Value,
+            ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, PassiveCallableVcBuilder.MaximumSteps, [],
+            postconditionGuard: clause.Safe, replayOptions: new IrProgramReplayOptions(request =>
+                Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
+                    ? Factory.CreateBooleanValue(false)
+                    : Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)));
+    }
+
+    internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)
+    {
+        if (outcome.Core.Any(justification => !_labels.ContainsKey(justification)))
+        { throw new ArgumentException("The core contains a foreign justification.", nameof(outcome)); }
+        return [.. outcome.Core.Select(justification => _labels[justification]).Distinct(StringComparer.Ordinal).OrderBy(label => label, StringComparer.Ordinal)];
+    }
+
+    internal ImmutableArray<OperationId> UsedBodyAssumptions(ProvenOutcome outcome)
+    {
+        CoreLabels(outcome);
+        return [.. outcome.Core.Where(_assumes.ContainsKey).Select(justification => _assumes[justification]).Distinct()];
+    }
+
+    internal ImmutableDictionary<IrVarId, IrValue> ProjectModel(RefutedOutcome outcome)
+    {
+        return _candidate.Parameters.ToImmutableDictionary(parameter => parameter.Entry, parameter => outcome.Model.Assignments[parameter.Entry]);
+    }
+
+    private void RequireOrdinal(int ordinal)
+    {
+        if ((uint)ordinal >= (uint)_goals.Length)
+        { throw new ArgumentOutOfRangeException(nameof(ordinal)); }
+    }
+}

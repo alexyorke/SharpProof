@@ -49,6 +49,7 @@ public sealed class TotalLoweringContext
 
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
+    internal object Origin { get; } = new();
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
     public IrVarId? Result { get; }
     // The program's initialization reads Entry, so concrete replay must bind

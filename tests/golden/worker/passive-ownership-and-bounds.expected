@@ -1,0 +1,8 @@
+alias old-current rejected: True
+alias old-entry rejected: True
+alias cross-input rejected: True
+alias result rejected: True
+uninitialized-body-old: UnsupportedBody
+straight-line-linear-bound: True
+over-limit: ResourceLimit
+construction-canceled: True

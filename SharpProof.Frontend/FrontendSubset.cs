@@ -176,6 +176,16 @@ public readonly struct FrontendProgramAbstention
 
 public sealed partial class FrontendProgramLoweringResult
 {
+    internal object? TotalOrigin { get; }
+    internal FrontendProgramLoweringResult(
+        IrProgram program, FrontendSubsetClassification classification,
+        ImmutableArray<FrontendVariableBinding> variables, ImmutableArray<IrVarId> captures,
+        ImmutableArray<FrontendProgramAbstention> abstentions, object totalOrigin)
+        : this(program, classification, variables, captures, abstentions)
+    {
+        TotalOrigin = ArgumentNullGuard.NotNull(totalOrigin, nameof(totalOrigin));
+    }
+
     internal FrontendProgramLoweringResult(
         IrProgram program,
         FrontendSubsetClassification classification,

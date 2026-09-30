@@ -35,10 +35,82 @@ public sealed class GoldenWorkerTests
         var actual = scenario == "native-infrastructure" ? await NativeInfrastructure()
             : scenario == "native-cancellation" ? await NativeCancellation()
             : scenario == "native-resource" ? await NativeResource()
+            : scenario == "passive-vc" ? await PassiveVc(fixture.Source)
+            : scenario == "passive-ownership" ? PassiveOwnership()
             : scenario == "model-boolean" ? await BooleanModels()
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static async Task<string> PassiveVc(string source)
+    {
+        var subject = PassiveSourceSubject.Create(source);
+        var candidate = subject.Enroll()!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var proven = await solver.VerifyEnsuresAsync(0);
+        var refuted = await solver.VerifyEnsuresAsync(1);
+        var output = new StringBuilder();
+        output.AppendLine("authority: passive candidate");
+        output.AppendLine("diamond-old: " + proven.Outcome!.GetType().Name);
+        output.AppendLine("mutated-equality: " + refuted.Outcome!.GetType().Name);
+        output.AppendLine("unused-entry-present: " + refuted.EntryModel.ContainsKey(candidate.Parameters[2].Entry));
+        output.AppendLine("projection-canonical: " + refuted.EntryModel.Keys.ToHashSet().SetEquals(candidate.Parameters.Select(parameter => parameter.Entry)));
+        return output.ToString();
+    }
+
+    private static string PassiveOwnership()
+    {
+        var output = new StringBuilder();
+        foreach (var alias in new[] { "old-current", "old-entry", "cross-input", "result" })
+        {
+            var subject = new PassiveCallableVcTests.ScalarSubject();
+            subject.Builder.Return(subject.Builder.CreateBlock(), subject.Site, subject.Factory.Integer(0));
+            var first = alias switch
+            {
+                "old-current" => subject.Parameter with { Old = subject.Parameter.Current },
+                "old-entry" => subject.Parameter with { Old = subject.Parameter.Entry },
+                _ => subject.Parameter
+            };
+            ImmutableArray<PassiveParameterBinding> parameters = [first];
+            if (alias == "cross-input")
+            {
+                parameters = parameters.Add(new(subject.Parameter.Current,
+                    subject.Factory.CreateVariable("other-current", subject.Factory.IntegerType),
+                    subject.Factory.CreateVariable("other-old", subject.Factory.IntegerType)));
+            }
+            var rejected = false;
+            try
+            {
+                _ = new PassiveCallableCandidate("aliases", subject.Builder.Build(), parameters,
+                    alias == "result" ? subject.Parameter.Current : subject.Result, [], []);
+            }
+            catch (ArgumentException)
+            { rejected = true; }
+            output.AppendLine("alias " + alias + " rejected: " + rejected);
+        }
+        var old = new PassiveCallableVcTests.ScalarSubject();
+        old.Builder.Return(old.Builder.CreateBlock(), old.Site, old.Factory.Variable(old.Parameter.Old));
+        var ensures = old.Factory.Binary(IrBinaryOperator.Equal, old.Factory.Variable(old.Result), old.Factory.Variable(old.Parameter.Entry));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(old.Candidate(ensures), out _, out var oldReason), Is.False);
+        output.AppendLine("uninitialized-body-old: " + oldReason);
+        var straight = PassiveCallableVcTests.StraightLineCandidate(80, 32);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(straight, out var plan, out _), Is.True);
+        var query = plan!.EnsuresQuery(0);
+        output.AppendLine("straight-line-linear-bound: " + (query.Assumptions.Length < 4 * (80 + 32) && query.ModelVariables.Length < 4 * (80 + 32)));
+        var oversized = PassiveCallableVcTests.StraightLineCandidate(PassiveCallableVcBuilder.MaximumSteps + 1, 0);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(oversized, out _, out var limitReason), Is.False);
+        output.AppendLine("over-limit: " + limitReason);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        var cancellationObserved = false;
+        try
+        { PassiveCallableVcBuilder.TryBuild(straight, out _, out _, canceled.Token); }
+        catch (OperationCanceledException)
+        { cancellationObserved = true; }
+        output.AppendLine("construction-canceled: " + cancellationObserved);
+        return output.ToString();
     }
 
     private static async Task<string> Verify(GoldenCase fixture, string scenario)

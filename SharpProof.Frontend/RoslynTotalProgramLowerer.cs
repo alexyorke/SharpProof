@@ -147,7 +147,7 @@ internal sealed class RoslynTotalProgramLowerer(TotalLoweringContext context)
     private FrontendProgramLoweringResult Result()
     {
         return new(_builder.Build(), _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
-            _context.Variables, _context.Captures, [.. _abstentions]);
+            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin);
     }
 
     private static bool HasUnsupportedRegion(ControlFlowRegion region)

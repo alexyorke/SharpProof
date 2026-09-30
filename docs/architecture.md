@@ -210,8 +210,20 @@ safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
 body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
-calls, regions, cycles, and checked binary arithmetic currently abstain. Worker
-routing and passive VC generation are still pending.
+calls, regions, cycles, and checked binary arithmetic currently abstain.
+
+The standalone passive VC builder owns one immutable Total scalar candidate.
+It derives SSA writes, guarded joins, block and edge reachability, and normal
+return obligations from the original acyclic program. Unchanged incoming
+versions are forwarded. Entry feasibility activates guarded Requires and the
+intrinsic typed domains; body Assume filters point reachability and retains its
+own core provenance. Construction is bounded and cancelable. Each callable
+uses one solver session with the existing method resource meter. Refutations
+must validate every SSA assignment and replay the original body and guarded
+postcondition; displayed models contain canonical entry parameters only. The
+source test adapter rejects mixed contexts, incomplete lowering, and source
+Assume until its point filter exists in the replay program. Worker routing and
+the optional Total compiler artifact payload remain pending.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.
