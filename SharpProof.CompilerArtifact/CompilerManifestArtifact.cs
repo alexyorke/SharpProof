@@ -407,8 +407,8 @@ internal static class CompilerManifestArtifactJson
         return callables?.All(callable =>
             callable != null &&
             (!hasCompilerDiagnostics ||
-             callable.FailureReason ==
-                CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason) &&
+             (callable.FailureReason ==
+                CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason && callable.Total == null)) &&
             (callable.FailureReason ==
                 CompilerCallableArtifactReasonCatalog.SuccessReason ||
              CompilerCallableArtifactReasonCatalog.IsFailureReason(

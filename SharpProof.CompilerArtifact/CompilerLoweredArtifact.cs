@@ -86,7 +86,8 @@ internal static class CompilerLoweredArtifact
             return new CompilerCallableArtifact
             {
                 CallableId = preparation.Entry.CallableId,
-                FailureReason = preparation.FailureReason
+                FailureReason = preparation.FailureReason,
+                Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total)
             };
         }
 
@@ -140,6 +141,7 @@ internal static class CompilerLoweredArtifact
         {
             CallableId = preparation.Entry.CallableId,
             FailureReason = WorkerClaimReason.None,
+            Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total),
             Graph = encoded.Graph,
             EffectClaims = preparation.EffectClaims.ToArray(),
             Clauses = [.. preparation.Clauses.Select((clause, index) =>
@@ -375,6 +377,8 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("A lowered callable reason is invalid.");
         }
 
+        var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
+
         if (artifact.FailureReason !=
             CompilerCallableArtifactReasonCatalog.SuccessReason)
         {
@@ -391,7 +395,8 @@ internal static class CompilerLoweredArtifact
                     artifact,
                     claims,
                     cancellationToken),
-                Compilation = compilation
+                Compilation = compilation,
+                Total = total
             };
         }
         if (artifact.Graph == null || artifact.Clauses == null || artifact.Variables == null)
@@ -522,7 +527,8 @@ internal static class CompilerLoweredArtifact
                 artifact,
                 claims,
                 cancellationToken),
-            Compilation = compilation
+            Compilation = compilation,
+            Total = total
         };
     }
 

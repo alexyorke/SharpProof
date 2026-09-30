@@ -37,10 +37,56 @@ public sealed class GoldenWorkerTests
             : scenario == "native-resource" ? await NativeResource()
             : scenario == "passive-vc" ? await PassiveVc(fixture.Source)
             : scenario == "passive-ownership" ? PassiveOwnership()
+            : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
+            : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "model-boolean" ? await BooleanModels()
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static async Task<string> TotalArtifact(string source)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
+        var row = artifact.Callables.Single();
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        var preparation = prepared.Single();
+        var total = preparation.Total!;
+        var type = total.Program.Factory.GetTypeInfo(total.Program.Factory.GetVariableInfo(total.Parameters[0].Entry).Type);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var proven = await solver.VerifyEnsuresAsync(0);
+        var output = new StringBuilder();
+        output.AppendLine("schema: " + artifact.SchemaVersion);
+        output.AppendLine("authority: legacy");
+        output.AppendLine("legacy-success: " + preparation.IsSuccess);
+        output.AppendLine("total-present: " + (row.Total != null));
+        output.AppendLine("integer-width: " + type.Width);
+        output.AppendLine("unsigned: " + !type.Signed);
+        output.AppendLine("roots-interleaved: " + row.Total!.Clauses.Select((clause, ordinal) => clause.ValueRoot == ordinal * 2 && clause.SafeRoot == ordinal * 2 + 1).All(value => value));
+        output.AppendLine("same-claim-ids: " + total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).Select(clause => clause.ClaimId).SequenceEqual(artifact.Manifest.Claims.Select(claim => claim.ClaimId)));
+        output.AppendLine("full-ulong-wrap: " + proven.Outcome!.GetType().Name);
+        return output.ToString();
+    }
+
+    private static async Task<string> ArtifactPassiveEnrollment(string source)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(prepared.Single())!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var proven = await solver.VerifyEnsuresAsync(0);
+        var refuted = await solver.VerifyEnsuresAsync(1);
+        var output = new StringBuilder();
+        output.AppendLine("authority: legacy");
+        output.AppendLine("candidate-source: decoded immutable IR");
+        output.AppendLine("diamond-old: " + proven.Outcome!.GetType().Name);
+        output.AppendLine("mutated-equality: " + refuted.Outcome!.GetType().Name);
+        output.AppendLine("unused-entry-present: " + refuted.EntryModel.ContainsKey(candidate.Parameters[2].Entry));
+        output.AppendLine("projection-canonical: " + refuted.EntryModel.Keys.ToHashSet().SetEquals(candidate.Parameters.Select(parameter => parameter.Entry)));
+        return output.ToString();
     }
 
     private static async Task<string> PassiveVc(string source)

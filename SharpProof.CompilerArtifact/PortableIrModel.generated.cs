@@ -163,7 +163,8 @@ internal sealed class DecodedPortableIrGraph(
     IrProgram? program,
     IrTerm[] roots,
     IrVarId[] variables,
-    IrInstruction[] instructions
+    IrInstruction[] instructions,
+    OperationId[] operations
 )
 {
     internal IrFactory Factory { get; } = factory;
@@ -171,17 +172,20 @@ internal sealed class DecodedPortableIrGraph(
     internal IReadOnlyList<IrTerm> Roots { get; } = roots;
     internal IReadOnlyList<IrVarId> Variables { get; } = variables;
     internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions;
+    internal IReadOnlyList<OperationId> Operations { get; } = operations;
 }
 
 internal sealed class EncodedPortableIrGraph(
     PortableIrGraph graph,
     IReadOnlyDictionary<IrVarId, int> variableIndices,
-    IReadOnlyDictionary<IrInstructionId, int> instructionIndices
+    IReadOnlyDictionary<IrInstructionId, int> instructionIndices,
+    IReadOnlyDictionary<OperationId, int> operationIndices
 )
 {
     internal PortableIrGraph Graph { get; } = graph;
     internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices;
     internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices;
+    internal IReadOnlyDictionary<OperationId, int> OperationIndices { get; } = operationIndices;
 }
 
 internal static class PortableIrWireCatalog

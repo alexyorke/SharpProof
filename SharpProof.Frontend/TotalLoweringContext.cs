@@ -22,15 +22,22 @@ public sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, Fronte
 public sealed class TotalLoweringContext
 {
     private readonly RoslynTypeMapper _types;
+    private readonly Func<SyntaxTree, string> _document;
     private readonly Dictionary<ISymbol, IrVarId> _locals = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
     private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
     private int _temporary;
 
     public TotalLoweringContext(IrFactory factory, IMethodSymbol target)
+        : this(factory, target, tree => string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath)
+    {
+    }
+
+    internal TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document)
     {
         Factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         Target = ArgumentNullGuard.NotNull(target, nameof(target));
+        _document = ArgumentNullGuard.NotNull(document, nameof(document));
         if (factory.Semantics != IrExecutionSemantics.Total)
         {
             throw new ArgumentException("Candidate lowering requires Total IR semantics.", nameof(factory));
@@ -116,7 +123,7 @@ public sealed class TotalLoweringContext
     {
         var syntax = operation.Syntax;
         return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart,
-            new IrSourceSpan(string.IsNullOrEmpty(syntax.SyntaxTree.FilePath) ? "source" : syntax.SyntaxTree.FilePath,
+            new IrSourceSpan(_document(syntax.SyntaxTree),
                 syntax.SpanStart, syntax.Span.Length));
     }
 

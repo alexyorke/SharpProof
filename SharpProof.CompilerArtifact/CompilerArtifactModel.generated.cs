@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 21;
+    internal const int Current = 22;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -94,6 +94,44 @@ internal sealed record CompilerCallablePreparation(
     internal bool IsSuccess => FailureReason == WorkerClaimReason.None;
     internal ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
     internal CompilerCompilationSnapshot Compilation { get; init; } = new();
+    internal CompilerTotalCallablePreparation? Total { get; init; }
+}
+
+internal sealed record CompilerTotalCallablePreparation(
+    string CallableId,
+    IrProgram Program,
+    ImmutableArray<CompilerTotalParameter> Parameters,
+    IrVarId? Result,
+    ImmutableArray<CompilerTotalClause> Clauses);
+
+internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
+
+internal sealed record CompilerTotalClause(CompilerContractKind Kind, IrTerm Value, IrTerm Safe,
+    OperationId Operation, string? ClaimId, string? AssumptionId);
+
+internal sealed class CompilerTotalCallableArtifact
+{
+    public PortableIrGraph Graph { get; set; } = new();
+    public CompilerTotalParameterArtifact[] Parameters { get; set; } = [];
+    public int Result { get; set; } = -1;
+    public CompilerTotalClauseArtifact[] Clauses { get; set; } = [];
+}
+
+internal sealed class CompilerTotalParameterArtifact
+{
+    public int Entry { get; set; } = -1;
+    public int Current { get; set; } = -1;
+    public int Old { get; set; } = -1;
+}
+
+internal sealed class CompilerTotalClauseArtifact
+{
+    public CompilerContractKind Kind { get; set; }
+    public int ValueRoot { get; set; } = -1;
+    public int SafeRoot { get; set; } = -1;
+    public int Operation { get; set; } = -1;
+    public string? ClaimId { get; set; }
+    public string? AssumptionId { get; set; }
 }
 
 internal sealed record CompilerPreparedClause(
@@ -193,6 +231,8 @@ internal sealed class CompilerCallableArtifact
     public CompilerVariableArtifact[] Variables { get; set; } = [];
     public CompilerBodyArtifact? Body { get; set; }
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerTotalCallableArtifact? Total { get; set; }
 }
 
 internal sealed class CompilerEffectClaimArtifact

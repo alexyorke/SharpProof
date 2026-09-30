@@ -7,6 +7,8 @@ internal sealed class CompilerCallableLowerer
 {
     private const int MaximumBodyBlocks = 64;
     private readonly IrFactory _factory;
+    private readonly CSharpCompilation _compilation;
+    private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
     private readonly ContractBinder _contracts;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerRelationalSummaryProvider _summaries;
@@ -35,6 +37,8 @@ internal sealed class CompilerCallableLowerer
         CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _compilation = compilation;
+        _capturedTrees = capturedTrees;
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _contracts = new ContractBinder(compilation, factory);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
@@ -47,6 +51,14 @@ internal sealed class CompilerCallableLowerer
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
+    {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        var total = CompilerTotalCallableLowerer.Prepare(_compilation, target,
+            _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken), cancellationToken);
+        return PrepareLegacy(target, cancellationToken) with { Total = total };
+    }
+
+    private CompilerCallablePreparation PrepareLegacy(ManifestCallableTarget target, CancellationToken cancellationToken)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
 

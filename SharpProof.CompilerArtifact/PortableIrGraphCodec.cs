@@ -68,6 +68,14 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<IrVarId>? variables = null,
         CancellationToken cancellationToken = default)
     {
+        return Encode(factory, program, roots, variables, [], cancellationToken);
+    }
+
+    internal static EncodedPortableIrGraph Encode(
+        IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
+        IReadOnlyList<IrVarId>? variables, IReadOnlyList<OperationId> operations,
+        CancellationToken cancellationToken = default)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         roots = ArgumentNullGuard.NotNull(roots, nameof(roots));
@@ -82,6 +90,7 @@ internal static partial class PortableIrGraphCodec
             program,
             roots,
             variables ?? [],
+            operations,
             cancellationToken).Encode();
     }
 
@@ -90,6 +99,7 @@ internal static partial class PortableIrGraphCodec
         IrProgram? program,
         IReadOnlyList<IrTerm> roots,
         IReadOnlyList<IrVarId> variables,
+        IReadOnlyList<OperationId> operations,
         CancellationToken cancellationToken)
     {
         return new Encoder(
@@ -97,6 +107,7 @@ internal static partial class PortableIrGraphCodec
             program,
             roots,
             variables,
+            operations,
             cancellationToken).Encode(includeInstructionIndices: false);
     }
 
@@ -104,6 +115,13 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph graph,
         IReadOnlyList<int>? externalVariableIndices = null,
         CancellationToken cancellationToken = default)
+    {
+        return Decode(graph, externalVariableIndices, [], cancellationToken);
+    }
+
+    internal static DecodedPortableIrGraph Decode(
+        PortableIrGraph graph, IReadOnlyList<int>? externalVariableIndices,
+        IReadOnlyList<int> externalOperationIndices, CancellationToken cancellationToken = default)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
         cancellationToken.ThrowIfCancellationRequested();
@@ -115,6 +133,7 @@ internal static partial class PortableIrGraphCodec
                 graph,
                 decoded,
                 externalVariableIndices ?? [],
+                externalOperationIndices,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             return decoded;
@@ -134,6 +153,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph graph,
         DecodedPortableIrGraph decoded,
         IReadOnlyList<int> externalVariableIndices,
+        IReadOnlyList<int> externalOperationIndices,
         CancellationToken cancellationToken)
     {
         var previous = -1;
@@ -148,11 +168,22 @@ internal static partial class PortableIrGraphCodec
             externalVariables.Add(decoded.Variables[index]);
         }
 
+        previous = -1;
+        var externalOperations = new List<OperationId>(externalOperationIndices.Count);
+        foreach (var index in externalOperationIndices)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(index >= 0 && index < decoded.Operations.Count && index > previous,
+                "Portable IR external operation metadata is not canonical.");
+            previous = index;
+            externalOperations.Add(decoded.Operations[index]);
+        }
         var canonical = EncodeGraph(
             decoded.Factory,
             decoded.Program,
             decoded.Roots,
             externalVariables,
+            externalOperations,
             cancellationToken).Graph;
         foreach (var member in canonical.Members)
         {
@@ -403,6 +434,7 @@ internal static partial class PortableIrGraphCodec
         private readonly IrProgram? _program;
         private readonly IReadOnlyList<IrTerm> _roots;
         private readonly IReadOnlyList<IrVarId> _extraVariables;
+        private readonly IReadOnlyList<OperationId> _extraOperations;
         private readonly CancellationToken _cancellationToken;
         private readonly EncodingTable<IrTypeId, PortableIrType> _types;
         private readonly EncodingTable<IrIdentityId, int> _identities;
@@ -420,10 +452,12 @@ internal static partial class PortableIrGraphCodec
             IrProgram? program,
             IReadOnlyList<IrTerm> roots,
             IReadOnlyList<IrVarId> extraVariables,
+            IReadOnlyList<OperationId> extraOperations,
             CancellationToken cancellationToken)
         {
             (_factory, _program, _roots, _extraVariables, _cancellationToken) =
                 (factory, program, roots, extraVariables, cancellationToken);
+            _extraOperations = extraOperations;
             _types = new((id, _) => TypeRow(id));
             _identities = new(static (_, index) => index);
             _variables = new((id, _) => VariableRow(id));
@@ -444,6 +478,11 @@ internal static partial class PortableIrGraphCodec
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 VariableIndex(variable);
+            }
+            foreach (var operation in _extraOperations)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                OperationIndex(operation);
             }
 
             if (_program == null)
@@ -492,7 +531,7 @@ internal static partial class PortableIrGraphCodec
                 Roots = roots
             };
             return new EncodedPortableIrGraph(
-                graph, _variables.Indices, _instructionIndices);
+                graph, _variables.Indices, _instructionIndices, _operations.Indices);
         }
 
         private PortableIrTerm TermRow(IrId id)
@@ -688,7 +727,7 @@ internal static partial class PortableIrGraphCodec
             var (program, instructions) = DecodeProgram();
             _cancellationToken.ThrowIfCancellationRequested();
             return new DecodedPortableIrGraph(
-                _factory, program, roots, _variables, instructions);
+                _factory, program, roots, _variables, instructions, _operations);
         }
 
         private void RequireGraphShape()
