@@ -27,7 +27,9 @@ internal static class Program
             var command = args.Length == 0 ? "corpus" : args[0];
             if (command == "corpus")
             {
+                var wallTime = System.Diagnostics.Stopwatch.StartNew();
                 var result = await CorpusGate.RunAsync(root).ConfigureAwait(false);
+                Console.Error.WriteLine($"Corpus gate wall time: {wallTime.Elapsed.TotalSeconds:F1}s.");
                 Console.WriteLine(
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;

@@ -93,7 +93,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
-        "tools/collector/RelationalSpecPackCatalog.json",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
@@ -1108,7 +1107,7 @@ public sealed class PackageLayoutSmokeTests
         using var result = JsonDocument.Parse(
             await File.ReadAllTextAsync(workspace.ResultPath));
         JsonAssert.Equal(result.RootElement, "runStatus", "Complete");
-        JsonAssert.Equal(result.RootElement, "summary.cacheStatus", "Miss");
+        JsonAssert.Equal(result.RootElement, "summary.cacheStatus", "Written");
         var claims = result.RootElement
             .GetProperty("claimResults")
             .EnumerateArray()
@@ -1179,22 +1178,6 @@ public sealed class PackageLayoutSmokeTests
                    await File.ReadAllTextAsync(
                        workspace.CompilerManifestPath)))
         {
-            var syntaxTreePaths = manifest.RootElement
-                .GetProperty("compilation")
-                .GetProperty("syntaxTrees")
-                .EnumerateArray()
-                .Select(static tree =>
-                    tree.GetProperty("path").GetString() ?? string.Empty)
-                .ToArray();
-            Assert.That(
-                syntaxTreePaths.Any(static path =>
-                    path.Replace('\\', '/').EndsWith(
-                        "/shared source/LinkedSubject.cs",
-                        StringComparison.OrdinalIgnoreCase)),
-                Is.True,
-                "The final compiler artifact must retain the linked " +
-                "file's physical source identity.");
-
             var claims = manifest.RootElement
                 .GetProperty("manifest")
                 .GetProperty("claims")

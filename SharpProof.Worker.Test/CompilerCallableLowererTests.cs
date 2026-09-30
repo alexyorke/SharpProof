@@ -358,12 +358,10 @@ public sealed class CompilerCallableLowererTests
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
 
-        var evidence = artifact.Compilation.SummaryEvidence.Single(row =>
-            row.Origin == CompilerSummaryOrigin.Source);
-        Assert.That(
-            evidence.SourcePath,
-            Is.EqualTo(CompilerCaptureAuthority.NormalizePath(
-                "generated/helper.g.cs")));
+        var summary = CompilerManifestArtifactJson.DecodeCallables(artifact).Single()
+            .Body!.SummaryCalls.Values.Single();
+        Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
+        Assert.That(summary.CallIdentity, Is.EqualTo("M:Helper.Read(System.Boolean)"));
     }
 
     [Test]

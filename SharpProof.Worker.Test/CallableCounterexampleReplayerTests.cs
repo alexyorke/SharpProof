@@ -10,6 +10,20 @@ namespace SharpProof.Worker.Test;
 public sealed class CallableCounterexampleReplayerTests
 {
     [Test]
+    public void ReplayRejectsAMissingPrestateEntryBinding()
+    {
+        var fixture = CreateIncrementingBranch(static (factory, _, _, _) => factory.Boolean(false));
+        var target = fixture.Target with
+        {
+            Variables = [.. fixture.Target.Variables.Select(static variable =>
+                variable.Role == CompilerVariableRole.PreState
+                    ? variable with { CurrentStateVariable = null }
+                    : variable)]
+        };
+        Assert.That(Replay(target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
     public void ReplayFollowsExactBranchAndRebuildsContractState()
     {
         var fixture = CreateIncrementingBranch(static (factory, current, result, old) =>
@@ -377,7 +391,7 @@ public sealed class CallableCounterexampleReplayerTests
     {
         var preparedEnsures = target.Clauses.Where(static clause =>
             clause.Kind == CompilerContractKind.Ensures).ToArray();
-        return CallableCounterexampleReplayer.Replay(
+        return CallableReplayTestHarness.Replay(
             target,
             claimOrdinal,
             model,

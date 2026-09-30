@@ -357,28 +357,8 @@ public sealed class WorkerMsBuildIntegrationTests
             await File.ReadAllTextAsync(project.RequestPath))!;
         var artifact = await CompilerManifestArtifact.ReadAsync(
             request.CompilerManifest.Path);
-        Assert.That(artifact.SyntaxTrees, Is.Not.Empty);
-        Assert.That(artifact.References, Is.Not.Empty);
-        var source = artifact.SyntaxTrees.Single(static tree =>
-            Path.GetFileName(tree.Path) == "Subject.cs");
-        Assert.That(
-            Path.IsPathFullyQualified(source.Path),
-            Is.True);
-        Assert.That(
-            artifact.References.All(static reference =>
-                Path.IsPathFullyQualified(reference.Path)),
-            Is.True);
-        Assert.That(
-            File.Exists(source.Path),
-            Is.True);
-        Assert.That(
-            artifact.References.All(static reference =>
-                File.Exists(reference.Path)),
-            Is.True);
-        Assert.That(
-            artifact.SyntaxTrees.SelectMany(static tree =>
-                tree.PreprocessorSymbols),
-            Does.Contain("NET8_0"));
+        Assert.That(artifact.ClaimPaths, Is.Not.Empty);
+        Assert.That(artifact.ClaimPaths, Has.Some.EndsWith("Subject.cs"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -402,51 +382,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 request.Budgets.MaximumExpressionDepth,
                 Is.EqualTo(
                     WorkerBudgets.DefaultMaximumExpressionDepth));
-            Assert.That(
-                artifact.TargetFramework,
-                Is.EqualTo("net8.0"));
-            Assert.That(
-                artifact.CompilerVersion,
-                Is.EqualTo("4.14.0.0"));
-            Assert.That(
-                artifact.SyntaxTrees.Select(static tree =>
-                    tree.LanguageVersion),
-                Has.All.EqualTo("CSharp12"));
-            Assert.That(
-                artifact.Options.NullableContext,
-                Is.EqualTo("Disable"));
-            Assert.That(
-                artifact.Options.OptimizationLevel,
-                Is.EqualTo("Release"));
-            Assert.That(artifact.Options.CheckOverflow, Is.False);
-            Assert.That(artifact.Options.AllowUnsafe, Is.False);
-            Assert.That(artifact.Options.Deterministic, Is.True);
-            Assert.That(
-                artifact.Options.MetadataImportOptions,
-                Is.EqualTo("Public"));
-            Assert.That(artifact.Options.WarningLevel, Is.GreaterThanOrEqualTo(0));
-            Assert.That(
-                artifact.Options.GeneralDiagnosticOption,
-                Is.EqualTo("Default"));
-            Assert.That(
-                artifact.Options.SpecificDiagnosticOptions.Zip(
-                    artifact.Options.SpecificDiagnosticOptions.Skip(1),
-                    static (left, right) => StringComparer.Ordinal.Compare(
-                        left.Id, right.Id) < 0).All(static ordered => ordered),
-                Is.True);
-            Assert.That(
-                artifact.Options.AssemblyIdentityComparer,
-                Is.EqualTo("Desktop"));
-            Assert.That(artifact.Options.Usings, Is.Not.Null);
-            Assert.That(
-                artifact.Options.ResolverPolicy,
-                Is.EqualTo("EvidenceOnly"));
-            Assert.That(
-                artifact.Options.OutputKind,
-                Is.EqualTo("DynamicallyLinkedLibrary"));
-            Assert.That(
-                artifact.Options.Platform,
-                Is.EqualTo("AnyCpu"));
             Assert.That(request.Cache.Enabled, Is.True);
             Assert.That(
                 request.Cache.MaximumBytes,
@@ -756,6 +691,11 @@ public sealed class WorkerMsBuildIntegrationTests
         var build = await BuildOkAsync(project.BuildAsync(verify: true));
         Assert.That(File.Exists(project.CompilerManifestPath), Is.True);
         var manifest = await File.ReadAllTextAsync(project.CompilerManifestPath);
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        await AssertPublicationBindingAsync(request, response);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -765,7 +705,11 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 manifest,
                 Does.Contain("\"schema\":\"SharpProof.CompilerManifest\""));
-            Assert.That(manifest, Does.Contain("\"targetFramework\":\"net8.0\""));
+            Assert.That(request.CompilerManifest.Path,
+                Does.Contain(Path.Combine("Release", "net8.0", "SharpProof")));
+            Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
+            Assert.That(response.ClaimResults[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(manifest, Does.Not.Contain('\r'));
         }
     }
@@ -803,12 +747,10 @@ public sealed class WorkerMsBuildIntegrationTests
             var response = WorkerProtocolJson.DeserializeResponse(
                 await File.ReadAllTextAsync(
                     project.VerifyOutputPath(framework, "result.json")))!;
-            var artifact = await AssertPublicationBindingAsync(
+            _ = await AssertPublicationBindingAsync(
                 request, response);
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(artifact.TargetFramework,
-                    Is.EqualTo(framework));
                 Assert.That(
                     request.CompilerManifest.Path,
                     Is.EqualTo(Path.GetFullPath(
@@ -841,10 +783,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 await File.ReadAllTextAsync(requestPath))!;
             var response = WorkerProtocolJson.DeserializeResponse(
                 await File.ReadAllTextAsync(resultPath))!;
-            var artifact = await AssertPublicationBindingAsync(request, response);
+            _ = await AssertPublicationBindingAsync(request, response);
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(artifact.TargetFramework, Is.EqualTo(framework));
                 Assert.That(request.CompilerManifest.Path,
                     Is.EqualTo(Path.GetFullPath(manifestPath)));
                 Assert.That(File.Exists(manifestPath), Is.True, build.Output);
@@ -1222,8 +1163,8 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.Manifest.Callables, Has.Length.EqualTo(2));
             Assert.That(response.Manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(response.Summary.CallableCount, Is.EqualTo(2));
-            Assert.That(response.Summary.ClaimCount, Is.EqualTo(2));
+            Assert.That(response.CallableResults.Length, Is.EqualTo(2));
+            Assert.That(response.ClaimResults.Length, Is.EqualTo(2));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             var outcomesByKind = response.Manifest.Claims.Join(
                 response.ClaimResults,
@@ -1243,8 +1184,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     $"{result.Kind}={result.Outcome}/{result.Reason}")) +
                 Environment.NewLine + build.Output);
             Assert.That(
-                response.Summary.OutcomeCounts.Single(static count =>
-                    count.Outcome == WorkerClaimOutcome.Refuted).Count,
+                response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Refuted),
                 Is.GreaterThanOrEqualTo(1));
             Assert.That(
                 outcomesByKind.Single(static result =>
@@ -2297,7 +2237,7 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
-    public async Task CompilerOptionChangesInvalidateIncrementalVerification()
+    public async Task CompilerOptionChangesReuseEquivalentSemanticArtifacts()
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
@@ -2319,34 +2259,15 @@ public sealed class WorkerMsBuildIntegrationTests
             await File.ReadAllTextAsync(project.RequestPath))!;
         var changedResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
-        var changedArtifact = await AssertPublicationBindingAsync(
+        _ = await AssertPublicationBindingAsync(
             changedRequest, changedResponse);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                changedArtifact.SyntaxTrees.Select(static tree =>
-                    tree.LanguageVersion),
-                Has.All.EqualTo("CSharp13"));
-            Assert.That(
-                changedArtifact.Options.NullableContext,
-                Is.EqualTo("Annotations"));
-            Assert.That(
-                changedArtifact.Options.OptimizationLevel,
-                Is.EqualTo("Debug"));
-            Assert.That(
-                changedArtifact.Options.CheckOverflow,
-                Is.True);
-            Assert.That(changedArtifact.Options.AllowUnsafe, Is.True);
-            Assert.That(
-                changedArtifact.Options.Deterministic,
-                Is.False);
-            Assert.That(
-                changedArtifact.Options.Platform,
-                Is.EqualTo("X64"));
-            Assert.That(
                 changedResponse.InputHash,
-                Is.Not.EqualTo(firstResponse.InputHash));
+                Is.EqualTo(firstResponse.InputHash));
+            Assert.That(changedResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(
                 File.GetLastWriteTimeUtc(project.ResultPath),
                 Is.GreaterThan(firstWrite));
@@ -2792,7 +2713,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var artifact = await CompilerManifestArtifact.ReadAsync(
             request.CompilerManifest.Path);
         Assert.That(
-            artifact.SyntaxTrees.Select(static tree => tree.Path),
+            artifact.ClaimPaths,
             Has.Some.Contains("consumer project"));
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
@@ -2977,7 +2898,7 @@ public sealed class WorkerMsBuildIntegrationTests
             workerPath,
             ContainerContract.GetZ3LibrarySha256Required());
         var expectedInputHash = CompilerArtifactInputHash.Compute(
-            request, artifact.Bytes, WorkerCacheIdentity.CurrentToolIdentity,
+            request, ArtifactDigest.Compute(artifact.Bytes), WorkerCacheIdentity.CurrentToolIdentity,
             WorkerCacheIdentity.Current.ToolVersion, workerBinarySha256,
             WorkerCacheIdentity.Current.ApiSpecIdentity,
             WorkerCacheIdentity.Current.ApiSpecVersion,
@@ -3029,147 +2950,34 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     private sealed record CompilerManifestArtifact(
-        byte[] Bytes,
-        string ProjectDirectory,
-        string AssemblyName,
-        string TargetFramework,
-        string CompilerVersion,
-        WorkerFeatureSet Features,
-        string CompilationSha256,
-        string ManifestHash,
-        CompilerCompilationOptions Options,
-        CompilerSyntaxTree[] SyntaxTrees,
-        CompilerReference[] References)
+        byte[] Bytes, string ProjectDirectory, WorkerFeatureSet Features,
+        string ManifestHash, string[] ClaimPaths)
     {
-        internal static async Task<CompilerManifestArtifact> ReadAsync(
-            string path)
+        internal static async Task<CompilerManifestArtifact> ReadAsync(string path)
         {
             Assert.That(File.Exists(path), Is.True, path);
             var bytes = await File.ReadAllBytesAsync(path);
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
-            var compilation = root.GetProperty("compilation");
-            var options = compilation.GetProperty("options");
+            var manifest = root.GetProperty("manifest");
             var artifact = new CompilerManifestArtifact(
                 bytes,
-                compilation.GetProperty("projectDirectory").GetString() ??
-                    string.Empty,
-                compilation.GetProperty("assemblyName").GetString() ??
-                    string.Empty,
-                compilation.GetProperty("targetFramework").GetString() ??
-                    string.Empty,
-                compilation.GetProperty("compilerVersion").GetString() ??
-                    string.Empty,
-                root.GetProperty("features")
-                    .Deserialize<WorkerFeatureSet>(
-                        WorkerProtocolJson.Options),
-                root.GetProperty("compilationSha256").GetString() ??
-                    string.Empty,
-                root.GetProperty("manifest").GetProperty("hash")
-                    .GetString() ?? string.Empty,
-                new CompilerCompilationOptions(
-                    options.GetProperty("outputKind").GetString() ??
-                        string.Empty,
-                    options.GetProperty("optimizationLevel").GetString() ??
-                        string.Empty,
-                    options.GetProperty("checkOverflow").GetBoolean(),
-                    options.GetProperty("allowUnsafe").GetBoolean(),
-                    options.GetProperty("deterministic").GetBoolean(),
-                    options.GetProperty("platform").GetString() ??
-                        string.Empty,
-                    options.GetProperty("nullableContext").GetString() ??
-                        string.Empty,
-                    options.GetProperty("metadataImportOptions").GetString() ??
-                        string.Empty,
-                    options.GetProperty("warningLevel").GetInt32(),
-                    options.GetProperty("generalDiagnosticOption").GetString() ??
-                        string.Empty,
-                    [.. options.GetProperty("specificDiagnosticOptions")
-                        .EnumerateArray()
-                        .Select(static option => new CompilerDiagnosticOption(
-                            option.GetProperty("id").GetString() ?? string.Empty,
-                            option.GetProperty("reportDiagnostic").GetString() ??
-                                string.Empty))],
-                    options.GetProperty("assemblyIdentityComparer").GetString() ??
-                        string.Empty,
-                    [.. options.GetProperty("usings").EnumerateArray()
-                        .Select(static item => item.GetString() ?? string.Empty)],
-                    options.GetProperty("resolverPolicy").GetString() ??
-                        string.Empty),
-                [.. compilation.GetProperty("syntaxTrees").EnumerateArray()
-                    .Select(static tree => new CompilerSyntaxTree(
-                        tree.GetProperty("path").GetString() ??
-                            string.Empty,
-                        tree.GetProperty("languageVersion").GetString() ??
-                            string.Empty,
-                        [.. tree.GetProperty("preprocessorSymbols")
-                            .EnumerateArray()
-                            .Select(static symbol => symbol.GetString() ??
-                                string.Empty)]))],
-                [.. compilation.GetProperty("references").EnumerateArray()
-                    .SelectMany(static reference =>
-                        reference.GetProperty("modules").EnumerateArray())
-                    .Select(static module => new CompilerReference(
-                        module.GetProperty("name").GetString() ?? string.Empty,
-                        module.GetProperty("mvid").GetString() ?? string.Empty,
-                        module.GetProperty("path").GetString() ?? string.Empty,
-                        module.GetProperty("sha256").GetString() ?? string.Empty))]);
+                root.GetProperty("compilation").GetProperty("projectDirectory").GetString() ?? string.Empty,
+                root.GetProperty("features").Deserialize<WorkerFeatureSet>(WorkerProtocolJson.Options),
+                manifest.GetProperty("hash").GetString() ?? string.Empty,
+                [.. manifest.GetProperty("claims").EnumerateArray()
+                    .Select(static claim => claim.GetProperty("location").GetProperty("path").GetString() ?? string.Empty)]);
             using (Assert.EnterMultipleScope())
             {
                 JsonAssert.Equal(root, "schema", "SharpProof.CompilerManifest");
                 JsonAssert.Equal(root, "schemaVersion", CompilerManifestArtifactVersions.Current);
                 JsonAssert.Equal(root, "protocolVersion", WorkerProtocolVersions.Current);
-                Assert.That(
-                    artifact.CompilationSha256,
-                    Does.Match("^[0-9a-f]{64}$"));
-                Assert.That(
-                    Path.IsPathFullyQualified(artifact.ProjectDirectory),
-                    Is.True);
-                Assert.That(artifact.AssemblyName, Is.Not.Empty);
-                Assert.That(artifact.TargetFramework, Is.Not.Empty);
-                Assert.That(artifact.CompilerVersion, Is.Not.Empty);
-                Assert.That(
-                    artifact.References.All(static reference =>
-                        !string.IsNullOrWhiteSpace(reference.Name) &&
-                        Guid.TryParseExact(reference.Mvid, "D", out _) &&
-                        reference.Sha256.Length == 64),
-                    Is.True);
+                Assert.That(Path.IsPathFullyQualified(artifact.ProjectDirectory), Is.True);
+                Assert.That(root.TryGetProperty("compilationSha256", out _), Is.False);
             }
             return artifact;
         }
     }
-
-    private sealed record CompilerCompilationOptions(
-        string OutputKind,
-        string OptimizationLevel,
-        bool CheckOverflow,
-        bool AllowUnsafe,
-        bool Deterministic,
-        string Platform,
-        string NullableContext,
-        string MetadataImportOptions,
-        int WarningLevel,
-        string GeneralDiagnosticOption,
-        CompilerDiagnosticOption[] SpecificDiagnosticOptions,
-        string AssemblyIdentityComparer,
-        string[] Usings,
-        string ResolverPolicy);
-
-    private sealed record CompilerDiagnosticOption(
-        string Id,
-        string ReportDiagnostic);
-
-    private sealed record CompilerSyntaxTree(
-        string Path,
-        string LanguageVersion,
-        string[] PreprocessorSymbols);
-
-    private sealed record CompilerReference(
-        string Name,
-        string Mvid,
-        string Path,
-        string Sha256);
-
     private sealed class ConsumerProject : IDisposable
     {
         private static readonly Lazy<ProjectTemplate> s_projectTemplate =

@@ -50,16 +50,18 @@ internal static class Program
         }
 
         WorkerVerifyRequest request;
+        var operationStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         CompilerManifestArtifact artifact;
         byte[] artifactBytes;
+        WorkerInputSnapshot preparedInput;
         string expectedInputHash;
         WorkerVersionSummary expectedVersions;
         try
         {
             (validatePreflight ?? (static value => value.ValidatePreflight()))(arguments);
             expectedVersions = ExpectedVersions();
-            request = arguments.CreateRequest(out artifact, out artifactBytes);
-            expectedInputHash = ComputeExpectedInputHash(request, artifactBytes);
+            request = arguments.CreateRequest(out artifact, out artifactBytes, out preparedInput);
+            expectedInputHash = preparedInput.InputHash;
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
@@ -98,7 +100,9 @@ internal static class Program
             });
         try
         {
-            var response = await (verify ?? WorkerHost.VerifyAsync)(request, cancellation.Token)
+            var response = await (verify != null
+                    ? verify(request, cancellation.Token)
+                    : WorkerHost.VerifyAsync(request, cancellation.Token, preparedInput, operationStarted))
                 .ConfigureAwait(false);
             await AtomicFile.WriteUtf8Async(
                     arguments.ResultPath,
@@ -196,7 +200,7 @@ internal static class Program
     {
         var identity = WorkerCacheIdentity.Current;
         return CompilerArtifactInputHash.Compute(
-            request, artifactBytes, identity.ToolIdentity, identity.ToolVersion,
+            request, ArtifactDigest.Compute(artifactBytes), identity.ToolIdentity, identity.ToolVersion,
             identity.WorkerBinarySha256, identity.ApiSpecIdentity,
             identity.ApiSpecVersion, identity.ApiSpecContentSha256);
     }
@@ -638,12 +642,21 @@ internal sealed partial class LauncherArguments
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
+        return CreateRequest(out artifact, out artifactBytes, out _);
+    }
+
+    internal WorkerVerifyRequest CreateRequest(
+        out CompilerManifestArtifact artifact, out byte[] artifactBytes,
+        out WorkerInputSnapshot preparedInput)
+    {
         ValidateDistinctPaths(
             Boolean("cache-enabled", true) ? OptionalFullPath("cache-directory") : null);
         var compilerManifest = CreateCompilerManifestReference(
-            out artifact,
+            out var validated,
             out artifactBytes);
+        artifact = validated.Manifest;
         var request = ProjectRequest(compilerManifest);
+        preparedInput = ArtifactValidator.Bind(request, validated, WorkerCacheIdentity.Current);
         ValidateDistinctPaths(
             Boolean("cache-enabled", true)
                 ? Program.NormalizeAbsolutePath(WorkerCachePath.Resolve(
@@ -687,12 +700,12 @@ internal sealed partial class LauncherArguments
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
-        out CompilerManifestArtifact artifact, out byte[] bytes)
+        out ValidatedArtifact artifact, out byte[] bytes)
     {
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path);
-        artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
-        return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
+        artifact = ArtifactValidator.Decode(bytes);
+        return new WorkerFileReference { Path = path, Sha256 = artifact.Digest };
     }
 
     internal static byte[] ReadCompilerManifest(string path)

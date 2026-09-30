@@ -24,14 +24,14 @@ internal sealed class CompilerCallableLowerer
         : this(
             compilation,
             factory,
-            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks))
+            CompilerSpecificationPackProvider.ResolveConfiguration(specificationPacks))
     {
     }
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
         IrFactory factory,
-        CompilerSpecificationPackAuthority specificationPackAuthority,
+        CompilerSpecificationPackConfiguration specificationPackAuthority,
         CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));

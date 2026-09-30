@@ -650,30 +650,6 @@ public sealed class LauncherArgumentTests
             ],
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = 2,
-                ClaimCount = 2,
-                OutcomeCounts = [
-                    new WorkerClaimOutcomeCount {
-                        Outcome = WorkerClaimOutcome.Unknown,
-                        Count = 2
-                    }
-                ],
-                ReasonCounts = [
-                    new WorkerClaimReasonCount {
-                        Reason = WorkerClaimReason.UnsupportedExpression,
-                        Count = 1
-                    },
-                    new WorkerClaimReasonCount {
-                        Reason = WorkerClaimReason.UnsupportedCallable,
-                        Count = 1
-                    }
-                ],
-                Assumptions = new WorkerAssumptionSummary
-                {
-                    Total = 1,
-                    Used = 1,
-                    User = 1
-                },
                 CacheStatus = WorkerCacheStatus.Disabled,
                 Versions = new WorkerVersionSummary
                 {
@@ -1009,15 +985,7 @@ public sealed class LauncherArgumentTests
             ],
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = 2,
-                ClaimCount = 1,
                 CacheStatus = WorkerCacheStatus.Disabled,
-                Assumptions = new WorkerAssumptionSummary
-                {
-                    Total = 1,
-                    Used = 1,
-                    User = 1
-                },
                 Versions = new WorkerVersionSummary
                 {
                     WorkerVersion = "1.0.0-test",
@@ -1237,18 +1205,6 @@ public sealed class LauncherArgumentTests
             }],
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = 1,
-                ClaimCount = 1,
-                OutcomeCounts = [new WorkerClaimOutcomeCount
-                {
-                    Outcome = WorkerClaimOutcome.Proven,
-                    Count = 1
-                }],
-                ReasonCounts = [new WorkerClaimReasonCount
-                {
-                    Reason = WorkerClaimReason.None,
-                    Count = 1
-                }],
                 CacheStatus = WorkerCacheStatus.Disabled,
                 Versions = new WorkerVersionSummary
                 {
@@ -1481,11 +1437,6 @@ public sealed class LauncherArgumentTests
             Summary = new WorkerVerificationSummary
             {
                 CacheStatus = WorkerCacheStatus.Disabled,
-                Assumptions = new WorkerAssumptionSummary
-                {
-                    Total = 1,
-                    User = 1
-                },
                 Versions = new WorkerVersionSummary
                 {
                     WorkerVersion = "launcher",

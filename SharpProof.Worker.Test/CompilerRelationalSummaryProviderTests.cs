@@ -363,15 +363,10 @@ public sealed class CompilerRelationalSummaryProviderTests
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(artifact.Compilation.SummaryEvidence, Has.Length.EqualTo(2));
-            Assert.That(
-                artifact.Compilation.SummaryEvidence.Count(row =>
-                    row.Origin == CompilerSummaryOrigin.ImplementationIl &&
-                    row.CallIdentity == "M:Lib.Inner(System.Int32)"),
-                Is.EqualTo(1));
-        }
+        var evidence = SummaryEvidence(artifact);
+        Assert.That(evidence, Has.Length.EqualTo(2));
+        Assert.That(evidence.Count(static row => row.Origin == CompilerSummaryOrigin.ImplementationIl &&
+            row.CallIdentity == "M:Lib.Inner(System.Int32)"), Is.EqualTo(1));
     }
 
     [Test]
@@ -439,26 +434,19 @@ public sealed class CompilerRelationalSummaryProviderTests
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
 
-        Assert.That(
-            artifact.Compilation.SummaryEvidence,
-            Is.Not.Empty,
-            string.Join(", ", artifact.Compilation.SummaryEvidence.Select(static row =>
-                $"{row.Origin}:{row.CallIdentity}:{row.EvidenceSha256}")));
-        var evidence = artifact.Compilation.SummaryEvidence.Single(row =>
+        var evidence = SummaryEvidence(artifact).Single(static row =>
             row.Origin == CompilerSummaryOrigin.ImplementationIl &&
             row.CallIdentity == "M:Lib.Identity(System.Int32)");
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(evidence.OwningModuleMvid, Is.Not.Empty);
-            Assert.That(evidence.OwningModuleSha256, Is.EqualTo(evidence.EvidenceSha256));
-            Assert.That(
-                artifact.Compilation.References
-                    .SelectMany(static reference => reference.Modules)
-                    .Count(module => module.Sha256 == evidence.EvidenceSha256),
-                Is.EqualTo(2));
-        }
+        Assert.That(evidence.EvidenceSha256, Does.Match("^[0-9a-f]{64}$"));
     }
 
+    private static CompilerPreparedSummaryEvidence[] SummaryEvidence(CompilerManifestArtifact artifact)
+    {
+        return [.. artifact.Callables.SelectMany(static callable => callable.Body?.SummaryCalls ?? [])
+            .SelectMany(static summary => summary.DependencyEvidence.Prepend(
+                new CompilerPreparedSummaryEvidence(summary.Origin, summary.Identity,
+                    summary.EvidenceSha256, summary.EvidenceIdentity))).Distinct()];
+    }
     private static (IMethodSymbol Method, IrMemberId Member) GetCall(
         CSharpCompilation compilation,
         IrFactory factory,

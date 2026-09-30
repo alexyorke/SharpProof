@@ -27,7 +27,7 @@ Roslyn-to-IR and inverse mappings, and comparison relations.
 |---|---:|---|---|
 | `SharpProofProfile` | `advisory` | Analyzer/build posture: `advisory`, `strict`, or `off` | `SharpProof.targets`; mirrored by `contract.json` |
 | `SharpProofFeatures` | `all` | Analyzer and worker-manifest features: `effects`, `contracts`, or `all` | `SharpProof.targets`; mirrored by `contract.json` |
-| `SharpProofSpecificationPacks` | unset | Semicolon-delimited IDs of embedded audited relational packs to enable; unknown or blank IDs fail closed | `RelationalSpecPackCatalog.json`, compiler collector, and preview-interface catalog |
+| `SharpProofSpecificationPacks` | unset | Semicolon-delimited IDs of embedded audited relational packs to enable; unknown or blank IDs fail closed | `RelationalSpecPackCatalog.generated.cs`, compiler collector, and preview-interface catalog |
 | `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | verifier targets; mirrored by `contract.json` |
 | `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | verifier targets; mirrored by `contract.json` |
 | `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
@@ -120,7 +120,7 @@ SharpProof does not inspect or duplicate cgroup enforcement.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-18 compiler artifact. The launcher supplies the same property as the
+schema-19 compiler artifact. The launcher supplies the same property as the
 worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
@@ -131,19 +131,13 @@ escaped literals and type names. Its existing nesting limit is 1,024. Oversized
 refuted preconditions keep their diagnostic with a short display-limit label.
 These display limits do not change the semantic result or verification budgets.
 
-Every budget and every artifact byte participates in worker input and cache
-identity. The artifact contains portable lowered callables plus a bounded
-proof-relevant compiler snapshot; it does not claim to serialize every Roslyn
-diagnostic or host option. The compilation hash covers handwritten and
-generated tree hashes and parse settings, bounded compilation options,
-assembly/target identity, compiler provenance, and reference provenance. The
-worker does not read the trees or references again. Raw analyzer inputs are not
-retained, but a change that affects final generated trees, selected claims, or
-lowered IR changes the artifact identity. Changing a limit or captured compiler
-input cannot reuse an answer produced under a different identity.
-Verification and assumption policy are reporting/build policies, not semantic
-proof inputs, so they do not alter the semantic cache payload.
-
+Every semantic budget and the full canonical artifact digest participate in the
+worker input/cache identity. The artifact contains portable lowered callables,
+claims, call bindings, effect constraints/replay, diagnostics, and locations.
+A compiler input change that alters those semantics changes its digest. Source,
+reference, and compiler-option inventories are not serialized or independently
+authenticated. Verification and assumption policy affect reporting, so they do
+not alter the semantic cache payload.
 Before launch, runtime-closure identity is also bounded and streamed. The
 closure permits at most 64 logical components and 64 MiB in total. A component
 identity is limited to 256 characters; an ordinary component is limited to
@@ -245,8 +239,8 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 12, cache schema version 14,
-claim-manifest schema version 4, compiler artifact schema version 18,
+The active contract also fixes protocol version 13, cache schema version 15,
+claim-manifest schema version 5, compiler artifact schema version 19,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
@@ -267,17 +261,16 @@ build, while require-proven reports an error. Malformed output, backend/replay
 failure, containment failure, and infrastructure failure make the run `Failed`
 and fail the build under every policy.
 
-Only exact-manifest, complete, postcondition-only project responses whose
-claims are all `Proven` or `Refuted` can enter the semantic cache. See
-[Typed abstention reasons](unknown-reasons.md) for exact reason values.
+Every exact-manifest, valid complete response can enter the semantic cache,
+including effect results, semantic Unknown, and empty claims. Timeouts,
+cancellation, backend failures, and infrastructure failures remain noncacheable.
+See [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
-Postcondition replay validation has two layers: exact backend-model and
-lowered-term checks in the proof kernel, followed by independent execution of
-the compiler-produced whole-body CFG in the worker. Executed spec calls become
-typed `CounterexampleNotReplayable`; other unsupported or inconsistent replay
-state fails the run as `CounterexampleReplayFailed`. Instructions on
-unselected paths do not block a concrete replay.
-
+Postcondition replay belongs to ProofKernel. It checks backend-model closure and
+lowered terms, executes the concrete compiler-produced CFG path, reconstructs
+contract state and source integer domains, and checks the original Ensures
+before constructing a refutation. Unsupported instructions on unselected paths
+do not block replay.
 Effect replay admission and outcomes follow the maintained
 [effect replay boundary](coverage-and-limits.md#outcomes-accountability-and-cache-boundary).
-Effect results are not cacheable.
+Valid complete effect results are cacheable.

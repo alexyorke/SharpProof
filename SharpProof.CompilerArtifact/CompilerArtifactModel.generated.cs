@@ -5,6 +5,7 @@
 #nullable enable
 
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
@@ -13,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 18;
+    internal const int Current = 19;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -79,12 +80,6 @@ internal enum CompilerSummaryOrigin
     Source = 0,
     ImplementationIl = 1,
     SpecificationPack = 2
-}
-
-internal enum CompilerSourceLocationOwnerKind
-{
-    Callable = 0,
-    Claim = 1
 }
 
 internal sealed record CompilerCallablePreparation(
@@ -180,25 +175,13 @@ internal sealed record CompilerPreparedSummaryCall(
     ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence
 )
 {
-    internal string InstantiationSha256 { get; init; } = string.Empty;
 }
 
-internal sealed class CompilerSpecificationPackAuthority
+internal sealed class CompilerSpecificationPackConfiguration
 {
     public string[] SpecificationPackIds { get; set; } = [];
     public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
     public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
-}
-
-internal sealed class CompilerLocationAuthorityArtifact
-{
-    public CompilerSourceLocationOwnerKind OwnerKind { get; set; }
-    public string OwnerId { get; set; } = string.Empty;
-    public WorkerSourceLocation Location { get; set; } = new();
-    public int SourceTreeOrdinal { get; set; } = -1;
-    public string SourceTreePath { get; set; } = string.Empty;
-    public string SourceTreeSha256 { get; set; } = string.Empty;
-    public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerCallableArtifact
@@ -210,7 +193,6 @@ internal sealed class CompilerCallableArtifact
     public CompilerVariableArtifact[] Variables { get; set; } = [];
     public CompilerBodyArtifact? Body { get; set; }
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
-    public CompilerEffectAuthorityArtifact[] EffectAuthorities { get; set; } = [];
 }
 
 internal sealed class CompilerEffectClaimArtifact
@@ -225,24 +207,6 @@ internal sealed class CompilerEffectClaimArtifact
     public CompilerEffectReplayArtifact? Replay { get; set; }
     public string Evidence { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
-}
-
-internal sealed class CompilerEffectAuthorityArtifact
-{
-    public string ClaimId { get; set; } = string.Empty;
-    public WorkerEffectContractKind ContractKind { get; set; }
-    public WorkerClaimOutcome Outcome { get; set; }
-    public WorkerClaimReason Reason { get; set; }
-    public WorkerEffectEvidenceCertainty Certainty { get; set; }
-    public CompilerEffectConstraintArtifact Constraint { get; set; } = new();
-    public WorkerEffectViolationWitness? Witness { get; set; }
-    public CompilerEffectReplayArtifact? Replay { get; set; }
-    public string Evidence { get; set; } = string.Empty;
-    public WorkerSourceLocation Source { get; set; } = new();
-    public int SourceTreeOrdinal { get; set; } = -1;
-    public string SourceTreePath { get; set; } = string.Empty;
-    public string SourceTreeSha256 { get; set; } = string.Empty;
-    public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerEffectConstraintArtifact
@@ -273,6 +237,7 @@ internal enum CompilerEffectReplayEventKind
 internal sealed class CompilerEffectReplayArtifact
 {
     public CompilerEffectReplayPathKind PathKind { get; set; }
+    [JsonIgnore]
     public string ConstraintSha256 { get; set; } = string.Empty;
     public CompilerEffectReplayEventArtifact[] Events { get; set; } = [];
 }
@@ -281,12 +246,19 @@ internal sealed class CompilerEffectReplayEventArtifact
 {
     public int Ordinal { get; set; } = -1;
     public CompilerEffectReplayEventKind Kind { get; set; }
+    [JsonIgnore]
     public int SyntaxTreeOrdinal { get; set; } = -1;
+    [JsonIgnore]
     public string SyntaxTreeSha256 { get; set; } = string.Empty;
+    [JsonIgnore]
     public string SyntaxTreeSnapshotSha256 { get; set; } = string.Empty;
+    [JsonIgnore]
     public string SyntaxTreeLineMapSha256 { get; set; } = string.Empty;
+    [JsonIgnore]
     public int SyntaxStart { get; set; } = -1;
+    [JsonIgnore]
     public int SyntaxLength { get; set; } = -1;
+    [JsonIgnore]
     public string OperationIdentitySha256 { get; set; } = string.Empty;
     public string MemberIdentity { get; set; } = string.Empty;
     public string? MemberDocumentationId { get; set; }
@@ -296,9 +268,13 @@ internal sealed class CompilerEffectReplayEventArtifact
     public long[] ScalarOperands { get; set; } = [];
     public string[] ExactExceptionTypeHierarchy { get; set; } = [];
     public WorkerSourceLocation Location { get; set; } = new();
+    [JsonIgnore]
     public int SourceTreeOrdinal { get; set; } = -1;
+    [JsonIgnore]
     public string SourceTreePath { get; set; } = string.Empty;
+    [JsonIgnore]
     public string SourceTreeSha256 { get; set; } = string.Empty;
+    [JsonIgnore]
     public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
@@ -309,7 +285,6 @@ internal sealed class CompilerClauseArtifact
     public int Root { get; set; } = -1;
     public string? ClaimId { get; set; }
     public string? AssumptionId { get; set; }
-    public string PredicateSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerVariableArtifact
@@ -356,22 +331,6 @@ internal sealed class CompilerSpecCallArtifact
     public bool ConsumesMemoryHavoc { get; set; }
 }
 
-internal sealed class CompilerSummaryEvidenceSnapshot
-{
-    public CompilerSummaryOrigin Origin { get; set; }
-    public string CallIdentity { get; set; } = string.Empty;
-    public string EvidenceSha256 { get; set; } = string.Empty;
-    public string EvidenceIdentity { get; set; } = string.Empty;
-    public string SourcePath { get; set; } = string.Empty;
-    public string SourceTreeSha256 { get; set; } = string.Empty;
-    public int SourceStart { get; set; } = -1;
-    public int SourceLength { get; set; } = -1;
-    public string OwningModuleName { get; set; } = string.Empty;
-    public string OwningModuleMvid { get; set; } = string.Empty;
-    public string OwningModuleSha256 { get; set; } = string.Empty;
-    public int MethodMetadataToken { get; set; } = -1;
-}
-
 internal sealed class CompilerSummaryCallArtifact
 {
     public int Instruction { get; set; } = -1;
@@ -383,7 +342,6 @@ internal sealed class CompilerSummaryCallArtifact
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
     public CompilerPreparedSummaryEvidence[] DependencyEvidence { get; set; } = [];
-    public string InstantiationSha256 { get; set; } = string.Empty;
 }
 
 internal enum CompilerOutputKind
@@ -445,9 +403,13 @@ internal sealed class CompilerDiagnosticArtifact
     public string Message { get; set; } = string.Empty;
     public bool IsSource { get; set; }
     public WorkerSourceLocation Location { get; set; } = new();
+    [JsonIgnore]
     public int SourceTreeOrdinal { get; set; } = -1;
+    [JsonIgnore]
     public string SourceTreePath { get; set; } = string.Empty;
+    [JsonIgnore]
     public string SourceTreeSha256 { get; set; } = string.Empty;
+    [JsonIgnore]
     public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
@@ -462,11 +424,9 @@ internal sealed class CompilerManifestArtifact
     public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
     public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
     public WorkerFeatureSet Features { get; set; }
-    public string CompilationSha256 { get; set; } = string.Empty;
     public CompilerCompilationSnapshot Compilation { get; set; } = new();
     public WorkerClaimManifest Manifest { get; set; } = new();
     public int MaximumExpressionDepth { get; set; } = WorkerBudgets.DefaultMaximumExpressionDepth;
-    public CompilerLocationAuthorityArtifact[] LocationAuthorities { get; set; } = [];
     public CompilerDiagnosticArtifact[] CompilerDiagnostics { get; set; } = [];
     public CompilerCallableArtifact[] Callables { get; set; } = [];
 }

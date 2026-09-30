@@ -13,7 +13,7 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 
 | Surface | Runs where | Implemented behavior | Current boundary |
 |---|---|---|---|
-| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in container worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; for direct source calls, defers async Task/ValueTask body exceptions and omits iterator effects only for ignored or unread results; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation, exact framework explicit-throw, empty-`lock`, and exact-`Monitor` events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Await, task result/wait access, and escaped or consumed iterator sequences retain their summaries; synchronous type initialization and non-throw async effects remain conservative. The worker authenticates the selected effect, capability, and exception constraints and derives each replayed witness independently. Fresh allocation remains observably pure; receiver-field, user-exception, conditional, and may-only candidates remain typed `Unknown`. Effect-only annotations on abstract, interface, and `extern` declarations report `BodylessEffectContractNotEnforced`; annotate concrete implementations directly; a complete body summary that exceeds its declared `[EffectContract]` emits warning SP0052, while incomplete body or contract analysis remains SP0047 Info |
+| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in container worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; for direct source calls, defers async Task/ValueTask body exceptions and omits iterator effects only for ignored or unread results; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation, exact framework explicit-throw, empty-`lock`, and exact-`Monitor` events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Await, task result/wait access, and escaped or consumed iterator sequences retain their summaries; synchronous type initialization and non-throw async effects remain conservative. The worker validates the selected effect, capability, and exception constraint shape and derives each replayed witness independently. Fresh allocation remains observably pure; receiver-field, user-exception, conditional, and may-only candidates remain typed `Unknown`. Effect-only annotations on abstract, interface, and `extern` declarations report `BodylessEffectContractNotEnforced`; annotate concrete implementations directly; a complete body summary that exceeds its declared `[EffectContract]` emits warning SP0052, while incomplete body or contract analysis remains SP0047 Info |
 | Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls, object creation, and direct local-function invocations; follows executable local-function, lambda, and anonymous-method child CFGs exactly once; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, explicitly trusted return-annotation, approved API-spec result, and effect facts at definite call sites, including nested statements and expressions whose execution is syntactically definite | Unknown or captured values, possible throws, cycles, quoted expression-tree lambdas, conditional/short-circuit/switch arms, exception-handler bodies, and exhausted analysis budgets do not become violations or proofs; source-only `Contract.Requires` and companion clauses on external compilation references are ignored to match emitted DLLs, while closed parameter attributes remain checked; `Contract.Requires` inside lambda and anonymous methods reports SP0024 because delegate invocation cannot bind the clause; local preconditions on overrides and interface implementations report SP0024 unless the visible base or interface member has an equivalent contract; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional container worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Relational callees | Build-time compiler collector plus the container worker | Infers quantifier-free relations for direct acyclic static scalar source methods and exact implementation IL, or imports an explicitly enabled schema-1 audited pack; composes every relation into the caller's Z3 obligation with a sealed transitive evidence closure | Boolean/supported-integer inputs and results only; no virtual/instance dispatch, generics, `ref`, heap, loops, recursion, reference-assembly body authority, or arbitrary pack files; unsupported cases remain `Unknown` |
@@ -202,7 +202,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 18 admits unconditional
+  For an effect candidate, compiler artifact schema 19 admits unconditional
   definite managed object/array allocation, exact framework explicit-throw,
   empty-`lock`, and exact-`Monitor` events. The worker recomputes each event's
   constraint and operation identities, checks its source-tree identity/span
@@ -213,7 +213,7 @@ ghost specification evidence.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 12 binds a compiler-manifest artifact and separately records
+- Protocol version 13 binds a compiler-manifest artifact and separately records
   run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
@@ -239,16 +239,16 @@ ghost specification evidence.
 - Proven postconditions expose `ContradictoryPreconditions` or
   `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. The latter also
   covers an unsatisfiable `Contract.Assume` combined with the modeled entry
-  and body assumptions. Proven claims are not disk-cache entries.
+  and body assumptions. Valid complete Proven responses are cached.
 - Caller cancellation is run status `Canceled`; project timeout is `TimedOut`
   and follows the selected incomplete-analysis policy; infrastructure,
   protocol, backend, and replay failure is `Failed`. None is a successful
   claim outcome.
-- Cache schema version 14 stores complete, postcondition-only responses whose
-  claims are all `Proven` or `Refuted`, keyed by the exact artifact, worker,
-  spec content, and budgets. Effect claims, `Unknown`, cancellation, timeout,
-  malformed results, and infrastructure failure are not semantic cache
-  entries.
+- Cache schema 15 stores every valid complete response, including Proven,
+  Refuted, semantic Unknown, effects, and empty claims. The key combines the
+  full artifact digest, worker/Z3/API-spec identities, and semantic budgets.
+  Cancellation, timeout, malformed results, and infrastructure failures are
+  not cache entries.
 - `SharpProofVerifyPolicy` maps incomplete selected analysis to informational,
   warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
   trusted evidence to SP0048. These policies do not make fatal runs successful.

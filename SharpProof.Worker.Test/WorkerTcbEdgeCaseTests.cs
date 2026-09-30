@@ -617,7 +617,6 @@ public sealed class WorkerTcbEdgeCaseTests
             outcome: null!,
             new Dictionary<ProofJustification, string>(),
             new Dictionary<ProofJustification, string>(),
-            WorkerClaimReason.None,
             WorkerVacuityKind.None);
 
         using (Assert.EnterMultipleScope())
@@ -678,7 +677,6 @@ public sealed class WorkerTcbEdgeCaseTests
             outcome,
             new Dictionary<ProofJustification, string>(),
             new Dictionary<ProofJustification, string>(),
-            WorkerClaimReason.None,
             WorkerVacuityKind.None);
 
         using (Assert.EnterMultipleScope())
@@ -698,7 +696,6 @@ public sealed class WorkerTcbEdgeCaseTests
             CreateProvenOutcome([]),
             new Dictionary<ProofJustification, string>(),
             new Dictionary<ProofJustification, string>(),
-            WorkerClaimReason.None,
             WorkerVacuityKind.None);
 
         using (Assert.EnterMultipleScope())
@@ -761,7 +758,6 @@ public sealed class WorkerTcbEdgeCaseTests
             refuted,
             new Dictionary<ProofJustification, string>(),
             new Dictionary<ProofJustification, string>(),
-            WorkerClaimReason.None,
             WorkerVacuityKind.None);
 
         (string Variable, string Kind, string Value)[] expected = [
@@ -796,7 +792,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 "result")],
             CompilerPreparedBody.Trivial());
 
-        var reason = CallableCounterexampleReplayer.Replay(
+        var reason = CallableReplayTestHarness.Replay(
             target,
             0,
             ImmutableDictionary<IrVarId, IrValue>.Empty,

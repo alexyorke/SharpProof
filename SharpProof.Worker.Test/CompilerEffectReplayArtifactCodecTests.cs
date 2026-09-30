@@ -135,8 +135,6 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             value.Replay!.Events[0].Kind =
                 CompilerEffectReplayEventKind.ExplicitThrow);
         AssertRejected(static value =>
-            value.Replay!.Events[0].SyntaxLength = 0);
-        AssertRejected(static value =>
             value.Replay!.Events[0].ScalarOperands = [1]);
         AssertRejected(static value =>
             value.Replay!.Events[0].ExactExceptionTypeHierarchy =

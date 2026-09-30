@@ -40,10 +40,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             Assert.That(
                 tree.EffectivePreprocessorSymbols,
                 Does.Not.Contain(Contract.ConditionalSymbol));
-            Assert.That(
-                snapshot.CompilerManifest.Compilation.SyntaxTrees
-                    .Single().EffectivePreprocessorSymbols,
-                Does.Not.Contain(Contract.ConditionalSymbol));
+            Assert.That(snapshot.Callables, Is.Empty);
         }
     }
 

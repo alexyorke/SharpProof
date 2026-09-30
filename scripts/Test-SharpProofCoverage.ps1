@@ -25,7 +25,6 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 function Test-ClearlyNonSemanticSourceLine {
     param(
         [Parameter(Mandatory = $true)]

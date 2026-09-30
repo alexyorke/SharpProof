@@ -5,8 +5,20 @@ public sealed class ProofKernel(ISmtBackend backend)
     private readonly ISmtBackend _backend =
         ArgumentNullGuard.NotNull(backend, nameof(backend));
 
-    public async Task<ProofOutcome> VerifyAsync(VerificationQuery query,
+    public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken = default)
+    {
+        return VerifyCoreAsync(query, null, cancellationToken);
+    }
+
+    public Task<ProofOutcome> VerifyCallableAsync(VerificationQuery query,
+        CallableReplayContext replayContext, CancellationToken cancellationToken = default)
+    {
+        return VerifyCoreAsync(query, ArgumentNullGuard.NotNull(replayContext, nameof(replayContext)), cancellationToken);
+    }
+
+    private async Task<ProofOutcome> VerifyCoreAsync(VerificationQuery query,
+        CallableReplayContext? replayContext, CancellationToken cancellationToken)
     {
         query = ArgumentNullGuard.NotNull(query, nameof(query));
 
@@ -39,7 +51,7 @@ public sealed class ProofKernel(ISmtBackend backend)
         return result.Status switch
         {
             BackendCheckStatus.Unsatisfiable => CreateProven(query, result, cancellationToken),
-            BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
+            BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, replayContext, cancellationToken),
             BackendCheckStatus.Unknown => CreateUnknown(result),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
@@ -96,6 +108,7 @@ public sealed class ProofKernel(ISmtBackend backend)
     private static ProofOutcome ReplayCounterexample(
         VerificationQuery query,
         BackendCheckResult result,
+        CallableReplayContext? replayContext,
         CancellationToken cancellationToken)
     {
         if (result is not
@@ -138,9 +151,16 @@ public sealed class ProofKernel(ISmtBackend backend)
             });
         }
 
-        return IsBoolean(goal, expected: false)
-            ? new RefutedOutcome(new ValidatedModel(model.Assignments))
-            : Unknown(AbstentionReason.CounterexampleReplayFailed);
+        if (!IsBoolean(goal, expected: false))
+        {
+            return Unknown(AbstentionReason.CounterexampleReplayFailed);
+        }
+        if (replayContext != null && CallableReplayValidator.Validate(
+                query.Factory, replayContext, model.Assignments, cancellationToken) is { } failure)
+        {
+            return Unknown(failure);
+        }
+        return new RefutedOutcome(new ValidatedModel(model.Assignments));
     }
     private static bool ValidateAssignments(VerificationQuery query,
         ImmutableDictionary<IrVarId, IrValue> assignments,

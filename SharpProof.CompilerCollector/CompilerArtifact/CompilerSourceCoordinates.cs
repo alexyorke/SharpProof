@@ -2,10 +2,8 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
 
-// Source locations are compiler evidence, not display-only hints.  Keep the
-// physical-tree binding and mapped geometry predicate in the shared artifact
-// assembly so the collector and worker cannot gradually diverge.
-internal static class CompilerSourceLocationAuthority
+// Producer-only mapping for stable reporting identities.
+internal static class CompilerSourceCoordinates
 {
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<WorkerSourceLocation, TreeBinding> TreeBindings = new();
     private sealed class TreeBinding(int ordinal) { internal int Ordinal { get; } = ordinal; }
@@ -22,7 +20,7 @@ internal static class CompilerSourceLocationAuthority
     }
     internal static bool IsNone(WorkerSourceLocation? value)
     {
-        return WorkerProtocolJson.IsNoneLocation(value);
+        return value is { Path.Length: 0, Start: 0, Length: 0, Line: 0, Column: 0 };
     }
 
     private static bool TryValidateLineMap(
@@ -38,9 +36,7 @@ internal static class CompilerSourceLocationAuthority
         mappedLine = 0;
         mappedColumn = 0;
         if (tree == null ||
-            !WorkerProtocolJson.IsSha256(tree.LineMapSha256) ||
-            tree.LineMap is not { Length: > 0 } entries ||
-            tree.LineMapSha256 != CompilationFingerprint.ComputeLineMapSha256(entries))
+            tree.LineMap is not { Length: > 0 } entries)
         {
             return false;
         }
@@ -131,7 +127,7 @@ internal static class CompilerSourceLocationAuthority
         CancellationToken cancellationToken = default)
     {
         if (location == null || tree == null ||
-            !locationAlreadyValidated && !WorkerProtocolJson.HasValidLocation(location) ||
+            !locationAlreadyValidated && (string.IsNullOrEmpty(location.Path) || location.Start < 0 || location.Length < 0 || location.Line <= 0 || location.Column <= 0) ||
             !TryValidateLineMap(
                 tree,
                 location.Start,
@@ -203,100 +199,6 @@ internal static class CompilerSourceLocationAuthority
         }
 
         return ordinal;
-    }
-
-    internal static bool IsBound(
-        WorkerSourceLocation? location,
-        int sourceTreeOrdinal,
-        string? sourceTreePath,
-        string? sourceTreeSha256,
-        string? sourceLineMapSha256,
-        CompilerCompilationSnapshot? compilation,
-        bool allowNone = false,
-        CancellationToken cancellationToken = default)
-    {
-        if (location == null || compilation is not { SyntaxTrees: not null } ||
-            sourceTreePath == null || sourceTreeSha256 == null ||
-            sourceLineMapSha256 == null)
-        {
-            return false;
-        }
-
-        if (allowNone && IsNone(location))
-        {
-            return sourceTreeOrdinal == -1 &&
-                sourceTreePath.Length == 0 &&
-                sourceTreeSha256.Length == 0 &&
-                sourceLineMapSha256.Length == 0;
-        }
-
-        if (!WorkerProtocolJson.HasValidLocation(location) ||
-            sourceTreeOrdinal < 0 ||
-            sourceTreeOrdinal >= compilation.SyntaxTrees.Length ||
-            !WorkerProtocolJson.IsSha256(sourceTreeSha256) ||
-            !WorkerProtocolJson.IsSha256(sourceLineMapSha256))
-        {
-            return false;
-        }
-
-        var tree = compilation.SyntaxTrees[sourceTreeOrdinal];
-        return tree != null &&
-            string.Equals(tree.Path, sourceTreePath, StringComparison.Ordinal) &&
-            string.Equals(tree.Sha256, sourceTreeSha256, StringComparison.Ordinal) &&
-            string.Equals(tree.LineMapSha256, sourceLineMapSha256, StringComparison.Ordinal) &&
-            HasValidLocationGeometry(
-                location,
-                tree,
-                locationAlreadyValidated: true,
-                cancellationToken: cancellationToken);
-    }
-
-    internal static CompilerLocationAuthorityArtifact CreateAuthority(
-        CompilerSourceLocationOwnerKind ownerKind,
-        string ownerId,
-        WorkerSourceLocation location,
-        CompilerCompilationSnapshot compilation)
-    {
-        if (!Enum.IsDefined(typeof(CompilerSourceLocationOwnerKind), ownerKind) ||
-            string.IsNullOrWhiteSpace(ownerId) ||
-            location == null ||
-            compilation == null)
-        {
-            throw new InvalidDataException(
-                "A compiler source-location authority is incomplete.");
-        }
-
-        if (IsNone(location))
-        {
-            return new CompilerLocationAuthorityArtifact
-            {
-                OwnerKind = ownerKind,
-                OwnerId = ownerId,
-                Location = CopyLocation(location),
-                SourceTreeOrdinal = -1,
-                SourceTreePath = string.Empty,
-                SourceTreeSha256 = string.Empty,
-                SourceLineMapSha256 = string.Empty
-            };
-        }
-
-        Bind(
-            location,
-            compilation,
-            out var sourceTreeOrdinal,
-            out var sourceTreePath,
-            out var sourceTreeSha256,
-            out var sourceLineMapSha256);
-        return new CompilerLocationAuthorityArtifact
-        {
-            OwnerKind = ownerKind,
-            OwnerId = ownerId,
-            Location = CopyLocation(location),
-            SourceTreeOrdinal = sourceTreeOrdinal,
-            SourceTreePath = sourceTreePath,
-            SourceTreeSha256 = sourceTreeSha256,
-            SourceLineMapSha256 = sourceLineMapSha256
-        };
     }
 
     internal static void Bind(

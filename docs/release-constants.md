@@ -11,21 +11,20 @@ release action rather than routine configuration.
 
 | Pin | Owner | Enforcement |
 |---|---|---|
-| Package and assembly version | `SharpProof.Release.props` | package, README, release-manifest, tag, and promotion checks |
+| Package and assembly version | `SharpProof.Release.props` | package and README checks |
 | Worker protocol, manifest, and cache schemas | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs` | worker and package tests |
 | Compiler-artifact schema | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs` | worker and package tests |
 | Supported target frameworks and host boundary | `eng/acceptance/contract.json` and `docs/preview-support.md` | acceptance and packaged-host tests |
-| TCB paths and mutation catalog | `eng/acceptance/contract.json` | exact path/count ownership and deterministic mutation gates |
-| Corpus, fuzz, performance, and complexity ceilings | `eng/acceptance/contract.json` | acceptance scripts; complexity changes require `ceilingRationale` |
+| Trusted kernel paths | `eng/acceptance/contract.json` | project ownership and compiler access checks |
+| Corpus outcomes and wall-time ceiling | `SharpProof.Gates/Corpus/` | canonical snapshot comparison and a five-minute gate limit |
 
 ## Behavioral defaults
 
-The protocol schema owns worker budget, cache, and launcher defaults. Generated
-`WorkerBudgets`, `WorkerCacheOptions`, and `WorkerLauncherDefaults` are the
-compiled projection. The verifier MSBuild defaults are generated into the
-package props companion from explicit schema mappings; the acceptance contract
-and documentation mirror those values for validation and explanation. Package,
-worker, acceptance, and README checks require exact parity. This covers
+The hand-maintained C# `WorkerBudgets`, `WorkerCacheOptions`, and
+`WorkerLauncherDefaults` own worker budget, cache, and launcher defaults. The
+verifier MSBuild defaults live in the package props companion; the acceptance
+contract and documentation mirror those values for validation and explanation.
+Package and worker checks require exact parity. This covers
 query/method limits, wall times, parallelism, expression depth, termination
 grace, and cache defaults.
 
@@ -35,12 +34,8 @@ The acceptance script reads the MSBuild XML and rejects drift.
 
 ## Derived measurements
 
-Source complexity, TCB inventory structure, generated-output shape, package
-layout, and release evidence are computed. They are never
-copied into production behavior. Checked-in ratchets are reviewed upper bounds
-or expected structural values, and their scripts recompute the current value
-before a gate can pass.
+Package layouts and test counts are computed from the current build. They are
+never copied into production behavior.
 
-Generated files must be changed through their owning schema/catalog generator.
-Do not hand-edit generated protocol, compiler-artifact, launcher-argument,
-diagnostic, IR, or projection code.
+The C# files with `.generated.cs` names are hand-maintained tables and models.
+Update them directly and run the relevant semantic and package tests.

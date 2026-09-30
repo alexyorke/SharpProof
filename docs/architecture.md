@@ -60,12 +60,12 @@ turn an unsupported result into proof.
 The exact path inventories in `eng/acceptance/contract.json` cover
 proof-outcome construction and each declared trusted boundary: discovery,
 lowering, execution, obligation construction, SMT encoding, API specification
-code and catalog generation, effect analysis, replay, policy, result assembly,
+hand-maintained catalog tables, effect analysis, replay, policy, result assembly,
 and cache validation. Compiler-input identity, typed canonical hash encoding,
 and protocol validation have their own non-overlapping inventories rather than
  being hidden inside the cache component. API-spec content identity is likewise
  separate from resolution and instantiation. The declarative API-spec catalog,
- its generator, and its generated matcher/instantiator source are one audited
+ its matcher/instantiator source are one audited
  `apiSpecificationCatalog` component. The contract API vocabulary has its own
  `contractApiCatalog` component; its generated output is limited to descriptors
  and ordered tables, while lookup behavior remains handwritten. The C# scalar type, conversion, checked
@@ -83,14 +83,6 @@ lowering, shape checks, and fail-closed behavior remain handwritten.
 Finite output, result-label, policy, operation-stage, and effect-wiring
 projections live in the per-project `*Projections.generated.cs` tables;
 replay, validation, and analysis algorithms remain handwritten.
-
-Source complexity is measured independently of formatting. Repository,
-coordinator, algorithm-file, and member ratchets count Roslyn expression nodes,
-decision points, and declarations while excluding whitespace, comments, line
-wrapping, and optional block braces. Physical and nonblank line totals are
-reported only as information. This replaced the historical physical/nonblank
-LOC and "10% smaller" gates, which rewarded brace removal and line collapsing
-rather than architectural decomposition.
 
 ## Semantic core
 
@@ -184,82 +176,56 @@ initializer semantics are lowered.
 
 ## Manifest, protocol, determinism, and cache
 
-IR identity is structural and factory-scoped. Solver names are canonical
-indices. Formula construction, worklists, specs, proof cores, diagnostics, and
-serialized responses are stably ordered. Z3 uses resource limits; wall time is
-an outer process kill boundary.
+IR identity is structural and factory-scoped. Formula construction, proof
+cores, diagnostics, and serialized responses are stably ordered.
 
-Protocol version 12 binds each request to a compiler-produced closed artifact.
-Stable semantic IDs identify selected callables, postcondition/effect claims, and
-user/trusted evidence independently of formatting. The protocol separates run
-status, callable coverage, and per-claim outcome. Central validation requires
-the response to match the sealed manifest exactly, including dense ordinals,
-claim ownership, summary counts, assumption summaries, and allowed payloads.
+Protocol version 13 carries the compiler-artifact path/digest, reporting
+policies, budgets, and cache controls. Source-generated System.Text.Json
+metadata requires every wire property and rejects unknown properties.
+Object property order is irrelevant. Semantic validation checks enum values,
+nulls, claim ownership, dense ordinals, assumptions, and allowed result payloads.
+Counts are derived from the callable and claim arrays rather than stored again.
 
-The request carries only the compiler-artifact path/digest, policies, budgets,
-and cache controls. The artifact carries `WorkerFeatureSet` and applies the same
-`effects`/`contracts`/`all` selection before manifest discovery: contract-only
-artifacts exclude effect annotations and effect-only artifacts exclude
-postcondition claims. In the supported Linux amd64 container, the
-`RunVerifier` MSBuild task starts one verifier process
-(`dotnet SharpProof.Worker.dll verify ...`) with a hard deadline and kills the
-process tree on timeout or cancellation. The verifier runs verification
-in-process and writes its typed result itself; a killed run has no fresh
-result. Docker owns the hard CPU and memory boundary. Concurrent builds use
-isolated artifact/request/result paths. After validating a response the
-verifier atomically replaces the published manifest, request, and optional
-SARIF, and writes the result last.
-verification. It intentionally contains no source text.
-Readable file-backed references are required while the compiler records their
-path, image hash, identity, kind, embed flag, and aliases. Resolver-dependent
-`#r`/`#load`, missing-assembly resolver mode, reference supersession, and custom
-assembly-identity comparers fail artifact collection as SP0049.
+The compiler produces a schema-19 closed artifact containing selected claims,
+portable typed IR, relational/spec call bindings, effect constraints and replay
+events, diagnostics, and mapped locations. One SHA-256 covers the full canonical
+artifact bytes, including effect-only callables without a graph. Source and
+reference inventories and duplicated provenance authorities are absent from the
+wire. Producer reporting IDs remain stable opaque labels.
 
-The verifier binds the artifact bytes and request identity into the response.
-The artifact is trusted build output and the worker's sole compilation input:
-the worker checks its digest against the request, requires the embedded
-maximum expression depth to equal the request budget, checks that the manifest
-and lowered callables agree, and decodes the portable graph before cache lookup
-or backend creation. Compiler diagnostics fail as `CompilationFailure`;
-undecodable lowered evidence or option mismatch fails as
-`CompilerManifestMismatch`.
+The artifact is trusted build output. ArtifactValidator checks its digest,
+validates semantic shape and claim/type/IR bindings, and decodes each graph once.
+The prepared snapshot passes through the launcher to the in-process worker.
+Before cache access the worker binds it to the current artifact digest, budgets,
+and runtime key. Compiler diagnostics fail as CompilationFailure; malformed IR
+or an expression-depth mismatch fails as CompilerManifestMismatch. The worker
+has no Roslyn dependency and does not reconstruct a compilation or reread source
+and reference files.
 
-The worker project contains no direct Roslyn dependency and performs no
-compiler reconstruction or source parsing. It does not reread reference files.
-Compiler versions and MVIDs and reference paths/hashes/identities/aliases are
-provenance and cache-key evidence, not a runtime compatibility gate.
-`AdditionalFiles` are sealed by canonical path and content hash without
-embedding their raw contents. Analyzer configuration is represented by its
-observable effects on the final compilation and effective SharpProof options;
-generated output is covered by its tree hashes, manifest entries, and lowered
-callables.
+ProofKernel alone constructs proof outcomes. For callable counterexamples it
+checks the backend model, assumptions, and transformed goal, executes the
+concrete IR path, reconstructs result and prestate values, checks source integer
+domains, and evaluates the original Ensures clause before creating Refuted.
+Unsupported instructions on other paths do not block replay. Executed calls
+without a concrete registered host become CounterexampleNotReplayable;
+inconsistent replay becomes CounterexampleReplayFailed.
 
-This closes both the compiler-to-worker lowered-artifact cutover and the
-independent whole-body postcondition-replay gate for the bounded verifier
-subset. Postcondition replay executes only the concrete CFG path selected by
-the model, so unsupported operations or modeled calls on other paths do
-not block a refutation. If a modeled call is executed, the candidate becomes
-`Unknown` with `CounterexampleNotReplayable`; other unsupported or
-inconsistent replay state is a fatal `CounterexampleReplayFailed`. Result JSON
-includes only canonical user-model variables, not temporary lowered variables.
+Effect replay remains an interpreter of compiler-produced unconditional events.
+It derives effects, capabilities, and exact exception hierarchy, evaluates the
+selected constraint, and matches the witness. It does not execute user code or
+invoke SMT. Conditional and may-only conflicts remain typed Unknown.
 
-Effect replay is a separate worker-owned interpreter and does not invoke SMT
-or execute user code. It derives effects, capabilities, and exact exception
-hierarchy from admitted unconditional allocation, exact-framework-throw, and
-synchronization events, then evaluates the authenticated selected constraint
-and sealed witness. Fresh allocation remains compatible with observable
-`EnforcePure`. Receiver-field access, user-constructed exception types,
-static-initialization-sensitive allocation, and other unsupported direct
-candidates become `Unknown(CounterexampleNotReplayable)`.
-Conditional/path-dependent and may-only conflicts remain
-`Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
-becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
-remain noncacheable. Under compiler artifact schema 18, worker protocol version
-12 and cache schema version 14 carry the current request and cache wire break.
+Cache schema 15 reuses every valid complete response, including effects,
+semantic Unknown, and empty claim sets. The key combines the artifact digest,
+worker/Z3/API-spec identities, and every semantic budget. Cancellation, timeouts,
+backend failures, and infrastructure failures are not cached. Reporting policy
+does not change the semantic cache payload.
 
-Optional deterministic SARIF 2.1.0 projects the validated response under the
-same atomic publication boundary and does not participate in semantic
-verification.
+RunVerifier starts one worker process with a hard deadline and kills its process
+tree on timeout or cancellation. The worker's project budget includes launcher
+artifact preparation and uses elapsed-time checks as well as cancellation.
+Validated manifest, request, optional SARIF, and result are published atomically,
+with the result written last. Docker owns CPU and memory isolation.
 
 ## Activation and release gates
 
@@ -322,7 +288,7 @@ policy. The preview interface rejects the removed `SharpProofMode` and
 The current gate includes:
 
 - exhaustive Roslyn operation-kind and architecture checks;
-- compiler-enforced banned APIs and repository meta-analyzers;
+- compiler-enforced banned APIs;
 - lattice laws and finite-CFG checks;
 - executable witnesses and mutation probes for every claim-bearing API-spec
   facet and postcondition;
@@ -331,7 +297,7 @@ The current gate includes:
 - snapshot-corpus and metamorphic invariance;
 - cache/concurrency/cancellation determinism;
 - worker/package consumer smoke checks;
-- fixed-seed fuzzing and performance budgets.
+- fixed-seed fuzzing and a five-minute corpus wall-time budget.
 
 Unannotated advisory latency samples alternate real compiler-only and
 SharpProof-imported MSBuild rebuilds under the repository-selected SDK. The

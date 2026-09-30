@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
 
-internal static class CompilerSpecificationPackAuthorityValidation
+internal static class CompilerSpecificationPackSelection
 {
     private static readonly ImmutableHashSet<string> KnownPackIds =
         ImmutableHashSet.CreateRange(
@@ -49,14 +49,10 @@ internal static class CompilerSpecificationPackAuthorityValidation
     internal static bool Matches(
         CompilerManifestArtifact artifact)
     {
-        return artifact != null &&
-            Matches(
-                artifact.SpecificationPackIds,
-                artifact.SpecificationPackCatalogVersion,
-                artifact.SpecificationPackCatalogSha256,
-                artifact.Compilation);
+        return artifact != null && artifact.Compilation != null &&
+            IsValid(artifact.SpecificationPackIds, artifact.SpecificationPackCatalogVersion,
+                artifact.SpecificationPackCatalogSha256);
     }
-
     internal static bool IsValidPackIdentity(
         string? identity,
         string[]? selectedPackIds)
@@ -72,25 +68,6 @@ internal static class CompilerSpecificationPackAuthorityValidation
         return separator > 0 && selectedPackIds.Contains(
             identity.Substring(0, separator),
             StringComparer.Ordinal);
-    }
-
-    private static bool Matches(
-        string[]? outerPackIds,
-        int outerCatalogVersion,
-        string? outerCatalogSha256,
-        CompilerCompilationSnapshot? compilation)
-    {
-        return compilation != null &&
-            IsValid(outerPackIds, outerCatalogVersion, outerCatalogSha256) &&
-            IsValid(
-                compilation.SpecificationPackIds,
-                compilation.SpecificationPackCatalogVersion,
-                compilation.SpecificationPackCatalogSha256) &&
-            outerPackIds!.SequenceEqual(
-                compilation.SpecificationPackIds,
-                StringComparer.Ordinal) &&
-            outerCatalogVersion == compilation.SpecificationPackCatalogVersion &&
-            outerCatalogSha256 == compilation.SpecificationPackCatalogSha256;
     }
 
     private static bool ValidPackId(string? value)

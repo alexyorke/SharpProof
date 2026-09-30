@@ -8,14 +8,16 @@ internal static class WorkerHost
 {
     internal static async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        WorkerInputSnapshot? preparedInput = null,
+        long? operationStarted = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var budgets = request.Budgets ?? new WorkerBudgets();
         try
         {
             using var worker = SharpProofWorker.Create(budgets);
-            return await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
+            return await worker.VerifyAsync(request, preparedInput, cancellationToken, operationStarted).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

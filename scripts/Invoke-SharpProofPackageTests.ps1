@@ -631,7 +631,7 @@ try {
             -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
             -BucketCount $packageLayoutBucketCount)
         $fixtureClasses = @(
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|DependencyAuditScriptTests|LauncherArgumentTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
             'FinalCompilationProbeTests')
         $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)

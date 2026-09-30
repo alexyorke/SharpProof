@@ -119,8 +119,9 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
     }
 
-    // Only fully decided postcondition runs are reusable. Unknown outcomes may
-    // depend on budgets or timing, and effect claims are not cacheable.
+    // The full key includes the artifact, runtime identity, and budgets.
+    // Every valid complete response is reusable, including semantic Unknown
+    // outcomes and effects. Failed, timed-out, and canceled runs are not.
     internal static bool IsCacheable(
         WorkerVerifyResponse? response,
         string expectedInputHash,
@@ -129,22 +130,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
         {
             RunStatus: WorkerRunStatus.Complete,
+            FailureReason: WorkerRunFailureReason.None,
             Errors.Length: 0,
-            CallableResults: { } callables,
-            ClaimResults: { Length: > 0 } claims
+            CallableResults: not null,
+            ClaimResults: not null
         } &&
-        callables.All(static result =>
-            result is
-            {
-                Coverage: WorkerCallableCoverage.Complete,
-                Reason: WorkerCallableCoverageReason.None
-            }) &&
-        claims.All(static result =>
-            result is { Outcome: WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted }) &&
-        expectedManifest is { Claims: { Length: var claimCount } } &&
-        claimCount == claims.Length &&
-        expectedManifest.Claims.All(static claim =>
-            claim.Kind == WorkerClaimKind.Postcondition) &&
+        expectedManifest != null &&
         WorkerProtocolJson.ValidateKnownInputHash(
             response,
             expectedInputHash,

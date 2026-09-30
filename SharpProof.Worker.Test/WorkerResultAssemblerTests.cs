@@ -110,8 +110,8 @@ public sealed class WorkerResultAssemblerTests
         Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
         Assert.That(response.ClaimResults[0].ClaimId, Is.EqualTo("claim"));
         Assert.That(response.ClaimResults[0].Assumptions, Is.Empty);
-        Assert.That(response.Summary.CallableCount, Is.EqualTo(1));
-        Assert.That(response.Summary.ClaimCount, Is.EqualTo(1));
+        Assert.That(response.CallableResults.Length, Is.EqualTo(1));
+        Assert.That(response.ClaimResults.Length, Is.EqualTo(1));
     }
 
     [Test]

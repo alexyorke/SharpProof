@@ -4,6 +4,8 @@
 // </auto-generated>
 #nullable enable
 
+using System.Text.Json.Serialization;
+
 namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerReferenceLimits
@@ -16,21 +18,34 @@ internal static class CompilerReferenceLimits
 internal sealed class CompilerCompilationSnapshot
 {
     public string ProjectDirectory { get; set; } = string.Empty;
+    [JsonIgnore]
     public string AssemblyName { get; set; } = string.Empty;
+    [JsonIgnore]
     public string AssemblyIdentity { get; set; } = string.Empty;
+    [JsonIgnore]
     public string TargetFramework { get; set; } = string.Empty;
+    [JsonIgnore]
     public string CompilerVersion { get; set; } = string.Empty;
+    [JsonIgnore]
     public string CompilerMvid { get; set; } = string.Empty;
+    [JsonIgnore]
     public string CSharpCompilerVersion { get; set; } = string.Empty;
+    [JsonIgnore]
     public string CSharpCompilerMvid { get; set; } = string.Empty;
+    [JsonIgnore]
     public string[] SpecificationPackIds { get; set; } = [];
+    [JsonIgnore]
     public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    [JsonIgnore]
     public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
+    [JsonIgnore]
     public CompilerCompilationOptionsSnapshot Options { get; set; } = new();
+    [JsonIgnore]
     public CompilerSyntaxTreeSnapshot[] SyntaxTrees { get; set; } = [];
+    [JsonIgnore]
     public CompilerReferenceSnapshot[] References { get; set; } = [];
+    [JsonIgnore]
     public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
-    public CompilerSummaryEvidenceSnapshot[] SummaryEvidence { get; set; } = [];
 }
 
 internal enum CompilerReportDiagnostic

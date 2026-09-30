@@ -9,8 +9,8 @@ public sealed class CompilerSpecificationPackProviderTests
     [Test]
     public void SelectionAuthorityIsExplicitCanonicalAndCatalogBound()
     {
-        var unset = CompilerSpecificationPackProvider.ResolveAuthority(null);
-        var selected = CompilerSpecificationPackProvider.ResolveAuthority(
+        var unset = CompilerSpecificationPackProvider.ResolveConfiguration(null);
+        var selected = CompilerSpecificationPackProvider.ResolveConfiguration(
             [" dotnet.scalar "]);
 
         using (Assert.EnterMultipleScope())
@@ -25,10 +25,10 @@ public sealed class CompilerSpecificationPackProviderTests
         }
 
         Assert.Throws<InvalidOperationException>((Action)(() =>
-            CompilerSpecificationPackProvider.ResolveAuthority(
+            CompilerSpecificationPackProvider.ResolveConfiguration(
                 ["dotnet.scalar", "dotnet.scalar"])));
         Assert.Throws<InvalidOperationException>((Action)(() =>
-            CompilerSpecificationPackProvider.ResolveAuthority(
+            CompilerSpecificationPackProvider.ResolveConfiguration(
                 ["dotnet.scalar", "missing.pack"])));
     }
 }

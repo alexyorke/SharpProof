@@ -267,7 +267,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             var query = new VerificationQuery(factory, assumptions,
                 new Goal(factory, condition, ProofDiagnosticKind.Postcondition, new SourceLocationId(index)),
                 replayVariables);
-            var outcome = await _kernel.VerifyAsync(query, cancellationToken).ConfigureAwait(false);
+            var outcome = await _kernel.VerifyCallableAsync(query,
+                CallableReplayContextBuilder.Create(target, ensures[index].Condition),
+                cancellationToken).ConfigureAwait(false);
             var resourceLimitExceeded = resourceBudget.IsExceeded;
             cancellationToken.ThrowIfCancellationRequested();
             if (resourceLimitExceeded)
@@ -287,15 +289,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 continue;
             }
 
-            var replayed = outcome is RefutedOutcome refuted
-                ? CallableCounterexampleReplayer.Replay(
-                    target,
-                    index,
-                    refuted.Model.Assignments,
-                    ensures,
-                    cancellationToken)
-                : WorkerClaimReason.None;
-            cancellationToken.ThrowIfCancellationRequested();
             var vacuity = noModeledNormalReturn
                 ? WorkerVacuityKind.NoModeledNormalReturn
                 : WorkerVacuityKind.None;
@@ -305,7 +298,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 outcome,
                 assumptionLabels,
                 userAssumptionIds,
-                replayed,
                 vacuity,
                 effectClaimIds);
             if (record.Outcome == WorkerClaimOutcome.Proven)

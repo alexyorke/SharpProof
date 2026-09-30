@@ -1,9 +1,8 @@
 namespace SharpProof.CompilerArtifact;
 
-// The compiler collector and the worker both consume the same capture image.
-// Keep producer spellings and worker predicates together so a value cannot be
-// valid merely because it is plausible JSON.
-internal static class CompilerCaptureAuthority
+// Producer identities used for stable reporting labels. Artifact validation
+// does not authenticate the compiler's source or configuration inventory.
+internal static class CompilerCaptureIdentity
 {
     internal static string NormalizePath(string path)
     {

@@ -34,9 +34,8 @@ The implementation remains the authority for enumerated surfaces:
   types, operation kinds, and operation shapes.
 - `SharpProof.Specs/ApiSpecTable.cs` declares typed API specifications. Not
   every witnessed facet is consumed by the worker.
-- `SharpProof.Specs/RelationalSpecPackCatalog.json` declares the embedded,
-  explicitly enabled relational specification packs. The schema-2 catalog is
-  strict data; relation parsing and identity validation remain handwritten in
+- `SharpProof.Specs/RelationalSpecPackCatalog.generated.cs` declares the embedded,
+  explicitly enabled relational specification packs. The hand-maintained C# catalog supplies typed relations; relation parsing and identity validation remain handwritten in
   the build-time compiler collector.
 - `SharpProof.Summaries` owns reusable typed-IR relational construction,
   instantiation, dependency analysis, and transitive provenance independent of
@@ -73,33 +72,19 @@ replace the current coverage inventory or normative semantics.
 
 ## Known production gaps
 
-During container verification, the production analyzer emits a deterministic
-schema-18 compiler artifact from the final post-generator Roslyn
-`Compilation`. It contains the selected-claim manifest and portable lowered
-whole-body CFG/IR for supported selected callables, plus bounded relational
-source/implementation-IL/audited-pack calls, bound contract/spec
-metadata, compiler diagnostics, generated-tree hashes, bounded options, mapped
-locations, and identity/provenance evidence. It contains no source text.
+The compiler emits a deterministic schema-19 closed artifact with selected
+claims, portable whole-body IR, relational/spec calls, effect constraints/replay,
+compiler diagnostics, and mapped locations. One full artifact digest replaces
+serialized source/reference inventories and redundant provenance authorities.
+ArtifactValidator validates claim/type/IR bindings and prepares graphs once.
+The worker consumes that snapshot without a Roslyn compilation or reference reads.
 
-The worker validates and hydrates that closed artifact without constructing a
-Roslyn compilation or rereading reference files. Exact manifest/lowered
-callable equality and the compiler-visible expression-depth match are required
-before cache or backend work. Compiler and reference identities are provenance,
-not a runtime Roslyn-build gate. The compiler reconstruction portion of
-production-plan Step 4 is complete for the bounded verifier subset.
-
-Independent whole-body postcondition-counterexample replay is implemented for
-the admitted scalar program subset. The proof kernel checks exact model closure
-and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 18 carries independently replayable
-events for unconditional definite managed object/array allocation, exact
-framework explicit throw, empty `lock`, and exact `Monitor` calls. The worker
-authenticates the selected effect, capability, and exception constraints,
-derives the replayed witness, and publishes only matching violations. Other
-effect candidates still fail closed as typed `Unknown`, and effect results
-remain noncacheable. Worker protocol 12, cache schema 13, relational-summary
-schema version 2, and specification-pack schema version 1 carry the current
-wire contract. The three-package split, portable SourceLink symbols,
+ProofKernel checks both the solver model and concrete callable execution before
+constructing a refutation. Effect replay interprets admitted unconditional
+compiler events and matches the resulting witness. Every valid complete response
+is cacheable, including effects and semantic Unknown; transient failures are not.
+Worker protocol 13, cache schema 15, manifest schema 5, relational-summary schema 2,
+and specification-pack schema 1 carry the current wire contract. The three-package split, portable SourceLink symbols,
 package validation, immutable
 tagged-byte validation, trusted-publishing workflow, package-backed sample
 matrix, and exact public API XML coverage are implemented. The tag workflow

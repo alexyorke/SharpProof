@@ -44,7 +44,6 @@ public sealed class WorkerProgramTests
         {
             Features = WorkerFeatureSet.All,
             Compilation = compilation,
-            CompilationSha256 = CompilationFingerprint.ComputeSha256(compilation, []),
             Manifest = manifest
         };
         await File.WriteAllTextAsync(

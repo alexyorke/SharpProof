@@ -29,8 +29,7 @@ internal sealed partial record ManifestClaim(
 
 internal sealed partial record ManifestEffectClaim(
     WorkerClaimManifestEntry Entry,
-    CompilerEffectClaimArtifact Evidence,
-    CompilerEffectAuthorityArtifact Authority
+    CompilerEffectClaimArtifact Evidence
 );
 
 internal sealed partial class ClaimManifestBuilder

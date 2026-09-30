@@ -2,7 +2,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
 
-internal static class CompilerEffectViolationAuthority
+internal static class CompilerEffectViolation
 {
     private const WorkerEffectSet ImpureState =
         WorkerEffectSet.ReadsCapturedState |

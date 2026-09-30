@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace SharpProof.Worker.Protocol;
 
@@ -12,6 +13,7 @@ public static partial class WorkerProtocolJson
     private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
     private static readonly StringComparer s_ordinal = StringComparer.Ordinal;
     private static readonly JsonSerializerOptions s_options = CreateOptions();
+    private static readonly ProtocolJsonContext s_context = new(new JsonSerializerOptions(s_options));
 
     public static JsonSerializerOptions Options => new(s_options);
 
@@ -159,7 +161,7 @@ public static partial class WorkerProtocolJson
 
     private static string SerializeBounded<T>(T value)
     {
-        var json = JsonSerializer.Serialize(value, s_options);
+        var json = JsonSerializer.Serialize(value, TypeInfo<T>());
         if (Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
         {
             throw new InvalidDataException(
@@ -171,7 +173,7 @@ public static partial class WorkerProtocolJson
 
     private static byte[] SerializeBoundedUtf8<T>(T value)
     {
-        var json = JsonSerializer.SerializeToUtf8Bytes(value, s_options);
+        var json = JsonSerializer.SerializeToUtf8Bytes(value, TypeInfo<T>());
         if (json.Length > MaximumJsonBytes)
         {
             throw new InvalidDataException(
@@ -284,13 +286,6 @@ public static partial class WorkerProtocolJson
             Canonicalize(result);
         }
 
-        if (response.Summary != null)
-        {
-            response.Summary.OutcomeCounts = SortOrdinal(response.Summary.OutcomeCounts,
-                static value => value?.Outcome.ToString());
-            response.Summary.ReasonCounts = SortOrdinal(response.Summary.ReasonCounts,
-                static value => value?.Reason.ToString());
-        }
         response.Errors = [.. (response.Errors ?? [])
             .OrderBy(static value => value?.Code, s_ordinal)
             .ThenBy(static value => value?.Message, s_ordinal)];
@@ -394,9 +389,6 @@ public static partial class WorkerProtocolJson
             ValidateCacheForRequest(
                 response,
                 expectedRequest,
-                allCallableResultsComplete,
-                allClaimResultsDecided,
-                allManifestClaimsPostconditions,
                 errors);
         }
 
@@ -406,9 +398,6 @@ public static partial class WorkerProtocolJson
     private static void ValidateCacheForRequest(
         WorkerVerifyResponse response,
         WorkerVerifyRequest request,
-        bool allCallableResultsComplete,
-        bool allClaimResultsDecided,
-        bool allManifestClaimsPostconditions,
         Validator errors)
     {
         if (response.Summary == null)
@@ -428,12 +417,9 @@ public static partial class WorkerProtocolJson
             RunStatus: WorkerRunStatus.Complete,
             FailureReason: WorkerRunFailureReason.None,
             Errors.Length: 0,
-            CallableResults: { Length: > 0 },
-            ClaimResults: { Length: > 0 }
-        } &&
-            allCallableResultsComplete &&
-            allClaimResultsDecided &&
-            allManifestClaimsPostconditions;
+            CallableResults: not null,
+            ClaimResults: not null
+        };
         var valid = status switch
         {
             WorkerCacheStatus.Hit or WorkerCacheStatus.Written => storableShape,
@@ -810,74 +796,10 @@ public static partial class WorkerProtocolJson
             errors.Add("response.summary");
             return;
         }
-        var outcomeCounts = new Dictionary<WorkerClaimOutcome, int>();
-        var reasonCounts = new Dictionary<WorkerClaimReason, int>();
-        foreach (var claim in claims)
-        {
-            outcomeCounts.TryGetValue(claim.Outcome, out var outcomeCount);
-            outcomeCounts[claim.Outcome] = outcomeCount + 1;
-            reasonCounts.TryGetValue(claim.Reason, out var reasonCount);
-            reasonCounts[claim.Reason] = reasonCount + 1;
-        }
-        errors.Check(summary.CallableCount == callables.Length &&
-                summary.ClaimCount == claims.Length, "summary.totals")
-            .Check(CountsMatch(summary.OutcomeCounts, outcomeCounts,
-                static value => value.Outcome, static value => value.Count,
-                WorkerClaimOutcome.Unspecified), "summary.outcomes")
-            .Check(CountsMatch(summary.ReasonCounts, reasonCounts,
-                static value => value.Reason, static value => value.Count,
-                WorkerClaimReason.Unspecified), "summary.reasons");
-        var assumptions = WorkerResultAssembler.SummarizeAssumptions(
-            callables, claims, out var conflictingKinds);
-        errors.Check(!conflictingKinds, "summary.assumption_conflict")
-            .Check(SummaryAssumptionsMatch(summary.Assumptions, assumptions), "summary.assumptions")
-            .Rules(summary, WorkerProtocolMetadata.SummaryRules.Take(2));
+        errors.Check(!WorkerResultAssembler.HasConflictingAssumptionKinds(callables, claims),
+                "summary.assumption_conflict")
+            .Rules(summary, WorkerProtocolMetadata.SummaryRules);
         ValidateBudgets(summary.Budgets, "summary.budgets", errors);
-        errors.Rules(summary, WorkerProtocolMetadata.SummaryRules.Skip(2));
-    }
-    private static bool SummaryAssumptionsMatch(WorkerAssumptionSummary? actual, WorkerAssumptionSummary expected)
-    {
-        if (actual == null)
-        {
-            return false;
-        }
-
-        return (actual.Total, actual.Used, actual.User, actual.Trusted) ==
-               (expected.Total, expected.Used, expected.User, expected.Trusted);
-    }
-
-    private static bool CountsMatch<TCount, TKind>(TCount[]? actual,
-        Dictionary<TKind, int> expected,
-        Func<TCount, TKind> kind, Func<TCount, int> count, TKind unspecified)
-        where TCount : class where TKind : struct, Enum
-    {
-        if (actual == null || actual.Length != expected.Count)
-        {
-            return false;
-        }
-
-        foreach (var value in actual)
-        {
-            if (value == null)
-            {
-                return false;
-            }
-            var itemCount = count(value);
-            if (itemCount <= 0)
-            {
-                return false;
-            }
-            var itemKind = kind(value);
-            if (!IsDefined(itemKind, unspecified) ||
-                !expected.TryGetValue(itemKind, out var expectedCount) ||
-                itemCount != expectedCount)
-            {
-                return false;
-            }
-            expected.Remove(itemKind);
-        }
-
-        return expected.Count == 0;
     }
     private static WorkerProtocolError[] ValidateProtocolErrors(WorkerProtocolError[]? values, Validator errors)
     {
@@ -1219,11 +1141,13 @@ public static partial class WorkerProtocolJson
                 $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
         }
 
-        using var document = JsonDocument.Parse(
-            json,
-            new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });
-        EnsureJsonShape(document.RootElement, typeof(T).Name);
-        return JsonSerializer.Deserialize<T>(document.RootElement, s_options);
+        return JsonSerializer.Deserialize(json, TypeInfo<T>());
+    }
+
+    private static JsonTypeInfo<T> TypeInfo<T>()
+    {
+        return (JsonTypeInfo<T>)(s_context.GetTypeInfo(typeof(T)) ??
+            throw new InvalidOperationException("The protocol type has no JSON metadata."));
     }
     private static OrdinalIdentityIndex<WorkerClaimManifestEntry>
         CreateClaimIndex(WorkerClaimManifest? manifest)

@@ -5,7 +5,11 @@
 #nullable enable
 namespace SharpProof.Worker;
 
-internal sealed partial record WorkerInputSnapshot(CompilerManifestArtifact CompilerManifest, string InputHash);
+internal sealed partial record WorkerInputSnapshot(
+    CompilerManifestArtifact CompilerManifest,
+    ImmutableArray<CompilerCallablePreparation> Callables,
+    string ArtifactDigest,
+    string InputHash);
 
 internal sealed partial record CallableEntryFeasibility(
     CallableEntryFeasibilityKind Kind,

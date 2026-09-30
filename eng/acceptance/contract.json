@@ -54,9 +54,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 12,
-    "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 18,
+    "protocolVersion": 13,
+    "manifestSchemaVersion": 5,
+    "compilerArtifactSchemaVersion": 19,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -72,13 +72,15 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 14,
+    "schemaVersion": 15,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
   "trustedKernel": {
     "paths": [
       "SharpProof.Verify/ProofKernel.cs",
+      "SharpProof.Verify/CallableReplayContext.cs",
+      "SharpProof.Verify/CallableReplayValidator.cs",
       "SharpProof.Verify/Evidence.cs",
       "SharpProof.Verify/Outcomes.cs"
     ]
@@ -128,7 +130,7 @@
         "paths": [
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
-          "SharpProof.CompilerArtifact/CompilerEffectAuthority.cs",
+          "SharpProof.Worker/ArtifactValidator.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
@@ -197,7 +199,6 @@
       {
         "name": "apiSpecificationCatalog",
         "paths": [
-          "SharpProof.Specs/RelationalSpecPackCatalog.json",
           "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
           "SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
@@ -258,12 +259,6 @@
         "name": "launcherArgumentCatalog",
         "paths": [
           "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
-        ]
-      },
-      {
-        "name": "mutationEvidencePolicy",
-        "paths": [
-          "scripts/SharpProof.MutationEvidence.psm1"
         ]
       },
       {
@@ -373,8 +368,8 @@
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.Ir/IrProgramCallHostExecution.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
-          "SharpProof.CompilerArtifact/CompilerEffectViolationAuthority.cs",
-          "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+          "SharpProof.CompilerArtifact/CompilerEffectViolation.cs",
+          "SharpProof.Worker/CallableReplayContextBuilder.cs",
           "SharpProof.Worker/EffectCounterexampleReplayer.cs"
         ]
       },
@@ -416,8 +411,8 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceLocationProjection.cs",
           "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
-          "SharpProof.CompilerArtifact/CompilationFingerprint.cs",
-          "SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs"
+          "SharpProof.CompilerArtifact/ArtifactDigest.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceCoordinates.cs"
         ]
       },
       {
@@ -591,10 +586,10 @@
           "eng/RoslynCfgFactory.cs",
           "eng/RoslynCfgThrowFacts.cs",
           "eng/RoslynSymbolFacts.cs",
-          "SharpProof.CompilerArtifact/CompilerCaptureAuthority.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "SharpProof.CompilerArtifact/CompilerDependencyEvidenceFormatter.cs",
           "SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs",
-          "SharpProof.CompilerArtifact/CompilerSpecificationPackAuthority.cs",
+          "SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSummarySignature.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",
           "SharpProof.Contracts/BoundContracts.cs",

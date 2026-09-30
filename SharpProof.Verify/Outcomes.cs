@@ -15,7 +15,8 @@ public enum AbstentionReason
     CounterexampleReplayFailed = 9,
     PostconditionMayBeUndefined = 10,
     InternalConsistencyMayBeUndefined = 11,
-    SolverIncomplete = 12
+    SolverIncomplete = 12,
+    CounterexampleNotReplayable = 13
 }
 
 public abstract class ProofOutcome

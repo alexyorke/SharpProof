@@ -36,6 +36,7 @@ internal static class WorkerProjections
             AbstentionReason.InfrastructureFailure => WorkerClaimReason.InfrastructureFailure,
             AbstentionReason.MalformedBackendResult => WorkerClaimReason.MalformedBackendResult,
             AbstentionReason.CounterexampleReplayFailed => WorkerClaimReason.CounterexampleReplayFailed,
+            AbstentionReason.CounterexampleNotReplayable => WorkerClaimReason.CounterexampleNotReplayable,
             AbstentionReason.PostconditionMayBeUndefined => WorkerClaimReason.PostconditionMayBeUndefined,
             _ => WorkerClaimReason.UnsupportedExpression
         };

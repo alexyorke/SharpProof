@@ -96,6 +96,7 @@ value accompanies backend `Unknown` and is mapped through the proof kernel.
 | `InfrastructureFailure` | Non-semantic worker/backend infrastructure failed |
 | `MalformedBackendResult` | Status, core, or model shape is invalid |
 | `CounterexampleReplayFailed` | A SAT model failed exact assignment-closure or lowered-term replay |
+| `CounterexampleNotReplayable` | Concrete callable replay reached a registered call without an executable specification |
 | `PostconditionMayBeUndefined` | A candidate input makes the postcondition expression throw instead of yielding a Boolean value |
 | `InternalConsistencyMayBeUndefined` | A candidate input makes an internal-consistency expression throw instead of yielding a Boolean value; this is distinct from malformed counterexample replay |
 
@@ -103,12 +104,12 @@ Only the proof kernel constructs proof outcomes. Backend UNSAT becomes
 `Proven` only after evidence-core hygiene. Backend SAT becomes `Refuted` only
 after its assignments exactly close the requested model and replay every
 lowered assumption as true and the goal as false. Any failed check becomes
-`Unknown`. The worker applies the additional independent whole-body replay
-before assembling a `Refuted` record.
+`Unknown`. The kernel also executes the concrete callable path and checks
+contract state, source domains, and the original Ensures before refuting.
 
 ## Worker verification records
 
-Protocol version 12 binds compiler-manifest evidence and separates run state,
+Protocol version 13 binds compiler-manifest evidence and separates run state,
 callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
@@ -246,17 +247,15 @@ The exact typed outcome and effect-certainty authority follows.
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 18 can seal
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 19 carries
 unconditional definite managed object/array allocation, exact framework
 explicit-throw, empty-`lock`, and exact-`Monitor` events for independent worker
-replay. The worker validates event order, source-tree identity/span,
-selected-constraint and semantic-operation hashes, and the sealed witness. It
-then derives effects, capabilities, and exact exception hierarchy itself and
-checks all three authenticated constraint dimensions. Fresh allocation remains
+replay. The artifact boundary validates event order, types, locations, and
+selected constraints once. The worker derives effects, capabilities, and exact
+exception hierarchy from the replay events and checks the resulting violation
+against the witness and all three constraint dimensions. Source discovery,
+analysis, and event lowering remain trusted. Fresh allocation remains
 compatible with observable `EnforcePure`.
-The operation hash checks canonical agreement among compiler-produced event
-fields; source discovery, analysis, and event lowering remain trusted rather
-than being independently reconstructed by the worker.
 
 Definite receiver-field, user-constructed exception,
 static-initialization-sensitive allocation, and other unsupported direct
@@ -266,7 +265,7 @@ candidate remain `Unknown(EffectContractNotEstablished)`. Invalid replay
 structure is malformed compiler evidence and fails as
 `CompilerManifestMismatch`; a structurally valid replay that disagrees
 semantically becomes the fatal
-`Unknown(CounterexampleReplayFailed)`. Effect results remain noncacheable.
+`Unknown(CounterexampleReplayFailed)`. Valid complete effect responses are cacheable.
 Analyzer evidence preserves the more specific
 `ManagedAbstractFlow:BlockBudgetExceeded`,
 or `ManagedAbstractFlow:OperationBudgetExceeded` detail through JSON, SARIF,
@@ -280,8 +279,8 @@ Proven postconditions additionally carry `WorkerVacuityKind`: `None`,
 partial-correctness vacuity visible rather than silently presenting the result
 as an ordinary proof. `NoModeledNormalReturn` also covers an unsatisfiable
 `Contract.Assume` combined with the method's other modeled assumptions. The
-field is preserved by canonical JSON and SARIF projection. Proven claims do
-not enter the semantic cache.
+field is preserved by canonical JSON and SARIF projection. Valid complete
+responses, including Proven claims, enter the semantic cache.
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
 proof `UnsupportedEncoding` maps to worker `UnsupportedExpression`.
@@ -350,12 +349,9 @@ language-gate abstention. See [Diagnostics](diagnostic-examples.md) for the
 reporting surface and [Coverage and limits](coverage-and-limits.md) for the
 admitted product subset.
 
-Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
-backend failures, and failed replay are never semantic cache entries. Only a
-`Complete`, exact-manifest, postcondition-only response with complete callable
-coverage and all claims replay-validated `Refuted` is cacheable. Cache schema
-version 13 revalidates every read against the complete current manifest,
-reconstructs supported scalar models, checks entry assumptions and source
-ranges, and repeats whole-body replay. Proven claims, effect claims, and
-unsupported models are not written or reused. `require-proven` runs bypass
-this local semantic cache.
+Every valid Complete response bound to the exact current manifest is cacheable,
+including Proven, replay-validated Refuted, semantic Unknown, effects, and empty
+claims. Cache schema 15 binds the full artifact digest, runtime/spec identities,
+and semantic budgets. Protocol errors, cancellation, timeout, malformed results,
+backend failures, and failed replay are not cache entries. Reads validate the
+stored response binding and payload shape without rerunning proof or replay.

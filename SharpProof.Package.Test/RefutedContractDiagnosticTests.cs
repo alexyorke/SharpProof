@@ -149,22 +149,6 @@ public sealed class RefutedContractDiagnosticTests
             ],
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = 1,
-                ClaimCount = 1,
-                OutcomeCounts = [
-                    new WorkerClaimOutcomeCount
-                    {
-                        Outcome = WorkerClaimOutcome.Refuted,
-                        Count = 1
-                    }
-                ],
-                ReasonCounts = [
-                    new WorkerClaimReasonCount
-                    {
-                        Reason = WorkerClaimReason.None,
-                        Count = 1
-                    }
-                ],
                 CacheStatus = WorkerCacheStatus.Disabled,
                 Versions = new WorkerVersionSummary
                 {

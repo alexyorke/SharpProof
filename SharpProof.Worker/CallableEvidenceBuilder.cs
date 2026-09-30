@@ -221,7 +221,7 @@ internal static class CallableEvidenceBuilder
         CompilerSummaryOrigin origin,
         out string prefix)
     {
-        prefix = CompilerSpecificationPackAuthorityValidation
+        prefix = CompilerSpecificationPackSelection
             .GetSummaryPrefix(origin) ?? string.Empty;
         return prefix.Length != 0;
     }

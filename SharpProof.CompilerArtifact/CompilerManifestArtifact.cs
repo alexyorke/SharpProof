@@ -12,7 +12,7 @@ internal static class CompilerArtifactInputHash
 {
     internal static string Compute(
         WorkerVerifyRequest request,
-        byte[] artifactBytes,
+        string artifactDigest,
         string toolIdentity,
         string toolVersion,
         string workerBinarySha256,
@@ -21,7 +21,7 @@ internal static class CompilerArtifactInputHash
         string apiSpecContentSha256)
     {
         request = ArgumentNullGuard.NotNull(request, nameof(request));
-        artifactBytes = ArgumentNullGuard.NotNull(artifactBytes, nameof(artifactBytes));
+        artifactDigest = ArgumentNullGuard.NotNull(artifactDigest, nameof(artifactDigest));
 
         using var hash = new CanonicalHashWriter();
         hash.Add("protocol")
@@ -52,7 +52,7 @@ internal static class CompilerArtifactInputHash
             .Add(request.Budgets.MaxParallelism)
             .Add("budget.expression_depth")
             .Add(request.Budgets.MaximumExpressionDepth);
-        return hash.Add("compiler_manifest").Add(artifactBytes).Finish();
+        return hash.Add("compiler_manifest").Add(artifactDigest).Finish();
     }
 }
 
@@ -136,10 +136,8 @@ internal static class CompilerManifestArtifactJson
             cancellationToken: cancellationToken);
     }
 
-    // CompilerManifestArtifactProducer validates and canonicalizes the
-    // artifact before handing it directly to one of these writers. Keep this
-    // precondition explicit so ordinary callers still receive the defensive
-    // canonicalization performed by SerializeValidated.
+    // The compiler emits a closed artifact. Semantic validation and IR decoding
+    // happen once at the worker boundary; this path only writes producer data.
     internal static string SerializeProducerValidated(
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
@@ -176,11 +174,6 @@ internal static class CompilerManifestArtifactJson
                     static item => item.CallableId,
                     StringComparer.Ordinal)
             ];
-            artifact.LocationAuthorities = [
-                .. (artifact.LocationAuthorities ?? [])
-                    .OrderBy(static item => item?.OwnerKind)
-                    .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
-            ];
         }
         cancellationToken.ThrowIfCancellationRequested();
         if (validate)
@@ -215,6 +208,14 @@ internal static class CompilerManifestArtifactJson
         string json,
         CancellationToken cancellationToken = default)
     {
+        return DeserializePrepared(json, out _, cancellationToken);
+    }
+
+    internal static CompilerManifestArtifact DeserializePrepared(
+        string json,
+        out ImmutableArray<CompilerCallablePreparation> callables,
+        CancellationToken cancellationToken = default)
+    {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
         cancellationToken.ThrowIfCancellationRequested();
         EnsureWithinByteLimit(json);
@@ -228,13 +229,14 @@ internal static class CompilerManifestArtifactJson
             document.RootElement, WorkerProtocolJson.SharedOptions) ??
             throw new JsonException("A compiler manifest artifact is required.");
         cancellationToken.ThrowIfCancellationRequested();
-        Validate(artifact, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (SerializeValidated(artifact, cancellationToken) != json)
+        try
         {
-            throw new JsonException("The compiler manifest artifact is not canonical.");
+            callables = DecodeCallables(artifact, cancellationToken);
         }
-
+        catch (InvalidDataException exception)
+        {
+            throw new JsonException("The compiler manifest callable payload is invalid.", exception);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         return artifact;
     }
@@ -243,14 +245,13 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
     {
-        // DecodeCallables is also used by in-memory hydration probes that
-        // deliberately mutate lowered evidence after the wire seal. Let the
-        // existing lowerer report those malformed-body cases; wire reads and
-        // writes still enforce the feature-scope seal below.
         Validate(
             artifact,
             validateDecodability: false,
             cancellationToken);
+        artifact.Compilation.SpecificationPackIds = artifact.SpecificationPackIds;
+        artifact.Compilation.SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion;
+        artifact.Compilation.SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256;
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
@@ -343,10 +344,7 @@ internal static class CompilerManifestArtifactJson
         RequireProperty(root, "specificationPackIds");
         RequireProperty(root, "specificationPackCatalogVersion");
         RequireProperty(root, "specificationPackCatalogSha256");
-        var compilation = RequireProperty(root, "compilation");
-        RequireProperty(compilation, "specificationPackIds");
-        RequireProperty(compilation, "specificationPackCatalogVersion");
-        RequireProperty(compilation, "specificationPackCatalogSha256");
+        RequireProperty(root, "compilation");
         cancellationToken.ThrowIfCancellationRequested();
         if (!root.TryGetProperty("compilerDiagnostics", out var diagnostics) ||
             diagnostics.ValueKind != JsonValueKind.Array)

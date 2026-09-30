@@ -451,15 +451,7 @@ internal sealed partial class ClaimManifestBuilder(
         };
         var evidence = CreateEffectEvidence(claimId, evaluation, isSupported);
         CompilerEffectClaimArtifactCodec.Seal(evidence);
-        var sourceTreePath = location.SourceTree?.FilePath ??
-            attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath;
-        return new ManifestEffectClaim(
-            entry,
-            evidence,
-            CompilerEffectAuthority.Create(
-                entry,
-                evidence,
-                sourceTreePath));
+        return new ManifestEffectClaim(entry, evidence);
     }
 
     private CompilerEffectClaimArtifact CreateEffectEvidence(
@@ -881,7 +873,7 @@ internal sealed partial class ClaimManifestBuilder(
             var ordinal = _compilation.SyntaxTrees.IndexOf(sourceTree);
             if (ordinal >= 0)
             {
-                CompilerSourceLocationAuthority.RememberTree(result, ordinal);
+                CompilerSourceCoordinates.RememberTree(result, ordinal);
             }
         }
         return result;
