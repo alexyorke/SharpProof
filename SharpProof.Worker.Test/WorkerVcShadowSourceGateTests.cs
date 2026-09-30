@@ -74,7 +74,7 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { public static int Target(int d) {
                 Contract.Ensures(Contract.Result<int>() == 10 / d); return 10 / d;
             } }
-            """, [WorkerClaimOutcome.Unknown], Checked: null, Reason: WorkerClaimReason.ResourceLimit)
+            """, [WorkerClaimOutcome.Proven])
     ];
 
     [Test]
@@ -103,6 +103,8 @@ public sealed class WorkerVcShadowSourceGateTests
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
         Assert.That(aggregate.Enrolled, Is.EqualTo(9));
         Assert.That(aggregate.Unenrolled, Is.EqualTo(3));
+        Assert.That(aggregate.Checked, Is.EqualTo(9));
+        Assert.That(aggregate.Unknown, Is.EqualTo(4));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);
         await TestContext.Out.WriteLineAsync($"source-worker universe: sources={Universe.Length} posts={aggregate.Postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unchecked={aggregate.Unchecked} unknown={aggregate.Unknown} disagreements={aggregate.SoundnessDisagreements} full-exit={aggregate.CoverageComplete}");

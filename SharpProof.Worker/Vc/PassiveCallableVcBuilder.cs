@@ -128,7 +128,10 @@ internal sealed class PassiveCallableVcBuilder
                         if (!Scalar(assigned.Type))
                         { return null; }
                         Fact(Guard(reach, Equal(assigned, value)), assign.Operation, "write");
-                        state[assign.Target] = assigned;
+                        // Forward only immutable atoms. The fresh write fact
+                        // and model identity remain available to the kernel;
+                        // compound evaluations keep their own SSA version.
+                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm ? value : assigned;
                         break;
                     case IrHavocInstruction havoc:
                         if (havoc.HavocKind != IrHavocKind.Variables ||

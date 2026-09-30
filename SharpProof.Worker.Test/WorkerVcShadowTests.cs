@@ -225,12 +225,23 @@ public sealed class WorkerVcShadowTests
     {
         using var project = new ShadowTestProject("""
             using SharpProof.Attributes;
-            public static class Subject { public static int Target(int d) {
-                Contract.Ensures(Contract.Result<int>() == 10 / d);
-                Contract.Ensures(Contract.Result<int>() == 10 / d);
-                return 10 / d;
+            public static class Subject { public static int Target(int x, int d) {
+                Contract.Ensures(unchecked(Contract.Result<int>() * d + x % d) == x);
+                Contract.Ensures(unchecked(Contract.Result<int>() * d + x % d) == x);
+                return x / d;
             } }
             """);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _), Is.True);
+        using (var native = new PassiveCallableSolver(plan!))
+        {
+            Assert.That((await native.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+            var beforeEnsures = native.ConsumedResourceCount;
+            var hardQuery = await native.VerifyEnsuresAsync(0);
+            Assert.That(hardQuery.Outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(hardQuery.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(native.ConsumedResourceCount - beforeEnsures, Is.EqualTo(WorkerBudgets.DefaultQueryRlimit));
+        }
         var backend = new UnknownBackend();
         using var worker = new SharpProofWorker(backend);
         WorkerVerifyResponse legacy;
