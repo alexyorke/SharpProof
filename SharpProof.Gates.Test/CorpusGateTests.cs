@@ -830,7 +830,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 message,
                 Is.EqualTo(
-                    "Call to 'Positive' violates precondition '(v3 > 0)'"));
+                    "Call to 'Positive' violates precondition 'value > 0'"));
             Assert.That(silentUnknown[1], Is.EqualTo("SilentUnknown"));
             Assert.That(silentUnknown[2], Is.EqualTo("Unknown"));
             Assert.That(silentUnknown[3], Is.Empty);
