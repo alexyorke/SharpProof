@@ -1,0 +1,7 @@
+publication: closed temporary then atomic rename
+held-empty-temporary: True
+public-ready-before-release: False
+ready-pid-positive: True
+cancel-exit: -1
+structured-error: False
+process-running-after-cancel: False

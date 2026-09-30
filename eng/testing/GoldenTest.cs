@@ -102,7 +102,7 @@ internal static class GoldenTest
 
     private static string StageDirectory(string root, string stage)
     {
-        if (stage is not ("lowering" or "worker" or "analyzer"))
+        if (stage is not ("lowering" or "worker" or "analyzer" or "build-task"))
         {
             throw new ArgumentException("Unknown golden stage.", nameof(stage));
         }

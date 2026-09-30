@@ -598,24 +598,46 @@ public sealed class BuildTaskTests
         }
     }
 
-    [Test]
-    public async System.Threading.Tasks.Task ActiveVerifierCancellationStopsItsProcess()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async System.Threading.Tasks.Task ActiveVerifierCancellationStopsItsProcess(bool heldPartialPublication)
     {
         using var directory = new TempDirectory("sharpproof-active-cancel-");
-        var helper = CreateTimedProcessAssembly(directory.FullName,
-            "using System; using System.IO; using System.Threading; File.WriteAllText(\"ready.pid\", Environment.ProcessId.ToString()); Thread.Sleep(Timeout.Infinite);");
+        var fixture = GoldenTest.Load("build-task", "active-cancel-readiness");
+        if (heldPartialPublication)
+        {
+            await File.WriteAllTextAsync(Path.Combine(directory.FullName, "hold-partial"), string.Empty);
+        }
+        var helper = CreateTimedProcessAssembly(directory.FullName, fixture.Source);
         var marker = Path.Combine(directory.FullName, "ready.pid");
         using var task = CreateVerifier(directory, helper, 10_000);
         var execution = System.Threading.Tasks.Task.Run(task.Execute);
         try
         {
             var deadline = Stopwatch.StartNew();
+            var heldEmptyTemporary = false;
+            var publicReadyBeforeRelease = false;
+            if (heldPartialPublication)
+            {
+                var partial = Path.Combine(directory.FullName, "partial.ready");
+                while (!File.Exists(partial) && deadline.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
+                {
+                    await System.Threading.Tasks.Task.Delay(10);
+                }
+                Assert.That(File.Exists(partial), Is.True, "The helper must hold an empty temporary before publication.");
+                heldEmptyTemporary = (await File.ReadAllTextAsync(Path.Combine(directory.FullName, "ready.pid.tmp"))).Length == 0;
+                publicReadyBeforeRelease = File.Exists(marker);
+                Assert.That(heldEmptyTemporary, Is.True);
+                Assert.That(publicReadyBeforeRelease, Is.False, "An incomplete PID must remain private.");
+                await File.WriteAllTextAsync(Path.Combine(directory.FullName, "publish.release"), "release");
+            }
             while (!File.Exists(marker) && deadline.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
             {
                 await System.Threading.Tasks.Task.Delay(10);
             }
             Assert.That(File.Exists(marker), Is.True, "The process must start before active cancellation.");
             var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
+            Assert.That(processId, Is.GreaterThan(0));
             task.Cancel();
             Assert.That(await execution.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
             using (Assert.EnterMultipleScope())
@@ -623,6 +645,16 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.EqualTo(-1));
                 Assert.That(task.HasStructuredError, Is.False);
                 Assert.That(IsProcessRunning(processId), Is.False);
+            }
+            if (heldPartialPublication)
+            {
+                GoldenTest.Compare(fixture, "publication: closed temporary then atomic rename\n" +
+                    "held-empty-temporary: " + heldEmptyTemporary +
+                    "\npublic-ready-before-release: " + publicReadyBeforeRelease +
+                    "\nready-pid-positive: " + (processId > 0) +
+                    "\ncancel-exit: " + task.ExitCode.ToString(CultureInfo.InvariantCulture) +
+                    "\nstructured-error: " + task.HasStructuredError +
+                    "\nprocess-running-after-cancel: " + IsProcessRunning(processId));
             }
         }
         finally
