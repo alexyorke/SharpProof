@@ -133,7 +133,6 @@ public sealed class TypedRegionProgramLoweringTests
     [TestCase("int Target(int x) { try { return 10 / x; } catch (System.Exception e) { return 0; } }")]
     [TestCase("int Target(int x) { try { throw new System.DivideByZeroException(); } catch (System.Exception) { return 0; } }")]
     [TestCase("int Target(int x) { try { return System.Math.Abs(x); } catch (System.Exception) { return 0; } }")]
-    [TestCase("int Target(int x) { try { return checked(x + 1); } catch (System.OverflowException) { return 0; } }")]
     [TestCase("int Target(int x) { ref int r = ref x; try { r++; return x; } finally { x = 7; } }")]
     public void IncompleteRegionFormsStayClosed(string members)
     {

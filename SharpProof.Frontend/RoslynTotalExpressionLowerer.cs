@@ -159,6 +159,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         {
             return Approximate(operation, block, rule.Classification.Abstention);
         }
+        return ApplyRule(operation, rule, block);
+    }
+
+    private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
+    {
         foreach (var fault in rule.Throws)
         {
             var thrown = _builder!.CreateBlock("throw");
@@ -222,16 +227,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue Increment(IIncrementOrDecrementOperation operation, IrVarId target, IrBlockId block)
     {
-        var type = _factory.GetVariableInfo(target).Type;
-        var info = _factory.GetTypeInfo(type);
-        if (operation.IsChecked || operation.IsLifted || operation.OperatorMethod != null ||
-            info.Kind != IrTypeKind.Integer || info.Width < 32)
-        {
-            return Approximate(operation, block, FrontendAbstention.UnsupportedMutation);
-        }
         var old = Capture(operation, new(_factory.Variable(target), block, FrontendSubsetClassification.Exact));
-        var next = Capture(operation, new(_factory.Binary(operation.Kind == OperationKind.Increment ? IrBinaryOperator.Add : IrBinaryOperator.Subtract,
-            old.Value, _factory.Integer(type, 1L)), old.Continuation, FrontendSubsetClassification.Exact));
+        var rule = CSharpOperationSemantics.Increment(_factory, operation, old.Value);
+        if (!rule.Classification.IsExact)
+        { return Approximate(operation, block, rule.Classification.Abstention); }
+        var next = ApplyRule(operation, rule, old.Continuation);
         _builder!.Assign(next.Continuation, _context.Site(operation), target, next.Value);
         return operation.IsPostfix ? new(old.Value, next.Continuation, next.Classification) : next;
     }
@@ -239,15 +239,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private TotalBodyValue Compound(ICompoundAssignmentOperation operation, IrVarId target, IrBlockId block, int depth)
     {
         var old = Capture(operation, new(_factory.Variable(target), block, FrontendSubsetClassification.Exact));
-        var right = LowerBodyValue(operation.Value, block, depth + 1);
-        if (!right.Classification.IsExact || operation.IsChecked || operation.IsLifted || operation.OperatorMethod != null ||
-            operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined || old.Value.Type != right.Value.Type ||
-            !CSharpOperationSemantics.TryBinary(operation.OperatorKind, out var kind) ||
-            kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply))
+        var right = LowerBodyValue(operation.Value, old.Continuation, depth + 1);
+        if (!right.Classification.IsExact)
         {
-            return Approximate(operation, right.Continuation, FrontendAbstention.UnsupportedMutation);
+            return Approximate(operation, right.Continuation, right.Classification.Abstention);
         }
-        var result = Capture(operation, new(_factory.Binary(kind, old.Value, right.Value), right.Continuation, FrontendSubsetClassification.Exact));
+        var rule = CSharpOperationSemantics.Compound(_factory, operation, old.Value, right.Value);
+        if (!rule.Classification.IsExact)
+        { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
+        var result = ApplyRule(operation, rule, right.Continuation);
         _builder!.Assign(result.Continuation, _context.Site(operation), target, result.Value);
         return result;
     }

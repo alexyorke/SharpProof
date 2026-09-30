@@ -210,7 +210,14 @@ safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
 body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
-calls, cycles, and checked binary or unary arithmetic currently abstain.
+calls and cycles currently abstain. Checked scalar Add, Subtract, Multiply and
+unary Plus/Minus use the same wrap value and guarded overflow rules in bodies
+and clauses. Increment/decrement and `+=`, `-=`, `*=` compound assignments preserve
+the resolved promotions and checked storage conversion. Earlier operand effects
+remain visible when the operator faults; its own storage write occurs only on
+the normal edge. Overflow routes through the same catch/finally machinery as
+other scalar faults. These rules use the existing integer widths without a
+wider numeric type or a frontend solver dependency.
 
 The candidate region route supports scalar faults, throw-null, ordered canonical
 runtime catches, and nested rethrow. Each lexical catch snapshots both the

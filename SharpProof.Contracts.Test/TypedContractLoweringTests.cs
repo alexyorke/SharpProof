@@ -14,6 +14,51 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class TypedContractLoweringTests
 {
+    [TestCase("Contract.Old(x) + Contract.Old(y)", int.MaxValue, 1, false)]
+    [TestCase("Contract.Old(x) + Contract.Old(y)", int.MinValue, -1, false)]
+    [TestCase("Contract.Old(x) - Contract.Old(y)", int.MinValue, 1, false)]
+    [TestCase("Contract.Old(x) * Contract.Old(y)", int.MinValue, -1, false)]
+    [TestCase("Contract.Old(x) * Contract.Old(y)", 0, int.MinValue, true)]
+    [TestCase("-Contract.Old(x)", int.MinValue, 0, false)]
+    [TestCase("+Contract.Old(x)", int.MinValue, 0, true)]
+    [TestCase("Contract.Old(x) * Contract.Old(y)", -2, -3, true)]
+    public void CheckedClauseValueAndSafetyRetainOriginalOperands(string expression, int first, int second, bool safe)
+    {
+        var subject = Subject.Create($$"""
+            using SharpProof.Attributes;
+            public static class Subject { public static int Target(int x, int y) {
+                Contract.Ensures(checked({{expression}}) == unchecked({{expression}}));
+                x = 0; y = 0; return 0;
+            } }
+            """);
+        var clause = subject.Bind().Clauses.Single();
+        var lowering = subject.Lower();
+        Assert.That(lowering.IsExact, Is.True);
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(first, second));
+        var interpreter = new IrInterpreter(subject.Factory);
+        Assert.That(interpreter.Evaluate(clause.Value, execution.Values).Value!.Boolean, Is.True);
+        Assert.That(interpreter.Evaluate(clause.SafeCondition, execution.Values).Value!.Boolean, Is.EqualTo(safe));
+        Assert.That(execution.Values[subject.Context.Parameters[0].Current].IntegerNumericValue, Is.EqualTo(BigInteger.Zero));
+    }
+
+    [TestCase("x == int.MaxValue || checked(x + 1) > x", true)]
+    [TestCase("x == int.MaxValue ? true : checked(x + 1) > x", true)]
+    [TestCase("checked(x + 1) > x || x == int.MaxValue", false)]
+    public void CheckedClauseSafetyFollowsSelectedOperand(string expression, bool safe)
+    {
+        var subject = Subject.Create($$"""
+            using SharpProof.Attributes;
+            public static class Subject { public static int Target(int x) {
+                Contract.Ensures({{expression}}); return x;
+            } }
+            """);
+        var clause = subject.Bind().Clauses.Single();
+        var interpreter = new IrInterpreter(subject.Factory);
+        var values = subject.Values(int.MaxValue);
+        Assert.That(interpreter.Evaluate(clause.Value, values).Value!.Boolean, Is.True);
+        Assert.That(interpreter.Evaluate(clause.SafeCondition, values).Value!.Boolean, Is.EqualTo(safe));
+    }
+
     [TestCase("Requires")]
     [TestCase("Assume")]
     [TestCase("Ensures")]

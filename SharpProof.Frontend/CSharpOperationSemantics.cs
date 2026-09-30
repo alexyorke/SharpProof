@@ -68,33 +68,7 @@ internal static partial class CSharpOperationSemantics
             {
                 return Fail(factory, FrontendAbstention.UserDefinedOperator);
             }
-            if (value.Type == target)
-            {
-                return Exact(value);
-            }
-            var sourceInfo = factory.GetTypeInfo(value.Type);
-            var targetInfo = factory.GetTypeInfo(target);
-            if (sourceInfo.Kind != IrTypeKind.Integer || targetInfo.Kind != IrTypeKind.Integer)
-            {
-                return Fail(factory, FrontendAbstention.ConversionMayChangeValue);
-            }
-            var guards = ImmutableArray.CreateBuilder<TotalThrow>();
-            if (conversion.IsChecked)
-            {
-                var (sourceMin, sourceMax) = Bounds(sourceInfo);
-                var (targetMin, targetMax) = Bounds(targetInfo);
-                if (targetMin > sourceMin)
-                {
-                    guards.Add(new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.LessThan,
-                        value, Number(factory, value.Type, targetMin))));
-                }
-                if (targetMax < sourceMax)
-                {
-                    guards.Add(new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.GreaterThan,
-                        value, Number(factory, value.Type, targetMax))));
-                }
-            }
-            return new(factory.Cast(target, value), guards.ToImmutable(), FrontendSubsetClassification.Exact);
+            return ConvertInteger(factory, value, target, conversion.IsChecked);
         }
         if (operation is IUnaryOperation unary)
         {
@@ -107,12 +81,16 @@ internal static partial class CSharpOperationSemantics
                 return Exact(factory.Unary(IrUnaryOperator.Not, value));
             }
             if (factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer ||
-                unary.OperatorKind is not (UnaryOperatorKind.Plus or UnaryOperatorKind.Minus) || unary.IsChecked)
+                unary.OperatorKind is not (UnaryOperatorKind.Plus or UnaryOperatorKind.Minus))
             {
                 return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
             }
             var promoted = value.Type == target ? value : factory.Cast(target, value);
-            return Exact(unary.OperatorKind == UnaryOperatorKind.Plus ? promoted : factory.Unary(IrUnaryOperator.Negate, promoted));
+            if (unary.OperatorKind == UnaryOperatorKind.Plus)
+            { return Exact(promoted); }
+            return new(factory.Unary(IrUnaryOperator.Negate, promoted), unary.IsChecked
+                ? [new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.Equal, promoted,
+                    Number(factory, target, Bounds(factory.GetTypeInfo(target)).Minimum)))] : [], FrontendSubsetClassification.Exact);
         }
         if (operation is not IBinaryOperation binary || operands.Length != 2)
         {
@@ -123,12 +101,13 @@ internal static partial class CSharpOperationSemantics
             return Fail(factory, binary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
         }
         var right = operands[1];
-        if (value.Type != right.Type || !TryBinary(binary.OperatorKind, out var kind) ||
-            (binary.IsChecked && kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply))
+        if (value.Type != right.Type || !TryBinary(binary.OperatorKind, out var kind))
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
         var faults = ImmutableArray.CreateBuilder<TotalThrow>();
+        if (kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
+        { return IntegerArithmetic(factory, kind, value, right, binary.IsChecked); }
         if (kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
         {
             faults.Add(new(IrExceptionKind.DivideByZero,
