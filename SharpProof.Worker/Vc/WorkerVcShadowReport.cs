@@ -38,7 +38,8 @@ internal sealed record WorkerVcShadowReport(string InputHash, string RequestHash
     public int Postconditions => Rows.Length;
     public int Enrolled => Rows.Count(row => row.Enrolled);
     // Checked means a completed Ensures query or kernel-validated vacuity.
-    // Unknown entry/normal feasibility and interrupted queries stay unchecked.
+    // Completed bounded witness searches may abstain. Skipped Ensures and
+    // interrupted/refused queries stay unchecked.
     public int Checked => Rows.Count(row => row.Checked);
     public int Unchecked => Postconditions - Checked;
     public int Unenrolled => Postconditions - Enrolled;

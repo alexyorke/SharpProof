@@ -57,12 +57,12 @@ public sealed class WorkerVcShadowSourceGateTests
                 Contract.Ensures(Contract.Result<int>() > 0); Contract.Assume(x > 0); return x;
             } }
             """, [WorkerClaimOutcome.Proven], Conditional: true),
-        new("source-loop-closed", """
+        new("source-scalar-loop", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
                 Contract.Ensures(Contract.Result<int>() == x); while (x < 0) x++; return x;
             } }
-            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody),
+            """, [WorkerClaimOutcome.Proven]),
         new("source-call-closed", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
@@ -111,10 +111,10 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(manifestPostconditions, Is.EqualTo(27));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(25));
-        Assert.That(aggregate.Unenrolled, Is.EqualTo(2));
-        Assert.That(aggregate.Checked, Is.EqualTo(25));
-        Assert.That(aggregate.Unknown, Is.EqualTo(4));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(26));
+        Assert.That(aggregate.Unenrolled, Is.EqualTo(1));
+        Assert.That(aggregate.Checked, Is.EqualTo(26));
+        Assert.That(aggregate.Unknown, Is.EqualTo(3));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);

@@ -65,7 +65,7 @@ internal static class WorkerVcShadowObserver
                 {
                     methodBoundary.Token.ThrowIfCancellationRequested();
                     var claimId = ensures[ordinal].ClaimId!;
-                    if (feasibility.Kind == PassiveCallableFeasibilityKind.Unknown)
+                    if (feasibility.Kind == PassiveCallableFeasibilityKind.Unknown && !solver.CanCheckWithoutNormalWitness)
                     {
                         rows[claimId] = rows[claimId] with { Feasibility = feasibility.Kind, NewReason = feasibility.Evidence.Reason };
                         continue;
@@ -106,7 +106,7 @@ internal static class WorkerVcShadowObserver
                     }
                     rows[claimId] = rows[claimId] with
                     {
-                        Checked = evidence.Outcome != null,
+                        Checked = evidence.Outcome != null || evidence.QueryCompleted,
                         NewOutcome = outcome,
                         NewReason = evidence.Reason,
                         NewVacuity = vacuity,

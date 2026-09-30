@@ -41,6 +41,7 @@ public sealed class GoldenWorkerTests
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
+            : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
             : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
             : scenario == "vc-shadow-meter-boundary" ? await VcShadowMeterBoundary(fixture.Source)
             : scenario == "vc-shadow-completed-boundary" ? await VcShadowCompletedBoundary(fixture.Source)
@@ -48,6 +49,16 @@ public sealed class GoldenWorkerTests
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static string VcLoopPrologueReentry(string source)
+    {
+        var output = new StringBuilder();
+        output.AppendLine("source-contract: finite direct prologue before scalar loop");
+        output.AppendLine("payload: canonical re-encoding with original ID/site/predicate");
+        output.AppendLine("body-to-assumption-rejected: " + WorkerVcLoopTests.PrologueReentryRejected(false, source));
+        output.AppendLine("body-to-initialization-rejected: " + WorkerVcLoopTests.PrologueReentryRejected(true, source));
+        return output.ToString();
     }
 
     private static string VcAssumePlacement(string source)

@@ -176,7 +176,13 @@ internal static class CompilerTotalCallableArtifactCodec
         }
         Require(pointSites.Count == assumptions.Count, "A Total user assumption is missing its original program point.");
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, _ => { cancellationToken.ThrowIfCancellationRequested(); return true; }, out var failure);
-        Require(failure == IrAcyclicOrderFailure.None, "The Total program must be acyclic.");
+        Require(failure is IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow,
+            "The Total program contains unsupported control flow.");
+        if (failure == IrAcyclicOrderFailure.CyclicControlFlow)
+        {
+            ValidateCyclicProgram(program, result, parameters, pointSites.Count, cancellationToken);
+            return;
+        }
         if (assumptions.Count != 0)
         { ValidateAssumptionPrologue(program, parameters, order, pointSites.Count, cancellationToken); }
         var resultType = result is { } variable ? program.Factory.GetVariableInfo(variable).Type : (IrTypeId?)null;
@@ -209,6 +215,113 @@ internal static class CompilerTotalCallableArtifactCodec
         void Add(IrBlockId block, bool pending)
         {
             pendingThrows[block] = !pendingThrows.TryGetValue(block, out var previous) ? pending : previous && pending;
+        }
+    }
+
+    private static void ValidateCyclicProgram(IrProgram program, IrVarId? result,
+        IEnumerable<CompilerTotalParameter> parameters, int pointCount, CancellationToken cancellationToken)
+    {
+        // Explore both pending-throw states. This is the finite fixed point of
+        // the existing AND join: any nonthrowing incoming path forbids an exit.
+        var resultType = result is { } variable ? program.Factory.GetVariableInfo(variable).Type : (IrTypeId?)null;
+        var pending = new Queue<(IrBlockId Block, bool Thrown, bool Body)>();
+        var visited = new HashSet<(IrBlockId Block, bool Thrown, bool Body)>();
+        pending.Enqueue((program.Entry, false, false));
+        var canonicalParameters = parameters.ToArray();
+        var inputPrefix = pointCount == 0 ? 0 : canonicalParameters.Length * 2;
+        var remaining = CompilerPreparedBody.MaximumInstructions * 8;
+        while (pending.Count != 0)
+        {
+            Spend();
+            var state = pending.Dequeue();
+            if (!visited.Add(state))
+            { continue; }
+            var block = program.GetBlock(state.Block);
+            Require(pointCount == 0 || state.Block != program.Entry || !state.Body,
+                "A Total source body re-enters its canonical input initialization.");
+            var body = state.Body;
+            var ordinal = 0;
+            foreach (var instruction in block.Instructions)
+            {
+                Spend();
+                Require(instruction.Kind is IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
+                    IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
+                    "The Total source program contains unsupported executable evidence.");
+                if (instruction is IrReturnInstruction returned)
+                { Require(returned.Value?.Type == resultType, "The Total return type disagrees with its canonical result."); }
+                if (pointCount != 0 && !(state.Block == program.Entry && ordinal < inputPrefix))
+                {
+                    if (instruction is IrAssumeInstruction)
+                    { Require(!body, "A Total source assumption is outside the direct prologue."); }
+                    else if (instruction is not IrGotoInstruction)
+                    { body = true; }
+                }
+                ordinal++;
+            }
+            switch (block.Terminator)
+            {
+                case IrExceptionalExitInstruction:
+                    Require(state.Thrown, "A Total exceptional exit is reachable without a pending throw.");
+                    break;
+                case IrThrowInstruction thrown:
+                    pending.Enqueue((thrown.Target, true, body));
+                    break;
+                case IrGotoInstruction go:
+                    pending.Enqueue((go.Target, state.Thrown, body));
+                    break;
+                case IrBranchInstruction branch:
+                    pending.Enqueue((branch.WhenTrue, state.Thrown, body));
+                    pending.Enqueue((branch.WhenFalse, state.Thrown, body));
+                    break;
+            }
+        }
+        if (pointCount == 0)
+        { return; }
+        // Before the first body instruction, only canonical initialization,
+        // point filters and unconditional links belong to a direct prologue.
+        // Its single path must be finite, and contain every declared point.
+        var entry = program.GetBlock(program.Entry);
+        var initializationCount = 0;
+        foreach (var parameter in canonicalParameters)
+        {
+            Initialization(parameter.Current, parameter.Entry);
+            Initialization(parameter.Old, parameter.Entry);
+        }
+        var prologue = new HashSet<IrBlockId>();
+        var current = program.Entry;
+        var reachedPoints = 0;
+        while (true)
+        {
+            Spend();
+            Require(prologue.Add(current), "A Total source assumption prologue is cyclic.");
+            var block = program.GetBlock(current);
+            for (var ordinal = current == program.Entry ? initializationCount : 0; ordinal < block.Instructions.Length; ordinal++)
+            {
+                Spend();
+                if (block.Instructions[ordinal] is IrAssumeInstruction)
+                { reachedPoints++; }
+                else if (block.Instructions[ordinal] is not IrGotoInstruction)
+                {
+                    Require(reachedPoints == pointCount, "A Total source assumption is outside the direct prologue.");
+                    return;
+                }
+            }
+            current = ((IrGotoInstruction)block.Terminator).Target;
+        }
+
+        void Initialization(IrVarId target, IrVarId source)
+        {
+            Spend();
+            Require(initializationCount < entry.Instructions.Length && entry.Instructions[initializationCount] is IrAssignInstruction assign &&
+                assign.Target == target && assign.Value is IrVariableTerm value && value.Variable == source &&
+                program.Factory.GetOperationInfo(assign.Operation).SourceSpan == null,
+                "The Total source prologue is missing its canonical input initialization.");
+            initializationCount++;
+        }
+        void Spend()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(--remaining >= 0, "The Total cyclic validation exceeds its construction bound.");
         }
     }
 

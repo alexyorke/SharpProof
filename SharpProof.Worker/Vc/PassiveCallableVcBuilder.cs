@@ -11,6 +11,8 @@ internal sealed class PassiveCallableVcBuilder
     private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value);
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
+    private readonly IrProgram _program;
+    private readonly ImmutableHashSet<IrInstructionId> _stops;
     private readonly List<Assumption> _facts = [];
     private readonly Dictionary<ProofJustification, string> _labels = [];
     private readonly Dictionary<ProofJustification, OperationId> _assumes = [];
@@ -31,10 +33,13 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutableDictionary();
     internal ImmutableDictionary<ProofJustification, OperationId> Assumes => _assumes.ToImmutableDictionary();
 
-    private PassiveCallableVcBuilder(PassiveCallableCandidate candidate, CancellationToken cancellationToken)
+    private PassiveCallableVcBuilder(PassiveCallableCandidate candidate, CancellationToken cancellationToken,
+        PassiveLoopCutter.Encoding? encoding = null)
     {
         _candidate = candidate;
         _factory = candidate.Factory;
+        _program = encoding?.Program ?? candidate.Program;
+        _stops = encoding?.Stops ?? [];
         _cancellationToken = cancellationToken;
     }
 
@@ -45,16 +50,29 @@ internal sealed class PassiveCallableVcBuilder
         cancellationToken.ThrowIfCancellationRequested();
         var builder = new PassiveCallableVcBuilder(candidate, cancellationToken);
         try
-        { plan = builder.Build(); }
+        {
+            if (candidate.Program.Blocks.Length > MaximumSteps)
+            { throw new ConstructionLimitException(); }
+            var order = IrBlockOrder.TryCreateAcyclicOrder(candidate.Program, amount => { builder.Spend(amount); return true; }, out var orderFailure);
+            if (orderFailure == IrAcyclicOrderFailure.CyclicControlFlow)
+            {
+                if (!PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out failure, cancellationToken))
+                { plan = null; return false; }
+                var searchPlan = new PassiveCallableVcBuilder(candidate, cancellationToken, search).Build(boundedSearch: true);
+                plan = searchPlan == null ? null : new PassiveCallableVcBuilder(candidate, cancellationToken, proof).Build(searchPlan);
+            }
+            else
+            { plan = order.IsDefault ? null : builder.Build(); }
+        }
         catch (ConstructionLimitException)
         { plan = null; failure = WorkerClaimReason.ResourceLimit; return false; }
         failure = plan == null ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None;
         return plan != null;
     }
 
-    private PassiveCallableVcPlan? Build()
+    private PassiveCallableVcPlan? Build(PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
-        var program = _candidate.Program;
+        var program = _program;
         if (program.Blocks.Length > MaximumSteps)
         { throw new ConstructionLimitException(); }
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
@@ -159,7 +177,7 @@ internal sealed class PassiveCallableVcBuilder
                         if (!TryRewrite(assume.Condition, state, out var condition))
                         { return null; }
                         var filtered = Fresh(_factory.BooleanType);
-                        Fact(Equal(filtered, And(reach, condition)), assume.Operation, "assume", userAssume: true);
+                        Fact(Equal(filtered, And(reach, condition)), assume.Operation, "assume", userAssume: !_stops.Contains(assume.Id));
                         reach = filtered;
                         break;
                     case IrBranchInstruction branch:
@@ -227,7 +245,7 @@ internal sealed class PassiveCallableVcBuilder
             Spend();
             NormalCompletion = _factory.Binary(IrBinaryOperator.OrElse, NormalCompletion, returned.Reach);
         }
-        return new(this);
+        return new(this, loopSearch, boundedSearch);
     }
 
     private void AddEdge(IrBlockId destination, IrTerm condition, Dictionary<IrVarId, IrTerm> state,

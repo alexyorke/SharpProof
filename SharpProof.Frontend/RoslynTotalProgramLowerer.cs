@@ -82,7 +82,14 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
             else if (source.Kind == BasicBlockKind.Exit)
             {
-                _builder.Return(block, site);
+                // Nonvoid C# fallthrough is rejected by the compiler. A
+                // constant loop can still expose its impossible exit in CFG;
+                // keep that structural return typed, behind its false edge.
+                IrTerm? filler = _context.Result is { } exitResult && source.Predecessors.Any(predecessor => predecessor.Semantics == ControlFlowBranchSemantics.Regular)
+                    ? _context.Factory.GetVariableInfo(exitResult).Type == _context.Factory.BooleanType
+                        ? _context.Factory.Boolean(false) : _context.Factory.Integer(_context.Factory.GetVariableInfo(exitResult).Type, 0L)
+                    : null;
+                _builder.Return(block, site, filler);
             }
             else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                 branch?.Destination is { } fallThrough && source.ConditionalSuccessor?.Destination is { } conditional)
@@ -230,8 +237,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 order.Add(block);
                 continue;
             }
+            // Ordinary scalar cycles remain owned original IR. The worker
+            // derives loop proof/search encodings; region cycles stay closed.
             if (active.Contains(block))
-            { return false; }
+            { continue; }
             if (!visited.Add(block))
             { continue; }
             if (visited.Count > MaximumRegionSteps)

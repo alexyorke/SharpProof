@@ -3,19 +3,19 @@ authority: legacy
 request-bindings: True
 cache: Written
 postconditions: 4
-enrolled: 2
-checked: 2
-unchecked: 2
-unenrolled: 2
-unknown: 2
+enrolled: 3
+checked: 3
+unchecked: 1
+unenrolled: 1
+unknown: 1
 oldProven: 1
-newProven: 2
+newProven: 3
 oldVacuous: 0
 newVacuous: 0
 oldConditional: 1
 newConditional: 1
 soundnessDisagreements: 0
-precisionGains: 1
+precisionGains: 2
 precisionLosses: 1
 coverageComplete: False
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
@@ -45,13 +45,13 @@ row: M:Subject.BAssume(System.Int32)~System.Int32#0
 row: M:Subject.CLoop(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
   newVacuity: None
-  feasibility: Unknown
+  feasibility: Feasible
   oldConditional: False
   newConditional: False
 row: M:Subject.DCall(System.Int32)~System.Int32#0
@@ -71,19 +71,19 @@ authority: legacy
 request-bindings: True
 cache: Hit
 postconditions: 4
-enrolled: 2
-checked: 2
-unchecked: 2
-unenrolled: 2
-unknown: 2
+enrolled: 3
+checked: 3
+unchecked: 1
+unenrolled: 1
+unknown: 1
 oldProven: 1
-newProven: 2
+newProven: 3
 oldVacuous: 0
 newVacuous: 0
 oldConditional: 1
 newConditional: 1
 soundnessDisagreements: 0
-precisionGains: 1
+precisionGains: 2
 precisionLosses: 1
 coverageComplete: False
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
@@ -113,13 +113,13 @@ row: M:Subject.BAssume(System.Int32)~System.Int32#0
 row: M:Subject.CLoop(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
   newVacuity: None
-  feasibility: Unknown
+  feasibility: Feasible
   oldConditional: False
   newConditional: False
 row: M:Subject.DCall(System.Int32)~System.Int32#0

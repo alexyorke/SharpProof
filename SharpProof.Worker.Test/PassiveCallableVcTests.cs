@@ -363,32 +363,38 @@ public sealed class PassiveCallableVcTests
     [TestCase("assert")]
     [TestCase("memory")]
     [TestCase("call")]
-    [TestCase("cycle")]
-    public void UnsupportedEffectsAndCyclesClose(string scenario)
+    public void UnsupportedEffectsClose(string scenario)
     {
         var subject = new ScalarSubject();
         var block = subject.Builder.CreateBlock();
-        if (scenario == "cycle")
-        { subject.Builder.Goto(block, subject.Site, block); }
-        else
+        switch (scenario)
         {
-            switch (scenario)
-            {
-                case "assert":
-                    subject.Builder.Assert(block, subject.Site, subject.Factory.Boolean(true));
-                    break;
-                case "memory":
-                    subject.Builder.Havoc(block, subject.Site, IrHavocKind.Memory);
-                    break;
-                case "call":
-                    var member = subject.Factory.GetOrCreateMember(subject.Factory.CreateIdentity(), subject.Factory.ObjectType,
-                        "Call", subject.Factory.IntegerType, true);
-                    subject.Builder.Call(block, subject.Site, subject.Result, member, null);
-                    break;
-            }
-            subject.Builder.Return(block, subject.Site, subject.Factory.Integer(0));
+            case "assert":
+                subject.Builder.Assert(block, subject.Site, subject.Factory.Boolean(true));
+                break;
+            case "memory":
+                subject.Builder.Havoc(block, subject.Site, IrHavocKind.Memory);
+                break;
+            case "call":
+                var member = subject.Factory.GetOrCreateMember(subject.Factory.CreateIdentity(), subject.Factory.ObjectType,
+                    "Call", subject.Factory.IntegerType, true);
+                subject.Builder.Call(block, subject.Site, subject.Result, member, null);
+                break;
         }
+        subject.Builder.Return(block, subject.Site, subject.Factory.Integer(0));
         AssertClosed(subject.Candidate(subject.Factory.Boolean(false)));
+    }
+
+    [Test]
+    public async Task PureScalarCycleHasSoundAbstractNormalVacuity()
+    {
+        var subject = new ScalarSubject();
+        var block = subject.Builder.CreateBlock();
+        subject.Builder.Goto(block, subject.Site, block);
+        using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
+        var feasibility = await solver.VerifyFeasibilityAsync();
+        Assert.That(feasibility.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
+        Assert.That(feasibility.Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]

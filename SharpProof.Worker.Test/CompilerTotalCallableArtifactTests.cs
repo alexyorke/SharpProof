@@ -163,6 +163,20 @@ public sealed class CompilerTotalCallableArtifactTests
             Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
     }
 
+    [Test]
+    public void OptionalLoopEvidencePreservesEveryLegacyRowAndGraphByte()
+    {
+        var compilation = TestCompilation.Create("LegacyLoopPreservation", ("Subject.cs", WorkerVcLoopTests.LoopSource));
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        Assert.That(preparation.Total, Is.Not.Null);
+        var withTotal = CompilerLoweredArtifact.Encode(preparation);
+        var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
+        withTotal.Total = null;
+        Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
+    }
+
     [TestCase("Subject.cs")]
     [TestCase("")]
     [TestCase("/project/Subject.cs")]
@@ -227,7 +241,6 @@ public sealed class CompilerTotalCallableArtifactTests
     }
 
     [TestCase("assume")]
-    [TestCase("loop")]
     [TestCase("call")]
     [TestCase("attribute")]
     public void UnsupportedSourceRemainsClosed(string kind)
@@ -235,7 +248,6 @@ public sealed class CompilerTotalCallableArtifactTests
         var body = kind switch
         {
             "assume" => "Contract.Assume(System.Math.Abs(x) > 0); Contract.Ensures(Contract.Result<int>() == x); return x;",
-            "loop" => "Contract.Ensures(Contract.Result<int>() == x); while (x < 0) x++; return x;",
             "call" => "Contract.Ensures(Contract.Result<int>() == x); return System.Math.Abs(x);",
             _ => "return x;"
         };

@@ -13,7 +13,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
 
-    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder)
+    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder, PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
         _candidate = builder.Candidate;
         _entry = builder.EntryAssumptions;
@@ -23,11 +23,17 @@ internal sealed class PassiveCallableVcPlan
         _model = builder.Model;
         _labels = builder.Labels;
         _assumes = builder.Assumes;
+        if (loopSearch != null && (!ReferenceEquals(_candidate, loopSearch._candidate) || loopSearch.LoopSearch != null || !loopSearch.IsBoundedSearch || boundedSearch))
+        { throw new ArgumentException("A loop search must derive from the same owned original.", nameof(loopSearch)); }
+        LoopSearch = loopSearch;
+        IsBoundedSearch = boundedSearch;
     }
 
     internal IrFactory Factory => _candidate.Factory;
     internal int EnsuresCount => _goals.Length;
     internal string CallableId => _candidate.CallableId;
+    internal PassiveCallableVcPlan? LoopSearch { get; }
+    internal bool IsBoundedSearch { get; }
 
     internal VerificationQuery EntryQuery()
     {

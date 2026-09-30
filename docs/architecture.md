@@ -210,7 +210,9 @@ safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
 body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
-calls and cycles currently abstain. Checked scalar Add, Subtract, Multiply and
+calls, irreducible loops and cyclic exception contexts currently abstain.
+Ordinary reducible scalar loops use the owned proof/search route below.
+Checked scalar Add, Subtract, Multiply and
 unary Plus/Minus use the same wrap value and guarded overflow rules in bodies
 and clauses. Increment/decrement and `+=`, `-=`, `*=` compound assignments preserve
 the resolved promotions and checked storage conversion. Earlier operand effects
@@ -237,7 +239,7 @@ finally join. Canonical parameter and Old identities retain their existing rules
 
 The standalone passive VC builder owns one immutable Total scalar candidate.
 It derives SSA writes, guarded joins, block and edge reachability, and normal
-return obligations from the original acyclic program. Unchanged incoming
+return obligations from owned scalar programs. Unchanged incoming
 versions are forwarded. Entry feasibility activates guarded Requires and the
 intrinsic typed domains; body Assume filters point reachability and retains its
 own core provenance. Construction is bounded and cancelable. Each callable
@@ -252,6 +254,27 @@ Late or conditional placement remains unsupported. Decoding binds each filter
 to its owned clause and requires reachable prologue placement before body
 execution. The optional Total artifact and shadow comparison reuse decoded
 preparations; authoritative worker responses and cache claims remain legacy.
+
+Ordinary reducible scalar loops retain their original cyclic Total program for
+concrete replay. The worker derives two bounded encodings from that same owner.
+For proof, each natural-loop header havocs all scalar storage written by its
+loop and cuts back edges. Every finite original return is represented by its
+last loop iteration, including zero trips, nested loops and control exits; Entry
+and Old remain immutable. Only UNSAT of this overapproximation establishes a
+proof or absence of normal completion. Cut stops are lowering facts, never user
+assumptions. Irreducible loops, cyclic exception contexts and point filters inside
+loops remain unsupported.
+
+Counterexample and normal-witness search unrolls at most four back-edge
+traversals. SAT must validate all SSA facts and replay the original cyclic body
+within the existing 4096-step bound. Bounded UNSAT establishes neither a proof
+nor vacuity. If that search is inconclusive, an independently established
+abstract Ensures proof may still be reported with unknown normal feasibility
+and no vacuity. A completed bounded search reports Unknown/SolverIncomplete
+and counts as checked; skipped, interrupted or refused queries stay unchecked.
+Both encodings share one solver session and the existing method resource meter.
+Cyclic artifact validation computes finite pending-throw and body-start states,
+rejecting every body path that re-enters the contract prologue or initialization.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.
