@@ -1,0 +1,8 @@
+authority: legacy
+boundary: caller canceled after completed observation
+completed-run: Complete
+observed-checks: 1
+cache: Disabled
+next-run: Complete
+next-failure: None
+same-backend-checks: 2

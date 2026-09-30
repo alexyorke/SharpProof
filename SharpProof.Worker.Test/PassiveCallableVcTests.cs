@@ -10,6 +10,45 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class PassiveCallableVcTests
 {
+    [TestCase(false, false, PassiveCallableFeasibilityKind.Feasible)]
+    [TestCase(true, false, PassiveCallableFeasibilityKind.NoModeledNormalReturn)]
+    [TestCase(false, true, PassiveCallableFeasibilityKind.ContradictoryEntry)]
+    public async Task OwnedNormalFeasibilitySeparatesEntryAndActualReturns(bool thrown, bool impossible, int expectedKind)
+    {
+        var subject = new ScalarSubject();
+        var block = subject.Builder.CreateBlock();
+        if (thrown)
+        {
+            var exit = subject.Builder.CreateBlock();
+            subject.Builder.Throw(block, subject.Site, IrExceptionKind.Overflow, exit);
+            subject.Builder.ExceptionalExit(exit, subject.Site);
+        }
+        else
+        { subject.Builder.Return(block, subject.Site, subject.Factory.Variable(subject.Parameter.Current)); }
+        var plan = Build(subject.Candidate(subject.Factory.Boolean(false), requires: subject.Factory.Boolean(!impossible)));
+        using var solver = new PassiveCallableSolver(plan);
+        var result = await solver.VerifyFeasibilityAsync();
+        Assert.That((int)result.Kind, Is.EqualTo(expectedKind));
+        if (result.Kind == PassiveCallableFeasibilityKind.Feasible)
+        {
+            Assert.That(result.Evidence.Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That(result.Evidence.EntryModel.Keys, Is.EqualTo(new[] { subject.Parameter.Entry }));
+        }
+    }
+
+    [Test]
+    public async Task NormalWitnessRejectsActualApproximationReadAndKeepsQueryIsolation()
+    {
+        var subject = new ScalarSubject();
+        var block = subject.Builder.CreateBlock();
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, subject.Parameter.Current);
+        subject.Builder.Return(block, subject.Site, subject.Factory.Variable(subject.Parameter.Current));
+        using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
+        var normal = await solver.VerifyFeasibilityAsync();
+        Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
+        Assert.That(normal.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+        Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+    }
     [Test]
     public async Task SourceDiamondReplaysMutationOldAndEveryUnusedCanonicalInput()
     {
@@ -87,6 +126,9 @@ public sealed class PassiveCallableVcTests
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
         Assert.That(proof.Core.Any(label => label.StartsWith("assume:", StringComparison.Ordinal)), Is.True);
+        var normal = await solver.VerifyFeasibilityAsync();
+        Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
+        Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
         Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
@@ -120,6 +162,8 @@ public sealed class PassiveCallableVcTests
         { subject.Builder.ExceptionalExit(target, subject.Site); }
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
         Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyFeasibilityAsync()).Kind,
+            Is.EqualTo(caught ? PassiveCallableFeasibilityKind.Feasible : PassiveCallableFeasibilityKind.NoModeledNormalReturn));
         Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, caught ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>());
     }
 

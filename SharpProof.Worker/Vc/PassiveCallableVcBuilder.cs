@@ -25,6 +25,7 @@ internal sealed class PassiveCallableVcBuilder
     internal PassiveCallableCandidate Candidate => _candidate;
     internal ImmutableArray<Assumption> EntryAssumptions { get; private set; }
     internal ImmutableArray<IrTerm> Goals { get; private set; }
+    internal IrTerm NormalCompletion { get; private set; } = null!;
     internal ImmutableArray<Assumption> Facts => [.. _facts];
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
     internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutableDictionary();
@@ -217,6 +218,12 @@ internal sealed class PassiveCallableVcBuilder
         }
         EntryAssumptions = entryAssumptions.ToImmutable();
         Goals = goals.ToImmutable();
+        NormalCompletion = _factory.Boolean(false);
+        foreach (var returned in _returns)
+        {
+            Spend();
+            NormalCompletion = _factory.Binary(IrBinaryOperator.OrElse, NormalCompletion, returned.Reach);
+        }
         return new(this);
     }
 

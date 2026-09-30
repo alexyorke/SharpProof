@@ -8,6 +8,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<Assumption> _entry;
     private readonly ImmutableArray<Assumption> _body;
     private readonly ImmutableArray<IrTerm> _goals;
+    private readonly IrTerm _normalCompletion;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
@@ -18,6 +19,7 @@ internal sealed class PassiveCallableVcPlan
         _entry = builder.EntryAssumptions;
         _body = builder.Facts;
         _goals = builder.Goals;
+        _normalCompletion = builder.NormalCompletion;
         _model = builder.Model;
         _labels = builder.Labels;
         _assumes = builder.Assumes;
@@ -42,6 +44,25 @@ internal sealed class PassiveCallableVcPlan
     internal CallableReplayContext Replay(int ordinal)
     {
         RequireOrdinal(ordinal);
+        var clause = _candidate.Ensures[ordinal];
+        return CreateReplay(clause.Value, clause.Safe);
+    }
+
+    internal VerificationQuery NormalCompletionQuery()
+    {
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory,
+            Factory.Unary(IrUnaryOperator.Not, _normalCompletion), ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)), _model);
+    }
+
+    internal CallableReplayContext NormalCompletionReplay()
+    {
+        // A false owned postcondition makes an actual normal return the only
+        // accepted counterexample. The kernel still validates every SSA fact.
+        return CreateReplay(Factory.Boolean(false), Factory.Boolean(true));
+    }
+
+    private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)
+    {
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
         var old = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId?>();
         foreach (var parameter in _candidate.Parameters)
@@ -50,11 +71,10 @@ internal sealed class PassiveCallableVcPlan
             bindings[parameter.Current] = parameter.Current;
             old[parameter.Old] = parameter.Entry;
         }
-        var clause = _candidate.Ensures[ordinal];
         return new(_candidate.Program, false, bindings.ToImmutable(), old.ToImmutable(),
-            _candidate.Result is { } result ? [result] : [], clause.Value,
+            _candidate.Result is { } result ? [result] : [], value,
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, PassiveCallableVcBuilder.MaximumSteps, [],
-            postconditionGuard: clause.Safe, replayOptions: new IrProgramReplayOptions(request =>
+            postconditionGuard: safe, replayOptions: new IrProgramReplayOptions(request =>
                 Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
                     ? Factory.CreateBooleanValue(false)
                     : Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)));

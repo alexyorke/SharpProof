@@ -1,0 +1,136 @@
+run: normal
+authority: legacy
+request-bindings: True
+cache: Written
+postconditions: 4
+enrolled: 1
+checked: 1
+unchecked: 3
+unenrolled: 3
+unknown: 3
+oldProven: 1
+newProven: 1
+oldVacuous: 0
+newVacuous: 0
+oldConditional: 1
+newConditional: 0
+soundnessDisagreements: 0
+precisionGains: 1
+precisionLosses: 1
+coverageComplete: False
+row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.BAssume(System.Int32)~System.Int32#0
+  oldOutcome: Proven
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: True
+  newConditional: False
+row: M:Subject.CLoop(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DCall(System.Int32)~System.Int32#0
+  oldOutcome: Refuted
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+run: cache-hit
+authority: legacy
+request-bindings: True
+cache: Hit
+postconditions: 4
+enrolled: 1
+checked: 1
+unchecked: 3
+unenrolled: 3
+unknown: 3
+oldProven: 1
+newProven: 1
+oldVacuous: 0
+newVacuous: 0
+oldConditional: 1
+newConditional: 0
+soundnessDisagreements: 0
+precisionGains: 1
+precisionLosses: 1
+coverageComplete: False
+row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.BAssume(System.Int32)~System.Int32#0
+  oldOutcome: Proven
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: True
+  newConditional: False
+row: M:Subject.CLoop(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DCall(System.Int32)~System.Int32#0
+  oldOutcome: Refuted
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False

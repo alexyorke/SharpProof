@@ -16,6 +16,7 @@ public sealed class SharpProofWorker : IDisposable
     // has timed out or been cancelled, fail closed rather than handing the
     // potentially poisoned instance to a later request.
     private bool _injectedBackendPoisoned;
+    internal Action<WorkerVcShadowReport>? ShadowReportSink { get; set; }
     public SharpProofWorker(ISmtBackend backend) : this(
         backend, ReadResources(backend))
     {
@@ -61,6 +62,7 @@ public sealed class SharpProofWorker : IDisposable
         CancellationToken cancellationToken, long? operationStarted = null)
     {
         request = request ?? throw new ArgumentNullException(nameof(request));
+        var shadow = string.Equals(Environment.GetEnvironmentVariable("SHARPPROOF_VC"), "shadow", StringComparison.Ordinal);
         ObjectDisposedException.ThrowIf(_disposed, this);
         var started = operationStarted ?? Stopwatch.GetTimestamp();
         var validation = WorkerProtocolJson.Validate(request);
@@ -129,6 +131,7 @@ public sealed class SharpProofWorker : IDisposable
         WorkerInputSnapshot snapshot;
         VerificationLane[] solverLanes = [];
         var ownsInjectedBackendRunGate = false;
+        var authoritativeResponseCompleted = false;
         try
         {
             snapshot = preparedInput == null
@@ -164,6 +167,27 @@ public sealed class SharpProofWorker : IDisposable
         {
             return ManifestFailure(snapshot.InputHash, snapshot.CompilerManifest.Manifest,
                 request.Budgets, started, reason, errors, requestHash, claimReason);
+        }
+
+        async Task<WorkerVerifyResponse> ObserveShadow(WorkerVerifyResponse authoritative)
+        {
+            if (!shadow)
+            { return authoritative; }
+            try
+            {
+                var report = await WorkerVcShadowObserver.ObserveAsync(authoritative, snapshot.Callables, budgets,
+                    projectBoundary.Token, cancellationToken).ConfigureAwait(false);
+                if (ShadowReportSink is { } sink)
+                { sink(report); }
+                else
+                { await Console.Error.WriteLineAsync(report.Serialize()).ConfigureAwait(false); }
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+            {
+                // Optional observation and diagnostic I/O cannot replace an
+                // already validated authoritative response or cache hit.
+            }
+            return authoritative;
         }
 
         if (cancellationToken.IsCancellationRequested)
@@ -225,7 +249,7 @@ public sealed class SharpProofWorker : IDisposable
                             manifest).IsValid)
                     {
                         ThrowIfProjectInterrupted();
-                        return cachedResponse;
+                        return await ObserveShadow(cachedResponse).ConfigureAwait(false);
                     }
                 }
                 if (cache.LastReadUnavailable)
@@ -431,12 +455,13 @@ public sealed class SharpProofWorker : IDisposable
                     Elapsed(started));
             }
             ThrowIfProjectInterrupted();
-            return response;
+            authoritativeResponseCompleted = true;
+            return await ObserveShadow(response).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { return Interrupted(snapshot); }
         finally
         {
-            if (ownsInjectedBackendRunGate && projectBoundary.IsCancellationRequested)
+            if (ownsInjectedBackendRunGate && !authoritativeResponseCompleted && projectBoundary.IsCancellationRequested)
             {
                 _injectedBackendPoisoned = true;
             }
