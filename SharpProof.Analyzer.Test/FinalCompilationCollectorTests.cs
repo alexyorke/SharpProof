@@ -549,6 +549,28 @@ public sealed class FinalCompilationCollectorTests
             Is.EqualTo(DiagnosticSeverity.Error));
     }
 
+    [Test]
+    public async Task CompilerDiagnosticWithoutSourceLocationRemainsUnmapped()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation("internal static class Subject { }");
+        compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
+        var expected = compilation.GetDiagnostics().Single(static item => item.Id == "CS5001");
+        Assert.That(expected.Location.IsInSource, Is.False);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("missing-main"), allowCompilationErrors: true);
+        var diagnostic = artifact.CompilerDiagnostics.Single(static item => item.Code == "compiler.CS5001");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostic.IsSource, Is.False);
+            Assert.That(diagnostic.Message, Is.EqualTo(expected.GetMessage(CultureInfo.InvariantCulture)));
+            Assert.That(diagnostic.Location.Path, Is.Empty);
+            Assert.That(diagnostic.Location.Start, Is.Zero);
+            Assert.That(diagnostic.Location.Length, Is.Zero);
+            Assert.That(diagnostic.Location.Line, Is.Zero);
+            Assert.That(diagnostic.Location.Column, Is.Zero);
+        }
+    }
+
     [TestCase("0")]
     [TestCase("257")]
     [TestCase("not-a-number")]

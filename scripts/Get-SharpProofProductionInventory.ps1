@@ -17,6 +17,7 @@ $global:LASTEXITCODE = 0
 $resolvedRepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PEMetadata.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofSourceDocument.ps1')
 $pathSeparator = [IO.Path]::DirectorySeparatorChar
 $repositoryPrefix = [IO.Path]::GetFullPath($resolvedRepositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + $pathSeparator)
 
@@ -281,14 +282,17 @@ function Get-PortablePdbModule {
                 if ($point.IsHidden) { continue }
                 $documentHandle = $point.Document
                 if ($documentHandle.IsNil) { $documentHandle = $debug.Document }
-                $sourceName = $null
-                if (-not $documentPaths.TryGetValue($documentHandle, [ref]$sourceName)) {
+                $relativePath = $null
+                if (-not $documentPaths.TryGetValue($documentHandle, [ref]$relativePath)) {
                     $sourceName = Get-PdbDocumentPath -Reader $pdb -Handle $documentHandle
-                    $documentPaths[$documentHandle] = $sourceName
+                    $relativePath = Resolve-SharpProofSourceDocument `
+                        -RepositoryRoot $resolvedRepositoryRoot -DocumentPath $sourceName -RequireFile $false
+                    $documentPaths[$documentHandle] = $relativePath
                 }
-                $relativePath = Resolve-RepositoryPath -Candidate $sourceName -Description ($AssemblyPath + ':' + $point.StartLine)
                 if (-not $relativePath.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) { throw "Production inventory PDB source is not C#: '$relativePath'." }
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }
+                Get-RepositoryFilePath -RelativePath $relativePath `
+                    -MissingMessage "Production inventory PDB source file is missing: '$relativePath'." | Out-Null
                 if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
                 if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
                 $documentState = $null

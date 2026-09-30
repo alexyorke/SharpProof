@@ -18,14 +18,9 @@ internal static class CompilerSourceCoordinates
     {
         return TreeBindings.TryGetValue(location, out var binding) ? binding.Ordinal : -1;
     }
-    internal static bool IsNone(WorkerSourceLocation? value)
-    {
-        return value is { Path.Length: 0, Start: 0, Length: 0, Line: 0, Column: 0 };
-    }
-
     private static bool TryValidateLineMap(
-        CompilerSyntaxTreeSnapshot? tree,
-        int? sourceStart,
+        CompilerSyntaxTreeSnapshot tree,
+        int sourceStart,
         int sourceLength,
         out string mappedPath,
         out int mappedLine,
@@ -35,8 +30,7 @@ internal static class CompilerSourceCoordinates
         mappedPath = string.Empty;
         mappedLine = 0;
         mappedColumn = 0;
-        if (tree == null ||
-            tree.LineMap is not { Length: > 0 } entries)
+        if (tree.LineMap is not { Length: > 0 } entries)
         {
             return false;
         }
@@ -62,7 +56,7 @@ internal static class CompilerSourceCoordinates
                 return false;
             }
 
-            if (sourceStart.HasValue && entry.SourceStart <= sourceStart.Value)
+            if (entry.SourceStart <= sourceStart)
             {
                 selected = entry;
             }
@@ -90,21 +84,14 @@ internal static class CompilerSourceCoordinates
             return false;
         }
 
-        if (!sourceStart.HasValue)
-        {
-            return true;
-        }
-
-        if (sourceStart.Value < 0 ||
-            sourceLength < 0 ||
-            sourceStart.Value > tree.TextLength ||
-            sourceLength > tree.TextLength - sourceStart.Value ||
+        if (sourceStart > tree.TextLength ||
+            sourceLength > tree.TextLength - sourceStart ||
             selected == null)
         {
             return false;
         }
 
-        var delta = (long)sourceStart.Value - selected.SourceStart;
+        var delta = (long)sourceStart - selected.SourceStart;
         var mappedDelta = Math.Max(delta - selected.CharacterOffset, 0);
         var line = (long)selected.MappedLine;
         var column = (long)selected.MappedColumn + mappedDelta;
@@ -123,11 +110,10 @@ internal static class CompilerSourceCoordinates
     internal static bool HasValidLocationGeometry(
         WorkerSourceLocation? location,
         CompilerSyntaxTreeSnapshot? tree,
-        bool locationAlreadyValidated = false,
         CancellationToken cancellationToken = default)
     {
         if (location == null || tree == null ||
-            !locationAlreadyValidated && (string.IsNullOrEmpty(location.Path) || location.Start < 0 || location.Length < 0 || location.Line <= 0 || location.Column <= 0) ||
+            string.IsNullOrEmpty(location.Path) || location.Start < 0 || location.Length < 0 || location.Line <= 0 || location.Column <= 0 ||
             !TryValidateLineMap(
                 tree,
                 location.Start,
@@ -223,75 +209,4 @@ internal static class CompilerSourceCoordinates
         sourceLineMapSha256 = tree.LineMapSha256;
     }
 
-    internal static WorkerSourceLocation CopyLocation(
-        WorkerSourceLocation? value)
-    {
-        return new WorkerSourceLocation
-        {
-            Path = value?.Path ?? string.Empty,
-            Start = value?.Start ?? 0,
-            Length = value?.Length ?? 0,
-            Line = value?.Line ?? 0,
-            Column = value?.Column ?? 0
-        };
-    }
-
-    internal static bool LocationsEqual(
-        WorkerSourceLocation? left,
-        WorkerSourceLocation? right)
-    {
-        return left != null && right != null &&
-            left.Path == right.Path &&
-            left.Start == right.Start &&
-            left.Length == right.Length &&
-            left.Line == right.Line &&
-            left.Column == right.Column;
-    }
-
-    internal static bool TryMap(
-        CompilerSourceLineMapEntry[]? entries,
-        int sourceStart,
-        out string mappedPath,
-        out int mappedLine,
-        out int mappedColumn)
-    {
-        mappedPath = string.Empty;
-        mappedLine = 0;
-        mappedColumn = 0;
-        if (entries is not { Length: > 0 } || sourceStart < 0)
-        {
-            return false;
-        }
-
-        CompilerSourceLineMapEntry? selected = null;
-        foreach (var entry in entries)
-        {
-            if (entry == null || entry.SourceStart > sourceStart)
-            {
-                break;
-            }
-
-            selected = entry;
-        }
-
-        if (selected == null)
-        {
-            return false;
-        }
-
-        var delta = (long)sourceStart - selected.SourceStart;
-        var mappedDelta = Math.Max(delta - selected.CharacterOffset, 0);
-        var line = (long)selected.MappedLine;
-        var column = (long)selected.MappedColumn + mappedDelta;
-        if (delta < 0 || line < 0 || column < 0 ||
-            line >= int.MaxValue || column >= int.MaxValue)
-        {
-            return false;
-        }
-
-        mappedPath = selected.MappedPath;
-        mappedLine = (int)line;
-        mappedColumn = (int)column;
-        return true;
-    }
 }

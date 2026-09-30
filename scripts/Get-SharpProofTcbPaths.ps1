@@ -135,6 +135,17 @@ function Get-SharpProofTcbPaths {
         foreach ($path in $paths) {
             if ($path.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase) -and
                 -not $compilePaths.Contains($path)) {
+                # This existing release authority is compiled by Add-Type in
+                # Test-SharpProofSymbolPackages, rather than a shipping project.
+                # Keep it classified and subject to changed-TCB coverage checks.
+                if ($path -ceq 'scripts/SharpProof.SymbolPackageValidator.cs' -and
+                    @($Contract.trustedComputingBase.components | Where-Object {
+                        $_.name -ceq 'releaseAuthorityDerivedLeaves' -and
+                        @($_.paths) -ccontains $path
+                    }).Count -eq 1 -and
+                    (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'SharpProof.SymbolPackageValidator.cs') -PathType Leaf)) {
+                    continue
+                }
                 throw (
                     "Trusted-computing-base source is not an evaluated " +
                     "production Compile item: '$path'.")

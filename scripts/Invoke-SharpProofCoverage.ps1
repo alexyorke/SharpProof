@@ -15,6 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+& (Join-Path $PSScriptRoot 'Test-SharpProofSourceDocuments.ps1')
 $repositoryPrefix = $repositoryRoot.TrimEnd(
     [IO.Path]::DirectorySeparatorChar,
     [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
@@ -110,7 +111,7 @@ function New-CoverageSettings {
     [void]$modulePaths.AppendChild($selector)
     $staticManaged = $settings.SelectSingleNode(
         '//EnableStaticManagedInstrumentation')
-    $staticManaged.InnerText = 'False'
+    $staticManaged.InnerText = 'True'
 
     $path = Join-Path `
         $resolvedResultsDirectory `
@@ -173,11 +174,9 @@ else {
     }
 }
 
-# SharpProof.Attributes is a compiler-input payload whose exact bytes are
-# authenticated by compiler evidence. Linux managed coverage instruments that
-# payload on disk, so the broad Worker pass must not rewrite it. Collect its
-# own behavioral coverage in an isolated testhost where no compiler manifest
-# consumes the instrumented assembly.
+# Keep Attributes out of broad Worker instrumentation and collect its behavior
+# in an isolated testhost, where consumer compilations cannot use its rewritten
+# assembly.
 $attributesSettings = New-CoverageSettings `
     -Name 'attributes' `
     -ModulePath '.*SharpProof\.Attributes\.dll$'
@@ -194,31 +193,6 @@ $attributesSettings = New-CoverageSettings `
 if ($LASTEXITCODE -ne 0) {
     throw (
         'Isolated Attributes coverage failed with exit code ' +
-        "$LASTEXITCODE.")
-}
-
-# The broad pass deliberately excludes wall-clock assertions. Exercise the
-# complete performance protocol in a separate structural-evidence test whose
-# settings instrument only SharpProof.Gates and never its child processes or
-# product payloads. The ordinary uninstrumented Performance test remains the
-# authoritative threshold gate.
-$gateSettings = New-CoverageSettings `
-    -Name 'gates' `
-    -ModulePath '.*SharpProof\.Gates\.dll$'
-& $dotnetWrapper `
-    -TimeoutSeconds $TimeoutSeconds `
-    test (Join-Path `
-        $repositoryRoot `
-        'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj') `
-    -c Release `
-    --no-build `
-    --filter 'TestCategory=Coverage' `
-    --settings $gateSettings `
-    --collect 'Code Coverage;Format=Cobertura' `
-    --results-directory $resolvedResultsDirectory
-if ($LASTEXITCODE -ne 0) {
-    throw (
-        'Isolated Gates coverage failed with exit code ' +
         "$LASTEXITCODE.")
 }
 

@@ -74,6 +74,24 @@ internal sealed class ContractApiTests
     }
 
     [Test]
+    public void CompanionAndAllowanceAttributesPreserveTheirTypedArguments()
+    {
+        Type[] exceptions = [typeof(IOException), typeof(InvalidOperationException)];
+        var capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(new AllowedExceptionsAttribute(exceptions).ExceptionTypes, Is.SameAs(exceptions));
+            Assert.That(new AllowedExceptionsAttribute().ExceptionTypes, Is.Empty);
+            Assert.That(new AllowedCapabilitiesAttribute(capabilities).Capabilities, Is.EqualTo(capabilities));
+            Assert.That(new ContractForAttribute(typeof(IDisposable)).TargetType, Is.EqualTo(typeof(IDisposable)));
+            Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
+                _ = new AllowedExceptionsAttribute(null!)))!.ParamName, Is.EqualTo("exceptionTypes"));
+            Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
+                _ = new ContractForAttribute(null!)))!.ParamName, Is.EqualTo("targetType"));
+        }
+    }
+
+    [Test]
     public void ClosedContractsTargetOnlyParametersAndReturns()
     {
         foreach (var type in new[] {

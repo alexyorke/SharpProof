@@ -329,6 +329,40 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    public async System.Threading.Tasks.Task ActiveVerifierCancellationStopsItsProcess()
+    {
+        using var directory = new TempDirectory("sharpproof-active-cancel-");
+        var helper = CreateTimedProcessAssembly(directory.FullName,
+            "using System; using System.IO; using System.Threading; File.WriteAllText(\"ready.pid\", Environment.ProcessId.ToString()); Thread.Sleep(Timeout.Infinite);");
+        var marker = Path.Combine(directory.FullName, "ready.pid");
+        using var task = CreateVerifier(directory, helper, 10_000);
+        var execution = System.Threading.Tasks.Task.Run(task.Execute);
+        try
+        {
+            var deadline = Stopwatch.StartNew();
+            while (!File.Exists(marker) && deadline.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
+            {
+                await System.Threading.Tasks.Task.Delay(10);
+            }
+            Assert.That(File.Exists(marker), Is.True, "The process must start before active cancellation.");
+            var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
+            task.Cancel();
+            Assert.That(await execution.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
+                Assert.That(task.HasStructuredError, Is.False);
+                Assert.That(IsProcessRunning(processId), Is.False);
+            }
+        }
+        finally
+        {
+            task.Cancel();
+            await execution.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Test]
     public void StructuredVerifierDiagnosticsPreserveArbitraryPathText()
     {
         var engine = new RecordingBuildEngine();
@@ -547,6 +581,133 @@ public sealed class BuildTaskTests
         task.Cancel();
 
         Assert.That(task.Execute(), Is.False);
+    }
+
+    [Test]
+    public void InvalidationDeletesPublishedOutputsAndPreservesEveryInput()
+    {
+        using var directory = new TempDirectory("sharpproof-invalidation-");
+        Directory.CreateDirectory(Path.Combine(directory.FullName, "runtime"));
+        string[] names = ["result.json", "result.sarif", "request.json", "manifest.json",
+            "invocation-request.json", "invocation-result.json", "invocation-manifest.json",
+            "compiler.dll", "runtime/worker.dll", "runtime/protocol.dll"];
+        foreach (var name in names)
+        {
+            File.WriteAllText(Path.Combine(directory.FullName, name), name);
+        }
+        var engine = new RecordingBuildEngine();
+        var task = new InvalidatePublishedResult
+        {
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            ResultPath = "result.json",
+            SarifPath = "result.sarif",
+            RequestPath = "request.json",
+            ManifestPath = "manifest.json",
+            InvocationRequestPath = "invocation-request.json",
+            InvocationResultPath = "invocation-result.json",
+            InvocationManifestPath = "invocation-manifest.json",
+            WorkerPath = "runtime/worker.dll",
+            LauncherPath = "runtime/worker.dll",
+            WorkerProtocolPath = "runtime/protocol.dll",
+            CachePath = "cache",
+            CompilerOutputPaths = [new TaskItem("compiler.dll")]
+        };
+
+        Assert.That(task.Execute(), Is.True);
+        Assert.That(task.Execute(), Is.True, "Already absent outputs are harmless.");
+        Assert.That(engine.Errors, Is.Empty);
+        foreach (var name in names)
+        {
+            var path = Path.Combine(directory.FullName, name);
+            if (name is "result.json" or "result.sarif")
+            {
+                Assert.That(File.Exists(path), Is.False);
+            }
+            else
+            {
+                Assert.That(File.ReadAllText(path), Is.EqualTo(name));
+            }
+        }
+    }
+
+    [TestCase("duplicate", "output paths must be distinct")]
+    [TestCase("input", "must not alias input paths")]
+    [TestCase("runtime", "must not be inside the worker runtime")]
+    [TestCase("cache", "cache, and worker paths must be distinct")]
+    [TestCase("compiler", "must not alias compiler-owned outputs")]
+    public void InvalidationPreflightsAllCollisionsBeforeDeletingAnyOutput(
+        string collision, string expectedError)
+    {
+        using var directory = new TempDirectory("sharpproof-invalidation-collision-");
+        Directory.CreateDirectory(Path.Combine(directory.FullName, "runtime"));
+        File.WriteAllText(Path.Combine(directory.FullName, "result.json"), "result");
+        File.WriteAllText(Path.Combine(directory.FullName, "result.sarif"), "sarif");
+        File.WriteAllText(Path.Combine(directory.FullName, "runtime/worker.dll"), "worker");
+        var engine = new RecordingBuildEngine();
+        var task = new InvalidatePublishedResult
+        {
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            ResultPath = "result.json",
+            SarifPath = "result.sarif",
+            WorkerPath = "runtime/worker.dll",
+            LauncherPath = "runtime/worker.dll",
+            WorkerProtocolPath = "runtime/protocol.dll"
+        };
+        switch (collision)
+        {
+            case "duplicate":
+                task.SarifPath = task.ResultPath;
+                break;
+            case "input":
+                task.RequestPath = task.ResultPath;
+                break;
+            case "runtime":
+                task.ManifestPath = "runtime/manifest.json";
+                break;
+            case "cache":
+                task.CachePath = "result.json";
+                break;
+            case "compiler":
+                task.CompilerOutputPaths = [new TaskItem("result.json")];
+                break;
+        }
+
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(engine.Errors.Select(static item => item.Message), Has.Some.Contains(expectedError));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "result.json")), Is.EqualTo("result"));
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "result.sarif")), Is.EqualTo("sarif"));
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "runtime/worker.dll")), Is.EqualTo("worker"));
+        }
+    }
+
+    [Test]
+    public void ResetRemovesOnlyTheConfiguredPublicationSet()
+    {
+        using var directory = new TempDirectory("sharpproof-reset-publication-");
+        string[] names = ["request.json", "result.json", "manifest.json", "result.sarif", "unrelated.txt"];
+        foreach (var name in names)
+        {
+            File.WriteAllText(Path.Combine(directory.FullName, name), name);
+        }
+        var engine = new RecordingBuildEngine();
+        var task = new ResetPublishedVerification
+        {
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            RequestPath = "request.json",
+            ResultPath = "result.json",
+            ManifestPath = "manifest.json",
+            SarifPath = "result.sarif"
+        };
+        Assert.That(task.Execute(), Is.True);
+        Assert.That(task.Execute(), Is.True);
+        Assert.That(engine.Errors, Is.Empty);
+        Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "unrelated.txt")), Is.EqualTo("unrelated.txt"));
+        Assert.That(names.Take(4).Select(name => File.Exists(Path.Combine(directory.FullName, name))), Is.All.False);
     }
 
     private static string CreateTimedProcessAssembly(

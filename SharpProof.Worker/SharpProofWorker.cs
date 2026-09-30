@@ -200,25 +200,6 @@ public sealed class SharpProofWorker : IDisposable
                     requestHash, Versions());
                 return assembled;
             }
-            WorkerVerifyResponse Canceled(WorkerCacheStatus status)
-            {
-                var lanes = targets.Select(target => Unknown(
-                    target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled)).ToArray();
-                var projected = ProjectResults(lanes);
-                return WorkerResultAssembler.Create(
-                    snapshot.InputHash,
-                    manifest,
-                    WorkerRunStatus.Canceled,
-                    WorkerRunFailureReason.None,
-                    projected.Callables,
-                    projected.Claims,
-                    request.Budgets,
-                    status,
-                    Elapsed(started),
-                    requestHash: requestHash,
-                    versions: Versions());
-            }
-
             var cache = CreateCacheIfEnabled(request,
                 snapshot.CompilerManifest.Compilation.ProjectDirectory, out var cacheStatus);
             if (cache != null)
@@ -390,7 +371,7 @@ public sealed class SharpProofWorker : IDisposable
             await Task.WhenAll(solverLanes.Select(RunLane)).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested)
             {
-                return Canceled(cacheStatus);
+                return Interrupted(snapshot);
             }
             ThrowIfProjectInterrupted();
 

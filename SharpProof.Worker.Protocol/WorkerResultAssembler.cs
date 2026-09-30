@@ -83,6 +83,19 @@ internal static class WorkerResultAssembler
         var claims = (manifest.Claims ?? [])
             .OfType<WorkerClaimManifestEntry>()
             .ToArray();
+        var runErrors = errors?.ToArray() ?? [];
+        if (callables.Length == 0 && claims.Length == 0 && runErrors.Length == 0 &&
+            failureReason == WorkerRunFailureReason.None &&
+            status is WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled)
+        {
+            runErrors = [new WorkerProtocolError
+            {
+                Code = status == WorkerRunStatus.TimedOut ? WorkerProtocolErrorCodes.WorkerTimeout : "worker.canceled",
+                Message = status == WorkerRunStatus.TimedOut
+                    ? "The project timed out before selected callable evidence was published."
+                    : "The worker was canceled before selected callable evidence was published."
+            }];
+        }
         var assumptionsByCallable = new Dictionary<
             string, WorkerAssumptionEvidence[]>(StringComparer.Ordinal);
         foreach (var callable in callables)
@@ -123,7 +136,7 @@ internal static class WorkerResultAssembler
                     ? []
                     : assumptions
             }),
-            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
+            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, runErrors, requestHash, versions);
     }
 
     internal static bool HasConflictingAssumptionKinds(
@@ -296,6 +309,12 @@ internal static class WorkerResultAssembler
         if (owned.Length == 0 &&
             !(runStatus == WorkerRunStatus.Failed && hasErrors))
         {
+            if (callable.Coverage == WorkerCallableCoverage.Incomplete &&
+                ((runStatus == WorkerRunStatus.TimedOut && callable.Reason == WorkerCallableCoverageReason.ProjectTimeout) ||
+                 (runStatus == WorkerRunStatus.Canceled && callable.Reason == WorkerCallableCoverageReason.Canceled)))
+            {
+                return true;
+            }
             return (callable.Coverage, callable.Reason) is
                 (WorkerCallableCoverage.Complete,
                     WorkerCallableCoverageReason.None)

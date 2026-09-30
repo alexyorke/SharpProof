@@ -1872,6 +1872,180 @@ public sealed class ProtocolJsonTests
             Is.EqualTo((long)int.MaxValue +
                 WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds -
                 WorkerExecutionEnvelope.CleanupReserveMilliseconds));
+
+        request.Budgets.MethodWallTimeMilliseconds = 0;
+        Assert.That(Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(request, 1000)))!.ParamName,
+            Is.EqualTo("request"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void RequestBoundValidationRejectsInvalidExpectedAuthority(bool invalidRuntime)
+    {
+        var request = CreateRequest();
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var versions = CreateExpectedVersions();
+        var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        response.RequestHash = requestHash;
+        if (invalidRuntime)
+        {
+            versions.WorkerVersion = string.Empty;
+        }
+        else
+        {
+            requestHash = new string('0', 64);
+        }
+        Assert.That(Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerProtocolJson.ValidateForRequest(response, requestHash, response.InputHash,
+                manifest, request, versions)))!.ParamName,
+            Is.EqualTo(invalidRuntime ? "expectedVersions" : "expectedRequest"));
+    }
+
+    [TestCase(WorkerRunStatus.TimedOut, false)]
+    [TestCase(WorkerRunStatus.Canceled, false)]
+    [TestCase(WorkerRunStatus.TimedOut, true)]
+    [TestCase(WorkerRunStatus.Canceled, true)]
+    public void ClaimlessInterruptionRetainsItsBoundStatusAndCannotBeCached(WorkerRunStatus status, bool hasCallable)
+    {
+        var request = CreateRequest();
+        var manifest = hasCallable ? CreateManifest() : WorkerResultAssembler.EmptyManifest();
+        if (hasCallable)
+        {
+            manifest.Callables[0].ClaimIds = [];
+            manifest.Claims = [];
+            WorkerProtocolJson.SealManifest(manifest);
+        }
+        var versions = CreateExpectedVersions();
+        var inputHash = new string('c', 64);
+        var response = WorkerResultAssembler.CreateIncomplete(inputHash,
+            WorkerProtocolJson.ComputeRequestHash(request), manifest, request.Budgets,
+            status, WorkerRunFailureReason.None,
+            status == WorkerRunStatus.Canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout,
+            status == WorkerRunStatus.Canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+            versions: versions);
+        var roundtrip = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+                inputHash, manifest, request, versions).IsValid, Is.True);
+            Assert.That(roundtrip.RunStatus, Is.EqualTo(status));
+            Assert.That(roundtrip.Manifest.Claims, Is.Empty);
+            Assert.That(roundtrip.ClaimResults, Is.Empty);
+            Assert.That(roundtrip.Errors.Select(static error => error.Code), Is.EqualTo(hasCallable ? [] : new[]
+            {
+                status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout
+            }));
+            Assert.That(VerificationCache.IsCacheable(roundtrip, inputHash, manifest), Is.False);
+        }
+        var originalError = new WorkerProtocolError
+        {
+            Code = status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout,
+            Message = "The actual interrupted operation's context."
+        };
+        var contextual = WorkerResultAssembler.CreateIncomplete(inputHash, response.RequestHash,
+            manifest, request.Budgets, status, WorkerRunFailureReason.None,
+            WorkerCallableCoverageReason.ProjectTimeout, WorkerClaimReason.ProjectTimeout,
+            errors: [originalError], versions: versions);
+        Assert.That(contextual.Errors, Is.EqualTo(new[] { originalError }));
+        roundtrip.RunStatus = WorkerRunStatus.Complete;
+        Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+            inputHash, manifest, request, versions).IsValid, Is.False);
+        if (hasCallable)
+        {
+            roundtrip.RunStatus = status;
+            roundtrip.CallableResults[0].Reason = status == WorkerRunStatus.Canceled
+                ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.Canceled;
+            Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+                inputHash, manifest, request, versions).IsValid, Is.False);
+        }
+        contextual.Errors = [originalError, new WorkerProtocolError
+        {
+            Code = status == WorkerRunStatus.Canceled ? WorkerProtocolErrorCodes.WorkerTimeout : "worker.canceled",
+            Message = "Contradictory interruption evidence."
+        }];
+        Assert.That(WorkerProtocolJson.ValidateForRequest(contextual, response.RequestHash,
+            inputHash, manifest, request, versions).IsValid, Is.False);
+    }
+
+    [Test]
+    public async Task CacheRejectsIncompleteEvidenceAndUnreadableEntries()
+    {
+        using var directory = new TempDirectory("sharpproof-cache-validation-");
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var cache = new VerificationCache(directory.FullName, 100_000);
+        Assert.That(await cache.TryWriteAsync(response, response.InputHash, manifest, CancellationToken.None), Is.True);
+        var path = Path.Combine(directory.FullName, response.InputHash + VerificationCache.CacheFileSuffix);
+        var entry = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        entry["claimResults"]![0]!["reason"] = "ProjectTimeout";
+        await File.WriteAllTextAsync(path, entry.ToJsonString());
+        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, CancellationToken.None), Is.Null);
+        Assert.That(File.Exists(path), Is.False, "A complete cache envelope cannot admit interrupted claim evidence.");
+        await File.WriteAllBytesAsync(path, [0xff]);
+        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, CancellationToken.None), Is.Null);
+        Assert.That(cache.LastReadUnavailable, Is.True);
+    }
+
+    [TestCase(WorkerRunStatus.TimedOut)]
+    [TestCase(WorkerRunStatus.Canceled)]
+    public void InterruptionProjectsEverySelectedCallableIncludingClaimlessDeclarations(WorkerRunStatus status)
+    {
+        var request = CreateRequest();
+        var manifest = CreateManifest();
+        var claimless = new WorkerCallableManifestEntry
+        {
+            CallableId = "M:Subject.NoPostcondition(System.Int64)",
+            SelectedFeatures = [WorkerSelectedFeature.Contracts],
+            SelectionReasons = [WorkerSelectionReason.ExplicitAnnotation],
+            Location = manifest.Callables[0].Location,
+            ClaimIds = []
+        };
+        manifest.Callables = [.. manifest.Callables, claimless];
+        WorkerProtocolJson.SealManifest(manifest);
+        var versions = CreateExpectedVersions();
+        var response = WorkerResultAssembler.CreateIncomplete(InputHash,
+            WorkerProtocolJson.ComputeRequestHash(request), manifest, request.Budgets,
+            status, WorkerRunFailureReason.None,
+            status == WorkerRunStatus.Canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout,
+            status == WorkerRunStatus.Canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+            versions: versions);
+        var roundtrip = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
+                InputHash, manifest, request, versions).IsValid, Is.True);
+            Assert.That(roundtrip.CallableResults.Select(static item => item.CallableId), Is.EquivalentTo(manifest.Callables.Select(static item => item.CallableId)));
+            Assert.That(roundtrip.ClaimResults.Select(static item => item.ClaimId), Is.EqualTo(manifest.Claims.Select(static item => item.ClaimId)));
+            Assert.That(VerificationCache.IsCacheable(roundtrip, InputHash, manifest), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task CacheEvictionKeepsTheNewestCompleteEntryAndUnrelatedFiles()
+    {
+        using var directory = new TempDirectory("sharpproof-cache-eviction-");
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var cache = new VerificationCache(directory.FullName, 100_000);
+        var firstHash = new string('a', 64);
+        var secondHash = new string('b', 64);
+        Assert.That(await cache.TryWriteAsync(response, firstHash, manifest, CancellationToken.None), Is.True);
+        var firstPath = Path.Combine(directory.FullName, firstHash + VerificationCache.CacheFileSuffix);
+        File.SetLastWriteTimeUtc(firstPath, DateTime.UtcNow.AddDays(-1));
+        var maximumBytes = new FileInfo(firstPath).Length + 1;
+        var unrelated = Path.Combine(directory.FullName, "unrelated.json");
+        await File.WriteAllTextAsync(unrelated, "preserve");
+        cache = new VerificationCache(directory.FullName, maximumBytes);
+        Assert.That(await cache.TryWriteAsync(response, secondHash, manifest, CancellationToken.None), Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(firstPath), Is.False);
+            Assert.That(File.Exists(Path.Combine(directory.FullName, secondHash + VerificationCache.CacheFileSuffix)), Is.True);
+            Assert.That(await File.ReadAllTextAsync(unrelated), Is.EqualTo("preserve"));
+            Assert.That(Directory.GetFiles(directory.FullName, "*" + VerificationCache.CacheFileSuffix).Sum(static path => new FileInfo(path).Length), Is.LessThanOrEqualTo(maximumBytes));
+        }
     }
 
     [Test]

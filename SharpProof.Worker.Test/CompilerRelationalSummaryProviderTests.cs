@@ -405,10 +405,16 @@ public sealed class CompilerRelationalSummaryProviderTests
                         diagnostic.ToString())));
         }
         File.Copy(implementationPath, duplicatePath);
+        var firstReference = MetadataReference.CreateFromFile(implementationPath,
+            new MetadataReferenceProperties(aliases: ["first"]));
+        var secondReference = MetadataReference.CreateFromFile(duplicatePath,
+            new MetadataReferenceProperties(aliases: ["second"]));
 
         var compilation = CreateCompilationWithReferences(
             """
             #undef SHARPPROOF_CONTRACTS
+            extern alias first;
+            extern alias second;
             using SharpProof.Attributes;
 
             public static class Subject
@@ -416,13 +422,26 @@ public sealed class CompilerRelationalSummaryProviderTests
                 public static int Verify(int value)
                 {
                     Contract.Ensures(Contract.Result<int>() == value);
-                    return Lib.Identity(value);
+                    return first::Lib.Identity(value);
+                }
+                public static int VerifySecond(int value)
+                {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return second::Lib.Identity(value);
                 }
             }
             """,
             Path.Combine(temporary.FullName, "Subject.cs"),
-            MetadataReference.CreateFromFile(implementationPath),
-            MetadataReference.CreateFromFile(duplicatePath));
+            firstReference,
+            secondReference);
+        var (method, _) = GetCall(compilation, new IrFactory(), "Verify", "Identity");
+        var resolution = new CompilerImplementationIlSummaryLowerer.MetadataResolutionContext(compilation);
+        for (var lookup = 0; lookup < 2; lookup++)
+        {
+            Assert.That(resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name,
+                CancellationToken.None, out _, out _, out var selectedPath), Is.True);
+            Assert.That(new[] { implementationPath, duplicatePath }, Does.Contain(selectedPath));
+        }
         var discovery = new ClaimManifestBuilder(compilation).Build();
 
         var artifact = CompilerManifestArtifactProducer.Create(

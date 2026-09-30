@@ -165,7 +165,8 @@
           "SharpProof.Worker/CallableVerifier.cs",
           "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
-          "SharpProof.Worker/SharpProofWorker.cs"
+          "SharpProof.Worker/SharpProofWorker.cs",
+          "SharpProof.Worker/WorkerHost.cs"
         ]
       },
       {
@@ -252,13 +253,15 @@
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
           "SharpProof.Effects/EffectProjections.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
-          "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
+          "SharpProof.Frontend/CompilerIdentityProjections.generated.cs",
+          "SharpProof.Worker/Launcher/LauncherProjections.generated.cs"
         ]
       },
       {
         "name": "launcherArgumentCatalog",
         "paths": [
-          "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
+          "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs",
+          "SharpProof.Worker/Launcher/LauncherArguments.generated.cs"
         ]
       },
       {
@@ -401,7 +404,10 @@
         "name": "resultAssembly",
         "paths": [
           "SharpProof.Worker/CallableClaimResultAssembler.cs",
-          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
+          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
+          "SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
+          "SharpProof.Worker/Launcher/LauncherProjections.cs",
+          "SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },
       {
@@ -412,7 +418,8 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceLocationProjection.cs",
           "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
           "SharpProof.CompilerArtifact/ArtifactDigest.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceCoordinates.cs"
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSourceCoordinates.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerReportingIdentity.cs"
         ]
       },
       {
@@ -454,7 +461,8 @@
           "SharpProof.BuildTasks/RunVerifier.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
-          "SharpProof.Host/ContainerNativeLibrary.cs"
+          "SharpProof.Host/ContainerNativeLibrary.cs",
+          "SharpProof.Worker/Launcher/LauncherProgram.cs"
         ],
         "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
       },
@@ -554,7 +562,8 @@
         "paths": [
           "eng/fuzz/retained-seeds.json",
           "scripts/Invoke-SharpProofFuzzCampaign.ps1",
-          "scripts/Resolve-SharpProofContainedPath.ps1"
+          "scripts/Resolve-SharpProofContainedPath.ps1",
+          "scripts/Resolve-SharpProofSourceDocument.ps1"
         ]
       },
       {

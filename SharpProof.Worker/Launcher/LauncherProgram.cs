@@ -322,7 +322,7 @@ internal static class Program
                 "Project analysis timed out before selected callable coverage was published.");
         }
 
-        var incompleteError = incompleteCount != 0 &&
+        var incompleteError = (incompleteCount != 0 || projectTimedOut) &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
         Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
@@ -555,7 +555,7 @@ internal static class Program
             WorkerRunFailureReason.None,
             WorkerCallableCoverageReason.ProjectTimeout,
             WorkerClaimReason.ProjectTimeout,
-            errors: null,
+            response.Errors,
             expectedVersions,
             response.Summary.ElapsedMilliseconds);
         await AtomicFile.WriteUtf8Async(
