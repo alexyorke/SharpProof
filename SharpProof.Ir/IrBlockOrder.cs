@@ -62,7 +62,10 @@ internal static class IrBlockOrder
                 case IrGotoInstruction go:
                     pending.Push((go.Target, false));
                     break;
-                case IrReturnInstruction:
+                case IrThrowInstruction thrown:
+                    pending.Push((thrown.Target, false));
+                    break;
+                case IrReturnInstruction or IrExceptionalExitInstruction:
                     break;
                 default:
                     failure = IrAcyclicOrderFailure.UnsupportedInstruction;

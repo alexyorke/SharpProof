@@ -186,12 +186,19 @@ Object property order is irrelevant. Semantic validation checks enum values,
 nulls, claim ownership, dense ordinals, assumptions, and allowed result payloads.
 Counts are derived from the callable and claim arrays rather than stored again.
 
-The compiler produces a schema-20 closed artifact containing selected claims,
+The compiler produces a schema-21 closed artifact containing selected claims,
 portable typed IR, relational/spec call bindings, effect constraints and replay
 events, diagnostics, and mapped locations. One SHA-256 covers the full canonical
 artifact bytes, including effect-only callables without a graph. Source and
 reference inventories and duplicated provenance authorities are absent from the
 wire. Producer reporting IDs remain stable opaque labels.
+
+Schema 21 requires an explicit execution mode, havoc origin, and nullable
+UTF-16 source span for each operation. The temporary Total mode uses signed
+32-bit default integers, deterministic bitvector division and remainder, and
+explicit Throw/ExceptionalExit edges. Legacy remains authoritative during
+migration, and the existing SMT backend rejects Total queries. The typed
+frontend guard lowering and bitvector solver are still pending.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.
@@ -209,6 +216,13 @@ domains, and evaluates the original Ensures clause before creating Refuted.
 Unsupported instructions on other paths do not block replay. Executed calls
 without a concrete registered host become CounterexampleNotReplayable;
 inconsistent replay becomes CounterexampleReplayFailed.
+
+Modeled replay tracks approximation values only when they are actually read,
+including reads in the original postcondition and its explicit Total-mode
+guard. Overwritten values and untaken lazy operands do not count as reads.
+Input havoc binds to the original entry model; generic spec-result havoc
+cannot authorize Refuted. Total replay without a successful clause guard
+abstains, so deterministic completion values cannot hide an undefined clause.
 
 Effect replay remains an interpreter of compiler-produced unconditional events.
 It derives effects, capabilities, and exact exception hierarchy, evaluates the

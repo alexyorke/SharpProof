@@ -122,6 +122,13 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrHavocKind havocKind,
         params IrVarId[] variables)
     {
+        return Havoc(block, operation, havocKind, IrHavocOrigin.Approximation, variables);
+    }
+
+    public IrHavocInstruction Havoc(
+        IrBlockId block, OperationId operation, IrHavocKind havocKind,
+        IrHavocOrigin origin, params IrVarId[] variables)
+    {
         ArgumentNullGuard.NotNull(variables, nameof(variables));
 
         var distinct = variables
@@ -131,7 +138,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         return Append(
             block,
             new IrHavocInstruction(
-                NextInstructionId(), operation, havocKind, distinct));
+                NextInstructionId(), operation, havocKind, distinct, origin));
     }
 
     public IrBranchInstruction Branch(
@@ -160,6 +167,17 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 NextInstructionId(), operation, value));
     }
 
+    public IrThrowInstruction Throw(IrBlockId block, OperationId operation,
+        IrExceptionKind exceptionKind, IrBlockId target)
+    {
+        return Append(block, new IrThrowInstruction(NextInstructionId(), operation, exceptionKind, target));
+    }
+
+    public IrExceptionalExitInstruction ExceptionalExit(IrBlockId block, OperationId operation)
+    {
+        return Append(block, new IrExceptionalExitInstruction(NextInstructionId(), operation));
+    }
+
     public IrProgram Build()
     {
         EnsureMutable();
@@ -176,7 +194,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 !block.Instructions[block.Instructions.Count - 1].IsTerminal)
             {
                 throw new InvalidOperationException(
-                    "Every program block must end in branch, goto, or return.");
+                    "Every program block must end in a control-flow terminator.");
             }
 
             blocks.Add(block.Freeze());
@@ -250,6 +268,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                     : ((IrAssertInstruction)instruction).Condition, "condition");
                 break;
             case IrHavocInstruction value:
+                _ = ArgumentNullGuard.RequireDefined(value.Origin, "origin");
                 _ = ArgumentNullGuard.RequireDefined(
                     value.HavocKind,
                     "havocKind");
@@ -275,6 +294,12 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 break;
             case IrGotoInstruction value:
                 GetBlock(value.Target);
+                break;
+            case IrThrowInstruction value:
+                _ = ArgumentNullGuard.RequireDefined(value.ExceptionKind, "exceptionKind");
+                GetBlock(value.Target);
+                break;
+            case IrExceptionalExitInstruction:
                 break;
             case IrReturnInstruction value:
                 if (value.Value != null)

@@ -11,7 +11,8 @@ internal static class IrInstructionFacts
                 when whenTrue == whenFalse => new(whenTrue, null),
             IrBranchInstruction branch => new(branch.WhenTrue, branch.WhenFalse),
             IrGotoInstruction go => new(go.Target, null),
-            IrReturnInstruction => new(null, null),
+            IrThrowInstruction thrown => new(thrown.Target, null),
+            IrReturnInstruction or IrExceptionalExitInstruction => new(null, null),
             _ => null
         };
     }

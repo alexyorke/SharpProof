@@ -29,6 +29,23 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
         CancellationToken cancellationToken)
     {
+        return Execute(program, initialValues, maximumSteps, callHost, replayOptions: null, cancellationToken);
+    }
+
+    public IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        int maximumSteps, IrProgramReplayOptions replayOptions,
+        CancellationToken cancellationToken = default)
+    {
+        return Execute(program, initialValues, maximumSteps, callHost: null, replayOptions, cancellationToken);
+    }
+
+    internal IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        int maximumSteps,
+        Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
+        IrProgramReplayOptions? replayOptions, CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(program, nameof(program));
 
@@ -40,7 +57,11 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         maximumSteps = ArgumentNullGuard.RequirePositive(
             maximumSteps, nameof(maximumSteps));
 
-        var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        if (replayOptions != null && _factory.Semantics != IrExecutionSemantics.Total)
+        {
+            throw new ArgumentException("Modeled havoc requires total program semantics.", nameof(replayOptions));
+        }
+        var values = new ReplayValues();
         if (initialValues != null)
         {
             foreach (var pair in initialValues)
@@ -55,6 +76,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             }
         }
         var (current, steps) = (program.Entry, 0);
+        var occurrences = new Dictionary<IrInstructionId, int>();
+        IrThrowInstruction? pendingException = null;
         while (steps < maximumSteps)
         {
             var block = program.GetBlock(current);
@@ -116,6 +139,17 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrGotoInstruction go:
                         current = go.Target;
                         goto NextBlock;
+                    case IrThrowInstruction thrown:
+                        pendingException = thrown;
+                        current = thrown.Target;
+                        goto NextBlock;
+                    case IrExceptionalExitInstruction exited:
+                        return pendingException == null
+                            ? Unsupported(exited, values, steps, "Exceptional exit has no pending exception.")
+                            : new IrProgramExecutionResult(IrProgramExecutionStatus.Exception, null,
+                                pendingException, null, new IrExceptionInfo(pendingException.ExceptionKind,
+                                    "The program followed an explicit exception edge.", pendingException.Operation),
+                                values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
                     case IrReturnInstruction returned:
                         if (returned.Value == null)
                         {
@@ -130,6 +164,22 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
                         return Result(IrProgramExecutionStatus.Returned, returned, values, steps, returnValue.Value);
                     case IrHavocInstruction havoc:
+                        if (replayOptions != null && havoc.HavocKind == IrHavocKind.Variables)
+                        {
+                            occurrences.TryGetValue(havoc.Id, out var occurrence);
+                            occurrences[havoc.Id] = occurrence + 1;
+                            foreach (var variable in havoc.Variables)
+                            {
+                                var modeled = replayOptions.HavocValueProvider(new IrHavocRequest(
+                                    havoc.Id, havoc.Operation, variable, occurrence, havoc.Origin));
+                                if (modeled == null || modeled.Type != _factory.GetVariableInfo(variable).Type)
+                                {
+                                    return Unsupported(havoc, values, steps, "The havoc model is missing or has the wrong type.");
+                                }
+                                values.SetHavocValue(variable, modeled, havoc.Origin);
+                            }
+                            break;
+                        }
                         if (havoc.HavocKind is IrHavocKind.Variables or IrHavocKind.VariablesAndMemory)
                         {
                             foreach (var variable in havoc.Variables)
@@ -262,13 +312,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     private static IrProgramExecutionResult FromEvaluation(IrEvaluationResult evaluation, IrInstruction instruction,
-        ImmutableDictionary<IrVarId, IrValue>.Builder values, int steps)
+        ReplayValues values, int steps)
     {
         return new(evaluation.Status == IrEvaluationStatus.Exception ? IrProgramExecutionStatus.Exception :
                 IrProgramExecutionStatus.Unsupported, null, instruction,
             evaluation.Status == IrEvaluationStatus.Exception ? null : evaluation.Unsupported,
             evaluation.Status == IrEvaluationStatus.Exception ? evaluation.Exception : null,
-            values.ToImmutable(), steps);
+            values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
     }
 
     private IrEvaluationResult EvaluateCondition(
@@ -296,17 +346,79 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     private static IrProgramExecutionResult Unsupported(IrInstruction instruction,
-            ImmutableDictionary<IrVarId, IrValue>.Builder values, int steps, string detail)
+            ReplayValues values, int steps, string detail)
     {
         return new(IrProgramExecutionStatus.Unsupported, null, instruction,
                 new IrUnsupportedInfo(IrUnsupportedReason.UnsupportedOperation, detail),
-                null, values.ToImmutable(), steps);
+                null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
     }
 
     private static IrProgramExecutionResult Result(IrProgramExecutionStatus status, IrInstruction? instruction,
-            ImmutableDictionary<IrVarId, IrValue>.Builder values,
+            ReplayValues values,
             int steps, IrValue? returnValue = null)
     {
-        return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps);
+        return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
+    }
+
+    private sealed class ReplayValues : IReadOnlyDictionary<IrVarId, IrValue>
+    {
+        private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        private readonly HashSet<IrVarId> _approximations = [];
+        internal bool ConsumedApproximation { get; private set; }
+        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
+        public IrValue this[IrVarId key]
+        {
+            get => TryGetValue(key, out var value) ? value : throw new KeyNotFoundException();
+            set
+            {
+                _values[key] = value;
+                _approximations.Remove(key);
+            }
+        }
+        public IEnumerable<IrVarId> Keys => _values.Keys;
+        public IEnumerable<IrValue> Values => _values.Values;
+        public int Count => _values.Count;
+        public bool ContainsKey(IrVarId key)
+        {
+            return _values.ContainsKey(key);
+        }
+        public bool TryGetValue(IrVarId key, out IrValue value)
+        {
+            var found = _values.TryGetValue(key, out value!);
+            if (found && _approximations.Contains(key))
+            {
+                ConsumedApproximation = true;
+            }
+            return found;
+        }
+        internal void Add(IrVarId key, IrValue value)
+        {
+            _values.Add(key, value);
+        }
+        internal void Remove(IrVarId key)
+        {
+            _values.Remove(key);
+            _approximations.Remove(key);
+        }
+        internal void SetHavocValue(IrVarId key, IrValue value, IrHavocOrigin origin)
+        {
+            this[key] = value;
+            if (origin == IrHavocOrigin.Approximation)
+            {
+                _approximations.Add(key);
+            }
+        }
+        internal ImmutableDictionary<IrVarId, IrValue> ToImmutable()
+        {
+            return _values.ToImmutable();
+        }
+        public IEnumerator<KeyValuePair<IrVarId, IrValue>> GetEnumerator()
+        {
+            return _values.GetEnumerator();
+        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }

@@ -2,12 +2,29 @@ using Z3Context = Microsoft.Z3.Context;
 using Z3Expr = Microsoft.Z3.Expr;
 using Z3Object = Microsoft.Z3.Z3Object;
 using Z3Status = Microsoft.Z3.Status;
+using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
 public sealed class IrSmtBackendTests
 {
+    [Test]
+    public async Task LegacyBackendRejectsTotalBuiltinIntegersAndBooleanOnlyQueries()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        using var backend = new IrSmtBackend();
+        foreach (var variables in new IrVarId[][] { [variable], [] })
+        {
+            var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
+                ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
+            var result = await backend.CheckAsync(query, CancellationToken.None);
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+        }
+    }
+
     [Test]
     public async Task UnsatProofReturnsAHygienicCore()
     {

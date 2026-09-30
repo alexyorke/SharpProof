@@ -3,7 +3,8 @@ namespace SharpProof.Ir;
 public abstract partial class IrInstruction
 {
     public bool IsTerminal => Kind is IrInstructionKind.Branch
-        or IrInstructionKind.Goto or IrInstructionKind.Return;
+        or IrInstructionKind.Goto or IrInstructionKind.Return
+        or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit;
 }
 
 public sealed partial class IrBasicBlock
@@ -13,6 +14,7 @@ public sealed partial class IrBasicBlock
 
 public sealed partial class IrProgram
 {
+    public IrExecutionSemantics Semantics => Factory.Semantics;
     internal IrProgram(
         IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks)
     {

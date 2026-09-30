@@ -94,6 +94,7 @@ public sealed partial class IrValue
     internal IrInteger IntegerData => Get<IrInteger>(IrValueKind.Integer, "The IR value is not an integer.");
     public long Integer => IntegerData.Int64;
     public ulong IntegerBits => IntegerData.Bits;
+    public System.Numerics.BigInteger IntegerNumericValue => IntegerData.NumericValue;
     public int IntegerWidth => IntegerData.Width;
     public bool IntegerSigned => IntegerData.Signed;
     public string String => Get<string>(IrValueKind.String, "The IR value is not a string.");
@@ -349,7 +350,7 @@ public sealed class IrInterpreter(IrFactory factory)
 
         if (_factory.GetTypeInfo(left.Type).Width != 0)
         {
-            var typed = IrBitVectorOperations.Evaluate(@operator, left.IntegerData, right.IntegerData);
+            var typed = IrBitVectorOperations.Evaluate(@operator, left.IntegerData, right.IntegerData, _factory.Semantics);
             return typed.Kind switch
             {
                 IrScalarResultKind.Integer => Value(_factory.CreateIntegerValueFromBits(left.Type, typed.Bits)),
@@ -464,7 +465,7 @@ public sealed class IrInterpreter(IrFactory factory)
                 return Value(_factory.CreateNullValue(cast.Type));
             }
 
-            return Fault(IrExceptionKind.NullReference,
+            return CastFault(cast.Type, IrExceptionKind.NullReference,
                 "Null cannot be unboxed to a non-nullable IR type.");
         }
 
@@ -493,7 +494,7 @@ public sealed class IrInterpreter(IrFactory factory)
         {
             return operand.Value.Reference is string value
                 ? Text(value)
-                : Fault(IrExceptionKind.InvalidCast,
+                : CastFault(cast.Type, IrExceptionKind.InvalidCast,
                     "The concrete reference is not a string.");
         }
         if (target.Kind == IrTypeKind.Integer)
@@ -514,18 +515,18 @@ public sealed class IrInterpreter(IrFactory factory)
                 };
                 return bits.HasValue
                     ? Value(_factory.CreateIntegerValueFromBits(cast.Type, bits.Value))
-                    : Fault(IrExceptionKind.InvalidCast, "The boxed integer has a different width or signedness.");
+                    : CastFault(cast.Type, IrExceptionKind.InvalidCast, "The boxed integer has a different width or signedness.");
             }
             return operand.Value.Reference is long value
                 ? Integer(value)
-                : Fault(IrExceptionKind.InvalidCast,
+                : CastFault(cast.Type, IrExceptionKind.InvalidCast,
                     "The concrete reference does not contain a boxed integer.");
         }
         if (target.Kind == IrTypeKind.Boolean)
         {
             return operand.Value.Reference is bool value
                 ? Boolean(value)
-                : Fault(IrExceptionKind.InvalidCast,
+                : CastFault(cast.Type, IrExceptionKind.InvalidCast,
                     "The concrete reference does not contain a boxed boolean.");
         }
 
@@ -543,8 +544,8 @@ public sealed class IrInterpreter(IrFactory factory)
 
         if (value.Value!.Kind == IrValueKind.Null)
         {
-            return Fault(IrExceptionKind.NullReference,
-                "Length was requested from null.");
+            return _factory.Semantics == IrExecutionSemantics.Total ? Integer(0)
+                : Fault(IrExceptionKind.NullReference, "Length was requested from null.");
         }
 
         return value.Value.Kind switch
@@ -570,7 +571,27 @@ public sealed class IrInterpreter(IrFactory factory)
         }
 
         var invalid = ValidateSequenceAccess(sequence.Value!, index.Value!);
+        if (invalid?.Status == IrEvaluationStatus.Exception && _factory.Semantics == IrExecutionSemantics.Total)
+        {
+            return DefaultValue(access.Type);
+        }
         return invalid ?? Value(sequence.Value!.Elements[(int)index.Value!.Integer]);
+    }
+
+    private IrEvaluationResult CastFault(IrTypeId type, IrExceptionKind kind, string detail)
+    {
+        return _factory.Semantics == IrExecutionSemantics.Total ? DefaultValue(type) : Fault(kind, detail);
+    }
+
+    private IrEvaluationResult DefaultValue(IrTypeId type)
+    {
+        return _factory.GetTypeInfo(type).Kind switch
+        {
+            IrTypeKind.Boolean => Boolean(false),
+            IrTypeKind.Integer => Value(_factory.CreateIntegerValueFromBits(type, 0)),
+            IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence => Value(_factory.CreateNullValue(type)),
+            _ => InvalidValue("The term has no supported default value.")
+        };
     }
 
     internal static IrEvaluationResult? ValidateSequenceAccess(IrValue sequence, IrValue index)

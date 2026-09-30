@@ -53,12 +53,19 @@ internal readonly struct IrInteger(ulong bits, int width, bool signed)
 internal static class IrBitVectorOperations
 {
     internal static (IrScalarResultKind Kind, ulong Bits) Evaluate(
-        IrBinaryOperator operation, IrInteger left, IrInteger right)
+        IrBinaryOperator operation, IrInteger left, IrInteger right,
+        IrExecutionSemantics semantics = IrExecutionSemantics.Legacy)
     {
         var mask = IrInteger.Mask(left.Width);
         if (operation is IrBinaryOperator.Divide or IrBinaryOperator.Remainder && right.Bits == 0)
         {
-            return (IrScalarResultKind.DivideByZero, 0);
+            if (semantics == IrExecutionSemantics.Legacy)
+            {
+                return (IrScalarResultKind.DivideByZero, 0);
+            }
+            return operation == IrBinaryOperator.Remainder
+                ? (IrScalarResultKind.Integer, left.Bits)
+                : (IrScalarResultKind.Integer, left.Signed && left.SignedValue < 0 ? 1UL : mask);
         }
         switch (operation)
         {
@@ -82,7 +89,9 @@ internal static class IrBitVectorOperations
                 if (left.Width is 32 or 64 && signedRight == -1 &&
                     signedLeft == (left.Width == 64 ? long.MinValue : int.MinValue))
                 {
-                    return (IrScalarResultKind.Overflow, 0);
+                    return semantics == IrExecutionSemantics.Legacy
+                        ? (IrScalarResultKind.Overflow, 0)
+                        : Integer(operation == IrBinaryOperator.Divide ? left.Bits : 0);
                 }
                 return Integer(unchecked((ulong)(operation == IrBinaryOperator.Divide
                     ? signedLeft / signedRight : signedLeft % signedRight)));

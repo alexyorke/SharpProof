@@ -56,7 +56,7 @@
   "worker": {
     "protocolVersion": 13,
     "manifestSchemaVersion": 5,
-    "compilerArtifactSchemaVersion": 20,
+    "compilerArtifactSchemaVersion": 21,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -368,6 +368,8 @@
         "name": "replay",
         "paths": [
           "SharpProof.Ir/IrInterpreter.cs",
+          "SharpProof.Ir/IrInteger.cs",
+          "SharpProof.Ir/IrExecutionSemantics.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.Ir/IrProgramCallHostExecution.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",

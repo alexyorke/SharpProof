@@ -131,15 +131,16 @@ public sealed class IrUnsupportedInfo
 
 public sealed class IrExceptionInfo
 {
-    internal IrExceptionInfo(IrExceptionKind kind, string detail)
+    internal IrExceptionInfo(IrExceptionKind kind, string detail, OperationId? site = null)
     {
-        (Kind, Detail) =
-            (kind, detail);
+        (Kind, Detail, Site) =
+            (kind, detail, site);
     }
 
     public IrExceptionKind Kind { get; }
 
     public string Detail { get; }
+    public OperationId? Site { get; }
 }
 
 public sealed partial class IrEvaluationResult
@@ -173,11 +174,15 @@ public sealed partial class IrProgramExecutionResult
         IrUnsupportedInfo? unsupported,
         IrExceptionInfo? exception,
         ImmutableDictionary<IrVarId, IrValue> values,
-        int steps
+        int steps,
+        bool consumedApproximation = false,
+        ImmutableHashSet<IrVarId>? approximationVariables = null
     )
     {
         (Status, ReturnValue, Instruction, Unsupported, Exception, Values, Steps) =
             (status, returnValue, instruction, unsupported, exception, values, steps);
+        ConsumedApproximation = consumedApproximation;
+        ApproximationVariables = approximationVariables ?? ImmutableHashSet<IrVarId>.Empty;
     }
 
     public IrProgramExecutionStatus Status { get; }
@@ -193,6 +198,8 @@ public sealed partial class IrProgramExecutionResult
     public ImmutableDictionary<IrVarId, IrValue> Values { get; }
 
     public int Steps { get; }
+    public bool ConsumedApproximation { get; }
+    public ImmutableHashSet<IrVarId> ApproximationVariables { get; }
 }
 
 public enum IrTermKind
@@ -289,15 +296,17 @@ public sealed class IrMemberInfo
 
 public sealed class IrOperationInfo
 {
-    internal IrOperationInfo(OperationId id, IrStringId? description)
+    internal IrOperationInfo(OperationId id, IrStringId? description, IrSourceSpan? sourceSpan = null)
     {
         (Id, Description) =
             (id, description);
+        SourceSpan = sourceSpan;
     }
 
     public OperationId Id { get; }
 
     public IrStringId? Description { get; }
+    public IrSourceSpan? SourceSpan { get; }
 }
 
 public abstract class IrTerm
@@ -506,7 +515,9 @@ public enum IrInstructionKind
     Havoc = 6,
     Branch = 7,
     Goto = 8,
-    Return = 9
+    Return = 9,
+    Throw = 10,
+    ExceptionalExit = 11
 }
 
 public enum IrLocationKind
@@ -695,16 +706,38 @@ public sealed class IrHavocInstruction : IrInstruction
         IrInstructionId id,
         OperationId operation,
         IrHavocKind havocKind,
-        ImmutableArray<IrVarId> variables
+        ImmutableArray<IrVarId> variables,
+        IrHavocOrigin origin = IrHavocOrigin.Approximation
     ) : base(id, IrInstructionKind.Havoc, operation)
     {
         (HavocKind, Variables) =
             (havocKind, variables);
+        Origin = origin;
     }
 
     public IrHavocKind HavocKind { get; }
 
     public ImmutableArray<IrVarId> Variables { get; }
+    public IrHavocOrigin Origin { get; }
+}
+
+public sealed class IrThrowInstruction : IrInstruction
+{
+    internal IrThrowInstruction(IrInstructionId id, OperationId operation,
+        IrExceptionKind exceptionKind, IrBlockId target)
+        : base(id, IrInstructionKind.Throw, operation)
+    {
+        (ExceptionKind, Target) = (exceptionKind, target);
+    }
+
+    public IrExceptionKind ExceptionKind { get; }
+    public IrBlockId Target { get; }
+}
+
+public sealed class IrExceptionalExitInstruction : IrInstruction
+{
+    internal IrExceptionalExitInstruction(IrInstructionId id, OperationId operation)
+        : base(id, IrInstructionKind.ExceptionalExit, operation) { }
 }
 
 public sealed class IrBranchInstruction : IrInstruction

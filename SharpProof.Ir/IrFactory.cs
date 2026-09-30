@@ -18,14 +18,21 @@ public sealed class IrFactory
     private readonly long _scope;
     private int _identityCount;
 
-    public IrFactory()
+    public IrFactory() : this(IrExecutionSemantics.Legacy) { }
+
+    public IrFactory(IrExecutionSemantics semantics)
     {
+        Semantics = ArgumentNullGuard.RequireDefined(semantics, nameof(semantics));
         _scope = Interlocked.Increment(ref s_nextScope);
         BooleanType = CreateBuiltInType("bool", IrTypeKind.Boolean);
-        IntegerType = CreateBuiltInType("int", IrTypeKind.Integer);
+        IntegerType = semantics == IrExecutionSemantics.Total
+            ? GetOrCreateIntegerType(32, signed: true)
+            : CreateBuiltInType("int", IrTypeKind.Integer);
         StringType = CreateBuiltInType("string", IrTypeKind.String);
         ObjectType = CreateBuiltInType("object", IrTypeKind.Reference);
     }
+
+    public IrExecutionSemantics Semantics { get; }
 
     public IrTypeId BooleanType
     {
@@ -279,13 +286,13 @@ public sealed class IrFactory
         }
     }
 
-    public OperationId CreateOperation(string? description = null)
+    public OperationId CreateOperation(string? description = null, IrSourceSpan? sourceSpan = null)
     {
         lock (_gate)
         {
             var id = new OperationId(_scope, _operations.Count);
             var descriptionId = string.IsNullOrWhiteSpace(description) ? (IrStringId?)null : InternStringCore(description!);
-            _operations.Add(new IrOperationInfo(id, descriptionId));
+            _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
             return id;
         }
     }

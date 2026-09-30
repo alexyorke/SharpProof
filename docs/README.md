@@ -72,7 +72,7 @@ replace the current coverage inventory or normative semantics.
 
 ## Known production gaps
 
-The compiler emits a deterministic schema-20 closed artifact with selected
+The compiler emits a deterministic schema-21 closed artifact with selected
 claims, portable whole-body IR, relational/spec calls, effect constraints/replay,
 compiler diagnostics, and mapped locations. One full artifact digest replaces
 serialized source/reference inventories and redundant provenance authorities.

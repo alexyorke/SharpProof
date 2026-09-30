@@ -15,6 +15,22 @@ public sealed class CallableReplayContext(
     ImmutableHashSet<IrInstructionId> registeredCalls,
     Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost = null)
 {
+    public CallableReplayContext(
+        IrProgram? program, bool isTrivial,
+        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
+        ImmutableDictionary<IrVarId, IrVarId?> preStateBindings,
+        ImmutableArray<IrVarId> resultVariables, IrTerm postcondition,
+        ImmutableDictionary<IrVarId, (BigInteger Minimum, BigInteger Maximum)> integerDomains,
+        int maximumSteps, ImmutableHashSet<IrInstructionId> registeredCalls,
+        IrTerm? postconditionGuard, IrProgramReplayOptions? replayOptions,
+        Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost = null)
+        : this(program, isTrivial, parameterBindings, preStateBindings, resultVariables,
+            postcondition, integerDomains, maximumSteps, registeredCalls, callHost)
+    {
+        PostconditionGuard = postconditionGuard;
+        ReplayOptions = replayOptions;
+    }
+
     internal IrProgram? Program { get; } = program;
     internal bool IsTrivial { get; } = isTrivial;
     internal ImmutableDictionary<IrVarId, IrVarId> ParameterBindings { get; } = parameterBindings;
@@ -25,4 +41,6 @@ public sealed class CallableReplayContext(
     internal int MaximumSteps { get; } = maximumSteps;
     internal ImmutableHashSet<IrInstructionId> RegisteredCalls { get; } = registeredCalls;
     internal Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? CallHost { get; } = callHost;
+    public IrTerm? PostconditionGuard { get; }
+    public IrProgramReplayOptions? ReplayOptions { get; }
 }

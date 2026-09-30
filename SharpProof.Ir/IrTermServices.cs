@@ -155,7 +155,7 @@ internal static class IrTermServices
         {
             if (factory.GetTypeInfo(left.Type).Width != 0)
             {
-                var typed = IrBitVectorOperations.Evaluate(@operator, leftInteger.Integer, rightInteger.Integer);
+                var typed = IrBitVectorOperations.Evaluate(@operator, leftInteger.Integer, rightInteger.Integer, factory.Semantics);
                 return typed.Kind switch
                 {
                     IrScalarResultKind.Integer => factory.IntegerBits(left.Type, typed.Bits),

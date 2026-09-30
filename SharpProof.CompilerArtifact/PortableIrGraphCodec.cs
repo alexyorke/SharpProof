@@ -27,7 +27,10 @@ internal static partial class PortableIrGraphCodec
             IsComplete(OpaquePurities),
             IsComplete(UnaryOperators),
             IsComplete(BinaryOperators),
-            IsComplete(HavocKinds)
+            IsComplete(HavocKinds),
+            IsComplete(PortableIrWireCatalog.HavocOrigins),
+            IsComplete(PortableIrWireCatalog.ExecutionSemantics),
+            IsComplete(PortableIrWireCatalog.ExceptionKinds)
         }.All(static complete => complete);
 
     internal static bool HasCompleteSlotCatalogs =>
@@ -327,6 +330,8 @@ internal static partial class PortableIrGraphCodec
         RequireCanonicalSlot(kind, mapping.Slots[3], -1);
         RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
         RequireCanonicalSlot(kind, mapping.Slots[5], row.Location);
+        Require(row.Kind == IrInstructionKind.Havoc || row.Origin == IrHavocOrigin.Approximation,
+            "Only havoc instructions may carry an origin.");
     }
 
     private static void RequireCanonicalLocationSlots(
@@ -474,6 +479,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             var graph = new PortableIrGraph
             {
+                Semantics = _factory.Semantics,
                 HasProgram = _program != null,
                 Types = _types.Rows,
                 Identities = _identities.Rows,
@@ -563,7 +569,10 @@ internal static partial class PortableIrGraphCodec
         {
             return new(
                 instruction.Kind, operation,
-                a, b, c, items, location);
+                a, b, c, items, location)
+            {
+                Origin = instruction is IrHavocInstruction havoc ? havoc.Origin : IrHavocOrigin.Approximation
+            };
         }
 
         private int TypeIndex(IrTypeId id)
@@ -644,7 +653,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph _graph,
         CancellationToken _cancellationToken)
     {
-        private readonly IrFactory _factory = new();
+        private readonly IrFactory _factory = new(_graph.Semantics);
         private readonly HashSet<IrMemberId> _distinctMembers = [];
         private readonly HashSet<IrId> _distinctTerms = [];
         private IrTypeId[] _types = [];
@@ -713,7 +722,7 @@ internal static partial class PortableIrGraphCodec
                 var row = Required(_graph.Types[index], "type row");
                 Require(
                     row.Kind == kind && row.Name == name && row.Element == -1 &&
-                    row.Width == 0 && row.Signed == (kind == IrTypeKind.Integer),
+                    row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
                 _typeState[index] = 2;
@@ -928,7 +937,8 @@ internal static partial class PortableIrGraphCodec
         {
             _cancellationToken.ThrowIfCancellationRequested();
             RequireCanonicalOptionalText(row.Description, "operation description");
-            return _factory.CreateOperation(row.Description);
+            return _factory.CreateOperation(row.Description, row.SourceSpan is { } span
+                ? new IrSourceSpan(span.Document, span.Start, span.Length) : null);
         }
 
         private static void RequireCanonicalOptionalText(string? value, string kind)

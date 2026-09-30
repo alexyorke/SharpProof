@@ -14,7 +14,7 @@ internal static class WorkerProjections
         return value.Kind switch
         {
             IrValueKind.Boolean => (nameof(IrValueKind.Boolean), value.Boolean ? "true" : "false"),
-            IrValueKind.Integer => (nameof(IrValueKind.Integer), value.Integer.ToString(CultureInfo.InvariantCulture)),
+            IrValueKind.Integer => (nameof(IrValueKind.Integer), value.IntegerNumericValue.ToString(CultureInfo.InvariantCulture)),
             IrValueKind.String => (nameof(IrValueKind.String), value.String),
             IrValueKind.Null => (nameof(IrValueKind.Null), "null"),
             IrValueKind.Reference => (nameof(IrValueKind.Reference), "<opaque>"),

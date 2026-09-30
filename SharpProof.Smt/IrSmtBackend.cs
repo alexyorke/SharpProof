@@ -198,6 +198,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         VerificationQuery query,
         CancellationToken cancellationToken)
     {
+        if (query.Factory.Semantics != IrExecutionSemantics.Legacy)
+        {
+            return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
+        }
         var meter = new QueryResourceMeter(
             _options.QueryRlimit, cancellationToken);
         try
