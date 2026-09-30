@@ -160,6 +160,7 @@
           "SharpProof.Frontend/RoslynTotalExpressionLowerer.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs",
           "SharpProof.Frontend/OperationSupportCatalog.cs"
         ]
       },

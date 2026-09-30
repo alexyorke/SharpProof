@@ -127,9 +127,6 @@ public sealed class TypedRegionProgramLoweringTests
         }
     }
 
-    [TestCase("int Target(int x) { try { return x; } catch (System.Exception) when (x == 0) { return 0; } }")]
-    [TestCase("int Target(int x) { try { try { return x; } finally { x++; } } finally { x++; } }")]
-    [TestCase("int Target(int x) { try { x++; } finally { x++; } try { return x; } finally { x++; } }")]
     [TestCase("int Target(int x) { try { return 10 / x; } catch (System.Exception e) { return 0; } }")]
     [TestCase("int Target(int x) { try { throw new System.DivideByZeroException(); } catch (System.Exception) { return 0; } }")]
     [TestCase("int Target(int x) { try { return System.Math.Abs(x); } catch (System.Exception) { return 0; } }")]

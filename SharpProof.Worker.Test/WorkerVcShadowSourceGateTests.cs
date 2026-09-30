@@ -84,14 +84,18 @@ public sealed class WorkerVcShadowSourceGateTests
         new("checked-normal-return", WorkerVcCheckedArithmeticTests.CheckedReturnSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("checked-caught-effects", WorkerVcCheckedArithmeticTests.CaughtEffectsSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("checked-full-ulong", WorkerVcCheckedArithmeticTests.FullUlongSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
-        new("checked-unsafe-clause", WorkerVcCheckedArithmeticTests.UnsafeClauseSource, [WorkerClaimOutcome.Unknown], Reason: WorkerClaimReason.PostconditionMayBeUndefined)
+        new("checked-unsafe-clause", WorkerVcCheckedArithmeticTests.UnsafeClauseSource, [WorkerClaimOutcome.Unknown], Reason: WorkerClaimReason.PostconditionMayBeUndefined),
+        new("filter-search-before-unwind", WorkerVcExceptionSearchTests.SearchSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("filter-fault-side-effects", WorkerVcExceptionSearchTests.FilterFaultSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("nested-finally-captured-return", WorkerVcExceptionSearchTests.NestedReturnSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("finally-replaces-selected-handler", WorkerVcExceptionSearchTests.ReplacementSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted])
     ];
 
     [Test]
     public async Task DefinedSourceWorkerUniverseAccountsForEveryPostconditionWithoutEmptyExitSuccess()
     {
         Assert.That(Universe.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
-        Assert.That(Universe.Length, Is.EqualTo(21));
+        Assert.That(Universe.Length, Is.EqualTo(25));
         using var environment = new ShadowEnvironment("shadow");
         var rows = new List<WorkerVcShadowRow>();
         var manifestPostconditions = 0;
@@ -108,12 +112,12 @@ public sealed class WorkerVcShadowSourceGateTests
             rows.AddRange(report!.Rows);
             await TestContext.Out.WriteLineAsync($"source-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} oldProven={report.OldProven} newProven={report.NewProven} disagreements={report.SoundnessDisagreements}");
         }
-        Assert.That(manifestPostconditions, Is.EqualTo(27));
+        Assert.That(manifestPostconditions, Is.EqualTo(35));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(26));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(34));
         Assert.That(aggregate.Unenrolled, Is.EqualTo(1));
-        Assert.That(aggregate.Checked, Is.EqualTo(26));
+        Assert.That(aggregate.Checked, Is.EqualTo(34));
         Assert.That(aggregate.Unknown, Is.EqualTo(3));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);

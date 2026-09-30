@@ -28,7 +28,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private readonly List<ILocalSymbol> _regionLocals = [];
     private ControlFlowGraph _regionGraph = null!;
     private BasicBlock _regionSource = null!;
-    private RegionFinally? _regionFinally;
+    private readonly Dictionary<ControlFlowRegion, RegionFinally> _regionFinallys = [];
     private IrBlockId _regionExceptionalExit;
     private int _regionRemaining = MaximumRegionSteps;
 
@@ -53,7 +53,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
                 if (region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime or
                         ControlFlowRegionKind.Try or ControlFlowRegionKind.TryAndCatch or ControlFlowRegionKind.Catch or
-                        ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally) ||
+                        ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally or
+                        ControlFlowRegionKind.FilterAndHandler or ControlFlowRegionKind.Filter) ||
                     region.Locals.Any(local => local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name) ||
                         local.RefKind != RefKind.None || !CSharpOperationSemantics.IsScalar(local.Type)))
                 { throw new RegionIncompleteException(); }
@@ -67,9 +68,14 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
                 if (region.Kind == ControlFlowRegionKind.Finally)
                 {
-                    if (_regionFinally != null)
-                    { throw new RegionIncompleteException(); }
-                    _regionFinally = new(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch"));
+                    _regionFinallys.Add(region, new(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch")));
+                }
+                if (region.Kind == ControlFlowRegionKind.Filter)
+                {
+                    var parent = region.EnclosingRegion ?? throw new RegionIncompleteException();
+                    var caught = parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch);
+                    _regionFilters.Add(region, new(region, caught, _context.Temporary(RegionInteger),
+                        RegionBlock("filter:accepted"), RegionBlock("filter:rejected")));
                 }
                 foreach (var child in region.NestedRegions.Reverse())
                 { SpendRegion(); regions.Push(child); }
@@ -87,7 +93,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             _expressions = new(_context, _builder, _regionExceptionalExit)
             {
                 Spend = SpendRegion,
-                ExceptionTarget = (kind, site) => RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))
+                ExceptionTarget = (kind, site) => EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
+                    ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))
             };
             _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
             var localInitialization = _regionLocals.Count == 0 ? default : RegionLocalInitialization();
@@ -108,7 +115,10 @@ internal sealed partial class RoslynTotalProgramLowerer
                 RegionTerminator(source, block, structural);
             }
             ResolveRegionRethrows();
-            FinishRegionFinally(structural);
+            foreach (var filter in _regionFilters.Values)
+            { FinishRegionFilter(filter, structural); }
+            foreach (var state in _regionFinallys.Values)
+            { FinishRegionFinally(state, structural); }
             var program = _builder.Build();
             var instructionCount = 0;
             foreach (var block in program.Blocks)
@@ -191,6 +201,11 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         var site = source.BranchValue == null ? structural : _context.Site(source.BranchValue);
         var branch = source.FallThroughSuccessor;
+        if (EnclosingRegionFilter(source.EnclosingRegion) is { } filter)
+        {
+            RegionFilterTerminator(filter, source, block, site);
+            return;
+        }
         if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
             branch?.Destination != null)
         { _builder.Goto(block, structural, RegionNormalTarget(branch, structural)); }
@@ -208,7 +223,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             {
                 var returned = RegionBlock("return:captured");
                 _builder.Return(returned, site, _context.Result is { } resultValue ? _context.Factory.Variable(resultValue) : null);
-                _builder.Goto(block, site, EnterRegionFinally(returned, site, null, preserveResult: true));
+                _builder.Goto(block, site, EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true));
             }
         }
         else if (branch?.Semantics == ControlFlowBranchSemantics.Throw)
@@ -232,9 +247,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         else if (branch?.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling)
         {
-            if (_regionFinally == null || !Inside(source.EnclosingRegion, _regionFinally.Region))
-            { throw new RegionIncompleteException(); }
-            _builder.Goto(block, site, _regionFinally.Dispatch);
+            var state = EnclosingRegionFinally(source.EnclosingRegion);
+            _builder.Goto(block, site, state.Dispatch);
         }
         else if (source.Kind == BasicBlockKind.Exit)
         { _builder.Return(block, site); }
@@ -256,20 +270,20 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId RegionNormalTarget(ControlFlowBranch branch, OperationId site)
     {
         SpendRegion();
-        if (branch.Semantics != ControlFlowBranchSemantics.Regular || branch.Destination == null ||
-            branch.FinallyRegions.Length > 1)
+        if (branch.Semantics != ControlFlowBranchSemantics.Regular || branch.Destination == null)
         { throw new RegionIncompleteException(); }
         var target = _blocks[branch.Destination];
         if (branch.FinallyRegions.IsEmpty)
         { return target; }
-        if (_regionFinally?.Region != branch.FinallyRegions[0])
-        { throw new RegionIncompleteException(); }
-        return EnterRegionFinally(target, site, null);
+        return EnterRegionFinallyChain(branch.FinallyRegions, target, site, null,
+            preserveResult: HasEnclosingRegionFinally(branch.Source.EnclosingRegion));
     }
 
     private IrBlockId RegionExceptionTarget(ControlFlowRegion source, RegionExceptionToken token)
     {
-        var throughFinally = false;
+        if (_regionFilters.Count != 0)
+        { return RegionExceptionSearch(source, token); }
+        var throughFinally = new List<ControlFlowRegion>();
         var target = _regionExceptionalExit;
         for (var region = source; region != null; region = region.EnclosingRegion)
         {
@@ -287,10 +301,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                     }
                 }
                 else if (parent.Kind == ControlFlowRegionKind.TryAndFinally)
-                { throughFinally = true; }
+                { throughFinally.Add(parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Finally)); }
             }
         }
-        return throughFinally ? EnterRegionFinally(target, token.Site, token) : target;
+        return EnterRegionFinallyChain(throughFinally, target, token.Site, token,
+            preserveResult: HasEnclosingRegionFinally(source));
     }
 
     private IrBlockId RegionCatchEntry(ControlFlowRegion caught, RegionExceptionToken token)
@@ -306,10 +321,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         return entry;
     }
 
-    private IrBlockId EnterRegionFinally(IrBlockId target, OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
+    private IrBlockId EnterRegionFinally(RegionFinally state, IrBlockId target, OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
     {
         SpendRegion();
-        var state = _regionFinally ?? throw new RegionIncompleteException();
         var key = (target, site, exception?.Kind, preserveResult);
         if (state.Entries.TryGetValue(key, out var entry))
         { return entry; }
@@ -372,10 +386,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
     }
 
-    private void FinishRegionFinally(OperationId structural)
+    private void FinishRegionFinally(RegionFinally state, OperationId structural)
     {
-        if (_regionFinally is not { } state)
-        { return; }
         var block = state.Dispatch;
         for (var index = 0; index < state.Transfers.Count; index++)
         {
@@ -417,6 +429,44 @@ internal sealed partial class RoslynTotalProgramLowerer
         return token;
     }
     private IrTypeId RegionInteger => _context.Factory.GetOrCreateIntegerType(32, true);
+
+    private IrBlockId EnterRegionFinallyChain(IReadOnlyList<ControlFlowRegion> regions, IrBlockId target,
+        OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
+    {
+        for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
+        {
+            SpendRegion();
+            if (!_regionFinallys.TryGetValue(regions[ordinal], out var state))
+            { throw new RegionIncompleteException(); }
+            target = EnterRegionFinally(state, target, site, exception, preserveResult);
+        }
+        return target;
+    }
+
+    private RegionFinally EnclosingRegionFinally(ControlFlowRegion source)
+    {
+        for (var region = source; region != null; region = region.EnclosingRegion)
+        {
+            SpendRegion();
+            if (_regionFinallys.TryGetValue(region, out var state))
+            { return state; }
+        }
+        throw new RegionIncompleteException();
+    }
+
+    private bool HasEnclosingRegionFinally(ControlFlowRegion source)
+    {
+        // Every executing finally entry defined hidden Result by return
+        // capture or the typed filler. Nested leaves must retain that value,
+        // including an inner fault caught before the outer finally completes.
+        for (var region = source; region != null; region = region.EnclosingRegion)
+        {
+            SpendRegion();
+            if (_regionFinallys.ContainsKey(region))
+            { return true; }
+        }
+        return false;
+    }
     private IrBlockId RegionBlock(string name)
     {
         SpendRegion();

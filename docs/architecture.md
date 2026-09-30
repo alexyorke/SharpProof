@@ -224,14 +224,21 @@ wider numeric type or a frontend solver dependency.
 The candidate region route supports scalar faults, throw-null, ordered canonical
 runtime catches, and nested rethrow. Each lexical catch snapshots both the
 original exception kind and throwing operation, so an inner handled fault cannot
-replace an outer rethrow's provenance. One finally per callable is lowered once
-with a continuation selector. Return values are captured before finally mutates
+replace an outer rethrow's provenance. Each finally region is lowered once
+with its own continuation selector. Return values are captured before finally mutates
 storage; exceptional continuations resume the original throw explicitly after
 mixed normal and exceptional joins. Construction is bounded and cancelable, and
-the final graph must remain acyclic. Filters, multiple or nested finally regions,
-exception-object locals, object construction, calls, and heap effects remain
-incomplete. A shared finally whose dispatch creates a syntactic cycle remains
-incomplete even if individual concrete executions terminate.
+the final graph must remain acyclic. Scalar catch filters search in lexical order
+before any finally unwind. A false or faulting filter retains its earlier storage
+effects and resumes search for the original exception. The selected handler owns
+only the finally regions left on its route; a fault during unwind replaces the
+original exception and cancels the handler. Nested and sibling finally regions
+form inner-to-outer continuation chains, preserving captured returns throughout.
+Exception-object locals, object construction, calls, and heap effects remain
+incomplete. A shared filter or finally whose dispatch creates a syntactic cycle remains
+incomplete even if individual concrete executions terminate. In particular, a
+finally fault can cause the same shared catch filter to be searched again; the
+generated exception/filter cycle is closed even without a source loop.
 Owned scalar local storage receives typed initial values at the live body entry,
 after the complete contract prologue. Valid C# definite assignment makes those
 values unobservable; they preserve normal-only local assignments across a shared

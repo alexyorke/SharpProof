@@ -86,7 +86,6 @@ public sealed class TypedProgramLoweringTests
         Assert.That(subject.Invoke([10, firstDenominator, 20, secondDenominator]), Is.TypeOf<DivideByZeroException>());
     }
 
-    [TestCase("int Target(int x) { try { try { return x; } finally { x++; } } finally { x++; } }")]
     [TestCase("int Target(int x) => System.Math.Abs(x);")]
     [TestCase("int Target(int[] x) => x[0];")]
     [TestCase("int Target(int x) { ref int r = ref x; r++; return x; }")]

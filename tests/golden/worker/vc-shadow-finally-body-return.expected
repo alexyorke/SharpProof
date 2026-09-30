@@ -2,23 +2,23 @@ run: normal
 authority: legacy
 request-bindings: True
 cache: Written
-postconditions: 9
-enrolled: 9
-checked: 9
+postconditions: 8
+enrolled: 8
+checked: 8
 unchecked: 0
 unenrolled: 0
 unknown: 0
 oldProven: 0
-newProven: 6
+newProven: 4
 oldVacuous: 0
-newVacuous: 1
+newVacuous: 0
 oldConditional: 0
-newConditional: 1
+newConditional: 0
 soundnessDisagreements: 0
-precisionGains: 7
+precisionGains: 8
 precisionLosses: 0
 coverageComplete: True
-row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#1
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#1
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -30,7 +30,7 @@ row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#1
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#0
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -42,7 +42,7 @@ row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#0
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.BMixedFinally(System.Int32)~System.Int32#0
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -54,7 +54,7 @@ row: M:Subject.BMixedFinally(System.Int32)~System.Int32#0
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.CNestedRethrow(System.Int32)~System.Int32#1
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#1
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -66,61 +66,49 @@ row: M:Subject.CNestedRethrow(System.Int32)~System.Int32#1
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.CNestedRethrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: False
-row: M:Subject.DAssumeRegion(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: True
-row: M:Subject.EAllThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: NoModeledNormalReturn
-  feasibility: NoModeledNormalReturn
-  oldConditional: False
-  newConditional: False
-row: M:Subject.FCatchAll(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: False
-row: M:Subject.GNestedFinallyClosed(System.Int32)~System.Int32#0
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#1
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
   newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
   newReason: None
   newVacuity: None
   feasibility: Feasible
@@ -130,23 +118,23 @@ run: cache-hit
 authority: legacy
 request-bindings: True
 cache: Hit
-postconditions: 9
-enrolled: 9
-checked: 9
+postconditions: 8
+enrolled: 8
+checked: 8
 unchecked: 0
 unenrolled: 0
 unknown: 0
 oldProven: 0
-newProven: 6
+newProven: 4
 oldVacuous: 0
-newVacuous: 1
+newVacuous: 0
 oldConditional: 0
-newConditional: 1
+newConditional: 0
 soundnessDisagreements: 0
-precisionGains: 7
+precisionGains: 8
 precisionLosses: 0
 coverageComplete: True
-row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#1
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#1
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -158,7 +146,7 @@ row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#1
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#0
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -170,7 +158,7 @@ row: M:Subject.ACapturedReturn(System.Int32)~System.Int32#0
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.BMixedFinally(System.Int32)~System.Int32#0
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -182,7 +170,7 @@ row: M:Subject.BMixedFinally(System.Int32)~System.Int32#0
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.CNestedRethrow(System.Int32)~System.Int32#1
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#1
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
@@ -194,61 +182,49 @@ row: M:Subject.CNestedRethrow(System.Int32)~System.Int32#1
   feasibility: Feasible
   oldConditional: False
   newConditional: False
-row: M:Subject.CNestedRethrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: False
-row: M:Subject.DAssumeRegion(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: True
-row: M:Subject.EAllThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: NoModeledNormalReturn
-  feasibility: NoModeledNormalReturn
-  oldConditional: False
-  newConditional: False
-row: M:Subject.FCatchAll(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: False
-row: M:Subject.GNestedFinallyClosed(System.Int32)~System.Int32#0
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#1
   oldOutcome: Unknown
   oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
   newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
   newReason: None
   newVacuity: None
   feasibility: Feasible
