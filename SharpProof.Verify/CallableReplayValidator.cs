@@ -39,12 +39,12 @@ internal static class CallableReplayValidator
                 }
                 initial[binding.Key] = value;
             }
-            var replayOptions = context.ReplayOptions == null ? null : new IrProgramReplayOptions(request =>
+            var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
                 request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
                     IrHavocOrigin.SpecResult => null,
-                    IrHavocOrigin.Approximation => context.ReplayOptions.HavocValueProvider(request),
+                    IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
                 });
             var execution = new IrProgramInterpreter(factory).Execute(
@@ -117,7 +117,14 @@ internal static class CallableReplayValidator
                 return AbstentionReason.CounterexampleReplayFailed;
             }
         }
-        var observed = new ContractValues(final, approximationVariables);
+        var consumedApproximation = false;
+        void ObserveRead(IrVarId variable)
+        {
+            if (approximationVariables.Contains(variable))
+            {
+                consumedApproximation = true;
+            }
+        }
         var interpreter = new IrInterpreter(factory);
         if (factory.Semantics == IrExecutionSemantics.Total)
         {
@@ -125,8 +132,8 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
-            var defined = interpreter.Evaluate(guard, observed, cancellationToken);
-            if (observed.ConsumedApproximation)
+            var defined = interpreter.Evaluate(guard, final, ObserveRead, cancellationToken);
+            if (consumedApproximation)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
@@ -139,8 +146,8 @@ internal static class CallableReplayValidator
                 return AbstentionReason.PostconditionMayBeUndefined;
             }
         }
-        var evaluated = interpreter.Evaluate(context.Postcondition, observed, cancellationToken);
-        if (observed.ConsumedApproximation)
+        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, cancellationToken);
+        if (consumedApproximation)
         {
             return AbstentionReason.CounterexampleNotReplayable;
         }
@@ -154,35 +161,4 @@ internal static class CallableReplayValidator
                 : AbstentionReason.CounterexampleReplayFailed;
     }
 
-    private sealed class ContractValues(
-        IReadOnlyDictionary<IrVarId, IrValue> values,
-        HashSet<IrVarId> approximations) : IReadOnlyDictionary<IrVarId, IrValue>
-    {
-        internal bool ConsumedApproximation { get; private set; }
-        public IrValue this[IrVarId key] => TryGetValue(key, out var value) ? value : throw new KeyNotFoundException();
-        public IEnumerable<IrVarId> Keys => values.Keys;
-        public IEnumerable<IrValue> Values => values.Values;
-        public int Count => values.Count;
-        public bool ContainsKey(IrVarId key)
-        {
-            return values.ContainsKey(key);
-        }
-        public bool TryGetValue(IrVarId key, out IrValue value)
-        {
-            var found = values.TryGetValue(key, out value!);
-            if (found && approximations.Contains(key))
-            {
-                ConsumedApproximation = true;
-            }
-            return found;
-        }
-        public IEnumerator<KeyValuePair<IrVarId, IrValue>> GetEnumerator()
-        {
-            return values.GetEnumerator();
-        }
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-    }
 }

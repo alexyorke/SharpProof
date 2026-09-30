@@ -142,12 +142,19 @@ public sealed class IrInterpreter(IrFactory factory)
         IReadOnlyDictionary<IrVarId, IrValue>? variables = null,
         CancellationToken cancellationToken = default)
     {
+        return Evaluate(term, variables, onVariableRead: null, cancellationToken);
+    }
+
+    internal IrEvaluationResult Evaluate(
+        IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
+        Action<IrVarId>? onVariableRead, CancellationToken cancellationToken)
+    {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
         return EvaluateCore(
             term,
-            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, cancellationToken));
+            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken));
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
@@ -191,7 +198,7 @@ public sealed class IrInterpreter(IrFactory factory)
             IrIntegerTerm value => Value(_factory.CreateIntegerValueFromBits(value.Type, value.Bits)),
             IrStringTerm value => Text(_factory.GetString(value.Value)),
             IrNullTerm => Value(_factory.CreateNullValue(term.Type)),
-            IrVariableTerm variable => EvaluateVariable(variable, state.Variables),
+            IrVariableTerm variable => EvaluateVariable(variable, state),
             IrOpaqueTerm opaque => EvaluateOpaque(opaque, state),
             IrUnaryTerm unary => EvaluateUnary(unary, state),
             IrBinaryTerm binary => EvaluateBinary(binary, state),
@@ -207,14 +214,15 @@ public sealed class IrInterpreter(IrFactory factory)
     }
 
     private static IrEvaluationResult EvaluateVariable(
-        IrVariableTerm variable, IReadOnlyDictionary<IrVarId, IrValue> variables)
+        IrVariableTerm variable, EvaluationState state)
     {
-        if (!variables.TryGetValue(variable.Variable, out var value))
+        if (!state.Variables.TryGetValue(variable.Variable, out var value))
         {
             return Unsupported(IrUnsupportedReason.MissingVariable,
                 "No value was supplied for " + variable.Variable + ".");
         }
 
+        state.OnVariableRead?.Invoke(variable.Variable);
         if (value == null || value.Type != variable.Type)
         {
             return Unsupported(IrUnsupportedReason.InvalidVariableValue,
@@ -658,10 +666,12 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private sealed class EvaluationState(
         IReadOnlyDictionary<IrVarId, IrValue> variables,
+        Action<IrVarId>? onVariableRead,
         CancellationToken cancellationToken)
     {
         internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = variables;
         internal CancellationToken CancellationToken { get; } = cancellationToken;
+        internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
         internal int Depth { get; set; }
     }

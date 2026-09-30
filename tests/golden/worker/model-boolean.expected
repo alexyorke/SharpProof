@@ -1,0 +1,4 @@
+model: Legacy False outcome=Refuted
+model: Legacy True outcome=Refuted
+model: Total False outcome=Refuted
+model: Total True outcome=Refuted

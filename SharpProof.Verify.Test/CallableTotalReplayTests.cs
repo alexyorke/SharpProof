@@ -22,6 +22,7 @@ public sealed class CallableTotalReplayTests
     [TestCase("untaken")]
     [TestCase("prestate")]
     [TestCase("input")]
+    [TestCase("input-no-provider")]
     public async Task OnlyValuesActuallyReadByBodyOrContractNeedReplayEvidence(string scenario)
     {
         var outcome = await Replay(scenario);
@@ -33,13 +34,16 @@ public sealed class CallableTotalReplayTests
 
     [TestCase("missing", AbstentionReason.CounterexampleNotReplayable)]
     [TestCase("false", AbstentionReason.PostconditionMayBeUndefined)]
+    [TestCase("unresolved", AbstentionReason.CounterexampleReplayFailed)]
     public async Task TotalPostconditionRequiresAnExplicitSuccessfulGuard(string scenario, AbstentionReason reason)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new CallableReplayContext(null, true, ImmutableDictionary<IrVarId, IrVarId>.Empty,
             ImmutableDictionary<IrVarId, IrVarId?>.Empty, [], factory.Boolean(false),
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 100, [],
-            postconditionGuard: scenario == "missing" ? null : factory.Boolean(false), replayOptions: null);
+            postconditionGuard: scenario == "missing" ? null
+                : scenario == "unresolved" ? factory.Variable(factory.CreateVariable("unresolved", factory.BooleanType))
+                : factory.Boolean(false), replayOptions: null);
         var outcome = await new ProofKernel(new StubBackend(new BackendModel([])))
             .VerifyCallableAsync(Query(factory, []), context);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
@@ -73,7 +77,7 @@ public sealed class CallableTotalReplayTests
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
-        var origin = scenario is "input" or "unbound-input" ? IrHavocOrigin.Input
+        var origin = scenario is "input" or "input-no-provider" or "unbound-input" ? IrHavocOrigin.Input
             : scenario == "spec-result" ? IrHavocOrigin.SpecResult : IrHavocOrigin.Approximation;
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, origin, bodyParameter);
         if (scenario == "read-then-overwritten")
@@ -98,7 +102,8 @@ public sealed class CallableTotalReplayTests
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 100, [],
             postconditionGuard: scenario == "guard" ? comparison : factory.Boolean(true),
             // Input substitutions must be ignored; only the bound entry value is authoritative.
-            replayOptions: new IrProgramReplayOptions(_ => factory.CreateIntegerValue(scenario == "input" ? 2 : -1)));
+            replayOptions: scenario == "input-no-provider" ? null
+                : new IrProgramReplayOptions(_ => factory.CreateIntegerValue(scenario == "input" ? 2 : -1)));
         var model = new BackendModel([
             KeyValuePair.Create(parameter, factory.CreateIntegerValue(-1)),
             KeyValuePair.Create(flag, factory.CreateBooleanValue(false))

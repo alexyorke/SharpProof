@@ -2,18 +2,10 @@ namespace SharpProof.Smt;
 
 public sealed class IrSmtBackend : ISmtBackend, IDisposable
 {
-    private const int MaximumEncodingDepth = 256;
     private readonly Context _context;
-    private readonly object _gate = new();
-    private readonly object _lifecycleGate = new();
-    private readonly SemaphoreSlim _queryGate = new(1, 1);
-    private readonly TaskCompletionSource<bool> _checksDrained = new(
-        TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly SmtNativeRunner _runner;
     private readonly IrSmtBackendOptions _options;
     private long _consumedResourceCount;
-    private int _activeCheckCount;
-    private int _disposeStarted;
-    private bool _disposed;
 
     public IrSmtBackend()
         : this(new IrSmtBackendOptions())
@@ -32,166 +24,21 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         _options = ArgumentNullGuard.NotNull(options, nameof(options));
         var validatedFactory = ArgumentNullGuard.NotNull(
             createContext, nameof(createContext));
-        _context = ArgumentNullGuard.NotNull(
-            validatedFactory(), nameof(createContext));
+        _runner = new SmtNativeRunner(validatedFactory);
+        _context = _runner.Context;
     }
 
-    public long ConsumedResourceCount
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _consumedResourceCount;
-            }
-        }
-    }
+    public long ConsumedResourceCount => Interlocked.Read(ref _consumedResourceCount);
 
-    public Task<BackendCheckResult> CheckAsync(
-        VerificationQuery query,
-        CancellationToken cancellationToken)
+    public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(query, nameof(query));
-
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_lifecycleGate)
-        {
-            if (_disposeStarted != 0)
-            {
-                return Task.FromResult(BackendCheckResult.Unknown(
-                    BackendFailureReason.Unavailable));
-            }
-
-            _activeCheckCount++;
-            return CheckSerializedAsync(query, cancellationToken);
-        }
-    }
-
-    private async Task<BackendCheckResult> CheckSerializedAsync(
-        VerificationQuery query,
-        CancellationToken cancellationToken)
-    {
-        var acquired = false;
-        try
-        {
-            await _queryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            acquired = true;
-            return await Task.Run(() =>
-            {
-                lock (_gate)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (_disposed || Volatile.Read(ref _disposeStarted) != 0)
-                    {
-                        return BackendCheckResult.Unknown(
-                            BackendFailureReason.Unavailable);
-                    }
-
-                    using var registration = cancellationToken.Register(
-                        static state => ((IrSmtBackend)state!).Interrupt(),
-                        this);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    try
-                    {
-                        var result = CheckCore(query, cancellationToken);
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return result;
-                    }
-                    catch (QueryResourceLimitException)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return BackendCheckResult.Unknown(
-                            BackendFailureReason.ResourceLimit);
-                    }
-                    catch (UnsupportedIrEncodingException)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return BackendCheckResult.Unknown(
-                            BackendFailureReason.UnsupportedEncoding);
-                    }
-                    catch (Exception exception) when (exception is
-                        Z3Exception or
-                        InvalidOperationException or
-                        ArgumentException or
-                        ArithmeticException)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return BackendCheckResult.Unknown(
-                            BackendFailureReason.InfrastructureFailure);
-                    }
-                }
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            if (acquired)
-            {
-                _queryGate.Release();
-            }
-
-            CheckFinished();
-        }
-    }
-
-    private void Interrupt()
-    {
-        _context.Interrupt();
+        return _runner.CheckAsync(() => CheckCore(query, cancellationToken), cancellationToken);
     }
 
     public void Dispose()
     {
-        lock (_lifecycleGate)
-        {
-            if (_disposeStarted != 0)
-            {
-                return;
-            }
-
-            _disposeStarted = 1;
-            if (_activeCheckCount == 0)
-            {
-                _checksDrained.TrySetResult(true);
-            }
-        }
-
-        // Take exclusive ownership of the query gate before disposing the
-        // native context. Checks that were already admitted observe
-        // _disposeStarted and drain through the gate with Unavailable.
-        _queryGate.Wait();
-        try
-        {
-            lock (_gate)
-            {
-                _disposed = true;
-                _context.Dispose();
-            }
-        }
-        finally
-        {
-            // Wake any checks that were queued before disposal began. They
-            // return Unavailable before touching the disposed context.
-            _queryGate.Release();
-            try
-            {
-                _checksDrained.Task.GetAwaiter().GetResult();
-            }
-            finally
-            {
-                _queryGate.Dispose();
-            }
-        }
-    }
-
-    private void CheckFinished()
-    {
-        lock (_lifecycleGate)
-        {
-            _activeCheckCount--;
-            if (_disposeStarted != 0 && _activeCheckCount == 0)
-            {
-                _checksDrained.TrySetResult(true);
-            }
-        }
+        _runner.Dispose();
     }
 
     private BackendCheckResult CheckCore(
@@ -202,7 +49,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         {
             return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
         }
-        var meter = new QueryResourceMeter(
+        var meter = new SmtQueryResourceMeter(
             _options.QueryRlimit, cancellationToken);
         try
         {
@@ -248,18 +95,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 _context.MkSymbol("rlimit"),
                 meter.GetRemainingBudget());
             solver.Parameters = parameters;
-            cancellationToken.ThrowIfCancellationRequested();
-            // Z3 reports this statistic as a context-lifetime total.
-            var resourceCountBeforeCheck = ReadResourceCount(solver);
-            var status = solver.Check();
-            var resourceCountAfterCheck = ReadResourceCount(solver);
-            if (resourceCountAfterCheck.HasValue)
-            {
-                meter.ConsumeNative(ComputeResourceDelta(
-                    resourceCountBeforeCheck.GetValueOrDefault(),
-                    resourceCountAfterCheck.Value));
-            }
-            cancellationToken.ThrowIfCancellationRequested();
+            var status = SmtNativeCheck.Run(solver, [], meter);
             return status switch
             {
                 Status.UNSATISFIABLE => CreateUnsatisfiable(
@@ -272,12 +108,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
         finally
         {
-            _consumedResourceCount = checked(
-                _consumedResourceCount + meter.Consumed);
+            Interlocked.Exchange(ref _consumedResourceCount,
+                checked(Interlocked.Read(ref _consumedResourceCount) + meter.Consumed));
         }
     }
 
-    private static BackendFailureReason ClassifyUnknown(string? reason)
+    internal static BackendFailureReason ClassifyUnknown(string? reason)
     {
         if (reason?.IndexOf("incomplete", StringComparison.OrdinalIgnoreCase) >= 0)
         {
@@ -311,7 +147,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             : (long)uint.MaxValue + 1 - before + after;
     }
 
-    private static uint? ReadResourceCount(Solver solver)
+    internal static uint? ReadResourceCount(Solver solver)
     {
         // Statistics is a caller-owned Z3 object holding a native reference, the
         // same as Model in CreateSatisfiable. This backend outlives hundreds of
@@ -348,7 +184,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private static BackendCheckResult CreateUnsatisfiable(
         Solver solver,
         Dictionary<string, int> tracked,
-        QueryResourceMeter meter,
+        SmtQueryResourceMeter meter,
         CancellationToken cancellationToken)
     {
         var expressions = solver.UnsatCore;
@@ -400,7 +236,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         VerificationQuery query,
         QueryEncoder encoder,
         Solver solver,
-        QueryResourceMeter meter)
+        SmtQueryResourceMeter meter)
     {
         using var model = solver.Model;
         var assignments = new Dictionary<IrVarId, IrValue>(encoder.Variables.Length);
@@ -426,8 +262,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     {
         if (type == factory.BooleanType)
         {
-            bool? boolean = expression.IsTrue ? true : expression.IsFalse ? false : null;
-            value = boolean.HasValue ? factory.CreateBooleanValue(boolean.Value) : null;
+            value = CreateBooleanValue(factory, expression);
         }
         else if (type == factory.IntegerType &&
                  expression is IntNum integer)
@@ -447,6 +282,16 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
 
         return value != null;
+    }
+
+    internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)
+    {
+        return expression is not BoolExpr ? null : expression.BoolValue switch
+        {
+            Z3_lbool.Z3_L_TRUE => factory.CreateBooleanValue(true),
+            Z3_lbool.Z3_L_FALSE => factory.CreateBooleanValue(false),
+            _ => null
+        };
     }
 
     private sealed class QueryEncoder
@@ -469,7 +314,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             Context context,
             VerificationQuery query,
             Z3ExpressionOwner owner,
-            QueryResourceMeter meter,
+            SmtQueryResourceMeter meter,
             CancellationToken cancellationToken)
         {
             _context = context;
@@ -479,9 +324,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             var maximumDepths = new Dictionary<IrId, int>();
             foreach (var assumption in query.Assumptions)
             {
-                ValidateDepth(assumption.Predicate, maximumDepths, meter, cancellationToken);
+                SmtEncodingDepth.Validate(assumption.Predicate, maximumDepths, meter, cancellationToken);
             }
-            ValidateDepth(query.Goal.Predicate, maximumDepths, meter, cancellationToken);
+            SmtEncodingDepth.Validate(query.Goal.Predicate, maximumDepths, meter, cancellationToken);
             var variables = ImmutableArray.CreateBuilder<
                 (IrVarId Variable, IrTypeId Type)>(query.ModelVariables.Length);
             for (var index = 0; index < query.ModelVariables.Length; index++)
@@ -502,39 +347,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                     : _owner.Own(_context.MkIntConst(name)));
             }
             Variables = variables.ToImmutable();
-        }
-
-        private static void ValidateDepth(
-            IrTerm root,
-            Dictionary<IrId, int> maximumDepths,
-            QueryResourceMeter meter,
-            CancellationToken cancellationToken)
-        {
-            var pending = new Stack<(IrTerm Term, int Depth)>();
-            var children = new Stack<IrTerm>();
-            pending.Push((root, 1));
-            while (pending.Count != 0)
-            {
-                meter.Consume();
-                cancellationToken.ThrowIfCancellationRequested();
-                var (term, depth) = pending.Pop();
-                if (depth > MaximumEncodingDepth)
-                {
-                    throw new UnsupportedIrEncodingException();
-                }
-                if (maximumDepths.TryGetValue(term.Id, out var previous) &&
-                    previous >= depth)
-                {
-                    continue;
-                }
-                maximumDepths[term.Id] = depth;
-                children.Clear();
-                IrTraversal.PushChildren(term, children);
-                while (children.Count != 0)
-                {
-                    pending.Push((children.Pop(), depth + 1));
-                }
-            }
         }
 
         internal ImmutableArray<(IrVarId Variable, IrTypeId Type)> Variables
@@ -774,54 +586,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
     }
 
-    private sealed class QueryResourceMeter(
-        uint limit,
-        CancellationToken cancellationToken)
-    {
-        private readonly long _limit = limit;
-        private long _consumed;
-
-        internal long Consumed => _consumed;
-
-        internal void PollCancellation()
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-
-        internal void Consume()
-        {
-            PollCancellation();
-            if (_consumed >= _limit)
-            {
-                throw new QueryResourceLimitException();
-            }
-
-            _consumed++;
-        }
-
-        internal void ConsumeNative(long consumed)
-        {
-            PollCancellation();
-            _consumed = checked(_consumed + consumed);
-            if (_consumed > _limit)
-            {
-                throw new QueryResourceLimitException();
-            }
-        }
-
-        internal uint GetRemainingBudget()
-        {
-            PollCancellation();
-            var remaining = _limit - _consumed;
-            if (remaining <= 0)
-            {
-                throw new QueryResourceLimitException();
-            }
-
-            return checked((uint)remaining);
-        }
-    }
-
     private readonly struct EncodedValue(Expr value, BoolExpr defined)
     {
         internal Expr Value { get; } = value;
@@ -834,6 +598,4 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         internal BoolExpr Defined { get; } = defined;
     }
 
-    private sealed class UnsupportedIrEncodingException : Exception;
-    private sealed class QueryResourceLimitException : Exception;
 }

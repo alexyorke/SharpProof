@@ -14,7 +14,6 @@ public sealed partial class IrBasicBlock
 
 public sealed partial class IrProgram
 {
-    public IrExecutionSemantics Semantics => Factory.Semantics;
     internal IrProgram(
         IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks)
     {

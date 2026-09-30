@@ -85,11 +85,48 @@ public sealed class IrTotalExecutionTests
         builder.Throw(entry, site, IrExceptionKind.DivideByZero, cleanup);
         builder.Goto(cleanup, factory.CreateOperation(), exit);
         builder.ExceptionalExit(exit, factory.CreateOperation());
-        var result = new IrProgramInterpreter(factory).Execute(builder.Build());
+        var program = builder.Build();
+        var order = IrBlockOrder.TryCreateAcyclicOrder(program, _ => true, out var failure);
+        Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
+        Assert.That(order, Is.EqualTo(new[] { entry, cleanup, exit }));
+        var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(entry).Terminator);
+        Assert.That(successors!.Value.First, Is.EqualTo(cleanup));
+        Assert.That(successors.Value.Second, Is.Null);
+        var terminal = IrInstructionFacts.TryGetSuccessors(program.GetBlock(exit).Terminator);
+        Assert.That(terminal!.Value.First, Is.Null);
+        Assert.That(terminal.Value.Second, Is.Null);
+        var result = new IrProgramInterpreter(factory).Execute(program);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         Assert.That(result.Exception.Site, Is.EqualTo(site));
         Assert.That(factory.GetOperationInfo(result.Instruction!.Operation).SourceSpan!.Start, Is.EqualTo(12));
+    }
+
+    [Test]
+    public void ThrowCycleIsRejectedByAcyclicOrdering()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.DivideByZero, entry);
+        var order = IrBlockOrder.TryCreateAcyclicOrder(builder.Build(), _ => true, out var failure);
+        Assert.That(order.IsDefault, Is.True);
+        Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.CyclicControlFlow));
+    }
+
+    [Test]
+    public void LegacyExecutionRejectsModeledHavocBeforeInvokingItsProvider()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(1));
+        var invoked = false;
+        var options = new IrProgramReplayOptions(_ => { invoked = true; return factory.CreateIntegerValue(2); });
+        var exception = Assert.Throws<ArgumentException>((Action)(() =>
+            new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100, options)));
+        Assert.That(exception!.ParamName, Is.EqualTo("replayOptions"));
+        Assert.That(invoked, Is.False);
     }
 
     [TestCase("replacement", IrProgramExecutionStatus.Exception)]
@@ -237,6 +274,134 @@ public sealed class IrTotalExecutionTests
             Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
             Assert.That(result.Value!.Type, Is.EqualTo(elementType));
             Assert.That(result.Value.IntegerBits, Is.Zero);
+        }
+    }
+
+    [TestCase(false, "null", true)]
+    [TestCase(true, "null", true)]
+    [TestCase(false, "missing", false)]
+    [TestCase(true, "missing", false)]
+    [TestCase(false, "nonnull", true)]
+    [TestCase(true, "nonnull", true)]
+    public void MemberLocationOperandsPreserveReadOrderBeforeMemoryFailure(bool store, string receiverKind, bool consumed)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var receiver = factory.CreateVariable("receiver", factory.ObjectType);
+        var argument = factory.CreateVariable("argument", factory.IntegerType);
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Item",
+            factory.IntegerType, false, [factory.IntegerType]);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables,
+            IrHavocOrigin.Approximation, argument, value);
+        var location = builder.MemberLocation(member, factory.Variable(receiver), factory.Variable(argument));
+        var site = factory.CreateOperation("member access");
+        if (store)
+        {
+            builder.Store(entry, site, location, factory.Variable(value));
+        }
+        else
+        {
+            builder.Load(entry, site, value, location);
+        }
+        builder.Return(entry, factory.CreateOperation());
+        var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        if (receiverKind != "missing")
+        {
+            initial = initial.Add(receiver, receiverKind == "null" ? factory.CreateNullValue(factory.ObjectType)
+                : factory.CreateReferenceValue(factory.ObjectType, new object()));
+        }
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
+        Assert.That(result.ConsumedApproximation, Is.EqualTo(consumed));
+        Assert.That(result.Instruction!.Operation, Is.EqualTo(site));
+        Assert.That(result.Status, Is.EqualTo(receiverKind == "null"
+            ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Unsupported));
+        if (receiverKind == "null")
+        {
+            Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.NullReference));
+        }
+        else if (receiverKind == "missing")
+        {
+            Assert.That(result.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.MissingVariable));
+        }
+    }
+
+    [Test]
+    public void TotalUnboxingFaultsUseBooleanAndStringDefaults()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var boxed = factory.CreateVariable("boxed", factory.ObjectType);
+        var values = ImmutableDictionary<IrVarId, IrValue>.Empty
+            .Add(boxed, factory.CreateReferenceValue(factory.ObjectType, new object()));
+        var interpreter = new IrInterpreter(factory);
+        var boolean = interpreter.Evaluate(factory.Cast(factory.BooleanType, factory.Null(factory.ObjectType)), values);
+        var text = interpreter.Evaluate(factory.Cast(factory.StringType, factory.Variable(boxed)), values);
+        Assert.That(boolean.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(boolean.Value!.Type, Is.EqualTo(factory.BooleanType));
+        Assert.That(boolean.Value.Boolean, Is.False);
+        Assert.That(text.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(text.Value!.Type, Is.EqualTo(factory.StringType));
+        Assert.That(text.Value.Kind, Is.EqualTo(IrValueKind.Null));
+    }
+
+    [TestCase(true, IrUnsupportedReason.InvalidVariableValue)]
+    [TestCase(false, IrUnsupportedReason.MissingVariable)]
+    public void ReadsAreObservedAfterSuccessfulLookupBeforeTypeValidation(bool present, IrUnsupportedReason reason)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var values = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        if (present)
+        {
+            values = values.Add(variable, factory.CreateBooleanValue(true));
+        }
+        var observed = new List<IrVarId>();
+        var result = new IrInterpreter(factory).Evaluate(factory.Variable(variable), values,
+            observed.Add, CancellationToken.None);
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(result.Unsupported!.Reason, Is.EqualTo(reason));
+        Assert.That(observed, Is.EqualTo(present ? new[] { variable } : Array.Empty<IrVarId>()));
+    }
+
+    [Test]
+    public async Task ConcurrentEvaluationsKeepSeparateLazyReadObservers()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        var x = factory.CreateVariable("x", factory.IntegerType);
+        var y = factory.CreateVariable("y", factory.IntegerType);
+        var term = factory.Conditional(factory.Variable(flag), factory.Variable(x), factory.Variable(y));
+        var interpreter = new IrInterpreter(factory);
+        using var barrier = new Barrier(2);
+        var whenTrue = new List<IrVarId>();
+        var whenFalse = new List<IrVarId>();
+        var tasks = new[]
+        {
+            Task.Run(() => Evaluate(true, whenTrue)),
+            Task.Run(() => Evaluate(false, whenFalse))
+        };
+        var results = await Task.WhenAll(tasks);
+        Assert.That(results.Select(result => result.Status), Is.All.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(results[0].Value!.Integer, Is.EqualTo(11));
+        Assert.That(results[1].Value!.Integer, Is.EqualTo(22));
+        Assert.That(whenTrue, Is.EqualTo(new[] { flag, x }));
+        Assert.That(whenFalse, Is.EqualTo(new[] { flag, y }));
+
+        IrEvaluationResult Evaluate(bool selected, List<IrVarId> observed)
+        {
+            var values = ImmutableDictionary<IrVarId, IrValue>.Empty
+                .Add(flag, factory.CreateBooleanValue(selected))
+                .Add(x, factory.CreateIntegerValue(11)).Add(y, factory.CreateIntegerValue(22));
+            return interpreter.Evaluate(term, values, variable =>
+            {
+                observed.Add(variable);
+                if (variable == flag)
+                {
+                    Assert.That(barrier.SignalAndWait(TimeSpan.FromSeconds(10)), Is.True);
+                }
+            }, CancellationToken.None);
         }
     }
 }

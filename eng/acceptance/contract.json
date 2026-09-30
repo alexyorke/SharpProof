@@ -179,6 +179,10 @@
         "name": "encoding",
         "paths": [
           "SharpProof.Smt/IrSmtBackend.cs",
+          "SharpProof.Smt/BvEncoder.cs",
+          "SharpProof.Smt/CallableSolverSession.cs",
+          "SharpProof.Smt/SmtNativeRunner.cs",
+          "SharpProof.Smt/SmtQueryResourceMeter.cs",
           "SharpProof.Verify/Backend.cs"
         ]
       },

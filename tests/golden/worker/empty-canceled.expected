@@ -1,0 +1,6 @@
+run: Canceled/None
+request-bound: True
+cacheable: False
+claims: 0
+error: worker.canceled
+exit: 4

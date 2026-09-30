@@ -8,13 +8,14 @@ internal static class IrProgramCallHostExecution
         IrCallInstruction call,
         IReadOnlyDictionary<IrVarId, IrValue> values,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
+        Action<IrVarId> onVariableRead,
         CancellationToken cancellationToken)
     {
         IrValue? receiverValue = null;
         if (call.Receiver is { } receiver)
         {
             var receiverResult = terms.Evaluate(
-                receiver, values, cancellationToken);
+                receiver, values, onVariableRead, cancellationToken);
             if (receiverResult.Status != IrEvaluationStatus.Value)
             {
                 return receiverResult;
@@ -28,7 +29,7 @@ internal static class IrProgramCallHostExecution
         foreach (var argument in call.Arguments)
         {
             var argumentResult = terms.Evaluate(
-                argument, values, cancellationToken);
+                argument, values, onVariableRead, cancellationToken);
             if (argumentResult.Status != IrEvaluationStatus.Value)
             {
                 return argumentResult;

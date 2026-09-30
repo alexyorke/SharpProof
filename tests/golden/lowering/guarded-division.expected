@@ -1,0 +1,20 @@
+mode: Legacy
+classification: Exact/None
+entry: b0
+variable: v0:int[width=0,signed=True] source=divisor
+variable: v1:int[width=0,signed=True] source=value
+block: b0 cfg:0:Entry
+  i0 op0 Goto b1
+block: b1 cfg:1:Block
+  i1 op1 Branch (v0 == 0) ? b2 : b3
+block: b2 cfg:2:Block
+  i2 op2 Return 0
+block: b3 cfg:3:Block
+  i3 op3 Return (v1 / v0)
+block: b4 cfg:4:Exit
+  i4 op4 Return void
+term: ir0 Variable type=t1:int width=0 signed=True value=v0
+term: ir1 Integer type=t1:int width=0 signed=True bits=0 value=0
+term: ir2 Binary type=t0:bool width=0 signed=False value=(v0 == 0)
+term: ir3 Variable type=t1:int width=0 signed=True value=v1
+term: ir4 Binary type=t1:int width=0 signed=True value=(v1 / v0)

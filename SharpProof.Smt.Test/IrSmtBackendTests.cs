@@ -733,11 +733,11 @@ public sealed class IrSmtBackendTests
                 new SourceLocationId(0)));
         using var backend = new IrSmtBackend();
         using var cancellation = new CancellationTokenSource();
-        var gate = typeof(IrSmtBackend).GetField(
+        var gate = typeof(SmtNativeRunner).GetField(
                 "_gate",
                 System.Reflection.BindingFlags.Instance |
                 System.Reflection.BindingFlags.NonPublic)?
-            .GetValue(backend);
+            .GetValue(GetRunner(backend));
         Assert.That(gate, Is.Not.Null);
 
         var check = backend.CheckAsync(query, cancellation.Token);
@@ -793,11 +793,11 @@ public sealed class IrSmtBackendTests
                 new SourceLocationId(0)));
         using var backend = new IrSmtBackend();
         using var cancellation = new CancellationTokenSource();
-        var gate = typeof(IrSmtBackend).GetField(
+        var gate = typeof(SmtNativeRunner).GetField(
                 "_gate",
                 System.Reflection.BindingFlags.Instance |
                 System.Reflection.BindingFlags.NonPublic)?
-            .GetValue(backend);
+            .GetValue(GetRunner(backend));
         Assert.That(gate, Is.Not.Null);
 
         Task<BackendCheckResult> active;
@@ -847,12 +847,12 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
         using var backend = new IrSmtBackend();
-        var queryGate = (SemaphoreSlim)typeof(IrSmtBackend).GetField(
+        var queryGate = (SemaphoreSlim)typeof(SmtNativeRunner).GetField(
                 "_queryGate",
                 System.Reflection.BindingFlags.Instance |
                 System.Reflection.BindingFlags.NonPublic)!
-            .GetValue(backend)!;
-        var disposeStarted = typeof(IrSmtBackend).GetField(
+            .GetValue(GetRunner(backend))!;
+        var disposeStarted = typeof(SmtNativeRunner).GetField(
                 "_disposeStarted",
                 System.Reflection.BindingFlags.Instance |
                 System.Reflection.BindingFlags.NonPublic)!;
@@ -864,7 +864,7 @@ public sealed class IrSmtBackendTests
         {
             Assert.That(
                 SpinWait.SpinUntil(
-                    () => (int)disposeStarted.GetValue(backend)! != 0,
+                    () => (int)disposeStarted.GetValue(GetRunner(backend))! != 0,
                     TimeSpan.FromSeconds(5)),
                 Is.True,
                 "Dispose must begin while the check is queued.");
@@ -1112,5 +1112,10 @@ public sealed class IrSmtBackendTests
         {
             IsDisposed = true;
         }
+    }
+    private static SmtNativeRunner GetRunner(IrSmtBackend backend)
+    {
+        return (SmtNativeRunner)typeof(IrSmtBackend).GetField("_runner",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(backend)!;
     }
 }

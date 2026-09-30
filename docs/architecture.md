@@ -197,8 +197,14 @@ Schema 21 requires an explicit execution mode, havoc origin, and nullable
 UTF-16 source span for each operation. The temporary Total mode uses signed
 32-bit default integers, deterministic bitvector division and remainder, and
 explicit Throw/ExceptionalExit edges. Legacy remains authoritative during
-migration, and the existing SMT backend rejects Total queries. The typed
-frontend guard lowering and bitvector solver are still pending.
+migration, and the existing SMT backend rejects Total queries. The candidate
+CallableSolverSession encodes total Boolean and fixed-width integer terms in
+one native solver per callable. Each query activates its own assumption subset
+and negated goal; models contain only that query's requested variables. It
+shares native scheduling and resource accounting with the legacy backend, while
+active cancellation or recognized infrastructure failure retires only the
+candidate session. Worker routing, typed frontend guards, and passive VC
+generation are still pending.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.

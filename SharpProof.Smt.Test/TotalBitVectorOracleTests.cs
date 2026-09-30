@@ -15,7 +15,7 @@ public sealed class TotalBitVectorOracleTests
     [TestCase(32, true)]
     [TestCase(64, false)]
     [TestCase(64, true)]
-    public void TotalDivisionAndRemainderAgreeWithIndependentZ3Completion(int width, bool isSigned)
+    public async Task TotalDivisionAndRemainderAgreeWithIndependentZ3Completion(int width, bool isSigned)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(width, isSigned);
@@ -23,6 +23,7 @@ public sealed class TotalBitVectorOracleTests
         var y = factory.CreateVariable("y", type);
         var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         using var context = new Context();
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         foreach (var left in new[] { 0UL, 1UL, mask, 1UL << (width - 1) })
         {
             foreach (var right in new[] { 0UL, 1UL, mask })
@@ -50,6 +51,19 @@ public sealed class TotalBitVectorOracleTests
                     Assert.That(actual.Status, Is.EqualTo(IrEvaluationStatus.Value));
                     Assert.That(actual.Value!.IntegerBits, Is.EqualTo(expected), $"{width}/{isSigned}: {left} {operation} {right}");
                     Assert.That(folded.Bits, Is.EqualTo(expected));
+                    var assumptions = new[]
+                    {
+                        new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.IntegerBits(type, left)),
+                            new LoweredJustification(factory.CreateOperation())),
+                        new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(y), factory.IntegerBits(type, right)),
+                            new LoweredJustification(factory.CreateOperation()))
+                    };
+                    var query = new VerificationQuery(factory, assumptions,
+                        new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
+                            ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)));
+                    var solved = await session.CheckAsync(query, CancellationToken.None);
+                    Assert.That(solved.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable),
+                        $"encoder {width}/{isSigned}: {left} {operation} {right}");
                 }
             }
         }

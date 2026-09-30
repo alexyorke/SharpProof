@@ -72,6 +72,13 @@
     <PackageReference Include="NUnit3TestAdapter" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Worker.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\GoldenTest.cs"
+             Link="GoldenTest.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
                         '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR

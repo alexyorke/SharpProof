@@ -12,6 +12,80 @@ public sealed class ResourceAccountingRegressionTests
     }
 
     [Test]
+    public async Task CancellationAfterNativeCompletionStillPublishesItsResourceCharge()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var runner = new SmtNativeRunner(static () => new Microsoft.Z3.Context(), retireAfterFailure: true);
+        long published = 0;
+        long nativeCost = 0;
+        var check = runner.CheckAsync(() =>
+        {
+            var meter = new SmtQueryResourceMeter(1_000_000, cancellation.Token);
+            try
+            {
+                using var solver = runner.Context.MkSolver();
+                var before = IrSmtBackend.ReadResourceCount(solver);
+                Assert.That(solver.Check(), Is.EqualTo(Microsoft.Z3.Status.SATISFIABLE));
+                var after = IrSmtBackend.ReadResourceCount(solver);
+                Assert.That(after, Is.Not.Null);
+                nativeCost = IrSmtBackend.ComputeResourceDelta(before.GetValueOrDefault(), after!.Value);
+                Assert.That(nativeCost, Is.GreaterThan(0));
+                cancellation.Cancel();
+                meter.ConsumeNative(nativeCost);
+                return BackendCheckResult.Unsatisfiable([]);
+            }
+            finally
+            {
+                published = meter.Consumed;
+            }
+        }, cancellation.Token);
+        var canceled = false;
+        try
+        {
+            await check;
+        }
+        catch (OperationCanceledException)
+        {
+            canceled = true;
+        }
+        Assert.That(canceled, Is.True);
+        Assert.That(published, Is.GreaterThanOrEqualTo(nativeCost));
+    }
+
+    [Test]
+    public async Task NativeBudgetExhaustionRetainsCompletedWorkAndTheNextCheckGetsItsOwnBudget()
+    {
+        using var runner = new SmtNativeRunner(static () => new Microsoft.Z3.Context(), retireAfterFailure: true);
+        using var solver = runner.Context.MkSolver();
+        using var predicate = runner.Context.MkBoolConst("native-budget");
+        solver.Assert(predicate);
+        long published = 0;
+        var exhausted = await runner.CheckAsync(() =>
+        {
+            var meter = new SmtQueryResourceMeter(1, CancellationToken.None);
+            try
+            {
+                SmtNativeCheck.Run(solver, [], meter);
+                return BackendCheckResult.Satisfiable(new BackendModel([]));
+            }
+            finally
+            {
+                published = meter.Consumed;
+            }
+        }, CancellationToken.None);
+        Assert.That(exhausted.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
+        Assert.That(published, Is.GreaterThan(1));
+        var later = await runner.CheckAsync(() =>
+        {
+            var meter = new SmtQueryResourceMeter(1_000_000, CancellationToken.None);
+            Assert.That(SmtNativeCheck.Run(solver, [], meter), Is.EqualTo(Microsoft.Z3.Status.SATISFIABLE));
+            Assert.That(meter.Consumed, Is.GreaterThan(0));
+            return BackendCheckResult.Satisfiable(new BackendModel([]));
+        }, CancellationToken.None);
+        Assert.That(later.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+    }
+
+    [Test]
     public async Task NativeResourceAccountingChargesOnlyTheCurrentQuery()
     {
         const uint queryLimit = 1_000_000;

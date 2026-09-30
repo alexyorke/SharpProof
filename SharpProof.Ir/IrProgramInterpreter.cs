@@ -93,7 +93,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 switch (instruction)
                 {
                     case IrAssignInstruction assign:
-                        var assigned = _terms.Evaluate(assign.Value, values, cancellationToken);
+                        var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, cancellationToken);
                         if (assigned.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(assigned, assign, values, steps);
@@ -156,7 +156,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             return Result(IrProgramExecutionStatus.Returned, returned, values, steps);
                         }
 
-                        var returnValue = _terms.Evaluate(returned.Value, values, cancellationToken);
+                        var returnValue = _terms.Evaluate(returned.Value, values.Current, values.ObserveRead, cancellationToken);
                         if (returnValue.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(returnValue, returned, values, steps);
@@ -207,8 +207,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrCallInstruction call:
                         {
                             var callResult = IrProgramCallHostExecution.Execute(
-                                _factory, _terms, call, values, callHost,
-                                cancellationToken);
+                                _factory, _terms, call, values.Current, callHost,
+                                values.ObserveRead, cancellationToken);
                             if (callResult.Status != IrEvaluationStatus.Value)
                             {
                                 return FromEvaluation(callResult, call, values, steps);
@@ -230,7 +230,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
     private IrEvaluationResult? EvaluateLocationOperands(
         IrLocation location, IrTerm? storedValue,
-        IReadOnlyDictionary<IrVarId, IrValue> values,
+        ReplayValues values,
         CancellationToken cancellationToken)
     {
         switch (location)
@@ -240,13 +240,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     member.Receiver, member.Arguments, storedValue, values,
                     "The member access receiver is null.", cancellationToken);
             case IrSequenceLocation sequence:
-                var sequenceResult = _terms.Evaluate(sequence.Sequence, values, cancellationToken);
+                var sequenceResult = _terms.Evaluate(sequence.Sequence, values.Current, values.ObserveRead, cancellationToken);
                 if (sequenceResult.Status != IrEvaluationStatus.Value)
                 {
                     return sequenceResult;
                 }
 
-                var indexResult = _terms.Evaluate(sequence.Index, values, cancellationToken);
+                var indexResult = _terms.Evaluate(sequence.Index, values.Current, values.ObserveRead, cancellationToken);
                 if (indexResult.Status != IrEvaluationStatus.Value)
                 {
                     return indexResult;
@@ -265,13 +265,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
     private IrEvaluationResult? EvaluateCallOperands(
         IrTerm? receiver, IReadOnlyList<IrTerm> arguments, IrTerm? storedValue,
-        IReadOnlyDictionary<IrVarId, IrValue> values, string nullReceiverDetail,
+        ReplayValues values, string nullReceiverDetail,
         CancellationToken cancellationToken)
     {
         IrValue? receiverValue = null;
         if (receiver != null)
         {
-            var receiverResult = _terms.Evaluate(receiver, values, cancellationToken);
+            var receiverResult = _terms.Evaluate(receiver, values.Current, values.ObserveRead, cancellationToken);
             if (receiverResult.Status != IrEvaluationStatus.Value)
             {
                 return receiverResult;
@@ -281,7 +281,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
         foreach (var argument in arguments)
         {
-            var argumentResult = _terms.Evaluate(argument, values, cancellationToken);
+            var argumentResult = _terms.Evaluate(argument, values.Current, values.ObserveRead, cancellationToken);
             if (argumentResult.Status != IrEvaluationStatus.Value)
             {
                 return argumentResult;
@@ -299,7 +299,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
     private IrEvaluationResult? EvaluateOptionalStoredValue(
         IrTerm? storedValue,
-        IReadOnlyDictionary<IrVarId, IrValue> values,
+        ReplayValues values,
         CancellationToken cancellationToken)
     {
         if (storedValue == null)
@@ -307,7 +307,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             return null;
         }
 
-        var result = _terms.Evaluate(storedValue, values, cancellationToken);
+        var result = _terms.Evaluate(storedValue, values.Current, values.ObserveRead, cancellationToken);
         return result.Status == IrEvaluationStatus.Value ? null : result;
     }
 
@@ -323,12 +323,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateCondition(
         IrTerm condition,
-        IReadOnlyDictionary<IrVarId, IrValue> values,
+        ReplayValues values,
         CancellationToken cancellationToken,
         out bool value)
     {
         value = false;
-        var result = _terms.Evaluate(condition, values, cancellationToken);
+        var result = _terms.Evaluate(condition, values.Current, values.ObserveRead, cancellationToken);
         if (result.Status != IrEvaluationStatus.Value)
         {
             return result;
@@ -360,36 +360,27 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
     }
 
-    private sealed class ReplayValues : IReadOnlyDictionary<IrVarId, IrValue>
+    private sealed class ReplayValues
     {
         private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         private readonly HashSet<IrVarId> _approximations = [];
         internal bool ConsumedApproximation { get; private set; }
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
-        public IrValue this[IrVarId key]
+        internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
+        internal IrValue this[IrVarId key]
         {
-            get => TryGetValue(key, out var value) ? value : throw new KeyNotFoundException();
             set
             {
                 _values[key] = value;
                 _approximations.Remove(key);
             }
         }
-        public IEnumerable<IrVarId> Keys => _values.Keys;
-        public IEnumerable<IrValue> Values => _values.Values;
-        public int Count => _values.Count;
-        public bool ContainsKey(IrVarId key)
+        internal void ObserveRead(IrVarId key)
         {
-            return _values.ContainsKey(key);
-        }
-        public bool TryGetValue(IrVarId key, out IrValue value)
-        {
-            var found = _values.TryGetValue(key, out value!);
-            if (found && _approximations.Contains(key))
+            if (_approximations.Contains(key))
             {
                 ConsumedApproximation = true;
             }
-            return found;
         }
         internal void Add(IrVarId key, IrValue value)
         {
@@ -411,14 +402,6 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal ImmutableDictionary<IrVarId, IrValue> ToImmutable()
         {
             return _values.ToImmutable();
-        }
-        public IEnumerator<KeyValuePair<IrVarId, IrValue>> GetEnumerator()
-        {
-            return _values.GetEnumerator();
-        }
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
     }
 }

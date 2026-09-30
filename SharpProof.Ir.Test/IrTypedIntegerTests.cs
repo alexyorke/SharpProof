@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using System.Globalization;
+using System.Numerics;
 
 namespace SharpProof.Ir.Test;
 
@@ -73,5 +75,84 @@ public sealed class IrTypedIntegerTests
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Type, Is.EqualTo(type));
         Assert.That(result.Value.IntegerBits, Is.EqualTo(ushort.MaxValue));
+    }
+
+    public static IEnumerable<object[]> BoxedIntegers()
+    {
+        yield return [8, true, (object)sbyte.MinValue, 128UL];
+        yield return [8, false, (object)byte.MaxValue, 255UL];
+        yield return [16, true, (object)short.MinValue, 32768UL];
+        yield return [16, false, (object)ushort.MaxValue, 65535UL];
+        yield return [32, true, (object)int.MinValue, 2147483648UL];
+        yield return [32, false, (object)uint.MaxValue, 4294967295UL];
+        yield return [64, true, (object)long.MinValue, 9223372036854775808UL];
+        yield return [64, false, (object)ulong.MaxValue, ulong.MaxValue];
+    }
+
+    [TestCaseSource(nameof(BoxedIntegers))]
+    public void UnboxingRetainsExactClrWidthSignAndHighBits(int width, bool isSigned, object boxed, ulong expected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateIntegerType(width, isSigned);
+        var variable = factory.CreateVariable("boxed", factory.ObjectType);
+        var values = new Dictionary<IrVarId, IrValue>
+        {
+            [variable] = factory.CreateReferenceValue(factory.ObjectType, boxed)
+        };
+        var result = new IrInterpreter(factory).Evaluate(factory.Cast(type, factory.Variable(variable)), values);
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(result.Value!.Type, Is.EqualTo(type));
+        Assert.That(result.Value.IntegerBits, Is.EqualTo(expected));
+        Assert.That(result.Value.IntegerNumericValue, Is.EqualTo(new BigInteger(Convert.ToDecimal(boxed, CultureInfo.InvariantCulture))));
+    }
+
+    [TestCase(IrBinaryOperator.LessThanOrEqual, true, true)]
+    [TestCase(IrBinaryOperator.LessThanOrEqual, false, false)]
+    [TestCase(IrBinaryOperator.GreaterThan, true, false)]
+    [TestCase(IrBinaryOperator.GreaterThan, false, true)]
+    public void ComparisonInterpretsTheSignBitBeforeFolding(IrBinaryOperator operation, bool isSigned, bool expected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateIntegerType(8, isSigned);
+        var left = factory.CreateVariable("left", type);
+        var right = factory.CreateVariable("right", type);
+        var values = new Dictionary<IrVarId, IrValue>
+        {
+            [left] = factory.CreateIntegerValueFromBits(type, 128),
+            [right] = factory.CreateIntegerValueFromBits(type, 127)
+        };
+        var runtime = new IrInterpreter(factory).Evaluate(factory.Binary(operation,
+            factory.Variable(left), factory.Variable(right)), values);
+        var folded = (IrBooleanTerm)factory.Binary(operation, factory.IntegerBits(type, 128), factory.IntegerBits(type, 127));
+        Assert.That(runtime.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(runtime.Value!.Boolean, Is.EqualTo(expected));
+        Assert.That(folded.Value, Is.EqualTo(expected));
+    }
+
+    [TestCase(1UL, 255UL)]
+    [TestCase(128UL, 128UL)]
+    public void TypedNegationWrapsAndFoldsTheSameBits(ulong bits, ulong expected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateIntegerType(8, true);
+        var variable = factory.CreateVariable("value", type);
+        var result = new IrInterpreter(factory).Evaluate(factory.Unary(IrUnaryOperator.Negate, factory.Variable(variable)),
+            new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateIntegerValueFromBits(type, bits) });
+        var folded = (IrIntegerTerm)factory.Unary(IrUnaryOperator.Negate, factory.IntegerBits(type, bits));
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(result.Value!.Type, Is.EqualTo(type));
+        Assert.That(result.Value.IntegerBits, Is.EqualTo(expected));
+        Assert.That(folded.Bits, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void IntegerStorageRejectsBooleanTypesAndNonintegerOperations()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var exception = Assert.Throws<ArgumentException>((Action)(() => factory.CreateIntegerValueFromBits(factory.BooleanType, 0)));
+        Assert.That(exception!.ParamName, Is.EqualTo("type"));
+        var integer = IrInteger.FromBits(factory.GetTypeInfo(factory.IntegerType), 1);
+        Assert.That(IrBitVectorOperations.Evaluate(IrBinaryOperator.StringConcat, integer, integer).Kind,
+            Is.EqualTo(IrScalarResultKind.Unsupported));
     }
 }
