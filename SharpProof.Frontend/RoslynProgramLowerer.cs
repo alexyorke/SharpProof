@@ -12,12 +12,18 @@ public sealed class RoslynProgramLowerer(
 
     public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context)
     {
+        return LowerCandidate(graph, context, default);
+    }
+
+    public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(context, nameof(context));
         if (!ReferenceEquals(_factory, context.Factory))
         {
             throw new ArgumentException("The context belongs to another factory.", nameof(context));
         }
-        return new RoslynTotalProgramLowerer(context).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
+        return new RoslynTotalProgramLowerer(context, cancellationToken).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
     }
 
     public FrontendProgramLoweringResult Lower(ControlFlowGraph graph)

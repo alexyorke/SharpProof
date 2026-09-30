@@ -18,6 +18,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private readonly IrProgramBuilder? _builder = builder;
     private readonly IrBlockId _exceptionalExit = exceptionalExit;
     internal Func<IInvocationOperation, TotalParameterState, GuardedExpression?>? Intrinsic { get; set; }
+    internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; set; }
+    internal Action? Spend { get; set; }
 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
@@ -74,6 +76,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
+        Spend?.Invoke();
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -162,7 +165,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             var normal = _builder.CreateBlock("normal");
             var site = _context.Site(operation);
             _builder.Branch(block, site, fault.Condition, thrown, normal);
-            _builder.Throw(thrown, site, fault.Kind, _exceptionalExit);
+            _builder.Throw(thrown, site, fault.Kind, ExceptionTarget?.Invoke(fault.Kind, site) ?? _exceptionalExit);
             block = normal;
         }
         return Capture(operation, new(rule.Value, block, rule.Classification));

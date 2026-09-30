@@ -74,14 +74,20 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { public static int Target(int d) {
                 Contract.Ensures(Contract.Result<int>() == 10 / d); return 10 / d;
             } }
-            """, [WorkerClaimOutcome.Proven])
+            """, [WorkerClaimOutcome.Proven]),
+        new("region-captured-return", WorkerVcRegionTests.CapturedReturnSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("region-mixed-finally", WorkerVcRegionTests.MixedFinallySource, [WorkerClaimOutcome.Proven]),
+        new("region-nested-rethrow", WorkerVcRegionTests.NestedRethrowSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("region-assume", WorkerVcRegionTests.AssumeRegionSource, [WorkerClaimOutcome.Proven], Conditional: true),
+        new("region-all-throw", WorkerVcRegionTests.AllThrowSource, [WorkerClaimOutcome.Proven], Vacuity: WorkerVacuityKind.NoModeledNormalReturn),
+        new("region-normal-local", WorkerVcRegionTests.LocalJoinSource, [WorkerClaimOutcome.Proven])
     ];
 
     [Test]
     public async Task DefinedSourceWorkerUniverseAccountsForEveryPostconditionWithoutEmptyExitSuccess()
     {
         Assert.That(Universe.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
-        Assert.That(Universe.Length, Is.EqualTo(11));
+        Assert.That(Universe.Length, Is.EqualTo(17));
         using var environment = new ShadowEnvironment("shadow");
         var rows = new List<WorkerVcShadowRow>();
         var manifestPostconditions = 0;
@@ -98,14 +104,14 @@ public sealed class WorkerVcShadowSourceGateTests
             rows.AddRange(report!.Rows);
             await TestContext.Out.WriteLineAsync($"source-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} oldProven={report.OldProven} newProven={report.NewProven} disagreements={report.SoundnessDisagreements}");
         }
-        Assert.That(manifestPostconditions, Is.EqualTo(12));
+        Assert.That(manifestPostconditions, Is.EqualTo(20));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(10));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(18));
         Assert.That(aggregate.Unenrolled, Is.EqualTo(2));
-        Assert.That(aggregate.Checked, Is.EqualTo(10));
+        Assert.That(aggregate.Checked, Is.EqualTo(18));
         Assert.That(aggregate.Unknown, Is.EqualTo(3));
-        Assert.That(aggregate.NewConditional, Is.EqualTo(1));
+        Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);
         await TestContext.Out.WriteLineAsync($"source-worker universe: sources={Universe.Length} posts={aggregate.Postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unchecked={aggregate.Unchecked} unknown={aggregate.Unknown} disagreements={aggregate.SoundnessDisagreements} full-exit={aggregate.CoverageComplete}");
@@ -138,7 +144,8 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(report.InputHash, Is.EqualTo(response.InputHash), sourceCase.Name);
         Assert.That(report.RequestHash, Is.EqualTo(response.RequestHash), sourceCase.Name);
         Assert.That(report.Rows.Select(row => row.ClaimId), Is.EquivalentTo(response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).Select(claim => claim.ClaimId)));
-        Assert.That(report.Rows.Select(row => row.NewOutcome), Is.EqualTo(sourceCase.Outcomes), sourceCase.Name);
+        var ordinals = response.Manifest.Claims.ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+        Assert.That(report.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewOutcome), Is.EqualTo(sourceCase.Outcomes), sourceCase.Name);
         Assert.That(report.Rows.Select(row => row.NewReason), Is.All.EqualTo(sourceCase.Reason), sourceCase.Name);
         Assert.That(report.Rows.Select(row => row.NewVacuity), Is.All.EqualTo(sourceCase.Vacuity), sourceCase.Name);
         Assert.That(report.Rows.Select(row => row.TotalPresent), Is.All.EqualTo(sourceCase.TotalPresent), sourceCase.Name);

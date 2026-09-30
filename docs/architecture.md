@@ -210,7 +210,23 @@ safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
 body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
-calls, regions, cycles, and checked binary arithmetic currently abstain.
+calls, cycles, and checked binary or unary arithmetic currently abstain.
+
+The candidate region route supports scalar faults, throw-null, ordered canonical
+runtime catches, and nested rethrow. Each lexical catch snapshots both the
+original exception kind and throwing operation, so an inner handled fault cannot
+replace an outer rethrow's provenance. One finally per callable is lowered once
+with a continuation selector. Return values are captured before finally mutates
+storage; exceptional continuations resume the original throw explicitly after
+mixed normal and exceptional joins. Construction is bounded and cancelable, and
+the final graph must remain acyclic. Filters, multiple or nested finally regions,
+exception-object locals, object construction, calls, and heap effects remain
+incomplete. A shared finally whose dispatch creates a syntactic cycle remains
+incomplete even if individual concrete executions terminate.
+Owned scalar local storage receives typed initial values at the live body entry,
+after the complete contract prologue. Valid C# definite assignment makes those
+values unobservable; they preserve normal-only local assignments across a shared
+finally join. Canonical parameter and Old identities retain their existing rules.
 
 The standalone passive VC builder owns one immutable Total scalar candidate.
 It derives SSA writes, guarded joins, block and edge reachability, and normal

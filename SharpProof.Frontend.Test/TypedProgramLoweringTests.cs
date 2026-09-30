@@ -88,7 +88,7 @@ public sealed class TypedProgramLoweringTests
 
     [TestCase("int Target(int x) { return checked(x + 1); }")]
     [TestCase("int Target(int x) { while (x > 0) { x--; } return x; }")]
-    [TestCase("int Target(int x) { try { return x; } finally { x++; } }")]
+    [TestCase("int Target(int x) { try { try { return x; } finally { x++; } } finally { x++; } }")]
     [TestCase("int Target(int x) => System.Math.Abs(x);")]
     [TestCase("int Target(int[] x) => x[0];")]
     [TestCase("int Target(int x) { ref int r = ref x; r++; return x; }")]
@@ -139,9 +139,9 @@ internal sealed class TypedProgramSubject : IDisposable
     internal TotalLoweringContext Context { get; }
     internal IrFactory Factory => Context.Factory;
 
-    internal static TypedProgramSubject Create(string members)
+    internal static TypedProgramSubject Create(string members, string additionalSource = "")
     {
-        var source = FrontendTestHelpers.WrapSubjectMembers("public static " + members);
+        var source = FrontendTestHelpers.WrapSubjectMembers("public static " + members) + additionalSource;
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "typed.cs");
         var compilation = CSharpCompilation.Create("TypedSubject", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));

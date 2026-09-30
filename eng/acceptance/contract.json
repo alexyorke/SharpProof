@@ -154,8 +154,10 @@
           "SharpProof.Frontend/TotalLoweringContext.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Operations.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Exceptions.cs",
           "SharpProof.Frontend/RoslynTotalExpressionLowerer.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
           "SharpProof.Frontend/OperationSupportCatalog.cs"
         ]
       },

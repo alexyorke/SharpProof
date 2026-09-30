@@ -1,20 +1,38 @@
 namespace SharpProof.Frontend;
 
-// Candidate scalar CFG only. Regions, cycles, calls and heap effects remain
-// explicitly incomplete until their exact routing/semantics are implemented.
-internal sealed class RoslynTotalProgramLowerer(TotalLoweringContext context)
+// Candidate scalar CFG. The bounded region route is separate from the
+// unchanged ordinary CFG path; unsupported forms remain incomplete.
+internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext context, CancellationToken cancellationToken)
 {
     private readonly TotalLoweringContext _context = context;
     private readonly IrProgramBuilder _builder = new(context.Factory);
     private readonly List<FrontendProgramAbstention> _abstentions = [];
     private readonly Dictionary<BasicBlock, IrBlockId> _blocks = [];
     private RoslynTotalExpressionLowerer _expressions = null!;
+    private readonly CancellationToken _cancellationToken = cancellationToken;
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
+        try
+        {
+            return LowerCore(graph);
+        }
+        catch (RegionIncompleteException)
+        { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
+    }
+
+    private FrontendProgramLoweringResult LowerCore(ControlFlowGraph graph)
+    {
+        _cancellationToken.ThrowIfCancellationRequested();
+        if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
+        { throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");
         var entry = _builder.CreateBlock("entry");
         _builder.SetEntry(entry);
+        if (_context.HasScalarSignature && _context.OwnsBody(graph.OriginalOperation) &&
+            (HasUnsupportedRegion(graph.Root) || graph.Blocks.Any(block =>
+                block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow)))
+        { return LowerRegions(graph, entry, structural); }
         if (!_context.HasScalarSignature || !_context.OwnsBody(graph.OriginalOperation) ||
             HasUnsupportedRegion(graph.Root) || !TrySelect(graph.Blocks[0], out var selected))
         {
@@ -33,7 +51,7 @@ internal sealed class RoslynTotalProgramLowerer(TotalLoweringContext context)
         }
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
         _builder.ExceptionalExit(exceptionalExit, structural);
-        _expressions = new(_context, _builder, exceptionalExit);
+        _expressions = new(_context, _builder, exceptionalExit) { Spend = SpendRegion };
         _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
         foreach (var source in selected)
         {
@@ -89,6 +107,7 @@ internal sealed class RoslynTotalProgramLowerer(TotalLoweringContext context)
 
     private IrBlockId Statement(IOperation operation, IrBlockId block)
     {
+        SpendRegion();
         if (_context.TryGetSpecificationAssumption(operation, out var assumption, out var site))
         {
             // Elided arguments have no runtime evaluation. This is the owning
@@ -151,48 +170,87 @@ internal sealed class RoslynTotalProgramLowerer(TotalLoweringContext context)
         return value;
     }
 
-    private FrontendProgramLoweringResult Result()
+    private FrontendProgramLoweringResult Result(IrProgram? program = null)
     {
-        return new(_builder.Build(), _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
+        program ??= _builder.Build();
+        var instructions = 0;
+        foreach (var block in program.Blocks)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            instructions += block.Instructions.Length;
+            if (instructions > MaximumRegionSteps)
+            {
+                throw new RegionIncompleteException();
+            }
+        }
+        return new(program, _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin);
     }
 
-    private static bool HasUnsupportedRegion(ControlFlowRegion region)
+    private bool HasUnsupportedRegion(ControlFlowRegion region)
     {
-        return region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime) || region.NestedRegions.Any(HasUnsupportedRegion);
+        var pending = new Stack<ControlFlowRegion>();
+        pending.Push(region);
+        var remaining = MaximumRegionSteps;
+        while (pending.Count != 0)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            if (--remaining < 0)
+            { return true; }
+            var current = pending.Pop();
+            if (current.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime))
+            { return true; }
+            foreach (var child in current.NestedRegions)
+            {
+                if (pending.Count >= MaximumRegionSteps)
+                {
+                    return true;
+                }
+                pending.Push(child);
+            }
+        }
+        return false;
     }
 
-    private static bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
+    private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
     {
         var visited = new HashSet<BasicBlock>();
         var active = new HashSet<BasicBlock>();
         var order = new List<BasicBlock>();
-        var valid = Visit(entry);
-        order.Reverse();
-        selected = [.. order];
-        return valid;
-
-        bool Visit(BasicBlock block)
+        var pending = new Stack<(BasicBlock Block, bool Exit)>();
+        pending.Push((entry, false));
+        selected = default;
+        while (pending.Count != 0)
         {
+            SpendRegion();
+            var (block, exit) = pending.Pop();
+            if (exit)
+            {
+                active.Remove(block);
+                order.Add(block);
+                continue;
+            }
             if (active.Contains(block))
             { return false; }
             if (!visited.Add(block))
-            { return true; }
+            { continue; }
+            if (visited.Count > MaximumRegionSteps)
+            { throw new RegionIncompleteException(); }
             active.Add(block);
-            foreach (var branch in new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
+            pending.Push((block, true));
+            // LIFO reproduces the old fall-through-then-conditional DFS order.
+            foreach (var branch in new[] { block.ConditionalSuccessor, block.FallThroughSuccessor })
             {
                 if (branch == null)
                 { continue; }
                 if (!branch.FinallyRegions.IsEmpty || branch.Semantics is not (ControlFlowBranchSemantics.Regular or ControlFlowBranchSemantics.Return))
-                {
-                    return false;
-                }
-                if (branch.Destination is { } destination && !Visit(destination))
                 { return false; }
+                if (branch.Destination is { } destination)
+                { pending.Push((destination, false)); }
             }
-            active.Remove(block);
-            order.Add(block);
-            return true;
         }
+        order.Reverse();
+        selected = [.. order];
+        return true;
     }
 }
