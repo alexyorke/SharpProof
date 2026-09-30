@@ -15,7 +15,7 @@ public sealed partial class IrPrinter
         return term switch
         {
             IrBooleanTerm value => value.Value ? "true" : "false",
-            IrIntegerTerm value => value.Value.ToString(CultureInfo.InvariantCulture),
+            IrIntegerTerm value => value.Integer.NumericValue.ToString(CultureInfo.InvariantCulture),
             IrStringTerm value => Quote(_factory.GetString(value.Value)),
             IrNullTerm => "((" + TypeName(term.Type) + ")null)",
             IrVariableTerm value => "v" + value.Variable.Value.ToString(CultureInfo.InvariantCulture),

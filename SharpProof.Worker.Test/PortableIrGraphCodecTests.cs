@@ -363,7 +363,7 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(
             hash,
             Is.EqualTo(
-                "AAA27C6AF3E73A71C545B94A78F722AE239012EB150972129D2FF6BABBF54E5B"));
+                "369E597B3404366C0029C4B06E0C21DFC18C951557107EC703AE574AC483F51F"));
 
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
@@ -843,7 +843,7 @@ public sealed class PortableIrGraphCodecTests
         {
             Types = [
                 new() { Kind = IrTypeKind.Boolean, Name = "bool" },
-                new() { Kind = IrTypeKind.Integer, Name = "int" },
+                new() { Kind = IrTypeKind.Integer, Name = "int", Signed = true },
                 new() { Kind = IrTypeKind.String, Name = "string" },
                 new() { Kind = IrTypeKind.Reference, Name = "object" }
             ]

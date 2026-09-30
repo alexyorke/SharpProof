@@ -416,6 +416,32 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task LegacyBackendRejectsTypedVariables()
+    {
+        var factory = new IrFactory();
+        var type = factory.GetOrCreateIntegerType(64, false);
+        var variable = factory.CreateVariable("value", type);
+        await AssertUnsupportedEncoding(factory,
+            factory.Binary(IrBinaryOperator.GreaterThan, factory.Variable(variable),
+                factory.Integer(type, ulong.MaxValue)), ProofDiagnosticKind.Postcondition);
+    }
+
+    [Test]
+    public async Task LegacyBackendRejectsTypedArithmeticWithOnlyBooleanInputs()
+    {
+        var factory = new IrFactory();
+        var type = factory.GetOrCreateIntegerType(32, true);
+        var choice = factory.CreateVariable("choice", factory.BooleanType);
+        var value = factory.Conditional(factory.Variable(choice),
+            factory.Integer(type, int.MaxValue), factory.Integer(type, 1));
+        var wrapped = factory.Binary(IrBinaryOperator.Add, value, factory.Integer(type, 1));
+        // Mathematical Int would falsely prove positivity when max+1 wraps.
+        await AssertUnsupportedEncoding(factory,
+            factory.Binary(IrBinaryOperator.GreaterThan, wrapped, factory.Integer(type, 0)),
+            ProofDiagnosticKind.Postcondition);
+    }
+
+    [Test]
     public async Task OpaqueTermsFailClosed()
     {
         var factory = new IrFactory();

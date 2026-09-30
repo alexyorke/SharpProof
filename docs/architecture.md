@@ -186,7 +186,7 @@ Object property order is irrelevant. Semantic validation checks enum values,
 nulls, claim ownership, dense ordinals, assumptions, and allowed result payloads.
 Counts are derived from the callable and claim arrays rather than stored again.
 
-The compiler produces a schema-19 closed artifact containing selected claims,
+The compiler produces a schema-20 closed artifact containing selected claims,
 portable typed IR, relational/spec call bindings, effect constraints and replay
 events, diagnostics, and mapped locations. One SHA-256 covers the full canonical
 artifact bytes, including effect-only callables without a graph. Source and

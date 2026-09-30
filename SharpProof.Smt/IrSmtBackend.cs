@@ -573,7 +573,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             {
                 IrBooleanTerm boolean => Defined(
                     _owner.Own(boolean.Value ? _context.MkTrue() : _context.MkFalse())),
-                IrIntegerTerm integer => Defined(_owner.Own(_context.MkInt(integer.Value))),
+                // Typed bitvectors have separate semantics; the legacy encoder
+                // must abstain until the candidate BV encoder is selected.
+                IrIntegerTerm integer when integer.Type == _factory.IntegerType =>
+                    Defined(_owner.Own(_context.MkInt(integer.Value))),
                 IrStringTerm text => EncodeString(text),
                 IrVariableTerm variable => Defined(GetVariable(variable.Variable)),
                 IrUnaryTerm unary => EncodeUnary(unary),

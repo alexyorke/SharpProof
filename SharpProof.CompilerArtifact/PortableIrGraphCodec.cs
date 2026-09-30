@@ -309,6 +309,8 @@ internal static partial class PortableIrGraphCodec
         RequireCanonicalSlot(kind, mapping.Slots[4], row.Number);
         RequireCanonicalSlot(kind, mapping.Slots[5], row.Text);
         RequireCanonicalSlot(kind, mapping.Slots[6], row.Items);
+        Require(row.Kind == IrTermKind.Integer || row.Bits == 0,
+            "Only integer terms may carry raw integer bits.");
     }
 
     private static void RequireCanonicalInstructionSlots(
@@ -710,7 +712,8 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1,
+                    row.Kind == kind && row.Name == name && row.Element == -1 &&
+                    row.Width == 0 && row.Signed == (kind == IrTypeKind.Integer),
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
                 _typeState[index] = 2;
@@ -739,6 +742,8 @@ internal static partial class PortableIrGraphCodec
             Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             _types[index] = row.Kind switch
             {
+                IrTypeKind.Integer when row.Element == -1 && row.Width is 8 or 16 or 32 or 64 =>
+                    _factory.GetOrCreateIntegerType(row.Width, row.Signed),
                 IrTypeKind.Reference when row.Element == -1 =>
                     _factory.GetOrCreateReferenceType(_factory.CreateIdentity(), row.Name),
                 IrTypeKind.Sequence => _factory.GetOrCreateSequenceType(
@@ -748,6 +753,8 @@ internal static partial class PortableIrGraphCodec
             var info = _factory.GetTypeInfo(_types[index]);
             Require(
                 info.Kind == row.Kind &&
+                info.Width == row.Width && info.Signed == row.Signed &&
+                (info.Kind != IrTypeKind.Integer || _factory.GetString(info.Name) == row.Name) &&
                 info.ElementType == (row.Element == -1 ? null : _types[row.Element]),
                 "Portable IR type metadata is inconsistent.");
             _typeState[index] = 2;

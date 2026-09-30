@@ -91,7 +91,11 @@ public sealed partial class IrValue
     }
 
     public bool Boolean => Get<bool>(IrValueKind.Boolean, "The IR value is not boolean.");
-    public long Integer => Get<long>(IrValueKind.Integer, "The IR value is not an integer.");
+    internal IrInteger IntegerData => Get<IrInteger>(IrValueKind.Integer, "The IR value is not an integer.");
+    public long Integer => IntegerData.Int64;
+    public ulong IntegerBits => IntegerData.Bits;
+    public int IntegerWidth => IntegerData.Width;
+    public bool IntegerSigned => IntegerData.Signed;
     public string String => Get<string>(IrValueKind.String, "The IR value is not a string.");
     public object Reference => Get<object>(IrValueKind.Reference, "The IR value is not a reference.");
     public ImmutableArray<IrValue> Elements =>
@@ -183,7 +187,7 @@ public sealed class IrInterpreter(IrFactory factory)
         var result = term switch
         {
             IrBooleanTerm value => Boolean(value.Value),
-            IrIntegerTerm value => Integer(value.Value),
+            IrIntegerTerm value => Value(_factory.CreateIntegerValueFromBits(value.Type, value.Bits)),
             IrStringTerm value => Text(_factory.GetString(value.Value)),
             IrNullTerm => Value(_factory.CreateNullValue(term.Type)),
             IrVariableTerm variable => EvaluateVariable(variable, state.Variables),
@@ -261,6 +265,12 @@ public sealed class IrInterpreter(IrFactory factory)
         }
 
         var value = operand.Value!;
+        if (unary.Operator == IrUnaryOperator.Negate && value.Kind == IrValueKind.Integer &&
+            _factory.GetTypeInfo(value.Type).Width != 0)
+        {
+            return Value(_factory.CreateIntegerValueFromBits(value.Type,
+                unchecked(0UL - value.IntegerBits) & IrInteger.Mask(value.IntegerWidth)));
+        }
         return unary.Operator switch
         {
             IrUnaryOperator.Not when value.Kind == IrValueKind.Boolean =>
@@ -337,6 +347,18 @@ public sealed class IrInterpreter(IrFactory factory)
                 : "Integer arithmetic requires integer values.");
         }
 
+        if (_factory.GetTypeInfo(left.Type).Width != 0)
+        {
+            var typed = IrBitVectorOperations.Evaluate(@operator, left.IntegerData, right.IntegerData);
+            return typed.Kind switch
+            {
+                IrScalarResultKind.Integer => Value(_factory.CreateIntegerValueFromBits(left.Type, typed.Bits)),
+                IrScalarResultKind.Boolean => Boolean(typed.Bits != 0),
+                IrScalarResultKind.DivideByZero => Fault(IrExceptionKind.DivideByZero, "Integer division or remainder by zero."),
+                IrScalarResultKind.Overflow => Fault(IrExceptionKind.Overflow, "Signed integer division or remainder overflowed."),
+                _ => Unsupported(IrUnsupportedReason.UnsupportedOperation, "Unsupported integer operator: " + @operator + ".")
+            };
+        }
         var result = IrScalarOperations.Evaluate(@operator, left.Integer, right.Integer);
         return result.Kind switch
         {
@@ -373,7 +395,7 @@ public sealed class IrInterpreter(IrFactory factory)
             (IrValueKind.Null, _) or (_, IrValueKind.Null) =>
                 left.Kind == IrValueKind.Null && right.Kind == IrValueKind.Null,
             (IrValueKind.Boolean, IrValueKind.Boolean) => left.Boolean == right.Boolean,
-            (IrValueKind.Integer, IrValueKind.Integer) => left.Integer == right.Integer,
+            (IrValueKind.Integer, IrValueKind.Integer) => left.IntegerBits == right.IntegerBits,
             (IrValueKind.String, IrValueKind.String) =>
                 string.Equals(left.String, right.String, StringComparison.Ordinal),
             (IrValueKind.Reference, IrValueKind.Reference) =>
@@ -430,6 +452,11 @@ public sealed class IrInterpreter(IrFactory factory)
         }
 
         var target = _factory.GetTypeInfo(cast.Type);
+        if (operand.Value.Kind == IrValueKind.Integer && target.Kind == IrTypeKind.Integer && target.Width != 0)
+        {
+            return Value(_factory.CreateIntegerValueFromBits(cast.Type,
+                operand.Value.IntegerData.ConvertBits(target.Width)));
+        }
         if (operand.Value.Kind == IrValueKind.Null)
         {
             if (target.Kind is IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence)
@@ -471,6 +498,24 @@ public sealed class IrInterpreter(IrFactory factory)
         }
         if (target.Kind == IrTypeKind.Integer)
         {
+            if (target.Width != 0)
+            {
+                ulong? bits = (target.Width, target.Signed, operand.Value.Reference) switch
+                {
+                    (8, true, sbyte integer) => unchecked((ulong)integer) & 0xff,
+                    (8, false, byte integer) => integer,
+                    (16, true, short integer) => unchecked((ulong)integer) & 0xffff,
+                    (16, false, ushort integer) => integer,
+                    (32, true, int integer) => unchecked((ulong)integer) & 0xffffffff,
+                    (32, false, uint integer) => integer,
+                    (64, true, long integer) => unchecked((ulong)integer),
+                    (64, false, ulong integer) => integer,
+                    _ => null
+                };
+                return bits.HasValue
+                    ? Value(_factory.CreateIntegerValueFromBits(cast.Type, bits.Value))
+                    : Fault(IrExceptionKind.InvalidCast, "The boxed integer has a different width or signedness.");
+            }
             return operand.Value.Reference is long value
                 ? Integer(value)
                 : Fault(IrExceptionKind.InvalidCast,

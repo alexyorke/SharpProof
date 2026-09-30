@@ -104,6 +104,12 @@ internal static class IrTermServices
         IrUnaryOperator @operator,
         IrTerm operand)
     {
+        if (@operator == IrUnaryOperator.Negate && operand is IrIntegerTerm integer &&
+            factory.GetTypeInfo(operand.Type).Width != 0)
+        {
+            return factory.IntegerBits(operand.Type,
+                unchecked(0UL - integer.Bits) & IrInteger.Mask(integer.Width));
+        }
         return (@operator, operand) switch
         {
             (IrUnaryOperator.Not, IrBooleanTerm value) =>
@@ -147,6 +153,16 @@ internal static class IrTermServices
         if (left is IrIntegerTerm leftInteger &&
             right is IrIntegerTerm rightInteger)
         {
+            if (factory.GetTypeInfo(left.Type).Width != 0)
+            {
+                var typed = IrBitVectorOperations.Evaluate(@operator, leftInteger.Integer, rightInteger.Integer);
+                return typed.Kind switch
+                {
+                    IrScalarResultKind.Integer => factory.IntegerBits(left.Type, typed.Bits),
+                    IrScalarResultKind.Boolean => factory.Boolean(typed.Bits != 0),
+                    _ => null
+                };
+            }
             return FoldIntegerBinary(
                 factory,
                 @operator,
@@ -186,6 +202,14 @@ internal static class IrTermServices
             return IrOperatorCatalog.GetBuiltInType(factory, resultKind);
         }
 
+        if (operandKind == IrTypeKind.Integer)
+        {
+            if (left.Type != right.Type || factory.GetTypeInfo(left.Type).Kind != IrTypeKind.Integer)
+            {
+                throw new ArgumentException("Integer operands must have the same width and signedness.", nameof(right));
+            }
+            return resultKind == IrTypeKind.Integer ? left.Type : factory.BooleanType;
+        }
         return RequireTypes(
             left,
             right,
@@ -220,7 +244,7 @@ internal static class IrTermServices
         if (left is IrIntegerTerm leftInteger &&
             right is IrIntegerTerm rightInteger)
         {
-            return leftInteger.Value == rightInteger.Value;
+            return leftInteger.Bits == rightInteger.Bits;
         }
 
         if (left is IrStringTerm leftString &&

@@ -219,10 +219,12 @@ public enum IrOpaquePurity
 
 public sealed class IrTypeInfo
 {
-    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType)
+    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType,
+        int width = 0, bool signed = false)
     {
         (Id, Name, Kind, ElementType) =
             (id, name, kind, elementType);
+        (Width, Signed) = (width, signed);
     }
 
     public IrTypeId Id { get; }
@@ -232,6 +234,11 @@ public sealed class IrTypeInfo
     public IrTypeKind Kind { get; }
 
     public IrTypeId? ElementType { get; }
+
+    // Width zero is the temporary legacy integer semantics used during shadow rollout.
+    public int Width { get; }
+
+    public bool Signed { get; }
 }
 
 public sealed class IrVariableInfo
@@ -320,12 +327,20 @@ public sealed class IrBooleanTerm : IrTerm
 
 public sealed class IrIntegerTerm : IrTerm
 {
-    internal IrIntegerTerm(IrId id, IrTypeId type, long value) : base(id, type, IrTermKind.Integer)
+    internal IrIntegerTerm(IrId id, IrTypeId type, IrInteger value) : base(id, type, IrTermKind.Integer)
     {
-        Value = value;
+        Integer = value;
     }
 
-    public long Value { get; }
+    internal IrInteger Integer { get; }
+
+    public long Value => Integer.Int64;
+
+    public ulong Bits => Integer.Bits;
+
+    public int Width => Integer.Width;
+
+    public bool Signed => Integer.Signed;
 }
 
 public sealed class IrStringTerm : IrTerm

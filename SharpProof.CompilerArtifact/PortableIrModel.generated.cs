@@ -26,12 +26,18 @@ internal sealed class PortableIrGraph
 internal sealed class PortableIrType(
     IrTypeKind kind = default,
     string? name = null,
-    int element = -1
+    int element = -1,
+    int width = 0,
+    bool signed = false
 )
 {
     public IrTypeKind Kind { get; set; } = kind;
     public string Name { get; set; } = name ?? string.Empty;
     public int Element { get; set; } = element;
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Width { get; set; } = width;
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool Signed { get; set; } = signed;
 }
 
 internal sealed class PortableIrVariable(
@@ -87,6 +93,8 @@ internal sealed class PortableIrTerm(
     public int C { get; set; } = c;
     public int D { get; set; } = d;
     public long Number { get; set; } = number;
+    [System.Text.Json.Serialization.JsonRequired]
+    public ulong Bits { get; set; }
     public string? Text { get; set; } = text;
     public int[] Items { get; set; } = items ?? [];
 }
@@ -248,7 +256,8 @@ internal static partial class PortableIrGraphCodec
             return new(
                 value.Kind,
                 _factory.GetString(value.Name),
-                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1);
+                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1,
+                value.Width, value.Signed);
         }
 
         private PortableIrVariable VariableRow(IrVarId id)
@@ -300,7 +309,7 @@ internal static class PortableIrGraphCodecProjections
         return term switch
         {
             IrBooleanTerm value => row(term, value.Value ? 1 : 0, -1, -1, -1, 0, null, null),
-            IrIntegerTerm value => row(term, -1, -1, -1, -1, value.Value, null, null),
+            IrIntegerTerm value => IntegerRow(value, row),
             IrStringTerm value => row(term, -1, -1, -1, -1, 0, stringValue(value.Value), null),
             IrNullTerm => row(term, -1, -1, -1, -1, 0, null, null),
             IrVariableTerm value => row(term, variableIndex(value.Variable), -1, -1, -1, 0, null, null),
@@ -482,6 +491,14 @@ internal static class PortableIrGraphCodecProjections
         };
     }
 
+    private static PortableIrTerm IntegerRow(IrIntegerTerm value,
+        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+    {
+        var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
+        result.Bits = value.Width == 0 ? 0 : value.Bits;
+        return result;
+    }
+
     internal static IrTerm DecodeTerm(
         PortableIrTerm row,
         IrFactory factory,
@@ -501,7 +518,10 @@ internal static class PortableIrGraphCodecProjections
         return row.Kind switch
         {
             IrTermKind.Boolean when row.A is 0 or 1 => factory.Boolean(row.A == 1),
-            IrTermKind.Integer => factory.Integer(row.Number),
+            IrTermKind.Integer when factory.GetTypeInfo(type(row.Type)).Width == 0 && row.Bits == 0 =>
+                factory.Integer(row.Number),
+            IrTermKind.Integer when factory.GetTypeInfo(type(row.Type)).Width != 0 && row.Number == 0 =>
+                factory.IntegerBits(type(row.Type), row.Bits),
             IrTermKind.String when row.Text != null => factory.String(row.Text),
             IrTermKind.Null => factory.Null(type(row.Type)),
             IrTermKind.Variable => factory.Variable(variable(row.A)),

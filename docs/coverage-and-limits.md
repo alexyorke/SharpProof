@@ -202,7 +202,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 19 admits unconditional
+  For an effect candidate, compiler artifact schema 20 admits unconditional
   definite managed object/array allocation, exact framework explicit-throw,
   empty-`lock`, and exact-`Monitor` events. The worker recomputes each event's
   constraint and operation identities, checks its source-tree identity/span

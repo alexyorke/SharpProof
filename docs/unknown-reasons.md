@@ -247,7 +247,7 @@ The exact typed outcome and effect-certainty authority follows.
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 19 carries
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 20 carries
 unconditional definite managed object/array allocation, exact framework
 explicit-throw, empty-`lock`, and exact-`Monitor` events for independent worker
 replay. The artifact boundary validates event order, types, locations, and
