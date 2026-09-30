@@ -89,25 +89,27 @@ internal static class CompilerTotalCallableArtifactCodec
         }
         IrVarId? result = artifact.Result == -1 ? null : Variable(artifact.Result, "result");
         var entryVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Entry));
+        var currentVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Current));
         var postconditions = claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
         var preconditions = entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        Require(!entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume),
-            "Total source Assume evidence is not yet supported.");
+        var userAssumptions = entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();
         var clauses = ImmutableArray.CreateBuilder<CompilerTotalClause>(artifact.Clauses.Length);
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
+        var userAssumptionOrdinal = 0;
         for (var ordinal = 0; ordinal < artifact.Clauses.Length; ordinal++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var row = artifact.Clauses[ordinal];
-            Require(row.Kind is CompilerContractKind.Requires or CompilerContractKind.Ensures &&
+            Require(row.Kind is CompilerContractKind.Requires or CompilerContractKind.Ensures or CompilerContractKind.Assume &&
                 row.ValueRoot == ordinal * 2 && row.SafeRoot == ordinal * 2 + 1 &&
                 row.Operation >= 0 && row.Operation < decoded.Operations.Count, "A Total clause has an invalid root or site binding.");
             var value = decoded.Roots[row.ValueRoot];
             var safe = decoded.Roots[row.SafeRoot];
             Require(value.Type == factory.BooleanType && safe.Type == factory.BooleanType &&
                 IrTraversal.CollectVariables([value, safe]).All(variable => identities.Contains(variable)) &&
-                (row.Kind != CompilerContractKind.Requires || IrTraversal.CollectVariables([value, safe]).All(entryVariables.Contains)),
+                (row.Kind != CompilerContractKind.Requires || IrTraversal.CollectVariables([value, safe]).All(entryVariables.Contains)) &&
+                (row.Kind != CompilerContractKind.Assume || IrTraversal.CollectVariables([value, safe]).All(currentVariables.Contains)),
                 "A Total clause is not a closed canonical predicate.");
             var operation = decoded.Operations[row.Operation];
             var span = factory.GetOperationInfo(operation).SourceSpan;
@@ -121,16 +123,21 @@ internal static class CompilerTotalCallableArtifactCodec
                     claim.Location.Start == span!.Start && claim.Location.Length == span.Length,
                     "The Total claim binding does not equal the manifest.");
             }
-            else
+            else if (row.Kind == CompilerContractKind.Requires)
             {
                 Require(assumptionOrdinal < preconditions.Length && row.AssumptionId == preconditions[assumptionOrdinal++].Id &&
                     row.ClaimId == null, "The Total assumption binding does not equal the manifest.");
             }
+            else
+            {
+                Require(userAssumptionOrdinal < userAssumptions.Length && row.AssumptionId == userAssumptions[userAssumptionOrdinal++].Id &&
+                    row.ClaimId == null, "The Total user assumption binding does not equal the manifest.");
+            }
             clauses.Add(new(row.Kind, value, safe, operation, row.ClaimId, row.AssumptionId));
         }
-        Require(claimOrdinal == postconditions.Length && assumptionOrdinal == preconditions.Length,
+        Require(claimOrdinal == postconditions.Length && assumptionOrdinal == preconditions.Length && userAssumptionOrdinal == userAssumptions.Length,
             "The Total clauses do not equal the manifest.");
-        ValidateProgram(decoded.Program!, result, cancellationToken);
+        ValidateProgram(decoded.Program!, result, clauses, parameters, cancellationToken);
         return new(entry.CallableId, decoded.Program!, parameters.MoveToImmutable(), result, clauses.MoveToImmutable());
     }
 
@@ -140,13 +147,38 @@ internal static class CompilerTotalCallableArtifactCodec
         return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64;
     }
 
-    private static void ValidateProgram(IrProgram program, IrVarId? result, CancellationToken cancellationToken)
+    private static void ValidateProgram(IrProgram program, IrVarId? result,
+        IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters, CancellationToken cancellationToken)
     {
         Require(program.Blocks.Length <= CompilerPreparedBody.MaximumInstructions &&
             program.Blocks.Sum(block => block.Instructions.Length) <= CompilerPreparedBody.MaximumInstructions,
             "The Total program exceeds its construction bound.");
+        var assumptions = new Dictionary<OperationId, CompilerTotalClause>();
+        foreach (var clause in clauses.Where(clause => clause.Kind == CompilerContractKind.Assume))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(!assumptions.ContainsKey(clause.Operation), "Total user assumption sites must be distinct.");
+            assumptions.Add(clause.Operation, clause);
+        }
+        var pointSites = new HashSet<OperationId>();
+        foreach (var block in program.Blocks)
+        {
+            foreach (var instruction in block.Instructions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (instruction is IrAssumeInstruction point)
+                {
+                    Require(assumptions.TryGetValue(point.Operation, out var clause) && pointSites.Add(point.Operation) &&
+                        point.Condition.Id == program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id,
+                        "A Total point assumption does not equal its owned clause evidence.");
+                }
+            }
+        }
+        Require(pointSites.Count == assumptions.Count, "A Total user assumption is missing its original program point.");
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, _ => { cancellationToken.ThrowIfCancellationRequested(); return true; }, out var failure);
         Require(failure == IrAcyclicOrderFailure.None, "The Total program must be acyclic.");
+        if (assumptions.Count != 0)
+        { ValidateAssumptionPrologue(program, parameters, order, pointSites.Count, cancellationToken); }
         var resultType = result is { } variable ? program.Factory.GetVariableInfo(variable).Type : (IrTypeId?)null;
         var pendingThrows = new Dictionary<IrBlockId, bool> { [program.Entry] = false };
         foreach (var blockId in order)
@@ -156,7 +188,7 @@ internal static class CompilerTotalCallableArtifactCodec
             foreach (var instruction in block.Instructions)
             {
                 Require(instruction.Kind is IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
-                    IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit,
+                    IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
                 {
@@ -177,6 +209,59 @@ internal static class CompilerTotalCallableArtifactCodec
         void Add(IrBlockId block, bool pending)
         {
             pendingThrows[block] = !pendingThrows.TryGetValue(block, out var previous) ? pending : previous && pending;
+        }
+    }
+
+    private static void ValidateAssumptionPrologue(IrProgram program, IEnumerable<CompilerTotalParameter> parameters,
+        IEnumerable<IrBlockId> order, int pointCount, CancellationToken cancellationToken)
+    {
+        var entry = program.GetBlock(program.Entry);
+        var initializationCount = 0;
+        foreach (var parameter in parameters)
+        {
+            Initialization(parameter.Current, parameter.Entry);
+            Initialization(parameter.Old, parameter.Entry);
+        }
+        var bodyStarted = new Dictionary<IrBlockId, bool> { [program.Entry] = false };
+        var reachedPoints = 0;
+        foreach (var blockId in order)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var block = program.GetBlock(blockId);
+            var body = bodyStarted[blockId];
+            for (var ordinal = 0; ordinal < block.Instructions.Length; ordinal++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (blockId == program.Entry && ordinal < initializationCount)
+                { continue; }
+                if (block.Instructions[ordinal] is IrAssumeInstruction)
+                {
+                    Require(!body, "A Total source assumption is outside the direct prologue.");
+                    reachedPoints++;
+                }
+                else if (block.Instructions[ordinal] is not IrGotoInstruction)
+                { body = true; }
+            }
+            if (block.Terminator is IrGotoInstruction go)
+            { Add(go.Target); }
+            else if (block.Terminator is IrBranchInstruction branch)
+            { Add(branch.WhenTrue); Add(branch.WhenFalse); }
+            else if (block.Terminator is IrThrowInstruction thrown)
+            { Add(thrown.Target); }
+
+            void Add(IrBlockId destination)
+            { bodyStarted[destination] = body || bodyStarted.TryGetValue(destination, out var previous) && previous; }
+        }
+        Require(reachedPoints == pointCount, "A Total source assumption is unreachable from the direct prologue.");
+
+        void Initialization(IrVarId target, IrVarId source)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(initializationCount < entry.Instructions.Length && entry.Instructions[initializationCount] is IrAssignInstruction assign &&
+                assign.Target == target && assign.Value is IrVariableTerm value && value.Variable == source &&
+                program.Factory.GetOperationInfo(assign.Operation).SourceSpan == null,
+                "The Total source prologue is missing its canonical input initialization.");
+            initializationCount++;
         }
     }
 

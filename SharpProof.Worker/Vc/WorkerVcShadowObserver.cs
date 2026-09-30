@@ -59,6 +59,8 @@ internal static class WorkerVcShadowObserver
                     requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture), clause.AssumptionId!);
                 }
                 var canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToArray();
+                var assumesByOperation = preparation.Total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume)
+                    .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId!);
                 for (var ordinal = 0; ordinal < ensures.Length; ordinal++)
                 {
                     methodBoundary.Token.ThrowIfCancellationRequested();
@@ -88,6 +90,12 @@ internal static class WorkerVcShadowObserver
                     {
                         methodBoundary.Token.ThrowIfCancellationRequested();
                         if (requiresByLabel.TryGetValue(label, out var id))
+                        { used.Add(id); }
+                    }
+                    foreach (var operation in evidence.BodyAssumptions)
+                    {
+                        methodBoundary.Token.ThrowIfCancellationRequested();
+                        if (assumesByOperation.TryGetValue(operation, out var id))
                         { used.Add(id); }
                     }
                     var assumptions = ImmutableArray.CreateBuilder<WorkerVcShadowAssumption>(canonicalAssumptions.Length);

@@ -147,10 +147,11 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(check.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
     }
 
-    [Test]
-    public void LegacyGraphBytesAndFailureRowsRemainUnchanged()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LegacyGraphBytesAndFailureRowsRemainUnchanged(bool sourceAssume)
     {
-        var compilation = TestCompilation.Create("LegacyPreservation", ("Subject.cs", DiamondSource));
+        var compilation = TestCompilation.Create("LegacyPreservation", ("Subject.cs", sourceAssume ? WorkerVcSourceAssumeTests.Source : DiamondSource));
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
@@ -233,7 +234,7 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         var body = kind switch
         {
-            "assume" => "Contract.Assume(x > 0); Contract.Ensures(Contract.Result<int>() == x); return x;",
+            "assume" => "Contract.Assume(System.Math.Abs(x) > 0); Contract.Ensures(Contract.Result<int>() == x); return x;",
             "loop" => "Contract.Ensures(Contract.Result<int>() == x); while (x < 0) x++; return x;",
             "call" => "Contract.Ensures(Contract.Result<int>() == x); return System.Math.Abs(x);",
             _ => "return x;"

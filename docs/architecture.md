@@ -221,9 +221,14 @@ own core provenance. Construction is bounded and cancelable. Each callable
 uses one solver session with the existing method resource meter. Refutations
 must validate every SSA assignment and replay the original body and guarded
 postcondition; displayed models contain canonical entry parameters only. The
-source test adapter rejects mixed contexts, incomplete lowering, and source
-Assume until its point filter exists in the replay program. Worker routing and
-the optional Total compiler artifact payload remain pending.
+source test adapter rejects mixed contexts and incomplete lowering. Legal
+prologue Assume clauses carry their static Safe-and-Value filter in the original
+Total program, with used UserAssume IDs retained for conditional and vacuous
+proofs. Their elided arguments do not emit runtime evaluations or throws.
+Late or conditional placement remains unsupported. Decoding binds each filter
+to its owned clause and requires reachable prologue placement before body
+execution. The optional Total artifact and shadow comparison reuse decoded
+preparations; authoritative worker responses and cache claims remain legacy.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.

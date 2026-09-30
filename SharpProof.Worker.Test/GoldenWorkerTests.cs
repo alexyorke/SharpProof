@@ -41,12 +41,23 @@ public sealed class GoldenWorkerTests
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
+            : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
             : scenario == "vc-shadow-meter-boundary" ? await VcShadowMeterBoundary(fixture.Source)
             : scenario == "vc-shadow-completed-boundary" ? await VcShadowCompletedBoundary(fixture.Source)
             : scenario == "model-boolean" ? await BooleanModels()
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static string VcAssumePlacement(string source)
+    {
+        var output = new StringBuilder();
+        output.AppendLine("source-contract: direct prologue");
+        output.AppendLine("payload: canonical re-encoding with original ID/site/predicate");
+        output.AppendLine("after-current-write-rejected: " + WorkerVcSourceAssumeTests.RelocatedAssumptionRejected(source, unreachable: false));
+        output.AppendLine("unreachable-point-rejected: " + WorkerVcSourceAssumeTests.RelocatedAssumptionRejected(source, unreachable: true));
+        return output.ToString();
     }
 
     private static async Task<string> VcShadowMeterBoundary(string source)

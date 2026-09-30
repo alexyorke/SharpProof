@@ -89,6 +89,13 @@ internal sealed class RoslynTotalProgramLowerer(TotalLoweringContext context)
 
     private IrBlockId Statement(IOperation operation, IrBlockId block)
     {
+        if (_context.TryGetSpecificationAssumption(operation, out var assumption, out var site))
+        {
+            // Elided arguments have no runtime evaluation. This is the owning
+            // static filter, including the clause's definedness domain.
+            _builder.Assume(block, site, assumption);
+            return block;
+        }
         if (_context.IsSpecificationOperation(operation))
         {
             return block;

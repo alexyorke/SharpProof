@@ -16,16 +16,14 @@ internal static class CompilerTotalCallableLowerer
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
         var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
         cancellationToken.ThrowIfCancellationRequested();
-        // Source Assume is erased today; keep it closed until original replay
-        // carries its point filter and conditional proof metadata.
-        if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions ||
-            binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume) ||
-            target.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume))
+        if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }
         var ensures = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Ensures).ToArray();
         var requires = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires).ToArray();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length)
+        var assumptions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();
+        if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length ||
+            binding.Clauses.Count(clause => clause.Kind == BoundContractKind.Assume) != assumptions.Length)
         { return null; }
         for (var ordinal = 0; ordinal < ensures.Length; ordinal++)
         {
@@ -58,12 +56,14 @@ internal static class CompilerTotalCallableLowerer
         }
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
+        var userAssumptionOrdinal = 0;
         return new(target.Entry.CallableId, lowering.Program,
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result,
             [.. binding.Clauses.Select(clause => new CompilerTotalClause(CompilerLoweringWireMappings.ToCompiler(clause.Kind),
                 clause.Value, clause.SafeCondition, clause.SourceOperation,
                 clause.Kind == BoundContractKind.Ensures ? target.Claims[claimOrdinal++].Entry.ClaimId : null,
-                clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id : null))]);
+                clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id :
+                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))]);
     }
 }

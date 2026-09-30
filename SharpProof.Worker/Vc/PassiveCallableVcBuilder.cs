@@ -252,7 +252,8 @@ internal sealed class PassiveCallableVcBuilder
     private void Fact(IrTerm predicate, OperationId site, string kind, bool userAssume = false)
     {
         Spend();
-        var justification = new LoweredJustification(site);
+        ProofJustification justification = userAssume
+            ? new UserAssumedJustification(new SourceLocationId(site.Value)) : new LoweredJustification(site);
         _labels.Add(justification, kind + ":" + _facts.Count.ToString(CultureInfo.InvariantCulture));
         if (userAssume)
         { _assumes.Add(justification, site); }

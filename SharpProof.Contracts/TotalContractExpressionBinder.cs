@@ -82,7 +82,7 @@ public sealed partial class ContractBinder
         foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
         {
             var invocation = occurrence.Invocation;
-            var state = occurrence.Kind == BoundContractKind.Ensures ? TotalParameterState.Current : TotalParameterState.Entry;
+            var state = occurrence.Kind == BoundContractKind.Requires ? TotalParameterState.Entry : TotalParameterState.Current;
             var expression = lowerer.LowerClause(invocation.Arguments[0].Value, state);
             if (!expression.Classification.IsExact ||
                 IrTraversal.CollectVariables(expression.Value).Any(variable => !allowed.Contains(variable)) ||
@@ -94,9 +94,16 @@ public sealed partial class ContractBinder
             { return Fail(ContractBindingFailure.NonBooleanCondition); }
             clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax)));
         }
+        var ordinal = 0;
         foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
         {
             context.ExcludeSpecificationCall(occurrence.Invocation);
+            var clause = clauses[ordinal++];
+            if (clause.Kind == BoundContractKind.Assume)
+            {
+                context.RegisterSpecificationAssumption(occurrence.Invocation,
+                    _factory.Binary(IrBinaryOperator.AndAlso, clause.SafeCondition, clause.Value), clause.SourceOperation);
+            }
         }
         return new(clauses.ToImmutable(), ContractBindingFailure.None, context.Origin);
 

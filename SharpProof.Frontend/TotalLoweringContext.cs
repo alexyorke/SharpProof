@@ -26,6 +26,7 @@ public sealed class TotalLoweringContext
     private readonly Dictionary<ISymbol, IrVarId> _locals = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
     private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
+    private readonly Dictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = [];
     private int _temporary;
 
     public TotalLoweringContext(IrFactory factory, IMethodSymbol target)
@@ -131,6 +132,26 @@ public sealed class TotalLoweringContext
     {
         var syntax = invocation.Syntax;
         _specificationCalls.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
+    }
+
+    internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site)
+    {
+        var syntax = invocation.Syntax;
+        _assumptions.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), (condition, site));
+    }
+
+    internal bool TryGetSpecificationAssumption(IOperation operation, out IrTerm condition, out OperationId site)
+    {
+        var syntax = (operation is IExpressionStatementOperation statement ? statement.Operation : operation).Syntax;
+        if (_assumptions.TryGetValue((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), out var assumption))
+        {
+            condition = assumption.Condition;
+            site = assumption.Site;
+            return true;
+        }
+        condition = null!;
+        site = default;
+        return false;
     }
 
     internal bool IsSpecificationOperation(IOperation operation)

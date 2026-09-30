@@ -37,9 +37,7 @@ internal sealed record PassiveSourceSubject(TotalLoweringContext Context,
         if (!ReferenceEquals(context.Origin, binding.Origin) || !ReferenceEquals(context.Origin, lowering.TotalOrigin) ||
             !ReferenceEquals(context.Factory, lowering.Program.Factory))
         { throw new ArgumentException("Binding and lowering must originate in the same callable context."); }
-        // Source Assume is erased today. Do not enroll it until the original
-        // replay program itself carries its point filter and user provenance.
-        if (!binding.IsSuccess || !lowering.IsExact || binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume))
+        if (!binding.IsSuccess || !lowering.IsExact)
         { return null; }
         ImmutableArray<PassiveContractClause> Clauses(BoundContractKind kind)
         {

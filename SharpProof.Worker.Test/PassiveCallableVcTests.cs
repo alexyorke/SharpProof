@@ -227,9 +227,9 @@ public sealed class PassiveCallableVcTests
         Assert.That(result.Reason, Is.EqualTo(readBeforeOverwrite ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
     }
 
-    [TestCase("Contract.Assume(x > 0); return x;")]
+    [TestCase("Contract.Assume(System.Math.Abs(x) > 0); return x;")]
     [TestCase("return Helper(x);")]
-    public void SourceAssumeAndNonExactBodyCannotEnroll(string body)
+    public void UnsupportedSourceAssumeAndNonExactBodyCannotEnroll(string body)
     {
         var subject = PassiveSourceSubject.Create($$"""
             using SharpProof.Attributes;
@@ -319,11 +319,15 @@ public sealed class PassiveCallableVcTests
         var plan = Build(subject.Candidate(subject.Factory.Boolean(false)));
         var query = plan.EnsuresQuery(0);
         Assert.That(query.Assumptions.Select(assumption => assumption.Justification).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
-        Assert.That(query.Assumptions.Select(assumption => ((LoweredJustification)assumption.Justification).Operation).Distinct(),
+        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).OfType<LoweredJustification>()
+            .Select(justification => justification.Operation).Distinct(),
             Is.EqualTo(new[] { subject.Site }));
+        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).OfType<UserAssumedJustification>()
+            .Single().Location, Is.EqualTo(new SourceLocationId(subject.Site.Value)));
         var kernel = new ProofKernel(new ReorderedCoreBackend());
         var proof = (ProvenOutcome)await kernel.VerifyAsync(query);
         Assert.That(plan.CoreLabels(proof), Has.Length.EqualTo(query.Assumptions.Length));
+        Assert.That(plan.UsedBodyAssumptions(proof), Is.EqualTo(new[] { subject.Site }));
         var other = new ScalarSubject();
         var otherBlock = other.Builder.CreateBlock();
         other.Builder.Return(otherBlock, other.Site, other.Factory.Integer(0));
