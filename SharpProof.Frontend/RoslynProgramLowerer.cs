@@ -10,6 +10,16 @@ public sealed class RoslynProgramLowerer(
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly Func<IMethodSymbol, bool> _isKnownPure = isKnownPure ?? (static _ => false);
 
+    public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context)
+    {
+        ArgumentNullGuard.NotNull(context, nameof(context));
+        if (!ReferenceEquals(_factory, context.Factory))
+        {
+            throw new ArgumentException("The context belongs to another factory.", nameof(context));
+        }
+        return new RoslynTotalProgramLowerer(context).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
+    }
+
     public FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));

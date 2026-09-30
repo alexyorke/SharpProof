@@ -1,0 +1,55 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+contract: Requires safety=true value=(v0 > 0)
+contract: Ensures safety=((!(v3 == v2)) || true) value=((v3 == v2) && (v1 == v3))
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op2 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op2 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op2 Goto b1 source=none
+block: b1 cfg:0
+  i4 op2 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Goto b3 source=none
+block: b3 cfg:2
+  i6 op2 Goto b5 source=none
+block: b4 cfg:4
+  i7 op2 Goto b6 source=none
+block: b5 cfg:3
+  i8 op2 Goto b6 source=none
+block: b6 cfg:5
+  i9 op2 Goto b7 source=none
+block: b7 cfg:6
+  i10 op4 Assign v4:int[width=32,signed=True] = v1 source=total-shared-entry-exit.cs:307+1
+  i11 op5 Assign v5:int[width=32,signed=True] = 1 source=total-shared-entry-exit.cs:311+1
+  i12 op6 Assign v6:int[width=32,signed=True] = (v4 + v5) source=total-shared-entry-exit.cs:307+5
+  i13 op7 Assign v1:int[width=32,signed=True] = v6 source=total-shared-entry-exit.cs:293+20
+  i14 op9 Assign v7:int[width=32,signed=True] = v1 source=total-shared-entry-exit.cs:330+1
+  i15 op8 Assign v3:int[width=32,signed=True] = v7 source=total-shared-entry-exit.cs:330+1
+  i16 op8 Return v3 source=total-shared-entry-exit.cs:330+1
+block: b8 cfg:7
+  i17 op2 Return void source=none
+block: b9 exceptional:exit
+  i2 op2 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Boolean type=t0:bool width=0 signed=False value=true
+term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir3 Binary type=t0:bool width=0 signed=False value=(v0 > 0)
+term: ir4 Variable type=t1:int width=32 signed=True value=v3
+term: ir5 Variable type=t1:int width=32 signed=True value=v2
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v3 == v2)
+term: ir7 Variable type=t1:int width=32 signed=True value=v1
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v1 == v3)
+term: ir9 Binary type=t0:bool width=0 signed=False value=((v3 == v2) && (v1 == v3))
+term: ir10 Unary type=t0:bool width=0 signed=False value=(!(v3 == v2))
+term: ir11 Binary type=t0:bool width=0 signed=False value=((!(v3 == v2)) || true)
+term: ir12 Variable type=t1:int width=32 signed=True value=v4
+term: ir13 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir14 Variable type=t1:int width=32 signed=True value=v5
+term: ir15 Binary type=t1:int width=32 signed=True value=(v4 + v5)
+term: ir16 Variable type=t1:int width=32 signed=True value=v6
+term: ir17 Variable type=t1:int width=32 signed=True value=v7

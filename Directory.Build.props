@@ -41,6 +41,7 @@
       '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(MSBuildProjectName)' == 'SharpProof.CompilerCollector' Or
       '$(MSBuildProjectName)' == 'SharpProof.Contracts' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Contracts.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Frontend' Or
       '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Fuzz' Or

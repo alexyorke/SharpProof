@@ -1,0 +1,51 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+parameter: 1 entry=v3:int[width=32,signed=True] current=v4:int[width=32,signed=True] old=v5:int[width=32,signed=True]
+result: v6:int[width=32,signed=True]
+contract-binding: None
+contract: Ensures safety=(((!(v5 == 0)) && (!((v2 == -2147483648) && (v5 == -1)))) && true) value=((v2 / v5) == 2)
+variable: v1:int[width=32,signed=True] source=x
+variable: v4:int[width=32,signed=True] source=d
+block: b0 entry
+  i0 op1 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op1 Assign v2:int[width=32,signed=True] = v0 source=none
+  i2 op1 Assign v4:int[width=32,signed=True] = v3 source=none
+  i3 op1 Assign v5:int[width=32,signed=True] = v3 source=none
+  i5 op1 Goto b1 source=none
+block: b1 cfg:0
+  i6 op1 Goto b2 source=none
+block: b2 cfg:1
+  i7 op2 Assign v7:int[width=32,signed=True] = 0 source=total-old-value-and-guard.cs:222+1
+  i8 op3 Assign v4:int[width=32,signed=True] = v7 source=total-old-value-and-guard.cs:218+5
+  i9 op5 Assign v8:int[width=32,signed=True] = v1 source=total-old-value-and-guard.cs:240+1
+  i10 op4 Assign v6:int[width=32,signed=True] = v8 source=total-old-value-and-guard.cs:240+1
+  i11 op4 Return v6 source=total-old-value-and-guard.cs:240+1
+block: b3 cfg:2
+  i12 op1 Return void source=none
+block: b4 exceptional:exit
+  i4 op1 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v2
+term: ir1 Boolean type=t0:bool width=0 signed=False value=true
+term: ir2 Variable type=t1:int width=32 signed=True value=v5
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir4 Binary type=t0:bool width=0 signed=False value=(v5 == 0)
+term: ir5 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v2 == -2147483648)
+term: ir7 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v5 == -1)
+term: ir9 Binary type=t0:bool width=0 signed=False value=((v2 == -2147483648) && (v5 == -1))
+term: ir10 Binary type=t1:int width=32 signed=True value=(v2 / v5)
+term: ir11 Unary type=t0:bool width=0 signed=False value=(!(v5 == 0))
+term: ir12 Unary type=t0:bool width=0 signed=False value=(!((v2 == -2147483648) && (v5 == -1)))
+term: ir13 Binary type=t0:bool width=0 signed=False value=((!(v5 == 0)) && (!((v2 == -2147483648) && (v5 == -1))))
+term: ir14 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir15 Binary type=t0:bool width=0 signed=False value=((v2 / v5) == 2)
+term: ir16 Binary type=t0:bool width=0 signed=False value=(((!(v5 == 0)) && (!((v2 == -2147483648) && (v5 == -1)))) && true)
+term: ir17 Variable type=t1:int width=32 signed=True value=v0
+term: ir18 Variable type=t1:int width=32 signed=True value=v3
+term: ir19 Variable type=t1:int width=32 signed=True value=v7
+term: ir20 Variable type=t1:int width=32 signed=True value=v1
+term: ir21 Variable type=t1:int width=32 signed=True value=v8
+term: ir22 Variable type=t1:int width=32 signed=True value=v6

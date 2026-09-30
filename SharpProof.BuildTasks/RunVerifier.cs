@@ -16,15 +16,18 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     // The verifier enforces the project budget itself and writes a typed
     // TimedOut result. This reserve covers process startup and publication;
     // the task's kill is only a safety net for a hung process.
-    internal const int LauncherProcessReserveMilliseconds = 30000;
+    internal const int LauncherProcessReserveMilliseconds = PublicationLease.TimeoutMilliseconds;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     // Once the verifier exits, only a leaked descendant can keep its pipes
     // open; the build does not wait for one.
     internal const int OutputDrainMilliseconds = 2000;
     private const int StructuredRefutedFailureExitCode = 5;
     private const int StructuredSemanticFailureExitCode = 6;
+    private const int InvalidInputExitCode = 2;
+    private const int PublicationFailureExitCode = 3;
     private readonly object _gate = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
+    private readonly CancellationTokenSource _cancellation = new();
     private Process? _process;
 
     [Required]
@@ -53,6 +56,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     public void Dispose()
     {
         _cancellationSignal.Dispose();
+        _cancellation.Dispose();
         _process?.Dispose();
     }
 
@@ -71,6 +75,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
             var timeout = ComputeProcessTimeout(
                 ProjectWallTimeMilliseconds,
                 TerminationGraceMilliseconds);
+            var operation = Stopwatch.StartNew();
             var executable = ResolveDotNetHost(Executable);
             process.StartInfo = new ProcessStartInfo
             {
@@ -82,9 +87,22 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 CreateNoWindow = true
             };
             TrustedChildEnvironment.Apply(process.StartInfo, executable);
-            foreach (var argument in Arguments)
+            var childArguments = Arguments.Select(argument => argument.ItemSpec).ToArray();
+            VerificationPublication? publication;
+            try
             {
-                process.StartInfo.ArgumentList.Add(argument.ItemSpec);
+                publication = VerificationPublication.Prepare(childArguments, process.StartInfo.WorkingDirectory);
+            }
+            catch (ArgumentException exception)
+            {
+                ExitCode = InvalidInputExitCode;
+                Log.LogMessage(MessageImportance.High, "SharpProof launcher input is invalid: {0}: {1}",
+                    exception.GetType().Name, exception.Message);
+                return true;
+            }
+            foreach (var argument in childArguments)
+            {
+                process.StartInfo.ArgumentList.Add(argument);
             }
 
             System.Threading.Tasks.Task<string> standardOutput;
@@ -135,6 +153,33 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 : exited
                     ? process.ExitCode
                     : LinuxProcessControlConstants.TimeoutExitCode;
+            if (publication != null && ExitCode is 0 or StructuredRefutedFailureExitCode or StructuredSemanticFailureExitCode)
+            {
+                var remaining = timeout - operation.ElapsedMilliseconds;
+                if (remaining <= 0)
+                { throw new TimeoutException("Verification publication exceeded the process deadline."); }
+                using var publicationDeadline = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
+                publicationDeadline.CancelAfter(TimeSpan.FromMilliseconds(remaining));
+                try
+                {
+                    publication.Publish(publicationDeadline.Token);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+                {
+                    ExitCode = PublicationFailureExitCode;
+                    Log.LogMessage(MessageImportance.High, "SharpProof worker result could not be published.");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Kill(process);
+            ExitCode = _cancellationSignal.IsSet ? -1 : LinuxProcessControlConstants.TimeoutExitCode;
+        }
+        catch (TimeoutException)
+        {
+            Kill(process);
+            ExitCode = LinuxProcessControlConstants.TimeoutExitCode;
         }
         catch (Exception exception)
         {
@@ -168,6 +213,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
         lock (_gate)
         {
             _cancellationSignal.Set();
+            _cancellation.Cancel();
             process = _process;
         }
         if (process != null)

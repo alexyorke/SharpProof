@@ -22,6 +22,12 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
                 "error:" + CompilerIdentityBridge.CreateTypeDisplay(type));
         }
 
+        if (_factory.Semantics == IrExecutionSemantics.Total &&
+            CSharpOperationSemantics.MapType(_factory, type.SpecialType) is { } scalar)
+        {
+            return scalar;
+        }
+
         if (type is IArrayTypeSymbol array)
         {
             var element = GetTypeId(array.ElementType);

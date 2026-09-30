@@ -236,13 +236,6 @@
     </SharpProof.BuildTasks.RunVerifier>
     <Error Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
-    <SharpProof.BuildTasks.ValidatePublishedVerificationResult
-        RequestPath="$(_SharpProofEffectiveRequestFile)"
-        ResultPath="$(_SharpProofEffectiveResultFile)"
-        ManifestPath="$(_SharpProofEffectiveCompilerManifestFile)"
-        InvocationResultPath="$(_SharpProofInvocationResultFile)"
-        SarifPath="$(_SharpProofEffectiveSarifFile)"
-        ProjectDirectory="$(MSBuildProjectDirectory)" />
     <Message Importance="High"
              Text="SharpProof verifier result: $(_SharpProofEffectiveResultFile)" />
     <Message Condition="'$(_SharpProofEffectiveSarifFile)' != ''"

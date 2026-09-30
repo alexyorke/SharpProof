@@ -4603,30 +4603,65 @@ public sealed class WorkerTests
             Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
-    [Test]
-    public async Task FatalClaimTakesPrecedenceOverAnotherCallableTimeout()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void FatalClaimTakesPrecedenceOverAnotherCallableTimeout(bool reverseRecords)
     {
         using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.Budgets.MaxParallelism = 1;
-        request.Budgets.MethodWallTimeMilliseconds = 30;
-        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
-        using var worker = new SharpProofWorker(
-            new UnavailableThenDelayingBackend());
-
-        var response = await worker.VerifyAsync(request);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var assembled = AssembleFatalAndTimedOut(request, snapshot, reverseRecords);
+        var response = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(assembled))!;
+        var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
+            snapshot.InputHash, snapshot.CompilerManifest.Manifest, request, Launcher.Program.ExpectedVersions());
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(validation.IsValid, Is.True, string.Join(';', validation.Errors.Select(error => error.Code)));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
             Assert.That(
                 response.ClaimResults.Select(static result => result.Reason),
-                Does.Contain(WorkerClaimReason.BackendUnavailable)
-                    .And.Contain(WorkerClaimReason.MethodTimeout));
+                Is.EqualTo((WorkerClaimReason[])[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
+            Assert.That(response.CallableResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerCallableCoverageReason[])[WorkerCallableCoverageReason.InfrastructureFailure,
+                    WorkerCallableCoverageReason.MethodTimeout]));
+            Assert.That(response.ClaimResults.Select(static result => result.ClaimId),
+                Is.EqualTo(snapshot.CompilerManifest.Manifest.Claims.Select(static claim => claim.ClaimId)));
+            Assert.That(VerificationCache.IsCacheable(response, snapshot.InputHash, snapshot.CompilerManifest.Manifest), Is.False);
         }
+    }
+
+    internal static WorkerVerifyResponse AssembleFatalAndTimedOut(
+        WorkerVerifyRequest request, WorkerInputSnapshot snapshot, bool reverseRecords)
+    {
+        var manifest = snapshot.CompilerManifest.Manifest;
+        Assert.That(manifest.Callables, Has.Length.EqualTo(2));
+        var callables = manifest.Callables.Select((callable, index) => new WorkerCallableResult
+        {
+            CallableId = callable.CallableId,
+            Coverage = WorkerCallableCoverage.Incomplete,
+            Reason = index == 0 ? WorkerCallableCoverageReason.InfrastructureFailure : WorkerCallableCoverageReason.MethodTimeout,
+            Assumptions = callable.Assumptions
+        }).ToArray();
+        var claims = manifest.Callables.SelectMany((callable, index) => callable.ClaimIds.Select(claimId => new WorkerClaimResult
+        {
+            ClaimId = claimId,
+            Outcome = WorkerClaimOutcome.Unknown,
+            Reason = index == 0 ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.MethodTimeout,
+            Assumptions = callable.Assumptions
+        })).ToArray();
+        if (reverseRecords)
+        {
+            Array.Reverse(callables);
+            Array.Reverse(claims);
+        }
+        var run = WorkerResultAssembler.Classify(callables, claims);
+        return WorkerResultAssembler.Create(snapshot.InputHash, manifest, run.Status, run.Failure, callables, claims,
+            request.Budgets, WorkerCacheStatus.Disabled, 0, requestHash: WorkerProtocolJson.ComputeRequestHash(request),
+            versions: Launcher.Program.ExpectedVersions());
     }
 
     [Test]
@@ -6373,26 +6408,6 @@ public sealed class WorkerTests
                     _active--;
                 }
             }
-        }
-    }
-
-    private sealed class UnavailableThenDelayingBackend : ISmtBackend
-    {
-        private int _calls;
-
-        public async Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            if (Interlocked.Increment(ref _calls) == 1)
-            {
-                return BackendCheckResult.Unknown(
-                    BackendFailureReason.Unavailable);
-            }
-
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            return BackendCheckResult.Unknown(
-                BackendFailureReason.InfrastructureFailure);
         }
     }
 

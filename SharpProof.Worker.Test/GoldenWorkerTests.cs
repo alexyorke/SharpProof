@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Host;
 using SharpProof.Smt;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -61,10 +62,241 @@ public sealed class GoldenWorkerTests
         };
         WorkerVerifyResponse response;
         int? exit = null;
-        if (scenario == "identity")
+        bool? leaseBlocked = null;
+        bool? bothPublicationsValid = null;
+        if (scenario == "publication-timeout")
+        {
+            var stableRequest = Path.Combine(directory.FullName, "published-request.json");
+            var stableResult = Path.Combine(directory.FullName, "published-result.json");
+            var stableManifest = Path.Combine(directory.FullName, "published-manifest.json");
+            var held = await PublicationLease.AcquireAsync([stableRequest, stableResult, stableManifest], CancellationToken.None);
+            var verified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var publishing = Program.RunMain(["verify", "--request", Path.Combine(directory.FullName, "private-request.json"),
+                "--result", Path.Combine(directory.FullName, "private-result.json"), "--compiler-manifest", path,
+                "--verify-policy", "advisory", "--assumption-policy", "allow", "--cache-enabled", "false",
+                "--project-wall-ms", "1", "--method-wall-ms", "1", "--termination-grace-ms", "1",
+                "--publish-request", stableRequest, "--publish-result", stableResult,
+                "--publish-compiler-manifest", stableManifest], async (invocation, token) =>
+            {
+                using var worker = SharpProofWorker.Create(invocation.Budgets);
+                var expired = Stopwatch.GetTimestamp() - Stopwatch.Frequency;
+                var interrupted = await worker.VerifyAsync(invocation, null, token, expired);
+                Assert.That(interrupted.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+                verified.SetResult();
+                return interrupted;
+            });
+            var waited = false;
+            try
+            {
+                await verified.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                waited = await Task.WhenAny(publishing, Task.Delay(100)) != publishing;
+            }
+            finally
+            {
+                held.Dispose();
+            }
+            var timeoutExit = await publishing;
+            Assert.That(waited, Is.True, "Publication must retain its own bounded reserve after the analysis budget expires.");
+            Assert.That(timeoutExit, Is.Zero);
+            var timeoutRequest = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(stableRequest))!;
+            var timeoutResponse = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(stableResult))!;
+            var inputHash = Program.ComputeExpectedInputHash(timeoutRequest, bytes);
+            var timeoutBinding = WorkerProtocolJson.ValidateForRequest(timeoutResponse, WorkerProtocolJson.ComputeRequestHash(timeoutRequest),
+                inputHash, artifact.Manifest, timeoutRequest, Program.ExpectedVersions());
+            Assert.That(timeoutBinding.IsValid, Is.True);
+            Assert.That(timeoutResponse.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(timeoutResponse.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(await File.ReadAllBytesAsync(stableManifest), Is.EqualTo(bytes));
+            return "analysis-budget-ms: 1\npublication-waited: True\nexit: 0\nrun: TimedOut/None\nrequest-bound: True\ninput-preserved: True\n";
+        }
+        if (scenario == "publication-runtime")
+        {
+            var runtime = Path.Combine(directory.FullName, "runtime");
+            Directory.CreateDirectory(runtime);
+            var workerPath = Path.Combine(runtime, "SharpProof.Worker.dll");
+            File.Copy(typeof(SharpProofWorker).Assembly.Location, workerPath);
+            var companionPath = Path.ChangeExtension(workerPath, ".deps.json");
+            await File.WriteAllTextAsync(companionPath, "Preserved declared runtime companion.");
+            var workerBytes = await File.ReadAllBytesAsync(workerPath);
+            var companionBytes = await File.ReadAllBytesAsync(companionPath);
+            var runtimeOutput = new StringBuilder();
+            foreach (var name in new[] { "direct", "leaf", "worker-leaf", "executing" })
+            {
+                var protectedWorker = name == "executing" ? typeof(Program).Assembly.Location : workerPath;
+                var protectedCompanion = name == "executing" ? Path.ChangeExtension(protectedWorker, ".deps.json") : companionPath;
+                var protectedWorkerBytes = name == "executing" ? await File.ReadAllBytesAsync(protectedWorker) : workerBytes;
+                var protectedCompanionBytes = name == "executing" ? await File.ReadAllBytesAsync(protectedCompanion) : companionBytes;
+                var declaredWorker = workerPath;
+                var destination = protectedCompanion;
+                if (name == "leaf")
+                {
+                    destination = Path.Combine(directory.FullName, "companion-alias.json");
+                    File.CreateSymbolicLink(destination, companionPath);
+                }
+                if (name == "worker-leaf")
+                {
+                    var aliasDirectory = Path.Combine(directory.FullName, "worker-alias");
+                    Directory.CreateDirectory(aliasDirectory);
+                    declaredWorker = Path.Combine(aliasDirectory, "worker.dll");
+                    File.CreateSymbolicLink(declaredWorker, workerPath);
+                }
+                var entered = false;
+                using var errors = new StringWriter(CultureInfo.InvariantCulture);
+                var previousError = Console.Error;
+                int runtimeExit;
+                try
+                {
+                    Console.SetError(errors);
+                    var arguments = new List<string> { "verify",
+                        "--request", Path.Combine(directory.FullName, name + "-request.json"),
+                        "--result", Path.Combine(directory.FullName, name + "-result.json"),
+                        "--compiler-manifest", path, "--verify-policy", "advisory", "--assumption-policy", "allow",
+                        "--cache-enabled", "false", "--publish-request", Path.Combine(directory.FullName, name + "-published-request.json"),
+                        "--publish-result", destination, "--publish-compiler-manifest", Path.Combine(directory.FullName, name + "-published-manifest.json") };
+                    if (name != "executing")
+                    {
+                        arguments.AddRange(["--worker", declaredWorker]);
+                    }
+                    runtimeExit = await Program.RunMain(arguments.ToArray(),
+                        async (invocation, token) =>
+                        {
+                            entered = true;
+                            using var worker = SharpProofWorker.Create(invocation.Budgets);
+                            return await worker.VerifyAsync(invocation, token);
+                        });
+                }
+                finally
+                {
+                    Console.SetError(previousError);
+                }
+                Assert.That(runtimeExit, Is.EqualTo(2));
+                Assert.That(errors.ToString(), Does.Contain("SharpProof launcher input is invalid: ArgumentException"));
+                Assert.That(entered, Is.False);
+                Assert.That(await File.ReadAllBytesAsync(protectedWorker), Is.EqualTo(protectedWorkerBytes));
+                Assert.That(await File.ReadAllBytesAsync(protectedCompanion), Is.EqualTo(protectedCompanionBytes));
+                runtimeOutput.AppendLine("alias: " + name);
+                runtimeOutput.AppendLine("exit: " + runtimeExit);
+                runtimeOutput.AppendLine("worker-executed: " + entered);
+                runtimeOutput.AppendLine("worker-preserved: True");
+                runtimeOutput.AppendLine("companion-preserved: True");
+            }
+            return runtimeOutput.ToString();
+        }
+        if (scenario == "publication-phases")
+        {
+            var phaseOutput = new StringBuilder();
+            foreach (var invalidInput in new[] { true, false })
+            {
+                var name = invalidInput ? "invalid" : "blocked";
+                var privateRequest = Path.Combine(directory.FullName, name + "-request.json");
+                var privateResult = Path.Combine(directory.FullName, name + "-result.json");
+                var stableResult = Path.Combine(directory.FullName, name + "-published-result.json");
+                var stableManifest = invalidInput ? path : Path.Combine(directory.FullName, "blocked-manifest.json");
+                if (!invalidInput)
+                {
+                    Directory.CreateDirectory(stableManifest);
+                }
+                using var errors = new StringWriter(CultureInfo.InvariantCulture);
+                var previousError = Console.Error;
+                int phaseExit;
+                try
+                {
+                    Console.SetError(errors);
+                    phaseExit = await Program.RunMain(["verify", "--request", privateRequest, "--result", privateResult,
+                        "--compiler-manifest", path, "--verify-policy", "advisory", "--assumption-policy", "allow",
+                        "--cache-enabled", "false", "--publish-request", Path.Combine(directory.FullName, name + "-published-request.json"),
+                        "--publish-result", stableResult, "--publish-compiler-manifest", stableManifest], async (invocation, token) =>
+                        {
+                            using var worker = SharpProofWorker.Create(invocation.Budgets);
+                            return await worker.VerifyAsync(invocation, token);
+                        });
+                }
+                finally
+                {
+                    Console.SetError(previousError);
+                }
+                var message = invalidInput ? "SharpProof launcher input is invalid: ArgumentException"
+                    : "SharpProof worker result could not be published.";
+                Assert.That(phaseExit, Is.EqualTo(invalidInput ? 2 : 3));
+                Assert.That(errors.ToString(), Does.Contain(message));
+                Assert.That(File.Exists(stableResult), Is.False);
+                Assert.That(await File.ReadAllBytesAsync(path), Is.EqualTo(bytes));
+                phaseOutput.AppendLine("phase: " + (invalidInput ? "input" : "publication"));
+                phaseOutput.AppendLine("exit: " + phaseExit);
+                phaseOutput.AppendLine("message: " + message);
+                phaseOutput.AppendLine("stable-result-absent: True");
+                phaseOutput.AppendLine("input-preserved: True");
+            }
+            return phaseOutput.ToString();
+        }
+        if (scenario == "fatal-timeout-precedence")
+        {
+            var input = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+            var mixedOutput = new StringBuilder();
+            foreach (var reverseRecords in new[] { false, true })
+            {
+                var mixed = WorkerTests.AssembleFatalAndTimedOut(request, input, reverseRecords);
+                mixed = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(mixed))!;
+                var bound = WorkerProtocolJson.ValidateForRequest(mixed, WorkerProtocolJson.ComputeRequestHash(request),
+                    input.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
+                Assert.That(bound.IsValid, Is.True, string.Join(';', bound.Errors.Select(error => error.Code)));
+                mixedOutput.AppendLine("record-order: " + (reverseRecords ? "timeout-first" : "fatal-first"));
+                mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"run: {mixed.RunStatus}/{mixed.FailureReason}");
+                mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"request-bound: {bound.IsValid}");
+                mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"cacheable: {VerificationCache.IsCacheable(mixed, input.InputHash, artifact.Manifest)}");
+                foreach (var claim in mixed.ClaimResults)
+                {
+                    mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"claim: {claim.Outcome}/{claim.Reason}");
+                }
+            }
+            return mixedOutput.ToString();
+        }
+        if (scenario is "identity" or "publication-private-binding")
         {
             using var worker = SharpProofWorker.Create(request.Budgets);
             response = await worker.VerifyAsync(request);
+        }
+        else if (scenario == "publication")
+        {
+            var stableRequest = Path.Combine(directory.FullName, "published-request.json");
+            var stableResult = Path.Combine(directory.FullName, "published-result.json");
+            var stableManifest = Path.Combine(directory.FullName, "published-manifest.json");
+            var stableSarif = Path.Combine(directory.FullName, "published.sarif");
+            var held = await PublicationLease.AcquireAsync([stableRequest, stableResult, stableManifest, stableSarif], CancellationToken.None);
+            var verified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var first = Publish("first", verified);
+            try
+            {
+                await verified.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                leaseBlocked = !first.IsCompleted && !File.Exists(stableResult);
+            }
+            finally
+            {
+                held.Dispose();
+            }
+            var firstExit = await first;
+            var secondExit = await Publish("second", null);
+            bothPublicationsValid = firstExit == 0 && secondExit == 0;
+            exit = secondExit;
+            request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(stableRequest))!;
+            response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(stableResult))!;
+            Assert.That(request.CompilerManifest.Path, Is.EqualTo(stableManifest));
+            Assert.That(await File.ReadAllBytesAsync(stableManifest), Is.EqualTo(bytes));
+
+            Task<int> Publish(string name, TaskCompletionSource? signal)
+            {
+                return Program.RunMain(["verify", "--request", Path.Combine(directory.FullName, name + "-request.json"),
+                    "--result", Path.Combine(directory.FullName, name + "-result.json"), "--compiler-manifest", path,
+                    "--verify-policy", "advisory", "--assumption-policy", "allow", "--cache-enabled", "false",
+                    "--publish-request", stableRequest, "--publish-result", stableResult,
+                    "--publish-compiler-manifest", stableManifest, "--publish-sarif", stableSarif], async (invocation, token) =>
+                {
+                    using var worker = SharpProofWorker.Create(invocation.Budgets);
+                    var verifiedResponse = await worker.VerifyAsync(invocation, token);
+                    signal?.SetResult();
+                    return verifiedResponse;
+                });
+            }
         }
         else
         {
@@ -104,13 +336,29 @@ public sealed class GoldenWorkerTests
         var binding = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
             snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
         Assert.That(binding.IsValid, Is.True, string.Join(';', binding.Errors.Select(error => error.Code)));
-        Assert.That(response.RunStatus, Is.EqualTo(scenario == "identity" ? WorkerRunStatus.Complete
+        Assert.That(response.RunStatus, Is.EqualTo(scenario is "identity" or "publication" or "publication-private-binding" ? WorkerRunStatus.Complete
             : scenario == "empty-canceled" ? WorkerRunStatus.Canceled : WorkerRunStatus.TimedOut));
         var output = new StringBuilder();
         output.AppendLine(CultureInfo.InvariantCulture, $"run: {response.RunStatus}/{response.FailureReason}");
         output.AppendLine(CultureInfo.InvariantCulture, $"request-bound: {binding.IsValid}");
         output.AppendLine(CultureInfo.InvariantCulture, $"cacheable: {VerificationCache.IsCacheable(response, snapshot.InputHash, artifact.Manifest)}");
         output.AppendLine(CultureInfo.InvariantCulture, $"claims: {response.ClaimResults.Length}");
+        if (scenario == "publication-private-binding")
+        {
+            var substitutedRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.SerializeRequest(request))!;
+            substitutedRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+            var substitutedResponse = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
+            substitutedResponse.RequestHash = WorkerProtocolJson.ComputeRequestHash(substitutedRequest);
+            var preparedBinding = WorkerProtocolJson.ValidateForRequest(substitutedResponse, WorkerProtocolJson.ComputeRequestHash(request),
+                snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
+            output.AppendLine(CultureInfo.InvariantCulture, $"prepared-request-bound: {preparedBinding.IsValid}");
+            output.AppendLine(CultureInfo.InvariantCulture, $"publication-allowed: {preparedBinding.IsValid}");
+        }
+        if (leaseBlocked != null)
+        {
+            output.AppendLine(CultureInfo.InvariantCulture, $"lease-blocked: {leaseBlocked}");
+            output.AppendLine(CultureInfo.InvariantCulture, $"both-publications-valid: {bothPublicationsValid}");
+        }
         foreach (var claim in response.ClaimResults)
         {
             var declaration = artifact.Manifest.Claims.Single(item => item.ClaimId == claim.ClaimId);

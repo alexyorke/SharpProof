@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
+using SharpProof.Contracts;
 using SharpProof.Ir;
 
 namespace SharpProof.Frontend.Test;
@@ -22,19 +23,61 @@ public sealed class GoldenLoweringTests
     {
         var fixture = GoldenTest.Load("lowering", caseName);
         var tree = CSharpSyntaxTree.ParseText(fixture.Source, new CSharpParseOptions(LanguageVersion.CSharp12), caseName + ".cs");
-        var compilation = CSharpCompilation.Create("GoldenLowering", [tree], TestMetadataReferences.Platform,
+        var bindContracts = fixture.Source.Contains("// golden-contracts: true", StringComparison.Ordinal);
+        var references = bindContracts ? TestMetadataReferences.Platform.Add(
+            MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.Contract).Assembly.Location)) : TestMetadataReferences.Platform;
+        var compilation = CSharpCompilation.Create("GoldenLowering", [tree], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node.Identifier.ValueText == "Target");
-        var factory = new IrFactory();
-        var graph = ControlFlowGraph.Create(method, compilation.GetSemanticModel(tree))!;
-        var result = new RoslynProgramLowerer(factory).Lower(graph);
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(node => node.Identifier.ValueText == "Target").ToArray();
+        var method = methods.Single(node => node.Body != null || node.ExpressionBody != null);
+        var total = fixture.Source.StartsWith("// golden-mode: Total\n", StringComparison.Ordinal);
+        var factory = new IrFactory(total ? IrExecutionSemantics.Total : IrExecutionSemantics.Legacy);
+        var model = compilation.GetSemanticModel(tree);
+        var graph = ControlFlowGraph.Create(method, model)!;
+        TotalLoweringContext? context = null;
+        TotalContractBindingResult? contracts = null;
+        if (total)
+        {
+            var symbol = (IMethodSymbol)model.GetDeclaredSymbol(methods[0])!;
+            if (fixture.Source.Contains("// golden-context: constructed", StringComparison.Ordinal))
+            {
+                symbol = symbol.Construct(compilation.GetSpecialType(SpecialType.System_String));
+            }
+            context = new(factory, symbol);
+            if (bindContracts)
+            {
+                contracts = new ContractBinder(compilation, factory).BindTotal(context);
+            }
+        }
+        var result = context == null ? new RoslynProgramLowerer(factory).Lower(graph)
+            : new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         var printer = new IrPrinter(factory);
         var terms = new Dictionary<IrId, IrTerm>();
         var output = new StringBuilder();
         output.AppendLine(CultureInfo.InvariantCulture, $"mode: {factory.Semantics}");
         output.AppendLine(CultureInfo.InvariantCulture, $"classification: {result.Classification.Decision}/{result.Classification.Abstention}");
         output.AppendLine(CultureInfo.InvariantCulture, $"entry: {result.Program.Entry}");
+        if (context != null)
+        {
+            foreach (var parameter in context.Parameters)
+            {
+                output.AppendLine(CultureInfo.InvariantCulture,
+                    $"parameter: {parameter.Parameter.Ordinal} entry={Variable(parameter.Entry)} current={Variable(parameter.Current)} old={Variable(parameter.PreState)}");
+            }
+            output.AppendLine("result: " + (context.Result is { } resultVariable ? Variable(resultVariable) : "void"));
+        }
+        if (contracts != null)
+        {
+            output.AppendLine("contract-binding: " + contracts.Failure);
+            foreach (var clause in contracts.Clauses)
+            {
+                output.AppendLine(CultureInfo.InvariantCulture,
+                    $"contract: {clause.Kind} safety={printer.Print(clause.SafeCondition)} value={printer.Print(clause.Value)}");
+                RememberTerm(clause.SafeCondition);
+                RememberTerm(clause.Value);
+            }
+        }
         foreach (var binding in result.Variables.OrderBy(binding => binding.Variable.Value))
         {
             output.AppendLine(CultureInfo.InvariantCulture, $"variable: {Variable(binding.Variable)} source={binding.Symbol.Name}");
@@ -44,7 +87,9 @@ public sealed class GoldenLoweringTests
             output.AppendLine(CultureInfo.InvariantCulture, $"block: {block.Id} {(block.Name is { } name ? factory.GetString(name) : "unnamed")}");
             foreach (var instruction in block.Instructions)
             {
-                output.AppendLine(CultureInfo.InvariantCulture, $"  {instruction.Id} {instruction.Operation} {Format(instruction)}");
+                var span = factory.GetOperationInfo(instruction.Operation).SourceSpan;
+                var source = total ? span == null ? " source=none" : $" source={span.Document}:{span.Start}+{span.Length}" : "";
+                output.AppendLine(CultureInfo.InvariantCulture, $"  {instruction.Id} {instruction.Operation} {Format(instruction)}{source}");
                 RememberInstruction(instruction);
             }
         }

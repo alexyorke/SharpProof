@@ -148,11 +148,11 @@ internal static class Program
             try
             {
                 await PublishOutputsAsync(arguments, request, artifact, artifactBytes, expectedInputHash,
-                    expectedVersions, validatedResponse!).ConfigureAwait(false);
+                    expectedVersions, validatedResponse!, cancellation.Token).ConfigureAwait(false);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
-                    UnauthorizedAccessException or ArgumentException)
+                    UnauthorizedAccessException or ArgumentException or OperationCanceledException)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
@@ -438,18 +438,31 @@ internal static class Program
         Console.Out.WriteLine(diagnostic);
     }
 
-    // Each member is written atomically; the result is written last so a
-    // reader that sees the new result also sees the matching inputs.
+    // Cooperating publishers/invalidation hold all stable member leases. The
+    // MSBuild task privately prepares this set and promotes it under the same
+    // leases through invocation validation.
     private static async Task PublishOutputsAsync(
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
-        WorkerVerifyResponse response)
+        WorkerVerifyResponse response, CancellationToken cancellationToken)
     {
         if (arguments.PublishRequestPath == null)
         {
             return;
         }
+        var members = PublicationLease.ValidateMembers(
+            new[] { arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath }
+                .Where(path => path != null)!);
+        if (members.Intersect(new[] { arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath }
+            .Select(PublicationLease.CanonicalMember), StringComparer.Ordinal).Any())
+        {
+            throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
+        }
+        using var publicationDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        publicationDeadline.CancelAfter(TimeSpan.FromMilliseconds(
+            (long)request.Budgets.ProjectWallTimeMilliseconds + arguments.TerminationGraceMilliseconds + PublicationLease.TimeoutMilliseconds));
+        using var lease = await PublicationLease.AcquireAsync(members, publicationDeadline.Token).ConfigureAwait(false);
 
         request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
         response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
@@ -462,10 +475,10 @@ internal static class Program
         }
 
         await AtomicFile.WriteBytesAsync(
-            arguments.PublishCompilerManifestPath!, artifactBytes).ConfigureAwait(false);
+            arguments.PublishCompilerManifestPath!, artifactBytes, publicationDeadline.Token).ConfigureAwait(false);
         await AtomicFile.WriteUtf8Async(
             arguments.PublishRequestPath,
-            WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
+            WorkerProtocolJson.SerializeRequest(request), publicationDeadline.Token).ConfigureAwait(false);
         if (arguments.PublishSarifPath != null)
         {
             await AtomicFile.WriteUtf8Async(
@@ -473,11 +486,11 @@ internal static class Program
                 SarifProjection.Serialize(
                     request,
                     response,
-                    artifact.Compilation.ProjectDirectory)).ConfigureAwait(false);
+                    artifact.Compilation.ProjectDirectory), publicationDeadline.Token).ConfigureAwait(false);
         }
         await AtomicFile.WriteUtf8Async(
             arguments.PublishResultPath!,
-            WorkerProtocolJson.SerializeCanonicalResponse(response)).ConfigureAwait(false);
+            WorkerProtocolJson.SerializeCanonicalResponse(response), publicationDeadline.Token).ConfigureAwait(false);
     }
 
     private static Task WriteLauncherFailureAsync(
@@ -668,6 +681,12 @@ internal sealed partial class LauncherArguments
 
     internal void ValidateDistinctPaths(string? cacheDirectory = null)
     {
+        var outputs = new string?[]
+        {
+            RequestPath, ResultPath, PublishRequestPath, PublishResultPath, PublishCompilerManifestPath, PublishSarifPath
+        }.OfType<string>().ToArray();
+        PublicationPaths.ValidateWorkerRuntime(outputs, typeof(Program).Assembly.Location);
+        PublicationPaths.ValidateWorkerRuntime(outputs, OptionalFullPath("worker"));
         if (Directory.Exists(ResultPath))
         {
             throw new ArgumentException(

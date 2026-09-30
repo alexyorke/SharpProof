@@ -137,10 +137,16 @@
           "SharpProof.Contracts/ContractBinder.cs",
           "SharpProof.Contracts/ContractCanonicalization.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
+          "SharpProof.Contracts/TotalContractExpressionBinder.cs",
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",
           "SharpProof.Contracts/ContractApiSymbols.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
+          "SharpProof.Frontend/TotalLoweringContext.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Operations.cs",
+          "SharpProof.Frontend/RoslynTotalExpressionLowerer.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.cs",
           "SharpProof.Frontend/OperationSupportCatalog.cs"
         ]
       },
@@ -465,12 +471,17 @@
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
           "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
+          "SharpProof.BuildTasks/VerificationPublication.cs",
+          "SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
           "SharpProof.Host/ContainerNativeLibrary.cs",
+          "SharpProof.Host/PublicationLease.cs",
+          "SharpProof.Host/PublicationFile.cs",
+          "SharpProof.Host/PublicationPaths.cs",
           "SharpProof.Worker/Launcher/LauncherProgram.cs"
         ],
-        "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
+        "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, canonical publication member leases, invocation validation, and cooperating invalidation."
       },
       {
         "name": "portableShippingBoundary",

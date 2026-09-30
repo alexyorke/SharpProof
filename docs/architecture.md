@@ -203,8 +203,15 @@ one native solver per callable. Each query activates its own assumption subset
 and negated goal; models contain only that query's requested variables. It
 shares native scheduling and resource accounting with the legacy backend, while
 active cancellation or recognized infrastructure failure retires only the
-candidate session. Worker routing, typed frontend guards, and passive VC
-generation are still pending.
+candidate session. An explicit candidate frontend shares typed scalar operation
+rules between body evaluation and guarded clauses. Body operands are captured
+in source order; local fault guards lead to Throw/ExceptionalExit. Clauses keep
+safety separate from value, including through Old and lazy expressions. A shared
+context gives entry inputs, mutable parameter storage, Old snapshots, and Result
+distinct identities. Validated specification calls are omitted from runtime
+body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
+calls, regions, cycles, and checked binary arithmetic currently abstain. Worker
+routing and passive VC generation are still pending.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.
@@ -244,8 +251,16 @@ does not change the semantic cache payload.
 RunVerifier starts one worker process with a hard deadline and kills its process
 tree on timeout or cancellation. The worker's project budget includes launcher
 artifact preparation and uses elapsed-time checks as well as cancellation.
-Validated manifest, request, optional SARIF, and result are published atomically,
-with the result written last. Docker owns CPU and memory isolation.
+The child prepares manifest, request, optional SARIF, and result in its private
+invocation directory. RunVerifier holds sorted leases for the canonical stable
+members through promotion and validation against that private invocation. Each
+file is replaced atomically, with the result written last. Standalone launcher
+publication, invalidation, and reset use the same leases. Their lock sidecars stay
+in place to keep cooperating owners on the same lock. Before rewriting child
+destinations, publishers reject outputs inside the declared worker runtime,
+including existing leaf symlinks into it. Invalidation uses the same path check.
+Input and publication failures retain the launcher's exit codes and messages.
+Docker owns CPU and memory isolation.
 
 ## Activation and release gates
 

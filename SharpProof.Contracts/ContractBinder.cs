@@ -1,6 +1,6 @@
 namespace SharpProof.Contracts;
 
-public sealed class ContractBinder
+public sealed partial class ContractBinder
 {
     private const int MaximumDiagnosticConditionLength = 512;
 
