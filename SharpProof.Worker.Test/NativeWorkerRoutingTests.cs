@@ -10,6 +10,28 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase("value", WorkerClaimOutcome.Proven)]
+    [TestCase("0", WorkerClaimOutcome.Refuted)]
+    public async Task NativeWorkerUsesCompanionClausesWithTheOriginalTargetBody(string returned, WorkerClaimOutcome outcome)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject { public static int Target(int value) { return {{returned}}; } }
+            [ContractFor(typeof(Subject))] public static class SubjectContracts {
+                public static int Target(int contractValue) {
+                    Contract.Requires(contractValue > 0);
+                    Contract.Ensures(Contract.Result<int>() == Contract.Old(contractValue));
+                    return contractValue;
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome));
+        Assert.That(response.Manifest.Claims.Single().Evidence, Is.EqualTo(WorkerClaimEvidence.CompanionClause));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
     [TestCase("int", "Positive", "1", WorkerClaimOutcome.Proven)]
     [TestCase("int", "Positive", "0", WorkerClaimOutcome.Refuted)]
     [TestCase("ulong", "Positive", "18446744073709551615UL", WorkerClaimOutcome.Proven)]

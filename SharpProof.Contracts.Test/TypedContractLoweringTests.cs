@@ -390,7 +390,7 @@ public sealed class TypedContractLoweringTests
     }
 
     [Test]
-    public void CompanionContractsAbstainWithoutBorrowingTheCompanionBody()
+    public void CompanionContractsBindWithoutBorrowingTheCompanionBody()
     {
         var subject = Subject.Create("""
             using SharpProof.Attributes;
@@ -406,8 +406,9 @@ public sealed class TypedContractLoweringTests
         Assert.That(legacy.IsSuccess, Is.True, legacy.Failure.ToString());
         Assert.That(legacy.Contracts!.UsesCompanion, Is.True);
         var binding = new ContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
-        Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
-        Assert.That(binding.Clauses, Is.Empty);
+        Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.None));
+        Assert.That(binding.Clauses, Has.Length.EqualTo(1));
+        Assert.That(binding.Clauses.Single().Evidence, Is.EqualTo(BoundContractEvidence.Companion));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(5));

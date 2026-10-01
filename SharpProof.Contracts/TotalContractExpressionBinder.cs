@@ -37,7 +37,7 @@ public sealed class TotalContractBindingResult
 public sealed partial class ContractBinder
 {
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
-    // authoritative; companion typing is not enabled here.
+    // authoritative while the native worker route is qualified.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
     { return BindTotalCore(context, implementationBody, requiresOnly: false); }
 
@@ -59,16 +59,32 @@ public sealed partial class ContractBinder
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
-        if (resolution.UsesCompanion || resolution.Inventory.ImplementationBody == null ||
-            !context.OwnsBody(resolution.Inventory.ImplementationBody))
+        var clauseContext = resolution.UsesCompanion ? context.CreateFrame(resolution.Source) : context;
+        if (!clauseContext.HasScalarSignature || resolution.Inventory.ImplementationBody == null ||
+            !clauseContext.OwnsBody(resolution.Inventory.ImplementationBody) ||
+            clauseContext.Parameters.Length != context.Parameters.Length)
         {
             return Fail(ContractBindingFailure.UnsupportedTarget);
         }
-        var intrinsicFailure = ValidateIntrinsics(context.Target, resolution.Inventory.ImplementationBody, requiresOnly);
+        var replacements = new Dictionary<IrVarId, IrTerm>();
+        if (resolution.UsesCompanion)
+        {
+            for (var index = 0; index < context.Parameters.Length; index++)
+            {
+                var source = clauseContext.Parameters[index];
+                var target = context.Parameters[index];
+                if (_factory.GetVariableInfo(source.Entry).Type != _factory.GetVariableInfo(target.Entry).Type)
+                { return Fail(ContractBindingFailure.UnsupportedExpression); }
+                replacements.Add(source.Entry, _factory.Variable(target.Entry));
+                replacements.Add(source.Current, _factory.Variable(target.Current));
+                replacements.Add(source.PreState, _factory.Variable(target.PreState));
+            }
+        }
+        var intrinsicFailure = ValidateIntrinsics(resolution.Source, resolution.Inventory.ImplementationBody, requiresOnly);
         if (intrinsicFailure != ContractBindingFailure.None)
         { return Fail(intrinsicFailure); }
         RoslynTotalExpressionLowerer lowerer = null!;
-        lowerer = new(context)
+        lowerer = new(clauseContext)
         {
             Intrinsic = (invocation, state) => _api.IsResult(invocation.TargetMethod)
                 ? context.Result is { } result
@@ -88,6 +104,11 @@ public sealed partial class ContractBinder
             var invocation = occurrence.Invocation;
             var state = occurrence.Kind == BoundContractKind.Requires ? TotalParameterState.Entry : TotalParameterState.Current;
             var expression = lowerer.LowerClause(invocation.Arguments[0].Value, state);
+            if (resolution.UsesCompanion && expression.Classification.IsExact)
+            {
+                expression = new GuardedExpression(IrSubstitution.Substitute(_factory, expression.Value, replacements),
+                    IrSubstitution.Substitute(_factory, expression.SafeCondition, replacements), expression.Classification);
+            }
             if (!expression.Classification.IsExact ||
                 IrTraversal.CollectVariables(expression.Value).Any(variable => !allowed.Contains(variable)) ||
                 IrTraversal.CollectVariables(expression.SafeCondition).Any(variable => !allowed.Contains(variable)))
@@ -96,7 +117,8 @@ public sealed partial class ContractBinder
             }
             if (expression.Value.Type != _factory.BooleanType)
             { return Fail(ContractBindingFailure.NonBooleanCondition); }
-            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax)));
+            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
+                resolution.UsesCompanion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation));
         }
         var attributeFailure = BindTotalAttributes(context, requiresOnly, clauses);
         if (attributeFailure != ContractBindingFailure.None)
