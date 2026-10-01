@@ -42,7 +42,7 @@ internal sealed record TotalProgramFuzzResult(TotalProgramFuzzCoverage Coverage,
 // observe the same generated body. This trusted source adapter is tooling-only.
 internal static class TotalProgramDifferentialOracle
 {
-    private static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
+    internal static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
 
     internal static async Task<TotalProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken = default)
     {
@@ -205,7 +205,7 @@ internal static class TotalProgramDifferentialOracle
         return ($"public static bool Target{name}(object x, object y) {{ return x == y; }}", [shared, same ? shared : new object()], 1 << 12);
     }
 
-    private static object Input(string type, long number, int ordinal)
+    internal static object Input(string type, long number, int ordinal)
     {
         var edge = ordinal / Types.Length % 3 == 0;
         var minimum = (ordinal / Types.Length % 12) is 3 or 6;
@@ -225,7 +225,7 @@ internal static class TotalProgramDifferentialOracle
         };
     }
 
-    private static IrValue Value(IrFactory factory, IrTypeId type, object? value, Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
+    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
     {
         if (value == null)
         { return factory.CreateNullValue(type); }
@@ -273,12 +273,12 @@ internal static class TotalProgramDifferentialOracle
         return observed;
     }
 
-    private static IrTerm Term(IrFactory factory, IrValue value)
+    internal static IrTerm Term(IrFactory factory, IrValue value)
     {
         return value.Kind == IrValueKind.Boolean ? factory.Boolean(value.Boolean) : factory.IntegerBits(value.Type, value.IntegerBits);
     }
 
-    private static bool Equal(IrValue left, IrValue right)
+    internal static bool Equal(IrValue left, IrValue right)
     {
         return left.Kind == right.Kind && left.Type == right.Type &&
             (left.Kind == IrValueKind.Boolean ? left.Boolean == right.Boolean : left.IntegerBits == right.IntegerBits);

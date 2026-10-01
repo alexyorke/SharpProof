@@ -27,6 +27,8 @@ public sealed class ProjectDagTests
             ["SharpProof.Effects"] = ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"],
             ["SharpProof.Frontend"] = ["SharpProof.Attributes", "SharpProof.Ir"],
             ["SharpProof.Fuzz"] = [
+                "SharpProof.Attributes",
+                "SharpProof.CompilerCollector",
                 "SharpProof.Frontend",
                 "SharpProof.Host",
                 "SharpProof.Smt",

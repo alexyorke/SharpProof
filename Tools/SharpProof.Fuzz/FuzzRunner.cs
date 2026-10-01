@@ -93,11 +93,12 @@ public sealed record FuzzSummary(
     int PartialSmtAgreements,
     FrontendFuzzCoverage FrontendCoverage,
     TotalProgramFuzzCoverage TotalProgramCoverage,
+    MetadataProgramFuzzCoverage MetadataProgramCoverage,
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
-        SchemaVersion == 6 &&
+        SchemaVersion == 7 &&
         Cases > 0 &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
@@ -109,9 +110,11 @@ public sealed record FuzzSummary(
         TotalProgramCoverage.HasValidCounts &&
         TotalProgramCoverage.Cases == Cases &&
         TotalProgramCoverage.Agreements == Cases &&
+        MetadataProgramCoverage != null && MetadataProgramCoverage.HasValidCounts &&
+        MetadataProgramCoverage.Cases == Cases && MetadataProgramCoverage.Agreements == Cases &&
         CoverageSatisfied &&
         (Cases < FuzzOptions.DefaultCases ||
-         (FrontendCoverage.HasExpandedCategories && TotalProgramCoverage.HasExpandedCategories)) &&
+         (FrontendCoverage.HasExpandedCategories && TotalProgramCoverage.HasExpandedCategories && MetadataProgramCoverage.HasExpandedCategories)) &&
         Abstentions == 0 &&
         Agreements == Cases &&
         FrontendAgreements == Cases &&
@@ -359,8 +362,11 @@ public static class FuzzRunner
         var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
         failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
         coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
+        var metadataPrograms = await MetadataProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken: cancellationToken);
+        failures.AddRange(metadataPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
+        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || metadataPrograms.Coverage.HasExpandedCategories;
         return new FuzzSummary(
-            SchemaVersion: 6,
+            SchemaVersion: 7,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,
@@ -371,6 +377,7 @@ public static class FuzzRunner
             partialSmtAgreements,
             frontendCoverage,
             totalPrograms.Coverage,
+            metadataPrograms.Coverage,
             coverageSatisfied,
             [.. failures]);
     }

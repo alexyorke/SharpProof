@@ -13,15 +13,26 @@ public sealed class FuzzResultValidationTests
     {
         TestRepository.RequireCanonicalContainer();
         using var temporaryDirectory = new TempDirectory("SharpProof.FuzzValidation.");
-        var summary = new FuzzSummary(6, 1000, 23063, 4, 1000, 0, 1000, 1000, 1000,
+        var summary = new FuzzSummary(7, 1000, 23063, 4, 1000, 0, 1000, 1000, 1000,
             new(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40), true, []);
+            new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40), new(1000, 1000, 1000, 1000, 1023, 127), true, []);
         var valid = JsonSerializer.Serialize(summary);
         await File.WriteAllTextAsync(Path.Combine(temporaryDirectory.FullName, "valid.json"), valid);
         Action<JsonObject>[] mutations =
         [
             root => root["SchemaVersion"] = 4,
             root => root["SchemaVersion"] = 5,
+            root => root["SchemaVersion"] = 6,
+            root => root.Remove("MetadataProgramCoverage"),
+            root => root["MetadataProgramCoverage"] = null,
+            root => root["MetadataProgramCoverage"]!["Cases"] = 999,
+            root => root["MetadataProgramCoverage"]!["Agreements"] = 999,
+            root => root["MetadataProgramCoverage"]!["NativeProofs"] = 999,
+            root => root["MetadataProgramCoverage"]!["NativeRefutations"] = 999,
+            root => root["MetadataProgramCoverage"]!["TypeMask"] = 1022,
+            root => root["MetadataProgramCoverage"]!["RecipeMask"] = 63,
+            root => root["MetadataProgramCoverage"]!["Cases"] = "1000",
+            root => root["MetadataProgramCoverage"]!["Unknown"] = 1,
             root => root.Remove("TotalProgramCoverage"),
             root => root["TotalProgramCoverage"] = null,
             root => root["TotalProgramCoverage"]!["Agreements"] = 999,
@@ -54,6 +65,7 @@ public sealed class FuzzResultValidationTests
             $arguments = @{ ExpectedCases = 1000; ExpectedSeed = 23063; ExpectedMaximumParallelism = 4 }
             $valid = Assert-SharpProofFuzzRunnerResult -Path (Join-Path $Inputs 'valid.json') @arguments
             if ($valid.TotalProgramCoverage.Agreements -ne 1000) { throw 'Validated Total coverage was lost.' }
+            if ($valid.MetadataProgramCoverage.Agreements -ne 1000) { throw 'Validated metadata coverage was lost.' }
             $rejected = 0
             foreach ($file in Get-ChildItem -LiteralPath $Inputs -Filter 'invalid*.json') {
                 try {

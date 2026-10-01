@@ -110,7 +110,7 @@ function Assert-SharpProofFuzzRunnerResult {
                 'SchemaVersion', 'Cases', 'Seed', 'MaximumParallelism',
                 'Agreements', 'Abstentions', 'FrontendAgreements',
                 'SmtAgreements', 'PartialSmtAgreements', 'FrontendCoverage',
-                'TotalProgramCoverage', 'CoverageSatisfied', 'Failures', 'Passed')
+                'TotalProgramCoverage', 'MetadataProgramCoverage', 'CoverageSatisfied', 'Failures', 'Passed')
 
         $schema = Get-ExactJsonInt32 $root 'SchemaVersion'
         $cases = Get-ExactJsonInt32 $root 'Cases'
@@ -125,7 +125,7 @@ function Assert-SharpProofFuzzRunnerResult {
         $coverageSatisfied = Get-ExactJsonBoolean $root 'CoverageSatisfied'
         $passed = Get-ExactJsonBoolean $root 'Passed'
 
-        if ($schema -ne 6) { throw "Unsupported fuzz schema '$schema'." }
+        if ($schema -ne 7) { throw "Unsupported fuzz schema '$schema'." }
         if ($cases -lt 1) {
             throw 'The fuzz runner case count must be positive.'
         }
@@ -215,6 +215,26 @@ function Assert-SharpProofFuzzRunnerResult {
             throw 'Total program coverage does not form a complete agreement partition.'
         }
 
+        $metadataCoverage = $root.GetProperty('MetadataProgramCoverage')
+        $metadataProperties = @('Cases', 'Agreements', 'NativeProofs', 'NativeRefutations', 'TypeMask', 'RecipeMask')
+        if ($metadataCoverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'Metadata program coverage must be a JSON object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($metadataCoverage.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -Description 'Metadata program coverage' -RejectDuplicates -Expected $metadataProperties
+        $metadataValues = [ordered]@{}
+        foreach ($name in $metadataProperties) {
+            $metadataValues[$name] = Get-ExactJsonInt32 $metadataCoverage $name
+        }
+        if ($metadataValues.Cases -ne $cases -or $metadataValues.Agreements -ne $cases -or
+            $metadataValues.NativeProofs -ne $cases -or $metadataValues.NativeRefutations -ne $cases -or
+            $metadataValues.TypeMask -lt 1 -or $metadataValues.TypeMask -gt 1023 -or
+            $metadataValues.RecipeMask -lt 1 -or $metadataValues.RecipeMask -gt 127 -or
+            ($cases -ge 1000 -and ($metadataValues.TypeMask -ne 1023 -or $metadataValues.RecipeMask -ne 127))) {
+            throw 'Metadata program coverage does not form complete native agreement evidence.'
+        }
+
         $failures = $root.GetProperty('Failures')
         if ($failures.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
             throw 'Fuzz failures must be a non-null JSON array.'
@@ -256,6 +276,7 @@ function Assert-SharpProofFuzzRunnerResult {
             PartialSmtAgreements = $partialSmtAgreements
             FrontendCoverage = [pscustomobject]$coverageValues
             TotalProgramCoverage = [pscustomobject]$totalValues
+            MetadataProgramCoverage = [pscustomobject]$metadataValues
             CoverageSatisfied = $coverageSatisfied
             Failures = [object[]]@()
             Passed = $passed

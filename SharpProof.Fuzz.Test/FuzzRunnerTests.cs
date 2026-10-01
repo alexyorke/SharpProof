@@ -87,7 +87,7 @@ public sealed class FuzzRunnerTests
         var second = await FuzzRunner.RunAsync(options);
 
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(6));
+        Assert.That(first.SchemaVersion, Is.EqualTo(7));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
@@ -169,6 +169,7 @@ public sealed class FuzzRunnerTests
             Is.EqualTo(serial.PartialSmtAgreements));
         Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
         Assert.That(parallel.TotalProgramCoverage, Is.EqualTo(serial.TotalProgramCoverage));
+        Assert.That(parallel.MetadataProgramCoverage, Is.EqualTo(serial.MetadataProgramCoverage));
     }
 
     [Test]
@@ -177,7 +178,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 6,
+            SchemaVersion: 7,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -188,6 +189,7 @@ public sealed class FuzzRunnerTests
             PartialSmtAgreements: 1,
             FrontendCoverage: coverage,
             TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -204,7 +206,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 6,
+            SchemaVersion: 7,
             Cases: cases,
             Seed: 7,
             MaximumParallelism: maximumParallelism,
@@ -215,6 +217,7 @@ public sealed class FuzzRunnerTests
             PartialSmtAgreements: cases,
             FrontendCoverage: coverage,
             TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -235,7 +238,7 @@ public sealed class FuzzRunnerTests
             OverflowExceptions = 1
         };
         var valid = new FuzzSummary(
-            SchemaVersion: 6,
+            SchemaVersion: 7,
             Cases: FuzzOptions.DefaultCases,
             Seed: 7,
             MaximumParallelism: 1,
@@ -246,12 +249,19 @@ public sealed class FuzzRunnerTests
             PartialSmtAgreements: FuzzOptions.DefaultCases,
             FrontendCoverage: complete,
             TotalProgramCoverage: new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40),
+            MetadataProgramCoverage: new(1000, 1000, 1000, 1000, 1023, 127),
             CoverageSatisfied: true,
             Failures: []);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(valid.Passed, Is.True);
+            Assert.That((valid with { MetadataProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeRefutations = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { TypeMask = 1022 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { RecipeMask = 63 } }).Passed, Is.False);
             Assert.That((valid with { TotalProgramCoverage = null! }).Passed, Is.False);
             Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
             Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);

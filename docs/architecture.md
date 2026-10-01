@@ -274,7 +274,7 @@ An oversized witness abstains without restricting the proof input domain.
 These source controls do not qualify reference implementation IL or complete
 the Phase 2 exit.
 
-The fuzz campaign's schema 6 result separately accounts for generated Total
+The fuzz campaign's schema 7 result separately accounts for generated Total
 programs. Each case compares compiled execution with the original Total IR
 interpreter and checks a true and false postcondition through the native
 callable solver and owned replay. Cases cover scalar wrapping and checked
@@ -288,8 +288,17 @@ modeled normal return. The campaign requires all cases to agree, and runs of
 at least 1,000 cases require every body category and all thirteen input types.
 The fuzz executable references Worker to exercise its callable solver through
 a trusted source tooling adapter; Worker still has no compiler-facing dependency.
-This bounded source-body generator does not qualify metadata IL, native-width
-index conversions, heap writes or the remaining Phase 2 exit conditions.
+The separate metadata-program oracle compiles scalar implementation images,
+captures them through the real collector, round-trips the artifact, and compares
+compiled caller execution with original IR and native true/false goals.
+Its coverage requires every case to agree; runs of at least 1,000 cases require
+all ten scalar types and seven recipes: wrapping addition, checked subtraction,
+multiplication, branches, same-module dependencies, division and remainder.
+Source caller handlers catch modeled arithmetic faults. The tooling executable
+references the collector and attributes for this adapter; the worker remains
+compiler-neutral. These generators do not qualify reference implementation IL,
+IL exception regions, native-width index conversions, heap writes or the
+remaining Phase 2 exit conditions.
 
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and
