@@ -7,6 +7,11 @@ internal static partial class CSharpOperationSemantics
         return Exact(factory.EmptyArray(type));
     }
 
+    internal static TotalScalarRule StringConcat(IrFactory factory, IrTerm left, IrTerm right)
+    {
+        return Exact(factory.RewriteBinary(IrBinaryOperator.StringConcat, left, right));
+    }
+
     internal static bool IsReferenceDomain(ITypeSymbol? type)
     {
         return type?.SpecialType is SpecialType.System_Object or SpecialType.System_String ||

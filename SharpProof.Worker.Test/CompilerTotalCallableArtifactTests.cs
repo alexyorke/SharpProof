@@ -10,6 +10,26 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    [Test]
+    public void NativeStringArtifactRejectsNonCanonicalComparisonMutation()
+    {
+        var artifact = CreateArtifact("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static string Target(string left, string right) {
+                    Contract.Ensures(Contract.Result<string>() != null);
+                    return string.Concat(left, right);
+                }
+            }
+            """);
+        var graph = artifact.Callables.Single().Total!.Graph;
+        var comparison = graph.Terms.Single(term => term.Kind == IrTermKind.Binary &&
+            (IrBinaryOperator)term.A == IrBinaryOperator.NotEqual);
+        comparison.C = comparison.B;
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
     private const string EmptyArraySource = """
         using System;
         using SharpProof.Attributes;

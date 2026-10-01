@@ -16,6 +16,46 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ScalarDifferentialMatrixTests
 {
+    [TestCase(null, null)]
+    [TestCase(null, "")]
+    [TestCase("", "")]
+    [TestCase("left", null)]
+    [TestCase(null, "right")]
+    [TestCase("left", "right")]
+    [TestCase("a\0b", "\ud83d\ude00")]
+    public void StringConcatAgreesWithCompiledRuntime(string? left, string? right)
+    {
+        using var project = DifferentialProject.Create("""
+            #nullable enable
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                [return: NotNull]
+                public static string Target(string? left, string? right) { return string.Concat(left, right); }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var factory = total.Program.Factory;
+        var values = new[] { left, right };
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.Select((parameter, ordinal) => (parameter.Entry, Value: values[ordinal] is { } text
+                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type)))
+                .ToDictionary(item => item.Entry, item => item.Value));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(execution.ReturnValue!.Kind, Is.EqualTo(IrValueKind.String));
+        var runtimeValue = (string)method.Invoke(null, [left, right])!;
+        Assert.That(execution.ReturnValue.String, Is.EqualTo(runtimeValue));
+        Assert.That(ReferenceEquals(execution.ReturnValue.String, left), Is.EqualTo(ReferenceEquals(runtimeValue, left)));
+        Assert.That(ReferenceEquals(execution.ReturnValue.String, right), Is.EqualTo(ReferenceEquals(runtimeValue, right)));
+        if (runtimeValue.Length == 0)
+        { Assert.That(runtimeValue, Is.SameAs(string.Empty)); }
+    }
+
     [TestCase("sbyte")]
     [TestCase("byte")]
     [TestCase("short")]

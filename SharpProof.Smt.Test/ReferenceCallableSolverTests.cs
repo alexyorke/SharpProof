@@ -7,6 +7,36 @@ namespace SharpProof.Smt.Test;
 [TestFixture]
 public sealed class ReferenceCallableSolverTests
 {
+    [TestCase("")]
+    [TestCase("text")]
+    [TestCase("a\0b")]
+    public async Task StringLiteralAliasesDecodeWithExactContents(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var input = factory.CreateVariable("input", factory.StringType);
+        var literal = factory.String(text);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, [Assume(factory, Equal(factory, factory.Variable(input), literal))],
+            factory.Boolean(false), [input]);
+        var result = await session.CheckAsync(query, CancellationToken.None);
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That(result.Model!.Assignments[input].String, Is.SameAs(factory.GetString(literal.Value)));
+        AssertAssumptions(factory, query, result.Model.Assignments);
+        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        var length = Query(factory, [], Equal(factory, factory.Length(literal), factory.Integer(text.Length)), []);
+        Assert.That((await session.CheckAsync(length, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+    }
+
+    [Test]
+    public async Task DifferentStringLiteralsCannotShareAnIdentity()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, [], factory.Binary(IrBinaryOperator.NotEqual, factory.String("left"), factory.String("same")), []);
+        Assert.That((await session.CheckAsync(query, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+    }
+
     [Test]
     public async Task EmptyArrayAliasesDecodeToTheSameConcreteValue()
     {
@@ -45,8 +75,8 @@ public sealed class ReferenceCallableSolverTests
         var result = await session.CheckAsync(query, CancellationToken.None);
         if (!alias && length == 0)
         {
-            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
-            Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+            Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<ProvenOutcome>());
             return;
         }
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));

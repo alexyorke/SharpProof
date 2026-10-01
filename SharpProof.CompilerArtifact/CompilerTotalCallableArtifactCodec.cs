@@ -90,13 +90,13 @@ internal static class CompilerTotalCallableArtifactCodec
         foreach (var term in artifact.Graph.Terms)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
+            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.String or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
                 IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast && SupportedType(artifact.Graph, term.Type) &&
                 (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
                 (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
-                    (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual),
+                    (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat),
                 "The Total graph contains unsupported term evidence.");
         }
         var identities = new HashSet<IrVarId>();

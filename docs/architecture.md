@@ -404,7 +404,17 @@ element type. It uses the approved compiler-resolved framework symbol and an
 exact typed empty-array term with non-nullness, zero length and cached identity.
 SMT encoding supplies those intrinsic facts, and decoded aliases replay as the
 same concrete empty array. Compiled C# runtime comparisons and artifact
-round-trip validation cover the model. String concatenation remains a gap. Existing
+round-trip validation cover the model. Native two-string concatenation also uses
+the approved framework symbol and preserves argument order and faults. String
+literals retain non-nullness, exact UTF-16 length and canonical empty identity.
+Concatenation retains empty-operand aliases and non-nullness; two nonempty operands
+have no content or input-related length facts in SMT. The VC builder forwards
+concatenation value expressions for nullness and length observations instead of
+requiring SAT replay to reproduce a fresh allocation's identity. String content
+comparisons remain unsupported at binding. VC admission also rejects non-null
+string identity comparisons in callables that concatenate strings; existing
+metadata identity transfers without concatenation retain their support.
+Runtime comparisons cover nullable, empty and nonempty operands and aliases. Existing
 proof expectations remain requirements for the transition; they have not been
 weakened to accommodate these gaps. Typed scalar improvements also change several
 legacy outcome and proof-core expectations and require separate review.
@@ -432,7 +442,7 @@ Native contract binding includes parameter and return `Positive`, `InRange`, and
 supported reference `NotNull` attributes. Numeric predicates use the value's
 signedness and width, including `ulong`; bounds outside the scalar domain fold
 to Boolean comparisons rather than wrapping. Attribute source spans and manifest
-evidence remain bound through the version 27 compiler artifact. Direct clauses
+evidence remain bound through the version 28 compiler artifact. Direct clauses
 precede return attributes, and parameter attributes use immutable entry values.
 Companion clauses bind in a separate clause context and substitute
 parameters by ordinal into the target's entry, current, and Old identities.

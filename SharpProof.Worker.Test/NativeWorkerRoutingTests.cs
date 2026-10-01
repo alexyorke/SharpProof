@@ -10,6 +10,79 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase("Contract.Result<string>() != null", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<string>() == null", WorkerClaimOutcome.Refuted)]
+    public async Task NativeConcatModelsItsNonNullResult(string predicate, WorkerClaimOutcome expected)
+    {
+        using var project = new ShadowTestProject($$"""
+            #nullable enable
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static string Target(string? left, string? right) {
+                    Contract.Ensures({{predicate}});
+                    return string.Concat(left, right);
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected), response.ClaimResults.Single().Reason.ToString());
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task NativeConcatPreservesPartialArgumentNormalCompletion()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static string Target(long divisor) {
+                    Contract.Ensures(divisor != 0);
+                    return string.Concat(1L / divisor == 0 ? "" : "value", "");
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().Reason.ToString());
+        Assert.That(response.ClaimResults.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+    }
+
+    [Test]
+    public async Task NativeStringContentEqualityRemainsUnsupported()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static string Target(string value) {
+                    Contract.Ensures(Contract.Result<string>() == "value");
+                    return string.Concat(value, "");
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task NativeConcatEvaluatesNamedArgumentsInSourceOrder()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static string Target([InRange(0, 0)] int value) {
+                    Contract.Ensures(value == 1);
+                    return string.Concat(str1: ++value == 1 ? "left" : "", str0: value == 1 ? "right" : "");
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().Reason.ToString());
+    }
+
+
     [TestCase("sbyte")]
     [TestCase("byte")]
     [TestCase("short")]

@@ -113,7 +113,10 @@ internal static class CompilerTotalCallableLowerer
                     CSharpOperationSemantics.IsReferenceDomain(method.ReturnType)
                     ? new TotalScalarCallModel(0, _ => CSharpOperationSemantics.ArrayEmpty(context.Factory,
                         new RoslynTypeMapper(context.Factory).GetTypeId(method.ReturnType)))
-                    : specificationPacks.ResolveTotal(method));
+                    : apiSpecs.TryGet(method, out spec) &&
+                        spec.Template.Target.DocumentationCommentId == "M:System.String.Concat(System.String,System.String)"
+                        ? new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(context.Factory, arguments[0], arguments[1]))
+                        : specificationPacks.ResolveTotal(method));
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;

@@ -22,6 +22,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
     private int _fresh;
+    private bool _hasStringConcat;
     private readonly CancellationToken _cancellationToken;
     private int _remainingWork = MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
     internal PassiveCallableCandidate Candidate => _candidate;
@@ -75,6 +76,17 @@ internal sealed class PassiveCallableVcBuilder
         var program = _program;
         if (program.Blocks.Length > MaximumSteps)
         { throw new ConstructionLimitException(); }
+        _hasStringConcat = _candidate.Requires.Concat(_candidate.Ensures)
+            .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
+            program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+                HasStringConcat(instruction switch
+                {
+                    IrAssignInstruction assign => assign.Value,
+                    IrBranchInstruction branch => branch.Condition,
+                    IrAssumeInstruction assume => assume.Condition,
+                    IrReturnInstruction returned => returned.Value,
+                    _ => null
+                }));
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None ||
             _candidate.Result is { } result && !Scalar(_factory.GetVariableInfo(result).Type) ||
@@ -142,6 +154,16 @@ internal sealed class PassiveCallableVcBuilder
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
                             !TryRewrite(assign.Value, state, out var value))
                         { return null; }
+                        if (value.Type == _factory.StringType && IrTraversal.Any(value,
+                                term => term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }))
+                        {
+                            // This domain observes strings through nullness and
+                            // length, not allocation identity. Preserve the value
+                            // expression instead of asking SAT replay to reproduce
+                            // a freshly allocated SSA reference.
+                            state[assign.Target] = value;
+                            break;
+                        }
                         var assigned = Fresh(_factory.GetVariableInfo(assign.Target).Type);
                         if (!Scalar(assigned.Type))
                         { return null; }
@@ -311,11 +333,22 @@ internal sealed class PassiveCallableVcBuilder
         return !IrTraversal.Any(root, term =>
         {
             Spend();
-            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
+            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer ||
                 term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&
-                    binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual);
+                    (binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat) ||
+                        _hasStringConcat && binary.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual &&
+                            binary.Left is not IrNullTerm && binary.Right is not IrNullTerm);
+        });
+    }
+    private bool HasStringConcat(IrTerm? root)
+    {
+        Spend();
+        return root != null && IrTraversal.Any(root, term =>
+        {
+            Spend();
+            return term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat };
         });
     }
     private void Spend(int amount = 1)

@@ -335,7 +335,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             if (operation is not IPropertyReferenceOperation property || !CSharpOperationSemantics.IsLength(property))
             { return FrontendAbstention.UnsupportedOperationKind; }
         }
-        if (operation.ConstantValue.HasValue && operation.ConstantValue.Value is string)
+        if (operation.ConstantValue is { HasValue: true, Value: string text } && !Utf16WellFormedness.IsWellFormed(text))
         { return FrontendAbstention.UnsupportedOperationKind; }
         return CSharpOperationSemantics.IsValueDomain(operation.Type) ||
             operation is ILiteralOperation { ConstantValue.HasValue: true, ConstantValue.Value: null }

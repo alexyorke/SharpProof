@@ -51,7 +51,10 @@ public sealed class GoldenLoweringTests
             }
         }
         var sourceCalls = fixture.Source.Contains("// golden-inline-source: true", StringComparison.Ordinal);
+        var frameworkModels = fixture.Source.Contains("// golden-framework-models: true", StringComparison.Ordinal);
         var result = context == null ? new RoslynProgramLowerer(factory).Lower(graph)
+            : frameworkModels ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,
+                CancellationToken.None, FrameworkModel)
             : sourceCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, CancellationToken.None)
             : new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         var printer = new IrPrinter(factory);
@@ -107,6 +110,19 @@ public sealed class GoldenLoweringTests
             output.AppendLine(CultureInfo.InvariantCulture, $"diagnostic: {diagnostic.Operation} {diagnostic.Reason} {(description is { } text ? factory.GetString(text) : "none")}");
         }
         GoldenTest.Compare(fixture, output.ToString());
+
+        TotalScalarCallModel? FrameworkModel(IMethodSymbol target)
+        {
+            if (target.IsStatic && target.ContainingType.SpecialType == SpecialType.System_String &&
+                target.Name == "Concat" && target.Parameters.Length == 2 &&
+                target.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_String))
+            { return new(2, arguments => CSharpOperationSemantics.StringConcat(factory, arguments[0], arguments[1])); }
+            if (target.IsStatic && target.ContainingType.SpecialType == SpecialType.System_Array &&
+                target.Name == "Empty" && target.Arity == 1 && target.Parameters.IsEmpty &&
+                CSharpOperationSemantics.IsReferenceDomain(target.ReturnType))
+            { return new(0, _ => CSharpOperationSemantics.ArrayEmpty(factory, new RoslynTypeMapper(factory).GetTypeId(target.ReturnType))); }
+            return null;
+        }
 
         bool PrepareCallee(TotalLoweringContext frame)
         {

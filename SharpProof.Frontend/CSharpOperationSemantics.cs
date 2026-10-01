@@ -50,6 +50,8 @@ internal static partial class CSharpOperationSemantics
     {
         if (value == null && (type == null || IsReferenceDomain(type)))
         { return factory.Null(new RoslynTypeMapper(factory).GetTypeId(type)); }
+        if (type?.SpecialType == SpecialType.System_String && value is string text)
+        { return factory.String(text); }
         var mapped = MapType(factory, type!.SpecialType)!.Value;
         return type.SpecialType == SpecialType.System_Boolean ? factory.Boolean(value is true)
             : value is ulong unsigned ? factory.Integer(mapped, unsigned)

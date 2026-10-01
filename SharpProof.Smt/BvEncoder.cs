@@ -33,6 +33,8 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             : IsReference(type) ? owner.Own(context.MkConst(name, ReferenceSort))
             : throw new UnsupportedIrEncodingException();
         _variables.Add(variable, expression);
+        if (type.Kind == IrTypeKind.String)
+        { EncodeEmptyStringIdentity(expression, meter); }
         return expression;
     }
 
@@ -56,6 +58,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 owner.Own(context.MkBV(integer.Bits, (uint)factory.GetTypeInfo(integer.Type).Width)),
             IrVariableTerm variable => GetVariable(variable.Variable, meter),
             IrNullTerm => NullReference,
+            IrStringTerm text => EncodeStringLiteral(text, meter),
             IrEmptyArrayTerm empty => EncodeEmptyArray(empty, meter),
             IrLengthTerm length => EncodeLength(Encode(length.Value, meter), meter),
             IrSequenceAccessTerm access => EncodeArrayAccess(access, meter),
@@ -87,6 +90,8 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         var right = Encode(binary.Right, meter);
         switch (binary.Operator)
         {
+            case IrBinaryOperator.StringConcat:
+                return EncodeStringConcat(binary, left, right, meter);
             case IrBinaryOperator.Equal:
                 return owner.Own(context.MkEq(left, right));
             case IrBinaryOperator.NotEqual:

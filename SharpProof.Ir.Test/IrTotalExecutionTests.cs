@@ -8,6 +8,14 @@ namespace SharpProof.Ir.Test;
 public sealed class IrTotalExecutionTests
 {
     [Test]
+    public void RuntimeEmptyStringConstructionPreservesCanonicalIdentity()
+    {
+        Assert.That(new string(Array.Empty<char>()), Is.SameAs(string.Empty));
+        Assert.That(new string('\0', 0), Is.SameAs(string.Empty));
+        Assert.That(string.Concat(null, string.Empty), Is.SameAs(string.Empty));
+    }
+
+    [Test]
     public void EmptyArrayTermsRequireTotalOwnedSequenceTypes()
     {
         var total = new IrFactory(IrExecutionSemantics.Total);

@@ -11,6 +11,28 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class TypedMetadataReferenceTests
 {
+    [Test]
+    public void ConcatenationAllocationIdentityRemainsOutsideNativeObservationProofs()
+    {
+        using var subject = new MetadataTestSubject(
+            "public static class Library { public static bool Target(string first, string second) { return (object)first == (object)second; } }",
+            """
+            using SharpProof.Attributes;
+            public static class Subject { public static bool Target(string value) {
+                Contract.Ensures(!Contract.Result<bool>());
+                return Library.Target(string.Concat("left", "right"), value);
+            } }
+            """);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        var preparation = preparations.Single();
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAssignInstruction>().Any(assign => assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }), Is.True);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
+        Assert.That(candidate, Is.Not.Null);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out _, out _), Is.False);
+    }
+
     [TestCase("object", "bool", "return value == null;")]
     [TestCase("object", "bool", "return value != null;")]
     [TestCase("string", "bool", "return value == null;")]
