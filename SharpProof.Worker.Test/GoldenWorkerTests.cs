@@ -39,6 +39,7 @@ public sealed class GoldenWorkerTests
             : scenario == "passive-vc" ? await PassiveVc(fixture.Source)
             : scenario == "passive-ownership" ? PassiveOwnership()
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
+            : scenario == "total-claim-results" ? await TotalClaimResults(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
             : scenario == "vc-shadow-reference" ? await VcShadow(fixture.Source, stableClaimOrder: true)
@@ -53,6 +54,50 @@ public sealed class GoldenWorkerTests
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static async Task<string> TotalClaimResults(string source)
+    {
+        using var project = new ShadowTestProject(source);
+        var claims = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
+        foreach (var preparation in project.Snapshot.Callables)
+        {
+            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
+                check => claims[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), CancellationToken.None);
+        }
+        var callables = project.Snapshot.Callables.Select(preparation =>
+        {
+            var reason = WorkerResultAssembler.ProjectCallableReasons(preparation.Entry.ClaimIds.Select(id => claims[id])).Reason;
+            return new WorkerCallableResult
+            {
+                CallableId = preparation.Entry.CallableId,
+                Coverage = reason == WorkerCallableCoverageReason.None ? WorkerCallableCoverage.Complete : WorkerCallableCoverage.Incomplete,
+                Reason = reason,
+                Assumptions = preparation.Entry.Assumptions
+            };
+        }).ToArray();
+        Assert.That(WorkerResultAssembler.TryProjectRunState(callables, claims.Values, [], out var runStatus, out var failureReason), Is.True);
+        var response = WorkerResultAssembler.Create(project.Bind().InputHash, project.Snapshot.CompilerManifest.Manifest,
+            runStatus, failureReason, callables, claims.Values, project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
+        var json = WorkerProtocolJson.SerializeResponse(response);
+        var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+        var output = new StringBuilder();
+        output.AppendLine("candidate-authority: Total IR (legacy worker routing retained)");
+        output.AppendLine("run: " + response.RunStatus);
+        output.AppendLine("wire-valid: True");
+        output.AppendLine("serialized: " + (json.Length > 0));
+        foreach (var claim in response.Manifest.Claims.OrderBy(claim => claim.CallableId, StringComparer.Ordinal).ThenBy(claim => claim.Ordinal))
+        {
+            var result = claims[claim.ClaimId];
+            output.AppendLine("claim: " + claim.CallableId + "#" + claim.Ordinal);
+            output.AppendLine("  outcome: " + result.Outcome);
+            output.AppendLine("  reason: " + result.Reason);
+            output.AppendLine("  vacuity: " + result.Vacuity);
+            foreach (var model in result.Model)
+            { output.AppendLine("  model: " + model.Variable + " " + model.Kind + " " + model.Value); }
+        }
+        return output.ToString();
     }
 
     private static string VcLoopPrologueReentry(string source)

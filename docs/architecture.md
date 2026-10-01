@@ -373,6 +373,15 @@ preparations; authoritative worker responses and cache claims remain legacy.
 lowering success and shadow reporting. It publishes each completed claim with
 canonical entry evidence and assumption usage before starting the next claim,
 so later cancellation preserves earlier kernel-validated results.
+The shadow comparison consumes the same Total-to-worker claim projection needed
+by the authority transition. It names counterexamples from canonical Total entry
+parameters rather than legacy variable ids, preserves full unsigned values, and
+quotes string displays to retain empty strings, whitespace and UTF-16 units in
+the existing nonblank model wire format. Missing or mistyped inputs, foreign
+assumptions and incomplete publications cannot publish a proof or refutation.
+Normal completion has an explicit SSA definition, so even a body with no return
+instructions carries kernel-validated normal-exit provenance in a vacuity proof
+core. This total fresh definition does not constrain the admitted input domain.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.

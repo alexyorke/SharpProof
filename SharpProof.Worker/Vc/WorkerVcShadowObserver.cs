@@ -39,21 +39,16 @@ internal static class WorkerVcShadowObserver
                 methodBoundary.CancelAfter(budgets.MethodWallTimeMilliseconds);
                 await TotalCallableVerifier.VerifyAsync(preparation, budgets, check =>
                 {
-                    var outcome = check.Evidence.Outcome switch
-                    {
-                        ProvenOutcome => WorkerClaimOutcome.Proven,
-                        RefutedOutcome => WorkerClaimOutcome.Refuted,
-                        _ => WorkerClaimOutcome.Unknown
-                    };
+                    var result = CallableClaimResultAssembler.FromTotal(preparation, check);
                     rows[check.ClaimId] = rows[check.ClaimId] with
                     {
                         Enrolled = check.Enrolled,
                         Checked = check.Checked,
-                        NewOutcome = outcome,
-                        NewReason = check.Evidence.Reason,
-                        NewVacuity = check.Vacuity,
+                        NewOutcome = result.Outcome,
+                        NewReason = result.Reason,
+                        NewVacuity = result.Vacuity,
                         Feasibility = check.Feasibility,
-                        NewAssumptions = Assumptions(check.Assumptions),
+                        NewAssumptions = check.Assumptions.IsEmpty ? [] : Assumptions(result.Assumptions),
                         HasBodyAssumptions = !check.Evidence.BodyAssumptions.IsEmpty
                     };
                 }, methodBoundary.Token).ConfigureAwait(false);

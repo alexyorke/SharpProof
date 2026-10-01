@@ -239,12 +239,16 @@ internal sealed class PassiveCallableVcBuilder
         }
         EntryAssumptions = entryAssumptions.ToImmutable();
         Goals = goals.ToImmutable();
-        NormalCompletion = _factory.Boolean(false);
+        IrTerm normalCompletion = _factory.Boolean(false);
         foreach (var returned in _returns)
         {
             Spend();
-            NormalCompletion = _factory.Binary(IrBinaryOperator.OrElse, NormalCompletion, returned.Reach);
+            normalCompletion = _factory.Binary(IrBinaryOperator.OrElse, normalCompletion, returned.Reach);
         }
+        // Retain structural absence of normal exits in the kernel proof core.
+        // The fresh total definition adds no restriction on inputs or paths.
+        NormalCompletion = Fresh(_factory.BooleanType);
+        Fact(Equal(NormalCompletion, normalCompletion), entry, "normal-completion");
         return new(this, loopSearch, boundedSearch);
     }
 

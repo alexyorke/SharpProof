@@ -2,6 +2,71 @@ namespace SharpProof.Worker;
 
 internal static class CallableClaimResultAssembler
 {
+    internal static WorkerClaimResult FromTotal(CompilerCallablePreparation target, TotalCallableClaimCheck check)
+    {
+        ArgumentNullGuard.NotNull(target, nameof(target));
+        ArgumentNullGuard.NotNull(check, nameof(check));
+        var total = target.Total;
+        if (total == null || !total.Clauses.Any(clause => clause.Kind == CompilerContractKind.Ensures && clause.ClaimId == check.ClaimId))
+        { throw new ArgumentException("The check does not belong to this Total callable.", nameof(check)); }
+        var record = Create(target, check.ClaimId, WorkerClaimOutcome.Unknown,
+            check.Evidence.Reason == WorkerClaimReason.None ? WorkerClaimReason.SolverIncomplete : check.Evidence.Reason,
+            WorkerEffectEvidenceCertainty.Unspecified, projectAssumptions: false);
+        record.Assumptions = ProjectAssumptions(target, static _ => false);
+        if (!check.Checked || !check.Enrolled)
+        {
+            if (check.Checked)
+            { record.Reason = WorkerClaimReason.MalformedBackendResult; }
+            return record;
+        }
+        if (check.Evidence.Outcome is ProvenOutcome or RefutedOutcome && check.Evidence.Reason != WorkerClaimReason.None)
+        { record.Reason = WorkerClaimReason.MalformedBackendResult; return record; }
+        var declarations = target.Entry.Assumptions.ToDictionary(assumption => assumption.Id, assumption => assumption.Kind, StringComparer.Ordinal);
+        if (check.Assumptions.Length != declarations.Count ||
+            check.Assumptions.Select(assumption => assumption.Id).Distinct(StringComparer.Ordinal).Count() != declarations.Count ||
+            check.Assumptions.Any(assumption => !declarations.TryGetValue(assumption.Id, out var kind) || kind != assumption.Kind))
+        { record.Reason = WorkerClaimReason.MalformedBackendResult; return record; }
+        record.Assumptions = [.. check.Assumptions.Select(assumption => new WorkerAssumptionEvidence
+        { Id = assumption.Id, Kind = assumption.Kind, Used = assumption.Used })];
+        switch (check.Evidence.Outcome)
+        {
+            case ProvenOutcome:
+                record.Outcome = WorkerClaimOutcome.Proven;
+                record.Reason = WorkerClaimReason.None;
+                record.Vacuity = check.Vacuity;
+                record.ProofCore = [.. check.Evidence.Core.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+                break;
+            case RefutedOutcome when check.Vacuity == WorkerVacuityKind.None:
+                // These variables belong to the Total factory. Legacy variable
+                // ids and integer domains cannot name or format this model.
+                if (check.Evidence.EntryModel.Count != total.Parameters.Length ||
+                    total.Parameters.Any(parameter => !check.Evidence.EntryModel.TryGetValue(parameter.Entry, out var value) ||
+                        value.Type != total.Program.Factory.GetVariableInfo(parameter.Entry).Type))
+                { record.Reason = WorkerClaimReason.MalformedBackendResult; break; }
+                record.Outcome = WorkerClaimOutcome.Refuted;
+                record.Reason = WorkerClaimReason.None;
+                record.Model = [.. total.Parameters.Select((parameter, ordinal) =>
+                {
+                    var value = check.Evidence.EntryModel[parameter.Entry];
+                    var formatted = WorkerProjections.FormatTotalValue(value);
+                    return new WorkerModelValue
+                    {
+                        Variable = "parameter:" + ordinal.ToString(CultureInfo.InvariantCulture),
+                        Kind = formatted.Kind,
+                        Value = formatted.Value
+                    };
+                }).OrderBy(value => value.Variable, StringComparer.Ordinal)];
+                break;
+            case UnknownOutcome:
+            case null when check.Evidence.QueryCompleted && check.Evidence.Reason != WorkerClaimReason.None:
+                break;
+            default:
+                record.Reason = WorkerClaimReason.MalformedBackendResult;
+                break;
+        }
+        return record;
+    }
+
     internal static WorkerClaimResult FromOutcome(CompilerCallablePreparation target, int contractOrdinal,
         ProofOutcome outcome,
         IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
