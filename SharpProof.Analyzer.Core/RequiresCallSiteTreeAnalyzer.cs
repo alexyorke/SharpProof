@@ -14,6 +14,31 @@ internal static partial class RequiresCallSiteTreeAnalyzer
     {
         caller = ContractClauseInventoryBuilder
             .NormalizeCallable(caller);
+        var initializerOutcome = AnalyzerSemanticOutcome.NotApplicable;
+        if (declaration is TypeDeclarationSyntax type &&
+            (PrimaryConstructorCallableInventory.TryGet(type, semanticModel, cancellationToken, out var constructor) ||
+             PrimaryConstructorCallableInventory.TryGetSynthesizedDefault(type, semanticModel, cancellationToken, out constructor)) &&
+            SymbolEqualityComparer.Default.Equals(caller, constructor))
+        {
+            // Both Roslyn callbacks own this same constructor. Whichever runs
+            // first must use the initializer route before claiming its key.
+            // Continue tree discovery for independent nested callable owners.
+            initializerOutcome = AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
+                constructor, type, semanticModel, session, reportDiagnostic, cancellationToken)
+                ?? AnalyzerSemanticOutcome.NotApplicable;
+        }
+        return AnalyzerSemanticOutcomes.Combine(initializerOutcome,
+            AnalyzeTree(caller, declaration, semanticModel, session, reportDiagnostic, cancellationToken));
+    }
+
+    private static AnalyzerSemanticOutcome AnalyzeTree(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
         var discovery = new RequiresCallSiteDiscovery(
             caller,
             declaration,

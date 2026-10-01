@@ -16,6 +16,11 @@ public sealed class GoldenAnalyzerTests
     {
         var fixture = GoldenTest.Load("analyzer", caseName);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(fixture.Source, "contracts", ["SP0027"], filePath: caseName + ".cs");
+        GoldenTest.Compare(fixture, FormatDiagnostics(diagnostics));
+    }
+
+    internal static string FormatDiagnostics(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
         var rows = diagnostics.Select(diagnostic =>
         {
             var location = diagnostic.Location.GetMappedLineSpan();
@@ -24,6 +29,6 @@ public sealed class GoldenAnalyzerTests
                 $"{location.EndLinePosition.Line + 1}:{location.EndLinePosition.Character + 1} " +
                 diagnostic.GetMessage(CultureInfo.InvariantCulture);
         }).Order(StringComparer.Ordinal);
-        GoldenTest.Compare(fixture, string.Join('\n', rows));
+        return string.Join('\n', rows);
     }
 }

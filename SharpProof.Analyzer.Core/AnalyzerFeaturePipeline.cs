@@ -593,31 +593,43 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        if (AnalyzerGeneratedCodePolicy.IsGenerated(
-                constructor,
-                declaration.SyntaxTree,
-                context.Compilation,
-                context.CancellationToken) ||
+        var outcome = AnalyzePrimaryConstructor(constructor, declaration,
+            context.SemanticModel, session, context.ReportDiagnostic, context.CancellationToken);
+        if (outcome.HasValue)
+        {
+            session.RecordSemanticOutcome(constructor, outcome.Value);
+        }
+    }
+
+    internal static AnalyzerSemanticOutcome? AnalyzePrimaryConstructor(
+        IMethodSymbol constructor,
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(constructor, declaration.SyntaxTree,
+                semanticModel.Compilation, cancellationToken) ||
             !session.TryBeginRequiresCallSiteAnalysis(constructor))
         {
-            return;
+            return null;
         }
 
-        var outcome = SharpProofControlAttributePolicy
+        return SharpProofControlAttributePolicy
             .ValidateAndShouldSuppress(
                 constructor,
                 session,
-                context.ReportDiagnostic,
-                context.CancellationToken)
+                reportDiagnostic,
+                cancellationToken)
             ? AnalyzerSemanticOutcome.Suppressed
             : RequiresCallSiteAnalyzer.AnalyzePrimaryConstructorInitializer(
                 constructor,
                 declaration,
-                context.SemanticModel,
+                semanticModel,
                 session,
-                context.ReportDiagnostic,
-                context.CancellationToken);
-        session.RecordSemanticOutcome(constructor, outcome);
+                reportDiagnostic,
+                cancellationToken);
     }
 
     internal static void AnalyzeMemberInitializer(
