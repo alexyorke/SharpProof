@@ -32,116 +32,103 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId _regionExceptionalExit;
     private int _regionRemaining = MaximumRegionSteps;
 
-    private FrontendProgramLoweringResult LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
+    private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
         _regionGraph = graph;
-        try
+        if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
+        { throw new RegionIncompleteException(); }
+        var regions = new Stack<ControlFlowRegion>();
+        regions.Push(graph.Root);
+        while (regions.Count != 0)
         {
-            if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
+            SpendRegion();
+            var region = regions.Pop();
+            for (var ordinal = 0; ordinal < region.Locals.Length; ordinal++)
+            {
+                SpendRegion();
+                if (!region.Locals[ordinal].IsConst)
+                { _regionLocals.Add(region.Locals[ordinal]); }
+            }
+            if (region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime or
+                    ControlFlowRegionKind.Try or ControlFlowRegionKind.TryAndCatch or ControlFlowRegionKind.Catch or
+                    ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally or
+                    ControlFlowRegionKind.FilterAndHandler or ControlFlowRegionKind.Filter) ||
+                region.Locals.Any(local => local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name) ||
+                    local.RefKind != RefKind.None || !CSharpOperationSemantics.IsScalar(local.Type)))
             { throw new RegionIncompleteException(); }
-            var regions = new Stack<ControlFlowRegion>();
-            regions.Push(graph.Root);
-            while (regions.Count != 0)
+            if (region.Kind == ControlFlowRegionKind.Catch)
             {
-                SpendRegion();
-                var region = regions.Pop();
-                for (var ordinal = 0; ordinal < region.Locals.Length; ordinal++)
-                {
-                    SpendRegion();
-                    if (!region.Locals[ordinal].IsConst)
-                    { _regionLocals.Add(region.Locals[ordinal]); }
-                }
-                if (region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime or
-                        ControlFlowRegionKind.Try or ControlFlowRegionKind.TryAndCatch or ControlFlowRegionKind.Catch or
-                        ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally or
-                        ControlFlowRegionKind.FilterAndHandler or ControlFlowRegionKind.Filter) ||
-                    region.Locals.Any(local => local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name) ||
-                        local.RefKind != RefKind.None || !CSharpOperationSemantics.IsScalar(local.Type)))
+                if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation ||
+                    !CSharpOperationSemantics.TryCatchKinds(compilation, region.ExceptionType, out var kinds))
                 { throw new RegionIncompleteException(); }
-                if (region.Kind == ControlFlowRegionKind.Catch)
-                {
-                    if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation ||
-                        !CSharpOperationSemantics.TryCatchKinds(compilation, region.ExceptionType, out var kinds))
-                    { throw new RegionIncompleteException(); }
-                    _regionCatchKinds.Add(region, kinds);
-                    _regionCaught.Add(region, _context.Temporary(RegionInteger));
-                }
-                if (region.Kind == ControlFlowRegionKind.Finally)
-                {
-                    _regionFinallys.Add(region, new(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch")));
-                }
-                if (region.Kind == ControlFlowRegionKind.Filter)
-                {
-                    var parent = region.EnclosingRegion ?? throw new RegionIncompleteException();
-                    var caught = parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch);
-                    _regionFilters.Add(region, new(region, caught, _context.Temporary(RegionInteger),
-                        RegionBlock("filter:accepted"), RegionBlock("filter:rejected")));
-                }
-                foreach (var child in region.NestedRegions.Reverse())
-                { SpendRegion(); regions.Push(child); }
+                _regionCatchKinds.Add(region, kinds);
+                _regionCaught.Add(region, _context.Temporary(RegionInteger));
             }
-            foreach (var binding in _context.Parameters)
+            if (region.Kind == ControlFlowRegionKind.Finally)
+            {
+                _regionFinallys.Add(region, new(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch")));
+            }
+            if (region.Kind == ControlFlowRegionKind.Filter)
+            {
+                var parent = region.EnclosingRegion ?? throw new RegionIncompleteException();
+                var caught = parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch);
+                _regionFilters.Add(region, new(region, caught, _context.Temporary(RegionInteger),
+                    RegionBlock("filter:accepted"), RegionBlock("filter:rejected")));
+            }
+            foreach (var child in region.NestedRegions.Reverse())
+            { SpendRegion(); regions.Push(child); }
+        }
+        foreach (var binding in _context.Parameters)
+        {
+            SpendRegion();
+            _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));
+            _builder.Assign(entry, structural, binding.PreState, _context.Factory.Variable(binding.Entry));
+        }
+        foreach (var block in graph.Blocks)
+        { _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture))); }
+        _regionExceptionalExit = RegionBlock("exceptional:exit");
+        _builder.ExceptionalExit(_regionExceptionalExit, structural);
+        _expressions = new(_context, _builder, _regionExceptionalExit)
+        {
+            Spend = SpendRegion,
+            SourceCall = InlineSourceCall,
+            ExceptionTarget = (kind, site) => EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
+                ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))
+        };
+        _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
+        var localInitialization = _regionLocals.Count == 0 ? default : RegionLocalInitialization();
+        foreach (var source in graph.Blocks)
+        {
+            SpendRegion();
+            _regionSource = source;
+            var block = _blocks[source];
+            for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
             {
                 SpendRegion();
-                _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));
-                _builder.Assign(entry, structural, binding.PreState, _context.Factory.Variable(binding.Entry));
-            }
-            foreach (var block in graph.Blocks)
-            { _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture))); }
-            _regionExceptionalExit = RegionBlock("exceptional:exit");
-            _builder.ExceptionalExit(_regionExceptionalExit, structural);
-            _expressions = new(_context, _builder, _regionExceptionalExit)
-            {
-                Spend = SpendRegion,
-                SourceCall = InlineSourceCall,
-                ExceptionTarget = (kind, site) => EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
-                    ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))
-            };
-            _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
-            var localInitialization = _regionLocals.Count == 0 ? default : RegionLocalInitialization();
-            foreach (var source in graph.Blocks)
-            {
-                SpendRegion();
-                _regionSource = source;
-                var block = _blocks[source];
-                for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
-                {
-                    SpendRegion();
-                    if (localInitialization == (source, ordinal))
-                    { InitializeRegionLocals(block, structural); }
-                    block = Statement(source.Operations[ordinal], block);
-                }
-                if (localInitialization == (source, source.Operations.Length))
+                if (localInitialization == (source, ordinal))
                 { InitializeRegionLocals(block, structural); }
-                RegionTerminator(source, block, structural);
+                block = Statement(source.Operations[ordinal], block);
             }
-            ResolveRegionRethrows();
-            foreach (var filter in _regionFilters.Values)
-            { FinishRegionFilter(filter, structural); }
-            foreach (var state in _regionFinallys.Values)
-            { FinishRegionFinally(state, structural); }
-            var program = _builder.Build();
-            var instructionCount = 0;
-            foreach (var block in program.Blocks)
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                instructionCount += block.Instructions.Length;
-                if (instructionCount > MaximumRegionSteps)
-                { throw new RegionIncompleteException(); }
-            }
-            _ = IrBlockOrder.TryCreateAcyclicOrder(program, _ =>
-            {
-                SpendRegion();
-                return true;
-            }, out var failure);
-            if (failure is not (IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow))
-            { throw new RegionIncompleteException(); }
-            return Result(program);
+            if (localInitialization == (source, source.Operations.Length))
+            { InitializeRegionLocals(block, structural); }
+            RegionTerminator(source, block, structural);
         }
-        catch (RegionIncompleteException)
+        ResolveRegionRethrows();
+        foreach (var filter in _regionFilters.Values)
+        { FinishRegionFilter(filter, structural); }
+        foreach (var state in _regionFinallys.Values)
+        { FinishRegionFinally(state, structural); }
+    }
+
+    private void ValidateRegionOrder(IrProgram program)
+    {
+        _ = IrBlockOrder.TryCreateAcyclicOrder(program, _ =>
         {
-            return IncompleteRegion(structural);
-        }
+            SpendRegion();
+            return true;
+        }, out var failure);
+        if (failure is not (IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow))
+        { throw new RegionIncompleteException(); }
     }
 
     private (BasicBlock? Block, int Operation) RegionLocalInitialization()
@@ -231,11 +218,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                 block = value.Continuation;
             }
             if (branch.FinallyRegions.IsEmpty)
-            { _builder.Return(block, site, _context.Result is { } returned ? _context.Factory.Variable(returned) : null); }
+            { Return(block, site, _context.Result is { } returned ? _context.Factory.Variable(returned) : null); }
             else
             {
                 var returned = RegionBlock("return:captured");
-                _builder.Return(returned, site, _context.Result is { } resultValue ? _context.Factory.Variable(resultValue) : null);
+                Return(returned, site, _context.Result is { } resultValue ? _context.Factory.Variable(resultValue) : null);
                 _builder.Goto(block, site, EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true));
             }
         }
@@ -264,7 +251,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Goto(block, site, state.Dispatch);
         }
         else if (source.Kind == BasicBlockKind.Exit)
-        { _builder.Return(block, site); }
+        { Return(block, site); }
         else if (branch?.Destination != null)
         { _builder.Goto(block, site, RegionNormalTarget(branch, site)); }
         else
@@ -281,7 +268,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (branch.Semantics == ControlFlowBranchSemantics.Return && _context.Result == null)
         {
             var returned = RegionBlock("return:conditional");
-            _builder.Return(returned, site);
+            Return(returned, site);
             return branch.FinallyRegions.IsEmpty ? returned
                 : EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true);
         }
@@ -315,7 +302,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrBlockId RegionExceptionTarget(ControlFlowRegion source, RegionExceptionToken token)
     {
-        if (_regionFilters.Count != 0)
+        if (_regionFilters.Count != 0 || _frame != null)
         { return RegionExceptionSearch(source, token); }
         var throughFinally = new List<ControlFlowRegion>();
         var target = _regionExceptionalExit;
@@ -416,7 +403,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
             }
             if (selected.Count == 0)
-            { _builder.Return(block, request.Site); }
+            { Return(block, request.Site); }
         }
     }
 
@@ -448,7 +435,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
         if (state.Transfers.Count == 0)
-        { _builder.Return(block, structural); }
+        { Return(block, structural); }
     }
 
     private RegionExceptionToken Token(IrExceptionKind kind, OperationId site)

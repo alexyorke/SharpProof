@@ -220,13 +220,20 @@ adding their Requires or Ensures as proof premises; callee Assume closes admissi
 All nested frames share the same construction cap and cancellation boundary.
 Original expanded IR retains callee returns, finally bodies, and escaping throw
 kind/site for replay and caller catch routing. Async, iterator, generic, ref/params,
-metadata and unmodeled type-initialization calls remain unsupported. A caller
-filter combined with a finally anywhere in its expanded callees also closes:
-exact cross-frame filter search must precede callee unwind, and the current
-standalone frame composition does not represent that order. This restriction
-propagates through intermediate callees and distinguishes absent evidence from
-a completed solver Unknown. Exact cross-frame search/unwind composition, typed
-metadata IL summaries and Ref/len remain required before the Phase 2 exit.
+metadata and unmodeled type-initialization calls remain unsupported. When an
+outer filter can observe a callee fault, fresh frames share one program builder.
+Each frame searches its own handlers first, then continues search at the caller's
+captured lexical point before running the immutable inner-to-outer finally
+prefix. A selected handler stops search; a fault during unwind starts fresh
+search from the faulting frame. Calls within a filter finish their own unwind
+before rejection resumes the original exception. Root entry and final validation
+remain owned by the caller. Ordinary calls retain the separate frame composition.
+Replacement exceptions can create shared filter/finally cycles; the owned loop
+proof and bounded witness encodings keep conservative completed Unknown results
+distinct from absent evidence. Havoc can lose correlations between earlier
+filter mutations and a later replacement search, leaving a valid postcondition
+Unknown when the bounded search is also inconclusive. Typed metadata IL summaries and Ref/len remain
+required before the Phase 2 exit.
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and
 unary Plus/Minus use the same wrap value and guarded overflow rules in bodies

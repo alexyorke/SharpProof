@@ -2,6 +2,16 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalProgramLowerer
 {
+    private sealed class SourceCallFrame(Action<IrBlockId, OperationId, IrTerm?> returned,
+        Func<IrExceptionKind, OperationId, Func<IrBlockId, IrBlockId>, IrBlockId> search)
+    {
+        internal IrBlockId Entry { get; set; }
+        internal void Return(IrBlockId block, OperationId site, IrTerm? value)
+        { returned(block, site, value); }
+        internal IrBlockId Search(IrExceptionKind kind, OperationId site, Func<IrBlockId, IrBlockId> unwind)
+        { return search(kind, site, unwind); }
+    }
+
     private TotalBodyValue? InlineSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
         if (_calls == null || !_calls.TryPrepare(_context, invocation, out var frame, out var graph))
@@ -12,11 +22,6 @@ internal sealed partial class RoslynTotalProgramLowerer
         var callerRegion = _regionGraph == null ? null : _regionSource.EnclosingRegion;
         var callerFilter = callerRegion == null ? null : EnclosingRegionFilter(callerRegion);
         var externalFilterSearch = _externalFilterSearch || callerFilter != null || HasEnclosingCatchFilter(callerRegion);
-        // Standalone frame lowering unwinds its finally before returning an
-        // escaping throw. C# searches an outer caller filter first. Until the
-        // two frame searches compose, close this combination transitively.
-        if (externalFilterSearch && HasFinally(graph!.Root))
-        { return null; }
         var site = _context.Site(invocation);
         var returned = callee.Result is { } result ? _context.Temporary(_context.Factory.GetVariableInfo(result).Type) : (IrVarId?)null;
         IrTerm marker = returned is { } resultStorage ? _context.Factory.Variable(resultStorage) : _context.Factory.Boolean(false);
@@ -37,6 +42,27 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (!value.Classification.IsExact)
             { return new(marker, block, value.Classification); }
             arguments[argument.Parameter!.Ordinal] = value.Value;
+        }
+        if (externalFilterSearch)
+        {
+            if (!_calls.Spend(callee.Parameters.Length + 2))
+            { throw new RegionIncompleteException(); }
+            var continued = _builder.CreateBlock("call:continued");
+            var composed = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch)
+            {
+                _builder = _builder,
+                _frame = new((source, operation, value) =>
+                {
+                    if (returned is { } storage && value != null)
+                    { _builder.Assign(source, operation, storage, value); }
+                    _builder.Goto(source, operation, continued);
+                }, (kind, operation, unwind) => ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind))
+            };
+            composed.LowerSharedFrame(graph!);
+            foreach (var parameter in callee.Parameters)
+            { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
+            _builder.Goto(block, site, composed._frame.Entry);
+            return new(marker, continued, FrontendSubsetClassification.Exact);
         }
         var lowering = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch).Lower(graph!);
         if (!lowering.IsExact)
@@ -104,6 +130,31 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
     }
 
+    private void LowerSharedFrame(ControlFlowGraph graph)
+    {
+        if (_calls == null || !_calls.Enter(_context.Target))
+        { throw new RegionIncompleteException(); }
+        try
+        {
+            LowerCore(graph);
+            if (_abstentions.Count != 0)
+            { throw new RegionIncompleteException(); }
+        }
+        finally
+        { _calls.Leave(_context.Target); }
+    }
+
+    private IrBlockId ContinueSourceException(ControlFlowRegion? callerRegion, RegionFilter? callerFilter,
+        IrExceptionKind kind, OperationId site, Func<IrBlockId, IrBlockId> unwind)
+    {
+        SpendRegion();
+        if (callerFilter != null)
+        { return unwind(callerFilter.Rejected); }
+        if (callerRegion != null)
+        { return RegionExceptionSearch(callerRegion, Token(kind, site), unwind); }
+        return _frame != null ? _frame.Search(kind, site, unwind) : unwind(_ordinaryExceptionalExit);
+    }
+
     private bool HasEnclosingCatchFilter(ControlFlowRegion? region)
     {
         for (; region != null; region = region.EnclosingRegion)
@@ -121,22 +172,4 @@ internal sealed partial class RoslynTotalProgramLowerer
         return false;
     }
 
-    private bool HasFinally(ControlFlowRegion root)
-    {
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(root);
-        while (pending.Count != 0)
-        {
-            SpendRegion();
-            var region = pending.Pop();
-            if (region.Kind == ControlFlowRegionKind.Finally)
-            { return true; }
-            foreach (var child in region.NestedRegions)
-            {
-                SpendRegion();
-                pending.Push(child);
-            }
-        }
-        return false;
-    }
 }

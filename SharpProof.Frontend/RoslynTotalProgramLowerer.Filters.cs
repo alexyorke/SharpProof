@@ -61,7 +61,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
     }
 
-    private IrBlockId RegionExceptionSearch(ControlFlowRegion source, RegionExceptionToken token)
+    private IrBlockId RegionExceptionSearch(ControlFlowRegion source, RegionExceptionToken token,
+        Func<IrBlockId, IrBlockId>? innerUnwind = null)
     {
         // Search all matching filters before leaving any try. Each selected
         // handler owns the precise prefix of finally regions being left.
@@ -98,13 +99,20 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
 
-        var next = complete ? default : Resume(EnterRegionFinallyChain(unwind, _regionExceptionalExit, token.Site, token, preserveResult));
+        // Frame search precedes all pending inner unwinds. Own selected
+        // handlers stop the outward search; escaping faults continue at the
+        // caller's captured lexical point with this immutable unwind prefix.
+        foreach (var _ in unwind)
+        { SpendRegion(); }
+        var escapingUnwind = unwind.ToArray();
+        var next = complete ? default : _frame != null
+            ? _frame.Search(token.Kind, token.Site, target => Unwind(escapingUnwind, target))
+            : Resume(Unwind(escapingUnwind, _regionExceptionalExit));
         for (var ordinal = candidates.Count - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
             var candidate = candidates[ordinal];
-            var selected = Resume(EnterRegionFinallyChain(candidate.Unwind,
-                RegionCatchEntry(candidate.Catch, token), token.Site, token, preserveResult));
+            var selected = Resume(Unwind(candidate.Unwind, RegionCatchEntry(candidate.Catch, token)));
             if (candidate.Filter is not { } filter)
             { next = selected; continue; }
             var entry = RegionBlock("filter:entry");
@@ -114,6 +122,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             next = entry;
         }
         return next;
+
+        IrBlockId Unwind(IReadOnlyList<ControlFlowRegion> prefix, IrBlockId target)
+        {
+            target = EnterRegionFinallyChain(prefix, target, token.Site, token, preserveResult);
+            return innerUnwind == null ? target : innerUnwind(target);
+        }
 
         IrBlockId Resume(IrBlockId target)
         {
@@ -149,7 +163,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
             }
             if (filter.Transfers.Count == 0)
-            { _builder.Return(block, structural); }
+            { Return(block, structural); }
         }
     }
 }

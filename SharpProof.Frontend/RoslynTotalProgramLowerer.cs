@@ -6,13 +6,15 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     TotalSourceCallSession? calls = null, bool externalFilterSearch = false)
 {
     private readonly TotalLoweringContext _context = context;
-    private readonly IrProgramBuilder _builder = new(context.Factory);
+    private IrProgramBuilder _builder = new(context.Factory);
     private readonly List<FrontendProgramAbstention> _abstentions = [];
     private readonly Dictionary<BasicBlock, IrBlockId> _blocks = [];
     private RoslynTotalExpressionLowerer _expressions = null!;
     private readonly CancellationToken _cancellationToken = cancellationToken;
     private readonly TotalSourceCallSession? _calls = calls;
     private readonly bool _externalFilterSearch = externalFilterSearch;
+    private SourceCallFrame? _frame;
+    private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
@@ -21,32 +23,39 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
         try
         {
-            return LowerCore(graph);
+            LowerCore(graph);
+            var result = Result();
+            if (_regionGraph != null)
+            { ValidateRegionOrder(result.Program); }
+            return result;
         }
         catch (RegionIncompleteException)
-        { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
+        { return IncompleteRegion(_regionStructural ?? _context.Factory.CreateOperation("candidate:cfg")); }
         finally
         { _calls?.Leave(_context.Target); }
     }
 
-    private FrontendProgramLoweringResult LowerCore(ControlFlowGraph graph)
+    private void LowerCore(ControlFlowGraph graph)
     {
         _cancellationToken.ThrowIfCancellationRequested();
         if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
         { throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");
         var entry = _builder.CreateBlock("entry");
-        _builder.SetEntry(entry);
+        if (_frame == null)
+        { _builder.SetEntry(entry); }
+        else
+        { _frame.Entry = entry; }
         if (_context.HasScalarSignature && _context.OwnsBody(graph.OriginalOperation) &&
             (HasUnsupportedRegion(graph.Root) || graph.Blocks.Any(block =>
                 block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow)))
-        { return LowerRegions(graph, entry, structural); }
+        { _regionStructural = structural; LowerRegions(graph, entry, structural); return; }
         if (!_context.HasScalarSignature || !_context.OwnsBody(graph.OriginalOperation) ||
             HasUnsupportedRegion(graph.Root) || !TrySelect(graph.Blocks[0], out var selected))
         {
             _abstentions.Add(new(structural, _context.HasScalarSignature ? FrontendAbstention.UnsupportedControlFlow : FrontendAbstention.UnsupportedType));
-            _builder.Return(entry, structural);
-            return Result();
+            Return(entry, structural);
+            return;
         }
         foreach (var binding in _context.Parameters)
         {
@@ -60,7 +69,12 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
         _ordinaryExceptionalExit = exceptionalExit;
         _builder.ExceptionalExit(exceptionalExit, structural);
-        _expressions = new(_context, _builder, exceptionalExit) { Spend = SpendRegion, SourceCall = InlineSourceCall };
+        _expressions = new(_context, _builder, exceptionalExit)
+        {
+            Spend = SpendRegion,
+            SourceCall = InlineSourceCall,
+            ExceptionTarget = _frame == null ? null : (kind, site) => _frame.Search(kind, site, static target => target)
+        };
         _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
         foreach (var source in selected)
         {
@@ -82,11 +96,11 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 {
                     var value = Value(returnOperation, block);
                     _builder.Assign(value.Continuation, site, result, value.Value);
-                    _builder.Return(value.Continuation, site, _context.Factory.Variable(result));
+                    Return(value.Continuation, site, _context.Factory.Variable(result));
                 }
                 else
                 {
-                    _builder.Return(block, site);
+                    Return(block, site);
                 }
             }
             else if (source.Kind == BasicBlockKind.Exit)
@@ -98,7 +112,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                     ? _context.Factory.GetVariableInfo(exitResult).Type == _context.Factory.BooleanType
                         ? _context.Factory.Boolean(false) : _context.Factory.Integer(_context.Factory.GetVariableInfo(exitResult).Type, 0L)
                     : null;
-                _builder.Return(block, site, filler);
+                Return(block, site, filler);
             }
             else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                 branch?.Destination is { } fallThrough && source.ConditionalSuccessor?.Destination is { } conditional)
@@ -115,10 +129,17 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             else
             {
                 _abstentions.Add(new(site, FrontendAbstention.UnsupportedControlFlow));
-                _builder.Return(block, site);
+                Return(block, site);
             }
         }
-        return Result();
+    }
+
+    private void Return(IrBlockId block, OperationId site, IrTerm? value = null)
+    {
+        if (_frame == null)
+        { _builder.Return(block, site, value); }
+        else
+        { _frame.Return(block, site, value); }
     }
 
     private IrBlockId Statement(IOperation operation, IrBlockId block)

@@ -32,7 +32,7 @@ public sealed class TypedSourceCallLoweringTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public void CrossFrameFilterSearchWithFinallyRemainsClosed(bool transitive)
+    public void CrossFrameFilterSearchPrecedesFinallyUnwind(bool transitive)
     {
         var forwarding = transitive ? "static int Forward(int value) { return Callee(value); }" : "";
         var call = transitive ? "Forward(x)" : "Callee(x)";
@@ -40,7 +40,11 @@ public sealed class TypedSourceCallLoweringTests
             "; } catch (System.DivideByZeroException) when (++x > 0) { return 7; } catch (System.OverflowException) { return x; } } " +
             forwarding + " static int Callee(int value) { try { return 10 / value; } finally { value = checked((byte)(value + 256)); } }");
         Assert.That(subject.Invoke([0]), Is.EqualTo(1));
-        Assert.That(subject.LowerSourceCalls().IsExact, Is.False, "Cross-frame search must precede the callee finally.");
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.True);
+        var execution = subject.Execute(lowering, [0]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(1)));
     }
 
     [Test]

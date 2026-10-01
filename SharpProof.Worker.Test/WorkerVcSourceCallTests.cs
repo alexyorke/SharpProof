@@ -81,14 +81,25 @@ public sealed class WorkerVcSourceCallTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public async Task CrossFrameFilterFinallyEvidenceRemainsUnenrolled(bool transitive)
+    public async Task CrossFrameFilterFinallyEvidenceRefutesTheFalseOriginalPostcondition(bool transitive)
     {
         var source = transitive ? FilterUnwindSource.Replace("return Callee(x);", "return Forward(x);", StringComparison.Ordinal)
             .Replace("private static int Callee", "private static int Forward(int value) { return Callee(value); } private static int Callee", StringComparison.Ordinal)
             : FilterUnwindSource;
         using var project = new ShadowTestProject(source, cacheEnabled: true);
         var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
-        Assert.That(target.Total, Is.Null, "Compiled C# returns1; the post-unwind inliner cannot model its prior caller filter.");
+        Assert.That(target.Total, Is.Not.Null);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var refuted = await solver.VerifyEnsuresAsync(0);
+        Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
+        Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(target.Total!.Parameters.Select(parameter => parameter.Entry)));
+        var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, refuted.EntryModel);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(1)));
         using var environment = new ShadowEnvironment("shadow");
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         WorkerVcShadowReport? report = null;
@@ -100,11 +111,12 @@ public sealed class WorkerVcSourceCallTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var row = report!.Rows.Single();
-            Assert.That(row.TotalPresent, Is.False);
-            Assert.That(row.Enrolled, Is.False);
-            Assert.That(row.Checked, Is.False);
-            Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(report.CoverageComplete, Is.False);
+            Assert.That(row.TotalPresent, Is.True);
+            Assert.That(row.Enrolled, Is.True);
+            Assert.That(row.Checked, Is.True);
+            Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(report.CoverageComplete, Is.True);
+            Assert.That(report.SoundnessDisagreements, Is.Zero);
         }
     }
 
