@@ -35,6 +35,11 @@ public sealed class TotalLoweringContext
     }
 
     internal TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document)
+        : this(factory, target, document, 0)
+    {
+    }
+
+    private TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document, int leadingParameters)
     {
         Factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         Target = ArgumentNullGuard.NotNull(target, nameof(target));
@@ -44,7 +49,7 @@ public sealed class TotalLoweringContext
             throw new ArgumentException("Candidate lowering requires Total IR semantics.", nameof(factory));
         }
         _types = new RoslynTypeMapper(factory);
-        Parameters = [.. target.Parameters.Select(parameter =>
+        Parameters = [.. target.Parameters.Skip(leadingParameters).Select(parameter =>
         {
             var type = _types.GetTypeId(parameter.Type);
             return new TotalParameterBinding(parameter,
@@ -62,13 +67,19 @@ public sealed class TotalLoweringContext
     {
         return new(Factory, target, _document);
     }
+    internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
+    {
+        return new(Factory, target, _document, omitReceiver ? 1 : 0);
+    }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
     public IrVarId? Result { get; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.
     public ImmutableArray<IrVarId> EntryVariables => [.. Parameters.Select(binding => binding.Entry)];
 
-    internal bool HasScalarSignature => Target.IsStatic && !Target.IsAsync && Target.Arity == 0 && !Target.ContainingType.IsGenericType &&
+    internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind == MethodKind.Ordinary &&
+        !Target.IsVirtual && !Target.IsAbstract && !Target.IsOverride) &&
+        !Target.IsAsync && Target.Arity == 0 && !Target.ContainingType.IsGenericType &&
         Target.PartialDefinitionPart == null && Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&

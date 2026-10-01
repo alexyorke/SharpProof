@@ -59,7 +59,11 @@ public sealed partial class ContractBinder
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
-        var clauseContext = resolution.UsesCompanion ? context.CreateFrame(resolution.Source) : context;
+        var omitReceiver = resolution.UsesCompanion && !context.Target.IsStatic;
+        if (omitReceiver && (resolution.Source.Parameters.Length == 0 || resolution.Source.Parameters[0].RefKind != RefKind.None ||
+            !SymbolEqualityComparer.Default.Equals(resolution.Source.Parameters[0].Type, context.Target.ContainingType)))
+        { return Fail(ContractBindingFailure.UnsupportedTarget); }
+        var clauseContext = resolution.UsesCompanion ? context.CreateContractFrame(resolution.Source, omitReceiver) : context;
         if (!clauseContext.HasScalarSignature || resolution.Inventory.ImplementationBody == null ||
             !clauseContext.OwnsBody(resolution.Inventory.ImplementationBody) ||
             clauseContext.Parameters.Length != context.Parameters.Length)

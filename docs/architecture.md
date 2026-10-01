@@ -400,11 +400,15 @@ signedness and width, including `ulong`; bounds outside the scalar domain fold
 to Boolean comparisons rather than wrapping. Attribute source spans and manifest
 evidence remain bound through the version 26 compiler artifact. Direct clauses
 precede return attributes, and parameter attributes use immutable entry values.
-Static companion clauses bind in a separate clause context and substitute
+Companion clauses bind in a separate clause context and substitute
 parameters by ordinal into the target's entry, current, and Old identities.
 Companion source spans and evidence remain bound to the manifest. Verification
 and concrete replay execute the original target body; the companion body supplies
-only its validated clauses. Instance companion signatures remain unsupported.
+only its validated clauses. Ordinary nonvirtual instance bodies may use scalar
+parameters and supported reference observations. Instance companion binding
+omits its receiver parameter only after validating its exact declaring type;
+clauses that read receiver state remain unsupported. Instance calls inside bodies
+and virtual or override instance roots remain unsupported.
 The shadow comparison consumes the same Total-to-worker claim projection needed
 by the authority transition. It names counterexamples from canonical Total entry
 parameters rather than legacy variable ids, preserves full unsigned values, and

@@ -12,13 +12,17 @@ public sealed class NativeWorkerRoutingTests
 {
     [TestCase("value", WorkerClaimOutcome.Proven)]
     [TestCase("0", WorkerClaimOutcome.Refuted)]
-    public async Task NativeWorkerUsesCompanionClausesWithTheOriginalTargetBody(string returned, WorkerClaimOutcome outcome)
+    [TestCase("value", WorkerClaimOutcome.Proven, true)]
+    [TestCase("0", WorkerClaimOutcome.Refuted, true)]
+    public async Task NativeWorkerUsesCompanionClausesWithTheOriginalTargetBody(string returned, WorkerClaimOutcome outcome, bool instance = false)
     {
+        var modifier = instance ? "" : "static";
+        var receiver = instance ? "Subject receiver, " : "";
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
-            public static class Subject { public static int Target(int value) { return {{returned}}; } }
+            public {{modifier}} class Subject { public {{modifier}} int Target(int value) { return {{returned}}; } }
             [ContractFor(typeof(Subject))] public static class SubjectContracts {
-                public static int Target(int contractValue) {
+                public static int Target({{receiver}}int contractValue) {
                     Contract.Requires(contractValue > 0);
                     Contract.Ensures(Contract.Result<int>() == Contract.Old(contractValue));
                     return contractValue;
@@ -60,12 +64,14 @@ public sealed class NativeWorkerRoutingTests
 
     [TestCase("int")]
     [TestCase("ulong")]
-    public async Task NativeWorkerCombinesParameterAttributesDirectClausesAndReturnAttributes(string type)
+    [TestCase("int", true)]
+    public async Task NativeWorkerCombinesParameterAttributesDirectClausesAndReturnAttributes(string type, bool instance = false)
     {
+        var modifier = instance ? "" : "static";
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
-            public static class Subject {
-                [return: Positive] public static {{type}} Target([InRange(1, 10)] {{type}} value) {
+            public {{modifier}} class Subject {
+                [return: Positive] public {{modifier}} {{type}} Target([InRange(1, 10)] {{type}} value) {
                     Contract.Ensures(Contract.Result<{{type}}>() == value);
                     return value;
                 }
@@ -75,6 +81,43 @@ public sealed class NativeWorkerRoutingTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [TestCase("Contract.Result<int>() == receiver.State")]
+    [TestCase("Contract.Result<int>() == (receiver == null ? 0 : contractValue)")]
+    public async Task ReceiverDependentCompanionClausesRemainUnsupported(string clause)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public class Subject { public int State; public int Target(int value) { return value; } }
+            [ContractFor(typeof(Subject))] public static class SubjectContracts {
+                public static int Target(Subject receiver, int contractValue) {
+                    Contract.Ensures({{clause}});
+                    return contractValue;
+                }
+            }
+            """);
+        Assert.That(project.Snapshot.Callables.Single().Total, Is.Null);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task VirtualInstanceBodiesRemainUnsupported()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public class Subject {
+                public virtual int Target(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; }
+            }
+            """);
+        Assert.That(project.Snapshot.Callables.Single().Total, Is.Null);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
 
@@ -227,7 +270,13 @@ public sealed class NativeWorkerRoutingTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
         Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
         var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
-        Assert.That(pending.Reason, Is.EqualTo(projectTimeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.Canceled));
+        if (projectTimeout)
+        {
+            // Both budgets expire together; either timer may signal first.
+            Assert.That(pending.Reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout).Or.EqualTo(WorkerClaimReason.MethodTimeout));
+        }
+        else
+        { Assert.That(pending.Reason, Is.EqualTo(WorkerClaimReason.Canceled)); }
         Assert.That(response.RunStatus, Is.EqualTo(projectTimeout ? WorkerRunStatus.TimedOut : WorkerRunStatus.Canceled));
         if (separateCallable)
         {
@@ -235,6 +284,20 @@ public sealed class NativeWorkerRoutingTests
             Assert.That(response.CallableResults.Last().Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
         }
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task ExplicitProjectBoundaryRetainsNativeProofAndClassifiesPendingClaim()
+    {
+        using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
+        using var boundary = new CancellationTokenSource();
+        var target = project.Snapshot.Callables.Single();
+        using var backend = new StallAfterQueriesBackend(target.Total!.Program.Factory, project.Request.Budgets.QueryRlimit, boundary.Cancel);
+        var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, project.Request.Budgets,
+            null, project.Request.Budgets.MethodWallTimeMilliseconds, boundary, CancellationToken.None);
+        Assert.That(result.Claims.Count(claim => claim.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        Assert.That(result.Claims.Single(claim => claim.Outcome == WorkerClaimOutcome.Unknown).Reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
+        Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.ProjectTimeout));
     }
 
     private sealed class StallAfterQueriesBackend : ISmtBackend, IDisposable
