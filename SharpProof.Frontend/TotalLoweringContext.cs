@@ -80,7 +80,7 @@ public sealed class TotalLoweringContext
     internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind == MethodKind.Ordinary &&
         !Target.IsVirtual && !Target.IsAbstract && !Target.IsOverride) &&
         !Target.IsAsync && Target.Arity == 0 && !Target.ContainingType.IsGenericType &&
-        Target.PartialDefinitionPart == null && Target.PartialImplementationPart == null &&
+        Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&

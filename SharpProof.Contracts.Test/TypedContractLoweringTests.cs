@@ -284,7 +284,7 @@ public sealed class TypedContractLoweringTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public void RelatedPartialParameterSymbolsAbstainBeforeClauseLowering(bool implementationContext)
+    public void PartialImplementationsBindTheirOwnParameterSymbols(bool implementationContext)
     {
         var subject = Subject.Create("""
             using SharpProof.Attributes;
@@ -296,8 +296,9 @@ public sealed class TypedContractLoweringTests
                 }
             }
             """, implementationContext: implementationContext);
-        Assert.That(subject.Bind().Failure, Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
-        Assert.That(subject.Lower().IsExact, Is.False);
+        Assert.That(subject.Bind().Failure, Is.EqualTo(implementationContext
+            ? ContractBindingFailure.None : ContractBindingFailure.UnsupportedTarget));
+        Assert.That(subject.Lower().IsExact, Is.EqualTo(implementationContext));
     }
 
     [Test]

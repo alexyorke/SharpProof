@@ -72,6 +72,15 @@ internal static class TotalCallableVerifier
         { return; }
         var total = preparation.Total!;
         var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
+        var deep = ensures.Select(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
+            IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth).ToArray();
+        if (deep.Any(value => value))
+        {
+            candidate = new(candidate.CallableId, candidate.Program, candidate.Parameters, candidate.Result,
+                candidate.Requires, [.. candidate.Ensures.Select((clause, index) => deep[index]
+                    ? new PassiveContractClause(candidate.Factory.Boolean(true), candidate.Factory.Boolean(true), clause.Operation)
+                    : clause)], candidate.IsBodyAbstraction);
+        }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var constructionReason, cancellationToken))
         {
             foreach (var clause in ensures)
@@ -101,6 +110,11 @@ internal static class TotalCallableVerifier
         {
             cancellationToken.ThrowIfCancellationRequested();
             var claimId = ensures[ordinal].ClaimId!;
+            if (deep[ordinal])
+            {
+                PublishUnchecked(claimId, false, WorkerClaimReason.DeepPostcondition);
+                continue;
+            }
             if (feasibility.Kind == PassiveCallableFeasibilityKind.Unknown && !solver.CanCheckWithoutNormalWitness)
             {
                 publish(new(claimId, true, false, feasibility.Evidence, feasibility.Kind, WorkerVacuityKind.None, []));

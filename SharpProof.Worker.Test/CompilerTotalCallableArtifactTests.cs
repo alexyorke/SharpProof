@@ -528,13 +528,14 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
     }
 
-    internal static CompilerManifestArtifact CreateArtifact(string source)
+    internal static CompilerManifestArtifact CreateArtifact(string source,
+        int maximumExpressionDepth = WorkerBudgets.DefaultMaximumExpressionDepth)
     {
         var compilation = TestCompilation.Create("TotalArtifact", ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            maximumExpressionDepth, CancellationToken.None);
     }
 
     private static CompilerCallablePreparation RoundTrip(string source)
