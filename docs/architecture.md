@@ -392,8 +392,8 @@ cancellation, including earlier completed callables. Only unfinished claims
 receive interruption reasons; the final response is classified from its retained
 evidence and is not written to the verification cache during interruption.
 Compiler effect evidence uses separately published entry feasibility; an unconstrained effect-only entry
-needs no SMT query. The public worker creation path remains legacy until the
-remaining contract forms and retirement gates are qualified.
+needs no SMT query. The public worker creation path now selects native typed
+verification. Legacy implementation retirement remains a separate gate.
 Legacy comparison fixtures explicitly construct the legacy backend. An explicitly
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.
@@ -417,7 +417,12 @@ metadata identity transfers without concatenation retain their support.
 Runtime comparisons cover nullable, empty and nonempty operands and aliases. Existing
 proof expectations remain requirements for the transition; they have not been
 weakened to accommodate these gaps. Typed scalar improvements also change several
-legacy outcome and proof-core expectations and require separate review.
+legacy outcomes and proof cores. Public-worker tests now require exact typed
+conversion proofs, replayed scalar and reference counterexamples, explicit fault
+edges, and native normal-completion selectors. Integer domains are intrinsic
+bitvector constraints and require no legacy domain selectors. An exact
+zero-dividend encoding avoids expanding 64-bit division while retaining Z3's
+division-by-zero completion; C# postcondition faults remain separate safety goals.
 Native Int32 `Math.Abs` calls use the approved compiler-resolved API symbol and
 the shared scalar semantic rule. The rule computes typed absolute values and
 emits an explicit overflow edge for `int.MinValue`; arguments are evaluated

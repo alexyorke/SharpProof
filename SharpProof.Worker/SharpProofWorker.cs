@@ -50,9 +50,9 @@ public sealed class SharpProofWorker : IDisposable
             {
                 ContainerNativeLibrary.InstallZ3ResolverRequired(
                     typeof(Microsoft.Z3.Context).Assembly);
-                return new IrSmtBackend(
+                return new NativeCallableBackend(
                     new IrSmtBackendOptions(queryRlimit));
-            }, queryRlimit);
+            }, queryRlimit, nativeAuthority: true);
     }
     internal static SharpProofWorker CreateNative(WorkerBudgets budgets)
     {

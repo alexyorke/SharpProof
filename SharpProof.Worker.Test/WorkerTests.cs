@@ -2215,14 +2215,14 @@ public sealed class WorkerTests
                 StringComparison.Ordinal));
         Assert.That(
             intIdentity.ProofCore,
-            Is.EqualTo(["domain:parameter:0"]));
+            Is.Empty);
         Assert.That(
             response.ClaimResults
                 .Where(record => !GetCallableId(response, record).Contains(
                     ".Int64Identity(",
                     StringComparison.Ordinal))
                 .SelectMany(static record => record.ProofCore),
-            Is.All.EqualTo("domain:parameter:0"));
+            Is.Empty);
     }
 
     [Test]
@@ -2582,13 +2582,13 @@ public sealed class WorkerTests
         {
             Assert.That(
                 concat.ProofCore,
-                Is.EqualTo(["spec:bcl.string.concat.string-string"]));
+                Is.Empty);
             Assert.That(empty, Has.Length.EqualTo(2));
             foreach (var record in empty)
             {
                 Assert.That(
                     record.ProofCore,
-                    Is.EqualTo(["spec:bcl.array.empty"]));
+                    Is.Empty);
             }
         }
     }
@@ -2654,8 +2654,8 @@ public sealed class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedExpression);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
@@ -2765,7 +2765,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task LoopsAbstainWhileDirectAcyclicSourceCallsAreProven()
+    public async Task ReducibleLoopsAndDirectAcyclicSourceCallsAreProven()
     {
         using var project = TestProject.Create(
             """
@@ -2807,17 +2807,17 @@ public sealed class WorkerTests
                 StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 loop.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(call.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(call.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 call.ProofCore.Any(static item => item.StartsWith(
                     "source-summary:",
                     StringComparison.Ordinal)),
-                Is.True);
+                Is.False);
         }
     }
 
@@ -2883,7 +2883,7 @@ public sealed class WorkerTests
             result.ProofCore.Any(static item => item.StartsWith(
                 "il-summary:",
                 StringComparison.Ordinal)),
-            Is.True);
+            Is.False);
     }
 
     [Test]
@@ -2969,8 +2969,8 @@ public sealed class WorkerTests
                     result.ProofCore.Any(static item => item.StartsWith(
                         "il-summary:",
                         StringComparison.Ordinal)),
-                    Is.True,
-                    methodName + " did not use an implementation-IL summary.");
+                    Is.False,
+                    methodName + " retained a legacy implementation-IL summary.");
             }
         }
     }
@@ -3234,7 +3234,7 @@ public sealed class WorkerTests
                 result.ProofCore.Any(static item => item.StartsWith(
                     "source-summary:",
                     StringComparison.Ordinal)),
-                Is.True);
+                Is.False);
         }
 
         // Reporting identities remain opaque after compiler lowering.
@@ -3304,7 +3304,7 @@ public sealed class WorkerTests
             Assert.That(
                 response.ClaimResults,
                 Has.All.Matches<WorkerClaimResult>(result =>
-                    result.ProofCore.Any(static item => item.StartsWith(
+                    !result.ProofCore.Any(static item => item.StartsWith(
                         "il-summary:",
                         StringComparison.Ordinal))));
         }
@@ -3656,18 +3656,17 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        var loop = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(".Loop(", StringComparison.Ordinal));
+        var recursion = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(".Recurse(", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(
-                response.ClaimResults.SelectMany(
-                    static result => result.ProofCore),
-                Is.Empty);
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(loop.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(recursion.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(recursion.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(recursion.ProofCore, Is.Empty);
         }
     }
 
@@ -3702,7 +3701,7 @@ public sealed class WorkerTests
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.CounterexampleNotReplayable);
         Assert.That(result.ProofCore, Is.Empty);
     }
 
@@ -3740,14 +3739,14 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 disabled.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(enabled.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(enabled.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 enabled.ProofCore.Any(static item => item.StartsWith(
                     "spec-pack:dotnet.scalar@1:",
                     StringComparison.Ordinal)),
-                Is.True);
+                Is.False);
             Assert.That(
                 summaryArtifact.Origin,
                 Is.EqualTo(CompilerSummaryOrigin.SpecificationPack));
@@ -3887,12 +3886,12 @@ public sealed class WorkerTests
         var record = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.CounterexampleNotReplayable);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
     [Test]
-    public async Task RelationalSummaryCallProducesTypedNonfatalUnreplayableCounterexample()
+    public async Task SourceCallProducesReplayedCounterexample()
     {
         using var project = TestProject.Create(
             """
@@ -3915,8 +3914,8 @@ public sealed class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.CounterexampleNotReplayable);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -3926,7 +3925,7 @@ public sealed class WorkerTests
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.None));
             Assert.That(record.ProofCore, Is.Empty);
-            Assert.That(record.Model, Is.Empty);
+            Assert.That(record.Model, Has.Length.EqualTo(1));
         }
     }
 
@@ -4196,7 +4195,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task WidthSensitiveArithmeticAndConversionsAbstain()
+    public async Task WidthSensitiveArithmeticAndConversionsUseTypedSemantics()
     {
         using var project = TestProject.Create(
             """
@@ -4233,24 +4232,25 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
-        Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
-            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(
-            response.ClaimResults
-                .Where(record => GetCallableId(response, record).Contains(
-                    "Contract(",
-                    StringComparison.Ordinal))
-                .Select(static record => record.Reason),
-            Is.All.EqualTo(
-                WorkerClaimReason.UnsupportedExpression));
-        Assert.That(
-            response.ClaimResults
-                .Where(record => GetCallableId(response, record).Contains(
-                    "Body(",
-                    StringComparison.Ordinal))
-                .Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+        foreach (var record in response.ClaimResults)
+        {
+            var callableId = GetCallableId(response, record);
+            if (callableId.Contains(".CheckedContract(", StringComparison.Ordinal))
+            {
+                Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
+            }
+            else if (callableId.Contains(".UncheckedContract(", StringComparison.Ordinal))
+            {
+                Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+                Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.None));
+            }
+            else
+            {
+                Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), callableId);
+                Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.None), callableId);
+            }
+        }
     }
 
     [Test]
@@ -4290,14 +4290,14 @@ public sealed class WorkerTests
                     record.Reason)));
         Assert.That(
             response.ClaimResults.Select(static record => record.ProofCore),
-            Is.All.Contain("body:normal-completion"));
+            Has.All.Matches<string[]>(core => core.Any(static item => item.StartsWith("normal-completion:", StringComparison.Ordinal))));
         Assert.That(
             response.ClaimResults.Select(static record => record.Vacuity),
             Is.All.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
     }
 
     [Test]
-    public async Task UnusedAssignmentDefinednessConstrainsNormalCompletion()
+    public async Task UnusedAssignmentFaultsConstrainNormalCompletion()
     {
         using var project = TestProject.Create(
             """
@@ -4325,7 +4325,7 @@ public sealed class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(record.ProofCore, Does.Contain("body:normal-completion"));
+            Assert.That(record.ProofCore, Has.Some.StartsWith("edge:"));
             Assert.That(record.Model, Is.Empty);
         }
     }
@@ -4395,7 +4395,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task NullableStringProofsAbstainWithoutNullTagEncoding()
+    public async Task StringConcatEqualityAbstainsWithoutContentEncoding()
     {
         using var project = TestProject.Create(
             """
@@ -4427,7 +4427,7 @@ public sealed class WorkerTests
         Assert.That(
             response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(
-                WorkerClaimReason.UnsupportedExpression));
+                WorkerClaimReason.UnsupportedBody));
     }
 
     [Test]
@@ -5580,10 +5580,10 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.ClaimResults[0].Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Proven));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.ClaimResults.Skip(1).Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 

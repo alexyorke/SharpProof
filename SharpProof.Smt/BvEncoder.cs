@@ -105,6 +105,16 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             throw new UnsupportedIrEncodingException();
         }
+        if (binary.Left is IrIntegerTerm { Bits: 0 } && binary.Operator is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
+        {
+            var width = factory.GetTypeInfo(binary.Left.Type).Width;
+            var zero = owner.Own(context.MkBV(0, (uint)width));
+            if (binary.Operator == IrBinaryOperator.Remainder)
+            { return zero; }
+            var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
+            return owner.Own(context.MkITE(owner.Own(context.MkEq(y, zero)),
+                owner.Own(context.MkBV(mask, (uint)width)), zero));
+        }
         var signed = factory.GetTypeInfo(binary.Left.Type).Signed;
         return owner.Own(binary.Operator switch
         {

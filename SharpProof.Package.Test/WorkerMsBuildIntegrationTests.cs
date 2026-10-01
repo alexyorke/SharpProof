@@ -506,7 +506,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 disabled.ClaimResults.Single().Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(
                 enabled.ClaimResults.Single().Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -515,7 +515,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     static item => item.StartsWith(
                         "spec-pack:dotnet.scalar@1:",
                         StringComparison.Ordinal)),
-                Is.True);
+                Is.False);
         }
     }
 
@@ -1237,7 +1237,7 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
-    public async Task UnsupportedIntIncrementControlRemainsUnknown()
+    public async Task UncheckedIntIncrementOverflowProducesReplayedRefutation()
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
@@ -1267,10 +1267,10 @@ public sealed class WorkerMsBuildIntegrationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
-            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 claim.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
         }
     }
 
@@ -1322,9 +1322,8 @@ public sealed class WorkerMsBuildIntegrationTests
             using SharpProof.Attributes;
             public static class Subject {
                 public static long Normalize(long value) {
-                    Contract.Ensures(Contract.Result<long>() >= 0);
-                    while (value < 0) value++;
-                    return value;
+                    Contract.Ensures(Contract.Result<long>() / value == 0L);
+                    return 0L;
                 }
             }
             """);

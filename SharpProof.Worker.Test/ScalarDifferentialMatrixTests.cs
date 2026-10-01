@@ -573,7 +573,7 @@ public sealed class ScalarDifferentialMatrixTests
                         item.MethodName);
                     Assert.That(
                         result.ProofCore,
-                        Does.Contain("body:normal-completion"),
+                        Has.Some.StartsWith("normal-completion:"),
                         item.MethodName);
                 }
             }
@@ -581,7 +581,7 @@ public sealed class ScalarDifferentialMatrixTests
     }
 
     [Test]
-    public async Task WidthSensitiveConversionsRemainTypedUnknown()
+    public async Task WidthSensitiveConversionsAreProvenWithTypedSemantics()
     {
         using var project = DifferentialProject.Create(
             CreateUnsupportedConversionSource());
@@ -602,10 +602,10 @@ public sealed class ScalarDifferentialMatrixTests
             Assert.That(conversions, Has.Length.EqualTo(4));
             Assert.That(
                 conversions.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 conversions.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.All.EqualTo(WorkerClaimReason.None));
         }
     }
 

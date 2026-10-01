@@ -59,7 +59,10 @@ public sealed class TotalBitVectorOracleTests
                             new LoweredJustification(factory.CreateOperation()))
                     };
                     var query = new VerificationQuery(factory, assumptions,
-                        new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
+                        new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.AndAlso,
+                            factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
+                            factory.Binary(IrBinaryOperator.Equal, factory.Binary(operation, factory.IntegerBits(type, left), factory.Variable(y)),
+                                factory.IntegerBits(type, expected))),
                             ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)));
                     var solved = await session.CheckAsync(query, CancellationToken.None);
                     Assert.That(solved.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable),
