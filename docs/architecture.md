@@ -255,6 +255,13 @@ cross-module dependency calls remain closed. Nonrecursive exact same-module
 dependencies are supported. Broader typed metadata coverage remains required
 before the Phase 2 exit.
 
+The compiled metadata conversion matrix checks all 162 source/target/mode pairs
+across the nine integral C# types, including char, in checked and unchecked mode.
+Each pair round-trips the real collector artifact and compares original IR with
+compiled execution at source limits, target limits and adjacent values within
+the source domain. These boundary checks supplement the seeded metadata oracle;
+they do not exhaust every input value or qualify unsupported IL operations.
+
 The Total source candidate also admits object, string and single-dimensional
 arrays of scalar, object or string elements for null, copy, identity and length
 observations. Reads from scalar arrays with int/uint indexes also emit ordered
