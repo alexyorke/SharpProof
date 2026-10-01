@@ -58,13 +58,17 @@ public sealed class TotalLoweringContext
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
     internal object Origin { get; } = new();
+    internal TotalLoweringContext CreateFrame(IMethodSymbol target)
+    {
+        return new(Factory, target, _document);
+    }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
     public IrVarId? Result { get; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.
     public ImmutableArray<IrVarId> EntryVariables => [.. Parameters.Select(binding => binding.Entry)];
 
-    internal bool HasScalarSignature => Target.IsStatic && Target.Arity == 0 && !Target.ContainingType.IsGenericType &&
+    internal bool HasScalarSignature => Target.IsStatic && !Target.IsAsync && Target.Arity == 0 && !Target.ContainingType.IsGenericType &&
         Target.PartialDefinitionPart == null && Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&

@@ -92,14 +92,26 @@ public sealed class WorkerVcShadowSourceGateTests
         new("cyclic-caught-loop", WorkerVcCyclicRegionTests.CaughtLoopSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("cyclic-repeated-filter-completed", WorkerVcCyclicRegionTests.RepeatedFilterSource.Replace(
             "Contract.Ensures(Contract.Result<int>() == 0);", "", StringComparison.Ordinal), [WorkerClaimOutcome.Unknown], Reason: WorkerClaimReason.SolverIncomplete),
-        new("guarded-rethrow-normal-return", WorkerVcCyclicRegionTests.GuardedRethrowSource, [WorkerClaimOutcome.Refuted])
+        new("guarded-rethrow-normal-return", WorkerVcCyclicRegionTests.GuardedRethrowSource, [WorkerClaimOutcome.Refuted]),
+        new("source-call-scalar", WorkerVcSourceCallTests.ScalarCallSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("source-call-argument-capture", WorkerVcSourceCallTests.ArgumentCaptureSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("source-call-loop-frames", WorkerVcSourceCallTests.LoopCallSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("source-call-ulong-default", WorkerVcSourceCallTests.FullUlongCallSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("source-call-cross-filter-finally-closed", WorkerVcSourceCallTests.FilterUnwindSource,
+            [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody),
+        new("async-root-closed", """
+            using SharpProof.Attributes;
+            public static class Subject { public static async void Target(int x) {
+                Contract.Ensures(false); throw null!;
+            } }
+            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody)
     ];
 
     [Test]
     public async Task DefinedSourceWorkerUniverseAccountsForEveryPostconditionWithoutEmptyExitSuccess()
     {
         Assert.That(Universe.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
-        Assert.That(Universe.Length, Is.EqualTo(28));
+        Assert.That(Universe.Length, Is.EqualTo(34));
         using var environment = new ShadowEnvironment("shadow");
         var rows = new List<WorkerVcShadowRow>();
         var manifestPostconditions = 0;
@@ -116,13 +128,13 @@ public sealed class WorkerVcShadowSourceGateTests
             rows.AddRange(report!.Rows);
             await TestContext.Out.WriteLineAsync($"source-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} oldProven={report.OldProven} newProven={report.NewProven} disagreements={report.SoundnessDisagreements}");
         }
-        Assert.That(manifestPostconditions, Is.EqualTo(39));
+        Assert.That(manifestPostconditions, Is.EqualTo(49));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(38));
-        Assert.That(aggregate.Unenrolled, Is.EqualTo(1));
-        Assert.That(aggregate.Checked, Is.EqualTo(38));
-        Assert.That(aggregate.Unknown, Is.EqualTo(4));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(46));
+        Assert.That(aggregate.Unenrolled, Is.EqualTo(3));
+        Assert.That(aggregate.Checked, Is.EqualTo(46));
+        Assert.That(aggregate.Unknown, Is.EqualTo(6));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);

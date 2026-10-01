@@ -42,7 +42,12 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         if (graph == null)
         { return null; }
-        var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, cancellationToken);
+        var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var contracts = new ContractBinder(compilation, context.Factory).BindTotal(frame);
+            return contracts.IsSuccess && contracts.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
+        }, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }

@@ -2,7 +2,8 @@ namespace SharpProof.Frontend;
 
 // Candidate scalar CFG. The bounded region route is separate from the
 // unchanged ordinary CFG path; unsupported forms remain incomplete.
-internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext context, CancellationToken cancellationToken)
+internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext context, CancellationToken cancellationToken,
+    TotalSourceCallSession? calls = null, bool externalFilterSearch = false)
 {
     private readonly TotalLoweringContext _context = context;
     private readonly IrProgramBuilder _builder = new(context.Factory);
@@ -10,15 +11,22 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private readonly Dictionary<BasicBlock, IrBlockId> _blocks = [];
     private RoslynTotalExpressionLowerer _expressions = null!;
     private readonly CancellationToken _cancellationToken = cancellationToken;
+    private readonly TotalSourceCallSession? _calls = calls;
+    private readonly bool _externalFilterSearch = externalFilterSearch;
+    private IrBlockId _ordinaryExceptionalExit;
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
+        if (_calls != null && !_calls.Enter(_context.Target))
+        { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
         try
         {
             return LowerCore(graph);
         }
         catch (RegionIncompleteException)
         { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
+        finally
+        { _calls?.Leave(_context.Target); }
     }
 
     private FrontendProgramLoweringResult LowerCore(ControlFlowGraph graph)
@@ -50,8 +58,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             _blocks.Add(block, _builder.CreateBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
         }
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
+        _ordinaryExceptionalExit = exceptionalExit;
         _builder.ExceptionalExit(exceptionalExit, structural);
-        _expressions = new(_context, _builder, exceptionalExit) { Spend = SpendRegion };
+        _expressions = new(_context, _builder, exceptionalExit) { Spend = SpendRegion, SourceCall = InlineSourceCall };
         _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
         foreach (var source in selected)
         {
@@ -202,6 +211,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         while (pending.Count != 0)
         {
             _cancellationToken.ThrowIfCancellationRequested();
+            if (_calls != null)
+            { SpendRegion(); }
             if (--remaining < 0)
             { return true; }
             var current = pending.Pop();

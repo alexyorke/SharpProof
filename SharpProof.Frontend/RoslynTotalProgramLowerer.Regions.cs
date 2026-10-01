@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalProgramLowerer
 {
-    private const int MaximumRegionSteps = 4096;
+    internal const int MaximumRegionSteps = 4096;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private bounded lowering control flow.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1064", Justification = "Private bounded lowering control flow never escapes the lowering session.")]
     private sealed class RegionIncompleteException : Exception;
@@ -93,6 +93,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             _expressions = new(_context, _builder, _regionExceptionalExit)
             {
                 Spend = SpendRegion,
+                SourceCall = InlineSourceCall,
                 ExceptionTarget = (kind, site) => EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
                     ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))
             };
@@ -508,7 +509,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void SpendRegion()
     {
         _cancellationToken.ThrowIfCancellationRequested();
-        if (--_regionRemaining < 0)
+        if (_calls != null ? !_calls.Spend() : --_regionRemaining < 0)
         { throw new RegionIncompleteException(); }
     }
     private bool Inside(ControlFlowRegion candidate, ControlFlowRegion expected)

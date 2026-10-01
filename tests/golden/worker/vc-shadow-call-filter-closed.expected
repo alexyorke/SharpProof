@@ -1,0 +1,88 @@
+run: normal
+authority: legacy
+request-bindings: True
+cache: Written
+postconditions: 2
+enrolled: 0
+checked: 0
+unchecked: 2
+unenrolled: 2
+unknown: 2
+oldProven: 0
+newProven: 0
+oldVacuous: 0
+newVacuous: 0
+oldConditional: 0
+newConditional: 0
+soundnessDisagreements: 0
+precisionGains: 0
+precisionLosses: 0
+coverageComplete: False
+row: M:Subject.ADirect(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.BTransitive(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+run: cache-hit
+authority: legacy
+request-bindings: True
+cache: Hit
+postconditions: 2
+enrolled: 0
+checked: 0
+unchecked: 2
+unenrolled: 2
+unknown: 2
+oldProven: 0
+newProven: 0
+oldVacuous: 0
+newVacuous: 0
+oldConditional: 0
+newConditional: 0
+soundnessDisagreements: 0
+precisionGains: 0
+precisionLosses: 0
+coverageComplete: False
+row: M:Subject.ADirect(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.BTransitive(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False

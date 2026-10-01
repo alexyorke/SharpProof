@@ -20,6 +20,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal Func<IInvocationOperation, TotalParameterState, GuardedExpression?>? Intrinsic { get; set; }
     internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; set; }
     internal Action? Spend { get; set; }
+    internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
@@ -77,6 +78,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (depth < 256 && operation is IInvocationOperation invocation &&
+            SourceCall?.Invoke(invocation, block, depth) is { } called)
+        { return called; }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {

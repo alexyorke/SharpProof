@@ -158,6 +158,10 @@ internal sealed class TypedProgramSubject : IDisposable
     {
         return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context);
     }
+    internal FrontendProgramLoweringResult LowerSourceCalls(CancellationToken cancellationToken = default)
+    {
+        return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context, static _ => true, cancellationToken);
+    }
     internal IrProgramExecutionResult Execute(FrontendProgramLoweringResult lowering, object[] arguments)
     {
         return new IrProgramInterpreter(Factory).Execute(lowering.Program,

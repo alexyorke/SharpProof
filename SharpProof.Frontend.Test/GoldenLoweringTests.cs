@@ -50,7 +50,9 @@ public sealed class GoldenLoweringTests
                 contracts = new ContractBinder(compilation, factory).BindTotal(context);
             }
         }
+        var sourceCalls = fixture.Source.Contains("// golden-inline-source: true", StringComparison.Ordinal);
         var result = context == null ? new RoslynProgramLowerer(factory).Lower(graph)
+            : sourceCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, CancellationToken.None)
             : new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         var printer = new IrPrinter(factory);
         var terms = new Dictionary<IrId, IrTerm>();
@@ -105,6 +107,14 @@ public sealed class GoldenLoweringTests
             output.AppendLine(CultureInfo.InvariantCulture, $"diagnostic: {diagnostic.Operation} {diagnostic.Reason} {(description is { } text ? factory.GetString(text) : "none")}");
         }
         GoldenTest.Compare(fixture, output.ToString());
+
+        bool PrepareCallee(TotalLoweringContext frame)
+        {
+            if (!bindContracts)
+            { return true; }
+            var binding = new ContractBinder(compilation, factory).BindTotal(frame);
+            return binding.IsSuccess && binding.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
+        }
 
         string Variable(IrVarId id)
         {

@@ -209,9 +209,24 @@ in source order; local fault guards lead to Throw/ExceptionalExit. Clauses keep
 safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
-body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
-calls, ordinary irreducible loops and point Assume instructions inside cycles
+body evaluation. Async and partial/generic contexts, ref locals, heap operations,
+metadata calls, ordinary irreducible loops and point Assume instructions inside cycles
 currently abstain.
+The compiler-owned source-call route admits nonrecursive same-compilation static
+scalar methods. Each invocation evaluates arguments once in source order, maps
+them to parameter ordinals, and owns a fresh Entry/Current/Old/Result frame.
+Default arguments must be scalar constants. Callee contracts are erased without
+adding their Requires or Ensures as proof premises; callee Assume closes admission.
+All nested frames share the same construction cap and cancellation boundary.
+Original expanded IR retains callee returns, finally bodies, and escaping throw
+kind/site for replay and caller catch routing. Async, iterator, generic, ref/params,
+metadata and unmodeled type-initialization calls remain unsupported. A caller
+filter combined with a finally anywhere in its expanded callees also closes:
+exact cross-frame filter search must precede callee unwind, and the current
+standalone frame composition does not represent that order. This restriction
+propagates through intermediate callees and distinguishes absent evidence from
+a completed solver Unknown. Exact cross-frame search/unwind composition, typed
+metadata IL summaries and Ref/len remain required before the Phase 2 exit.
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and
 unary Plus/Minus use the same wrap value and guarded overflow rules in bodies
@@ -235,7 +250,7 @@ effects and resumes search for the original exception. The selected handler owns
 only the finally regions left on its route; a fault during unwind replaces the
 original exception and cancels the handler. Nested and sibling finally regions
 form inner-to-outer continuation chains, preserving captured returns throughout.
-Exception-object locals, object construction, calls, and heap effects remain
+Exception-object locals, object construction, unsupported calls, and heap effects remain
 incomplete. Scalar loops through catches/finally and generated cycles that search
 a shared filter again retain their original bodies for replay. Native enrollment
 uses the exception-component abstraction below; unsupported instructions and
