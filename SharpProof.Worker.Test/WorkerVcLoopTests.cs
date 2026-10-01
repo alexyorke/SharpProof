@@ -134,7 +134,7 @@ public sealed class WorkerVcLoopTests
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), kind + ": " + refuted.Reason);
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)
@@ -156,7 +156,7 @@ public sealed class WorkerVcLoopTests
     {
         using var project = new ShadowTestProject(BeyondSearchSource);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -185,7 +185,7 @@ public sealed class WorkerVcLoopTests
             } }
             """);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -208,7 +208,7 @@ public sealed class WorkerVcLoopTests
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

@@ -101,7 +101,7 @@ public sealed class WorkerVcRegionTests
         var check = await solver.VerifyEnsuresAsync(0);
         Assert.That(check.Outcome, Is.TypeOf<ProvenOutcome>(), check.Reason.ToString());
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -155,7 +155,7 @@ public sealed class WorkerVcRegionTests
             Assert.That(proven.BodyAssumptions, Does.Contain(point.Operation));
         }
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

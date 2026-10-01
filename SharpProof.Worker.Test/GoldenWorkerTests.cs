@@ -195,7 +195,7 @@ public sealed class GoldenWorkerTests
     private static async Task<string> VcShadow(ShadowTestProject project, bool stableClaimOrder = false)
     {
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         using var errors = new StringWriter(CultureInfo.InvariantCulture);
         var previous = Console.Error;
         var output = new StringBuilder();

@@ -2,6 +2,7 @@ using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Smt;
+using SharpProof.Host;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -58,7 +59,7 @@ public sealed class WorkerVcShadowTests
             Assert.That(skipped.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         }
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(budgets);
+        using var worker = project.CreateLegacyWorker(budgets);
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -123,7 +124,7 @@ public sealed class WorkerVcShadowTests
     public async Task ValidatedResponseSurvivesObservationSinkFailureOrCallerRace(bool cacheHit, bool ioFailure)
     {
         using var project = new ShadowTestProject(IdentitySource, cacheEnabled: true);
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         if (cacheHit)
         {
             using var disabled = new ShadowEnvironment(null);
@@ -157,7 +158,7 @@ public sealed class WorkerVcShadowTests
     public async Task CacheHitObservesPreparedIrAndLeavesAuthoritativeCacheBytesUnchanged()
     {
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource, cacheEnabled: true);
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVerifyResponse first;
         using (var disabled = new ShadowEnvironment(null))
         { first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None); }
@@ -185,11 +186,11 @@ public sealed class WorkerVcShadowTests
     [TestCase(null)]
     [TestCase("other")]
     [TestCase("SHADOW")]
-    public async Task DefaultAndUnrecognizedModesKeepLegacyRoute(string? mode)
+    public async Task LegacyQualificationProfileIgnoresUnrecognizedModes(string? mode)
     {
         using var project = new ShadowTestProject(IdentitySource);
         using var environment = new ShadowEnvironment(mode);
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         var reports = 0;
         worker.ShadowReportSink = _ => reports++;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -201,7 +202,7 @@ public sealed class WorkerVcShadowTests
     public async Task InterruptedShadowReportsRemainUncheckedAndRetainExactReason()
     {
         using var project = new ShadowTestProject(IdentitySource);
-        using var legacyWorker = SharpProofWorker.Create(project.Request.Budgets);
+        using var legacyWorker = project.CreateLegacyWorker();
         WorkerVerifyResponse authoritative;
         using (var disabled = new ShadowEnvironment(null))
         { authoritative = await legacyWorker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None); }
@@ -351,5 +352,15 @@ internal sealed class ShadowTestProject : IDisposable
     {
         return ArtifactValidator.Bind(Request,
             new ValidatedArtifact(Snapshot.CompilerManifest, Snapshot.Callables, Snapshot.ArtifactDigest), WorkerCacheIdentity.Current);
+    }
+
+    internal SharpProofWorker CreateLegacyWorker(WorkerBudgets? budgets = null)
+    {
+        var selected = budgets ?? Request.Budgets;
+        return new SharpProofWorker(() =>
+        {
+            ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+            return new IrSmtBackend(new IrSmtBackendOptions(selected.QueryRlimit));
+        });
     }
 }

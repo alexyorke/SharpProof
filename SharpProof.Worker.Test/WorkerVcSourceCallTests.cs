@@ -101,7 +101,7 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(1)));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)
@@ -175,7 +175,7 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.GetCurrentValue(target.Total.Parameters[0].Current)!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(capture ? 4 : 0)));
         Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>(), Is.Empty);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)
@@ -234,7 +234,7 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)

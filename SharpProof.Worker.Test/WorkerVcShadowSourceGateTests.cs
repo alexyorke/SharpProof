@@ -185,7 +185,7 @@ public sealed class WorkerVcShadowSourceGateTests
         foreach (var sourceCase in Universe)
         {
             using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
-            using var worker = SharpProofWorker.Create(project.Request.Budgets);
+            using var worker = project.CreateLegacyWorker();
             WorkerVcShadowReport? report = null;
             worker.ShadowReportSink = observed => report = observed;
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -375,7 +375,7 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { [EnforcePure] public static int Target(int x) { return x; } }
             """);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

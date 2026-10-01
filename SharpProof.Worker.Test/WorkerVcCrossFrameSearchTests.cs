@@ -153,7 +153,7 @@ public sealed class WorkerVcCrossFrameSearchTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(execution.GetCurrentValue(target.Total.Parameters[0].Current)!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(current)));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)

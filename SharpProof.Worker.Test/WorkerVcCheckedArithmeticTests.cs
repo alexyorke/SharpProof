@@ -93,7 +93,7 @@ public sealed class WorkerVcCheckedArithmeticTests
         if (kind == "full-ulong")
         { Assert.That(refuted.EntryModel.Single().Value.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(ulong.MaxValue))); }
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -115,7 +115,7 @@ public sealed class WorkerVcCheckedArithmeticTests
     {
         using var environment = new ShadowEnvironment("shadow");
         using var unsafeProject = new ShadowTestProject(UnsafeClauseSource);
-        using var unsafeWorker = SharpProofWorker.Create(unsafeProject.Request.Budgets);
+        using var unsafeWorker = unsafeProject.CreateLegacyWorker(unsafeProject.Request.Budgets);
         WorkerVcShadowReport? report = null;
         unsafeWorker.ShadowReportSink = value => report = value;
         await unsafeWorker.VerifyAsync(unsafeProject.Request, unsafeProject.Snapshot, CancellationToken.None);
@@ -127,7 +127,7 @@ public sealed class WorkerVcCheckedArithmeticTests
                 Contract.Requires(x == int.MaxValue); Contract.Ensures(false); return checked(x + 1);
             } }
             """);
-        using var throwingWorker = SharpProofWorker.Create(throwingProject.Request.Budgets);
+        using var throwingWorker = throwingProject.CreateLegacyWorker(throwingProject.Request.Budgets);
         throwingWorker.ShadowReportSink = value => report = value;
         await throwingWorker.VerifyAsync(throwingProject.Request, throwingProject.Snapshot, CancellationToken.None);
         Assert.That(report!.Rows.Single().NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));

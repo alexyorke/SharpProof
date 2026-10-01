@@ -34,7 +34,7 @@ public sealed class WorkerVcSourceAssumeTests
         Assert.That(point.Condition.Id, Is.EqualTo(total.Program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id));
         Assert.That(clause.AssumptionId, Is.EqualTo(assumption.Id));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -94,7 +94,7 @@ public sealed class WorkerVcSourceAssumeTests
         else
         { Assert.That(ensures.BodyAssumptions, Is.Not.Empty); }
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -120,7 +120,7 @@ public sealed class WorkerVcSourceAssumeTests
             } }
             """);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

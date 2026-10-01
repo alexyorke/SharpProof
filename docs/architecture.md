@@ -394,6 +394,15 @@ evidence and is not written to the verification cache during interruption.
 Compiler effect evidence uses separately published entry feasibility; an unconstrained effect-only entry
 needs no SMT query. The public worker creation path remains legacy until the
 remaining contract forms and retirement gates are qualified.
+Legacy comparison fixtures explicitly construct the legacy backend. An explicitly
+native worker ignores the legacy shadow switch, so qualification cannot silently
+run an additional legacy comparison or emit its reports.
+A trial public-factory switch exposed remaining parity gaps in API specification
+models (`Math.Abs`, string concatenation and `Array.Empty` result facets), opted-in
+specification packs, and source callees containing `Contract.Assume`. Existing
+proof expectations remain requirements for the transition; they have not been
+weakened to accommodate these gaps. Typed scalar improvements also change several
+legacy outcome and proof-core expectations and require separate review.
 Native contract binding includes parameter and return `Positive`, `InRange`, and
 supported reference `NotNull` attributes. Numeric predicates use the value's
 signedness and width, including `ulong`; bounds outside the scalar domain fold

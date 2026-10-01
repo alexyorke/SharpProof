@@ -47,7 +47,7 @@ public sealed class WorkerVcReferenceTests
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)

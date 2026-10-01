@@ -153,7 +153,7 @@ public sealed class WorkerVcMetadataCallTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(expected is ulong number
             ? new System.Numerics.BigInteger(number) : new System.Numerics.BigInteger(Convert.ToInt64(expected, System.Globalization.CultureInfo.InvariantCulture))));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)

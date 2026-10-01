@@ -53,7 +53,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             var workerWatch = Stopwatch.StartNew();
             using var workerProject = new ShadowTestProject(source);
             var workerSetupMilliseconds = workerWatch.Elapsed.TotalMilliseconds;
-            using var worker = SharpProofWorker.Create(workerProject.Request.Budgets);
+            using var worker = workerProject.CreateLegacyWorker(workerProject.Request.Budgets);
             WorkerVcShadowReport? report = null;
             worker.ShadowReportSink = value => report = value;
             var response = await worker.VerifyAsync(workerProject.Request, workerProject.Snapshot, CancellationToken.None);
@@ -112,7 +112,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             } }
             """);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

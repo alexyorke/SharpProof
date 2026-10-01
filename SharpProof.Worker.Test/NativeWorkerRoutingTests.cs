@@ -10,6 +10,29 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [Test]
+    public async Task NativeFactoryDoesNotEmitLegacyShadowComparisons()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static ulong Target(ulong value) {
+                    Contract.Requires(value == 18446744073709551615UL);
+                    Contract.Ensures(Contract.Result<ulong>() == 0UL);
+                    return unchecked(value + 1UL);
+                }
+            }
+            """);
+        using var environment = new ShadowEnvironment("shadow");
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var reports = 0;
+        worker.ShadowReportSink = _ => reports++;
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(reports, Is.Zero);
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
     [TestCase("value", WorkerClaimOutcome.Proven)]
     [TestCase("0", WorkerClaimOutcome.Refuted)]
     [TestCase("value", WorkerClaimOutcome.Proven, true)]

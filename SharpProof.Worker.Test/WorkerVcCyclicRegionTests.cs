@@ -111,7 +111,7 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(result.BodyAssumptions, Has.Length.EqualTo(1));
         Assert.That(plan!.EntryQuery().Assumptions, Is.Empty);
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -195,7 +195,7 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -241,7 +241,7 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.Not.EqualTo(System.Numerics.BigInteger.One));
         using var environment = new ShadowEnvironment("shadow");
-        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        using var worker = project.CreateLegacyWorker();
         WorkerVcShadowReport? report = null;
         worker.ShadowReportSink = value => report = value;
         for (var invocation = 0; invocation < 2; invocation++)

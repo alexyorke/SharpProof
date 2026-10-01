@@ -76,7 +76,7 @@ public sealed class SharpProofWorker : IDisposable
         CancellationToken cancellationToken, long? operationStarted = null)
     {
         request = request ?? throw new ArgumentNullException(nameof(request));
-        var shadow = string.Equals(Environment.GetEnvironmentVariable("SHARPPROOF_VC"), "shadow", StringComparison.Ordinal);
+        var shadow = !_nativeAuthority && string.Equals(Environment.GetEnvironmentVariable("SHARPPROOF_VC"), "shadow", StringComparison.Ordinal);
         ObjectDisposedException.ThrowIf(_disposed, this);
         var started = operationStarted ?? Stopwatch.GetTimestamp();
         var validation = WorkerProtocolJson.Validate(request);
