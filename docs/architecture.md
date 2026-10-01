@@ -252,8 +252,21 @@ Only AnyCPU and amd64 IL-only implementation images are admitted. Reference-only
 images, type/module initialization, vararg/unmanaged/synchronized methods, IL
 exception regions, reference/native operations, unsupported opcodes and
 cross-module dependency calls remain closed. Nonrecursive exact same-module
-dependencies are supported. Broader typed metadata coverage and Ref/len remain
-required before the Phase 2 exit.
+dependencies are supported. Broader typed metadata coverage remains required
+before the Phase 2 exit.
+
+The Total source candidate also admits object, string and single-dimensional
+arrays of scalar, object or string elements for null, copy, identity and length
+observations. Built-in string content comparisons, general reference casts,
+allocation and element operations remain closed. Length reads emit guarded
+NullReference faults in bodies and safe conditions in clauses. The native
+candidate uses one uninterpreted Ref sort and a length function with the full
+0..Int32.MaxValue range; null has mathematical length zero, while source reads
+still fault. SAT model decoding preserves array and object aliases, creates
+concrete string and array witnesses, and charges their size before allocation.
+An oversized witness abstains without restricting the proof input domain.
+These source controls do not qualify reference implementation IL or complete
+the Phase 2 exit.
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and
 unary Plus/Minus use the same wrap value and guarded overflow rules in bodies

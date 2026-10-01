@@ -1,6 +1,6 @@
 namespace SharpProof.Smt;
 
-internal sealed class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner)
+internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner)
 {
     private readonly Dictionary<IrId, Expr> _encoded = [];
     private readonly Dictionary<IrVarId, Expr> _variables = [];
@@ -30,6 +30,7 @@ internal sealed class BvEncoder(Context context, IrFactory factory, Z3Expression
         var name = "v" + _variables.Count.ToString(CultureInfo.InvariantCulture);
         Expr expression = type.Kind == IrTypeKind.Boolean ? owner.Own(context.MkBoolConst(name))
             : IsInteger(type) ? owner.Own(context.MkBVConst(name, (uint)type.Width))
+            : IsReference(type) ? owner.Own(context.MkConst(name, ReferenceSort))
             : throw new UnsupportedIrEncodingException();
         _variables.Add(variable, expression);
         return expression;
@@ -54,6 +55,8 @@ internal sealed class BvEncoder(Context context, IrFactory factory, Z3Expression
             IrIntegerTerm integer when IsInteger(factory.GetTypeInfo(integer.Type)) =>
                 owner.Own(context.MkBV(integer.Bits, (uint)factory.GetTypeInfo(integer.Type).Width)),
             IrVariableTerm variable => GetVariable(variable.Variable, meter),
+            IrNullTerm => NullReference,
+            IrLengthTerm length => EncodeLength(Encode(length.Value, meter), meter),
             IrUnaryTerm unary => EncodeUnary(unary, meter),
             IrBinaryTerm binary => EncodeBinary(binary, meter),
             IrConditionalTerm conditional => owner.Own(context.MkITE(EncodeBoolean(conditional.Condition, meter),

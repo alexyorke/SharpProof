@@ -32,8 +32,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // A fault never reads a call result. Keeping its internal storage
             // initialized preserves normal-only writes across shared finally.
             var type = _context.Factory.GetVariableInfo(initialized).Type;
-            _builder.Assign(block, site, initialized, type == _context.Factory.BooleanType
-                ? _context.Factory.Boolean(false) : _context.Factory.Integer(type, 0));
+            _builder.Assign(block, site, initialized, CSharpOperationSemantics.DefaultValue(_context.Factory, type));
         }
         var arguments = new IrTerm[callee.Parameters.Length];
         foreach (var argument in invocation.Arguments)

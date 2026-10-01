@@ -109,8 +109,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 // constant loop can still expose its impossible exit in CFG;
                 // keep that structural return typed, behind its false edge.
                 IrTerm? filler = _context.Result is { } exitResult && source.Predecessors.Any(predecessor => predecessor.Semantics == ControlFlowBranchSemantics.Regular)
-                    ? _context.Factory.GetVariableInfo(exitResult).Type == _context.Factory.BooleanType
-                        ? _context.Factory.Boolean(false) : _context.Factory.Integer(_context.Factory.GetVariableInfo(exitResult).Type, 0L)
+                    ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(exitResult).Type)
                     : null;
                 Return(block, site, filler);
             }

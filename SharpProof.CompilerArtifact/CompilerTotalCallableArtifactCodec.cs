@@ -58,10 +58,11 @@ internal static class CompilerTotalCallableArtifactCodec
         foreach (var term in artifact.Graph.Terms)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var type = artifact.Graph.Types[term.Type];
-            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.Variable or IrTermKind.Unary or
-                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast &&
-                (type.Kind == IrTypeKind.Boolean || type.Kind == IrTypeKind.Integer && type.Width is 8 or 16 or 32 or 64),
+            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.Variable or IrTermKind.Null or IrTermKind.Length or IrTermKind.Unary or
+                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast && SupportedType(artifact.Graph, term.Type) &&
+                (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer) &&
+                (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
+                    artifact.Graph.Terms[term.B].Kind == IrTermKind.Null || artifact.Graph.Terms[term.C].Kind == IrTermKind.Null),
                 "The Total graph contains unsupported term evidence.");
         }
         var identities = new HashSet<IrVarId>();
@@ -144,7 +145,19 @@ internal static class CompilerTotalCallableArtifactCodec
     private static bool Scalar(IrFactory factory, IrTypeId type)
     {
         var info = factory.GetTypeInfo(type);
-        return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64;
+        return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64 ||
+            type == factory.ObjectType || type == factory.StringType || info.Kind == IrTypeKind.Sequence &&
+                info.ElementType is { } element && (factory.GetTypeInfo(element).Kind is IrTypeKind.Boolean or IrTypeKind.Integer ||
+                    element == factory.ObjectType || element == factory.StringType);
+    }
+
+    private static bool SupportedType(PortableIrGraph graph, int index)
+    {
+        var type = graph.Types[index];
+        return type.Kind == IrTypeKind.Reference && type.Name == "object" || type.Kind == IrTypeKind.String && type.Name == "string" ||
+            type.Kind == IrTypeKind.Sequence && graph.Types[type.Element].Kind != IrTypeKind.Sequence && SupportedType(graph, type.Element) ||
+            type.Kind == IrTypeKind.Boolean ||
+            type.Kind == IrTypeKind.Integer && type.Width is 8 or 16 or 32 or 64;
     }
 
     private static void ValidateProgram(IrProgram program, IrVarId? result,

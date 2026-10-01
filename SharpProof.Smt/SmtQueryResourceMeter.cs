@@ -16,13 +16,18 @@ internal sealed class SmtQueryResourceMeter(
 
     internal void Consume()
     {
+        Consume(1);
+    }
+
+    internal void Consume(long amount)
+    {
         PollCancellation();
-        if (_consumed >= _limit)
+        if (amount < 0 || amount > _limit - _consumed)
         {
             throw new SmtResourceLimitException();
         }
 
-        _consumed++;
+        _consumed += amount;
     }
 
     internal void ConsumeNative(long consumed)

@@ -61,8 +61,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.ContainingType.IsGenericType || invocation.Instance != null ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsParams ||
-                !CSharpOperationSemantics.IsScalar(parameter.Type)) ||
-            !method.ReturnsVoid && !CSharpOperationSemantics.IsScalar(method.ReturnType) ||
+                !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
+            !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
             method.DeclaringSyntaxReferences.Length != 1 || invocation.Arguments.Length != method.Parameters.Length)
         { return false; }

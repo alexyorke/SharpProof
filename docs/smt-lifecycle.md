@@ -23,7 +23,7 @@ query; a lane without a backend factory is retired instead.
 
 A SAT result becomes `Refuted` only after proof-kernel replay. The proof
 kernel requires the extracted assignments to close exactly over every
-requested Boolean/integer model variable, re-evaluates all lowered assumptions
+requested model variable, re-evaluates all lowered assumptions
 as true, and re-evaluates the lowered goal as false. For callables, it also seeds
 and independently executes the compiler-produced whole-body program along the
 model-selected concrete CFG path, reconstructs the post-state, and requires the
@@ -32,6 +32,11 @@ original `Ensures` condition to evaluate to false. Contract-only ordinary
 as `UnsupportedBody` until base-constructor and field-initializer semantics are
 lowered. Only canonical user-model variables are exposed in the result;
 lowered temporaries remain internal.
+
+The separate Total candidate additionally accepts canonical object and string
+types and arrays of Boolean, integer, object or string elements. Its native
+model decoder preserves reference identity and length. The original replay
+checks still apply; the legacy Boolean/integer model boundary is unchanged.
 
 An executed API-spec or relational-summary call cannot be independently
 replayed, so the candidate is reported as claim `Unknown` with

@@ -54,7 +54,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally or
                     ControlFlowRegionKind.FilterAndHandler or ControlFlowRegionKind.Filter) ||
                 region.Locals.Any(local => local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name) ||
-                    local.RefKind != RefKind.None || !CSharpOperationSemantics.IsScalar(local.Type)))
+                    local.RefKind != RefKind.None || !CSharpOperationSemantics.IsValueDomain(local.Type)))
             { throw new RegionIncompleteException(); }
             if (region.Kind == ControlFlowRegionKind.Catch)
             {
@@ -168,7 +168,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             SpendRegion();
             var variable = _context.Variable(local);
             var type = _context.Factory.GetVariableInfo(variable).Type;
-            IrTerm initial = type == _context.Factory.BooleanType ? _context.Factory.Boolean(false) : _context.Factory.Integer(type, 0);
+            IrTerm initial = CSharpOperationSemantics.DefaultValue(_context.Factory, type);
             _builder.Assign(block, structural, variable, initial);
         }
     }
@@ -355,7 +355,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // Only a return continuation observes it, and that edge captured
             // the actual value before entering finally.
             var type = _context.Factory.GetVariableInfo(result).Type;
-            IrTerm filler = type == _context.Factory.BooleanType ? _context.Factory.Boolean(false) : _context.Factory.Integer(type, 0);
+            IrTerm filler = CSharpOperationSemantics.DefaultValue(_context.Factory, type);
             _builder.Assign(entry, site, result, filler);
         }
         _builder.Assign(entry, site, state.Selector, _context.Factory.Integer(RegionInteger, state.Transfers.Count));

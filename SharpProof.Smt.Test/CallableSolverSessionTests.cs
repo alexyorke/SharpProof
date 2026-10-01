@@ -171,7 +171,8 @@ public sealed class CallableSolverSessionTests
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
         var text = factory.CreateVariable("text", factory.StringType);
         result = await session.CheckAsync(Query(factory, [], factory.Boolean(false), [text]), CancellationToken.None);
-        Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That(result.Model!.Assignments[text].Type, Is.EqualTo(factory.StringType));
     }
 
     [Test]

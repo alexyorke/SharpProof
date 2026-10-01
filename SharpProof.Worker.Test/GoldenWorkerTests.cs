@@ -41,6 +41,7 @@ public sealed class GoldenWorkerTests
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
+            : scenario == "vc-shadow-reference" ? await VcShadow(fixture.Source, stableClaimOrder: true)
             : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => VcShadow(artifact))
             : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => TotalArtifact(artifact))
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
@@ -125,10 +126,10 @@ public sealed class GoldenWorkerTests
         return output.ToString();
     }
 
-    private static async Task<string> VcShadow(string source)
+    private static async Task<string> VcShadow(string source, bool stableClaimOrder = false)
     {
         using var project = new ShadowTestProject(source, cacheEnabled: true);
-        return await VcShadow(project);
+        return await VcShadow(project, stableClaimOrder);
     }
 
     private static async Task<string> VcShadow(CompilerManifestArtifact artifact)

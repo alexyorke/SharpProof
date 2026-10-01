@@ -149,7 +149,7 @@ internal sealed class PassiveCallableVcBuilder
                         // Forward only immutable atoms. The fresh write fact
                         // and model identity remain available to the kernel;
                         // compound evaluations keep their own SSA version.
-                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm ? value : assigned;
+                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm ? value : assigned;
                         break;
                     case IrHavocInstruction havoc:
                         if (havoc.HavocKind != IrHavocKind.Variables ||
@@ -307,7 +307,10 @@ internal sealed class PassiveCallableVcBuilder
         return !IrTraversal.Any(root, term =>
         {
             Spend();
-            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm);
+            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrNullTerm or IrLengthTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
+                term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer ||
+                term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&
+                    binary.Left is not IrNullTerm && binary.Right is not IrNullTerm;
         });
     }
     private void Spend(int amount = 1)
@@ -319,7 +322,11 @@ internal sealed class PassiveCallableVcBuilder
     }
     private bool Scalar(IrTypeId type)
     {
-        return type == _factory.BooleanType || _factory.GetTypeInfo(type) is { Kind: IrTypeKind.Integer, Width: 8 or 16 or 32 or 64 };
+        var info = _factory.GetTypeInfo(type);
+        return type == _factory.BooleanType || info is { Kind: IrTypeKind.Integer, Width: 8 or 16 or 32 or 64 } ||
+            type == _factory.ObjectType || type == _factory.StringType || info.Kind == IrTypeKind.Sequence &&
+                info.ElementType is { } element && (_factory.GetTypeInfo(element).Kind is IrTypeKind.Boolean or IrTypeKind.Integer ||
+                    element == _factory.ObjectType || element == _factory.StringType);
     }
     private IrTerm Equal(IrTerm left, IrTerm right)
     { return _factory.Binary(IrBinaryOperator.Equal, left, right); }

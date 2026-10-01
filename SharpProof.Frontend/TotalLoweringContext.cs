@@ -72,8 +72,8 @@ public sealed class TotalLoweringContext
         Target.PartialDefinitionPart == null && Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&
-            CSharpOperationSemantics.IsScalar(binding.Parameter.Type)) &&
-        (Target.ReturnsVoid || CSharpOperationSemantics.IsScalar(Target.ReturnType));
+            CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
+        (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
 
     internal bool OwnsBody(IOperation body)
     {

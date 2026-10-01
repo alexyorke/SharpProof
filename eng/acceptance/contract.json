@@ -157,6 +157,7 @@
           "SharpProof.Frontend/TotalLoweringContext.cs",
           "SharpProof.Frontend/TotalSourceCallSession.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.References.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Arithmetic.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Operations.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Exceptions.cs",
@@ -207,6 +208,7 @@
         "paths": [
           "SharpProof.Smt/IrSmtBackend.cs",
           "SharpProof.Smt/BvEncoder.cs",
+          "SharpProof.Smt/BvEncoder.References.cs",
           "SharpProof.Smt/CallableSolverSession.cs",
           "SharpProof.Smt/SmtNativeRunner.cs",
           "SharpProof.Smt/SmtQueryResourceMeter.cs",

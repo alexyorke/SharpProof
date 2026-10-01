@@ -193,12 +193,24 @@ public sealed class ProofKernel(ISmtBackend backend)
             {
                 var type = query.Factory.GetVariableInfo(assignment.Key).Type;
                 return type == assignment.Value.Type &&
-                    (type == query.Factory.BooleanType || query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Integer);
+                    (type == query.Factory.BooleanType || query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ||
+                        query.Factory.Semantics == IrExecutionSemantics.Total && IsReferenceDomain(type));
             }
             catch (ArgumentException)
             {
                 return false;
             }
+        }
+
+        bool IsReferenceDomain(IrTypeId type)
+        {
+            if (type == query.Factory.ObjectType || type == query.Factory.StringType)
+            { return true; }
+            var info = query.Factory.GetTypeInfo(type);
+            if (info.Kind != IrTypeKind.Sequence || info.ElementType is not { } element)
+            { return false; }
+            return element == query.Factory.BooleanType || element == query.Factory.ObjectType ||
+                element == query.Factory.StringType || query.Factory.GetTypeInfo(element).Kind == IrTypeKind.Integer;
         }
     }
 

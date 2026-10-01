@@ -136,19 +136,9 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private BackendCheckResult CreateModel(VerificationQuery query, SmtQueryResourceMeter meter)
     {
         using var model = _solver.Model;
-        var values = new Dictionary<IrVarId, IrValue>();
-        foreach (var variable in query.ModelVariables)
-        {
-            meter.Consume();
-            using var evaluated = model.Evaluate(_encoder.GetVariable(variable, meter), true);
-            var value = BvEncoder.CreateValue(_factory, _factory.GetVariableInfo(variable).Type, evaluated);
-            if (value == null)
-            {
-                return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
-            }
-            values.Add(variable, value);
-        }
-        return BackendCheckResult.Satisfiable(new BackendModel(values));
+        var values = _encoder.DecodeModel(query, model, meter);
+        return values == null ? BackendCheckResult.Unknown(BackendFailureReason.MalformedResult)
+            : BackendCheckResult.Satisfiable(new BackendModel(values));
     }
 
     private void DisposeOwned()
@@ -160,6 +150,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         finally
         {
             _owner.Dispose();
+            _encoder?.DisposeReferences();
         }
     }
 

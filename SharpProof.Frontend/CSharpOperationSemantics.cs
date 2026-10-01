@@ -46,9 +46,11 @@ internal static partial class CSharpOperationSemantics
         };
     }
 
-    internal static IrTerm Literal(IrFactory factory, ITypeSymbol type, object? value)
+    internal static IrTerm Literal(IrFactory factory, ITypeSymbol? type, object? value)
     {
-        var mapped = MapType(factory, type.SpecialType)!.Value;
+        if (value == null && (type == null || IsReferenceDomain(type)))
+        { return factory.Null(new RoslynTypeMapper(factory).GetTypeId(type)); }
+        var mapped = MapType(factory, type!.SpecialType)!.Value;
         return type.SpecialType == SpecialType.System_Boolean ? factory.Boolean(value is true)
             : value is ulong unsigned ? factory.Integer(mapped, unsigned)
             : factory.Integer(mapped, value == null ? 0 : Convert.ToInt64(value, CultureInfo.InvariantCulture));
@@ -56,6 +58,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule Apply(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)
     {
+        if (ReferenceRule(factory, operation, operands) is { } reference)
+        { return reference; }
         if (!IsScalar(operation.Type))
         {
             return Fail(factory, FrontendAbstention.UnsupportedType);

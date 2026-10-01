@@ -83,7 +83,9 @@ internal sealed class PassiveCallableVcPlan
             postconditionGuard: safe, replayOptions: new IrProgramReplayOptions(request =>
                 Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
                     ? Factory.CreateBooleanValue(false)
-                    : Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)));
+                    : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
+                        ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
+                        : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)));
     }
 
     internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)

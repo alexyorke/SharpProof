@@ -56,12 +56,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 }
             case IConversionOperation conversion:
                 return Compose(operation, [LowerClause(conversion.Operand, state, depth + 1)]);
+            case IPropertyReferenceOperation { Instance: { } receiver }:
+                return Compose(operation, [LowerClause(receiver, state, depth + 1)]);
             case IUnaryOperation unary:
                 return Compose(operation, [LowerClause(unary.Operand, state, depth + 1)]);
             case IBinaryOperation binary:
                 {
-                    var left = LowerClause(binary.LeftOperand, state, depth + 1);
-                    var right = LowerClause(binary.RightOperand, state, depth + 1);
+                    var operands = CSharpOperationSemantics.EqualityOperands(binary);
+                    var left = LowerClause(operands.Left, state, depth + 1);
+                    var right = LowerClause(operands.Right, state, depth + 1);
                     var result = Compose(operation, [left, right]);
                     if (result.Classification.IsExact && binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr)
                     {
@@ -113,12 +116,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return Lazy(binary, block, depth);
             case IConversionOperation conversion:
                 return ApplyBody(operation, [LowerBodyValue(conversion.Operand, block, depth + 1)]);
+            case IPropertyReferenceOperation { Instance: { } receiver }:
+                return ApplyBody(operation, [LowerBodyValue(receiver, block, depth + 1)]);
             case IUnaryOperation unary:
                 return ApplyBody(operation, [LowerBodyValue(unary.Operand, block, depth + 1)]);
             case IBinaryOperation binary:
                 {
-                    var left = LowerBodyValue(binary.LeftOperand, block, depth + 1);
-                    var right = LowerBodyValue(binary.RightOperand, left.Continuation, depth + 1);
+                    var operands = CSharpOperationSemantics.EqualityOperands(binary);
+                    var left = LowerBodyValue(operands.Left, block, depth + 1);
+                    var right = LowerBodyValue(operands.Right, left.Continuation, depth + 1);
                     return ApplyBody(operation, [left, right]);
                 }
             default:
@@ -258,6 +264,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue Capture(IOperation operation, TotalBodyValue value)
     {
+        if (value.Value is IrNullTerm)
+        { return value; }
         var target = _context.Temporary(value.Value.Type);
         _builder!.Assign(value.Continuation, _context.Site(operation), target, value.Value);
         return new(_factory.Variable(target), value.Continuation, value.Classification);
@@ -299,8 +307,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (admission == TotalOperationAdmission.Invalid)
         { return FrontendAbstention.InvalidOperation; }
         if (admission == TotalOperationAdmission.Incomplete)
+        {
+            if (operation is not IPropertyReferenceOperation property || !CSharpOperationSemantics.IsLength(property))
+            { return FrontendAbstention.UnsupportedOperationKind; }
+        }
+        if (operation.ConstantValue.HasValue && operation.ConstantValue.Value is string)
         { return FrontendAbstention.UnsupportedOperationKind; }
-        return CSharpOperationSemantics.IsScalar(operation.Type) ? FrontendAbstention.None : FrontendAbstention.UnsupportedType;
+        return CSharpOperationSemantics.IsValueDomain(operation.Type) ||
+            operation is ILiteralOperation { ConstantValue.HasValue: true, ConstantValue.Value: null }
+            ? FrontendAbstention.None : FrontendAbstention.UnsupportedType;
     }
 
     private GuardedExpression Failed(IOperation operation, FrontendAbstention reason)
@@ -319,7 +334,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     }
     private IrTerm Default(ITypeSymbol? type)
     {
-        return CSharpOperationSemantics.IsScalar(type) ? CSharpOperationSemantics.Literal(_factory, type!, null) : _factory.Boolean(false);
+        return CSharpOperationSemantics.IsValueDomain(type) ? CSharpOperationSemantics.Literal(_factory, type, null) : _factory.Boolean(false);
     }
     private IrTerm And(IrTerm first, IrTerm second)
     {
