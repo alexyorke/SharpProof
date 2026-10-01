@@ -393,7 +393,10 @@ receive interruption reasons; the final response is classified from its retained
 evidence and is not written to the verification cache during interruption.
 Compiler effect evidence uses separately published entry feasibility; an unconstrained effect-only entry
 needs no SMT query. The public worker creation path now selects native typed
-verification. Legacy implementation retirement remains a separate gate.
+verification through both the static factory and injected-backend constructor.
+Native lanes do not instantiate the legacy callable verifier or predicate
+executor. Temporary legacy comparison fixtures explicitly select their internal
+route; legacy implementation retirement remains a separate gate.
 Legacy comparison fixtures explicitly construct the legacy backend. An explicitly
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.

@@ -86,7 +86,7 @@ public sealed class WorkerVcShadowTests
         budgets.MethodWallTimeMilliseconds = 2_000;
         using var cancellation = new CancellationTokenSource();
         var backend = new UnknownBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = new SharpProofWorker(backend, readConsumedResourceCount: null, nativeAuthority: false);
         WorkerVcShadowReport? observed = null;
         worker.ShadowReportSink = report =>
         {
@@ -244,7 +244,7 @@ public sealed class WorkerVcShadowTests
             Assert.That(native.ConsumedResourceCount - beforeEnsures, Is.EqualTo(WorkerBudgets.DefaultQueryRlimit));
         }
         var backend = new UnknownBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = new SharpProofWorker(backend, readConsumedResourceCount: null, nativeAuthority: false);
         WorkerVerifyResponse legacy;
         using (var disabled = new ShadowEnvironment(null))
         { legacy = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None); }

@@ -10,6 +10,35 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task PublicConstructionUsesTypedProofAndOriginalBodyReplay(bool injectBackend)
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == unchecked(value + 1));
+                    Contract.Ensures(Contract.Result<int>() > value);
+                    return unchecked(value + 1);
+                }
+            }
+            """);
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        using var backend = new NativeCallableBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
+        using var worker = injectBackend ? new SharpProofWorker(backend) : SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.ClaimResults.Select(result => result.Outcome),
+                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Assert.That(response.ClaimResults[1].Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(response.ClaimResults[1].Model, Has.Length.EqualTo(1));
+            Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+        }
+    }
+
     [TestCase("Contract.Result<string>() != null", WorkerClaimOutcome.Proven)]
     [TestCase("Contract.Result<string>() == null", WorkerClaimOutcome.Refuted)]
     public async Task NativeConcatModelsItsNonNullResult(string predicate, WorkerClaimOutcome expected)

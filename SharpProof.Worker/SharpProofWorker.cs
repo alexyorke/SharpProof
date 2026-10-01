@@ -19,7 +19,7 @@ public sealed class SharpProofWorker : IDisposable
     private bool _injectedBackendPoisoned;
     internal Action<WorkerVcShadowReport>? ShadowReportSink { get; set; }
     public SharpProofWorker(ISmtBackend backend) : this(
-        backend, ReadResources(backend))
+        backend, ReadResources(backend), nativeAuthority: true)
     {
     }
     internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount, bool nativeAuthority = false)
@@ -401,9 +401,7 @@ public sealed class SharpProofWorker : IDisposable
                             WorkerCallableCoverageReason.MethodTimeout &&
                         !projectBoundary.IsCancellationRequested)
                     {
-                        var renewal = lane.Renew(
-                            solverLanes,
-                            request.Budgets.MaximumExpressionDepth);
+                        var renewal = lane.Renew(solverLanes);
                         if (renewal != LaneRenewalResult.Success)
                         {
                             if (renewal == LaneRenewalResult.Unsupported && _backend != null)
@@ -696,14 +694,14 @@ public sealed class SharpProofWorker : IDisposable
     {
         private readonly Func<ISmtBackend>? _backendFactory = backendFactory;
         private IDisposable? _ownedBackend = ownedBackend;
-        private (ISmtBackend Backend, CallableVerifier Verifier, Func<long>? ResourceReader)
-            _backend = ProjectBackend(backend, maximumExpressionDepth, resourceReader);
+        private readonly int _maximumExpressionDepth = maximumExpressionDepth;
+        private CallableVerifier? _legacyVerifier;
+        private (ISmtBackend Backend, Func<long>? ResourceReader)
+            _backend = ProjectBackend(backend, resourceReader);
         internal ISmtBackend Backend => _backend.Backend;
-        internal CallableVerifier Verifier => _backend.Verifier;
+        internal CallableVerifier Verifier => _legacyVerifier ??= new CallableVerifier(Backend, _maximumExpressionDepth);
         internal Func<long>? ReadConsumedResourceCount => _backend.ResourceReader;
-        internal LaneRenewalResult Renew(
-            VerificationLane[] lanes,
-            int maximumExpressionDepth)
+        internal LaneRenewalResult Renew(VerificationLane[] lanes)
         {
             if (_backendFactory == null)
             {
@@ -733,7 +731,8 @@ public sealed class SharpProofWorker : IDisposable
                     replacementOwner = replacement as IDisposable;
                     _ownedBackend = null;
                     priorOwner?.Dispose();
-                    _backend = ProjectBackend(replacement, maximumExpressionDepth);
+                    _backend = ProjectBackend(replacement);
+                    _legacyVerifier = null;
                     _ownedBackend = replacementOwner;
                     replacementOwner = null;
                     return LaneRenewalResult.Success;
@@ -755,12 +754,11 @@ public sealed class SharpProofWorker : IDisposable
                 }
             }
         }
-        private static (ISmtBackend, CallableVerifier, Func<long>?) ProjectBackend(
-            ISmtBackend backend, int maximumExpressionDepth,
+        private static (ISmtBackend, Func<long>?) ProjectBackend(
+            ISmtBackend backend,
             Func<long>? resourceReader = null)
         {
-            return (backend, new CallableVerifier(backend, maximumExpressionDepth),
-                resourceReader ?? ReadResources(backend));
+            return (backend, resourceReader ?? ReadResources(backend));
         }
         internal void DisposeOwnedBackend()
         {

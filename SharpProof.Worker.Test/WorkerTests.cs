@@ -498,7 +498,7 @@ public sealed class WorkerTests
         var backend = new CountingBackend(
             BackendCheckResult.Unknown(
                 BackendFailureReason.ResourceLimit));
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
@@ -1840,7 +1840,7 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        using (var first = new SharpProofWorker(
+        using (var first = CreateLegacyWorker(
                    new SpuriousModelBackend()))
         {
             Assert.That(
@@ -1849,7 +1849,7 @@ public sealed class WorkerTests
         }
 
         var factoryCalls = 0;
-        using var second = new SharpProofWorker(() =>
+        using var second = CreateLegacyWorker(() =>
         {
             Interlocked.Increment(ref factoryCalls);
             return new CountingBackend(
@@ -2042,7 +2042,7 @@ public sealed class WorkerTests
                 Is.EqualTo("Implementation.cs"));
         }
 
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
         var response = await worker.VerifyAsync(request);
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
@@ -2242,7 +2242,7 @@ public sealed class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         var backend = new CapturingBackend(
             BackendCheckResult.Unsatisfiable([0]));
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
@@ -2272,7 +2272,7 @@ public sealed class WorkerTests
             .AssumptionId;
         var backend = new CapturingBackend(
             BackendCheckResult.Unsatisfiable([0]));
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
@@ -4145,7 +4145,7 @@ public sealed class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         var backend = new CapturingBackend(
             BackendCheckResult.Unsatisfiable([0]));
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
@@ -4534,7 +4534,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var enabled = project.CreateRequest(cacheEnabled: true);
         var backend = new SpuriousModelBackend();
-        using var firstWorker = new SharpProofWorker(backend);
+        using var firstWorker = CreateLegacyWorker(backend);
         var first = await firstWorker.VerifyAsync(enabled);
         var second = await firstWorker.VerifyAsync(enabled);
         Assert.That(backend.CallCount, Is.EqualTo(1));
@@ -4542,7 +4542,7 @@ public sealed class WorkerTests
 
         var disabled = project.CreateRequest(cacheEnabled: false);
         var disabledBackend = new SpuriousModelBackend();
-        using var disabledWorker = new SharpProofWorker(disabledBackend);
+        using var disabledWorker = CreateLegacyWorker(disabledBackend);
         var withoutCache = await disabledWorker.VerifyAsync(disabled);
         AssertSemanticallyEquivalent(first, withoutCache);
     }
@@ -4872,7 +4872,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
         var first = await worker.VerifyAsync(request);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
@@ -4890,7 +4890,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
         var first = await worker.VerifyAsync(request);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
@@ -4920,7 +4920,7 @@ public sealed class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         request.Cache.MaximumBytes = 1;
         var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
         var first = await worker.VerifyAsync(request);
         var second = await worker.VerifyAsync(request);
 
@@ -5197,7 +5197,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
         var backend = new ConcurrentRunBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
 
         var first = worker.VerifyAsync(request);
         await backend.FirstEntered.WaitAsync(TimeSpan.FromSeconds(10));
@@ -5620,7 +5620,7 @@ public sealed class WorkerTests
         request.Budgets.MethodRlimit = 12;
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
@@ -5636,7 +5636,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
+        using var worker = CreateLegacyWorker(backend);
         var first = await worker.VerifyAsync(request);
 
         request.Budgets.MethodRlimit--;
@@ -5877,6 +5877,17 @@ public sealed class WorkerTests
         }
     }
 
+    // Temporary comparison seams. Public worker construction uses native verification.
+    private static SharpProofWorker CreateLegacyWorker(ISmtBackend backend)
+    {
+        return new SharpProofWorker(backend, readConsumedResourceCount: null, nativeAuthority: false);
+    }
+
+    private static SharpProofWorker CreateLegacyWorker(Func<ISmtBackend> backendFactory)
+    {
+        return new SharpProofWorker(backendFactory, nativeAuthority: false);
+    }
+
     private static async Task<WorkerVerifyResponse> RunAsync(
         string source,
         bool cacheEnabled,
@@ -5888,7 +5899,7 @@ public sealed class WorkerTests
         var request = project.CreateRequest(
             cacheEnabled,
             maximumExpressionDepth: maximumExpressionDepth);
-        using var worker = new SharpProofWorker(
+        using var worker = CreateLegacyWorker(
             backend ?? new CountingBackend(
                 BackendCheckResult.Unsatisfiable([])));
         return await worker.VerifyAsync(request);
