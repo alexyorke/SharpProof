@@ -6,6 +6,56 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class TotalCallableVerifierTests
 {
+    [TestCase("throw", CallableEntryFeasibilityKind.Feasible, PassiveCallableFeasibilityKind.NoModeledNormalReturn)]
+    [TestCase("loop", CallableEntryFeasibilityKind.Feasible, PassiveCallableFeasibilityKind.Unknown)]
+    [TestCase("contradictory", CallableEntryFeasibilityKind.Contradictory, PassiveCallableFeasibilityKind.ContradictoryEntry)]
+    public async Task EntryPublicationDoesNotUseNormalReturnEvidence(string scenario, int entryKind, int normalKind)
+    {
+        var source = scenario == "loop" ? WorkerVcLoopTests.BeyondSearchSource : """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int x) {
+                    Contract.Requires(x > 0 && x < 0);
+                    Contract.Ensures(false);
+                    throw null!;
+                }
+            }
+            """;
+        if (scenario == "throw")
+        { source = source.Replace("Contract.Requires(x > 0 && x < 0);", "", StringComparison.Ordinal); }
+        using var project = new ShadowTestProject(source);
+        var preparation = project.Snapshot.Callables.Single();
+        CallableEntryFeasibility? entry = null;
+        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
+            check => checks[check.ClaimId] = check, value => entry = value, CancellationToken.None);
+        Assert.That(entry, Is.Not.Null);
+        Assert.That((int)entry!.Kind, Is.EqualTo(entryKind));
+        Assert.That(checks.Values.Select(check => (int)check.Feasibility), Is.All.EqualTo(normalKind));
+        if (scenario == "contradictory")
+        {
+            Assert.That(entry.ProofCore, Is.Not.Empty);
+            Assert.That(entry.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption.Id)));
+        }
+        else
+        { Assert.That(entry.ProofCore, Is.Empty); }
+    }
+
+    [Test]
+    public void EntryPublicationSurvivesCancellationBeforeNormalQuery()
+    {
+        using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
+        using var cancellation = new CancellationTokenSource();
+        CallableEntryFeasibility? entry = null;
+        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () =>
+            await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
+                check => checks[check.ClaimId] = check,
+                value => { entry = value; cancellation.Cancel(); }, cancellation.Token)));
+        Assert.That(entry!.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
+        Assert.That(checks.Values.All(check => !check.Checked), Is.True);
+    }
+
     [Test]
     public async Task LegacyLoweringFailureDoesNotSuppressTypedVerification()
     {

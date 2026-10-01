@@ -6,7 +6,8 @@ internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerC
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
-internal sealed record PassiveCallableFeasibility(PassiveCallableFeasibilityKind Kind, PassiveCallableCheckResult Evidence);
+internal sealed record PassiveCallableFeasibility(PassiveCallableFeasibilityKind Kind,
+    PassiveCallableCheckResult Evidence, PassiveCallableCheckResult EntryEvidence);
 
 // One session per owned plan; the existing method meter reads the actual solver
 // consumption. This is a standalone candidate API, never a worker authority.
@@ -61,13 +62,19 @@ internal sealed class PassiveCallableSolver : IDisposable
     private static PassiveCallableCheckResult Inconclusive()
     { return new(null, WorkerClaimReason.SolverIncomplete, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true); }
 
-    internal async Task<PassiveCallableFeasibility> VerifyFeasibilityAsync(CancellationToken cancellationToken = default)
+    internal Task<PassiveCallableFeasibility> VerifyFeasibilityAsync(CancellationToken cancellationToken = default)
+    { return VerifyFeasibilityAsync(null, cancellationToken); }
+
+    internal async Task<PassiveCallableFeasibility> VerifyFeasibilityAsync(
+        Action<PassiveCallableCheckResult>? publishEntry, CancellationToken cancellationToken)
     {
         var entry = await VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
+        publishEntry?.Invoke(entry);
+        cancellationToken.ThrowIfCancellationRequested();
         if (entry.Outcome is ProvenOutcome)
-        { return new(PassiveCallableFeasibilityKind.ContradictoryEntry, entry); }
+        { return new(PassiveCallableFeasibilityKind.ContradictoryEntry, entry, entry); }
         if (entry.Outcome is not RefutedOutcome)
-        { return new(PassiveCallableFeasibilityKind.Unknown, entry); }
+        { return new(PassiveCallableFeasibilityKind.Unknown, entry, entry); }
         _entryFeasible = true;
         var normal = await VerifyNormalCompletionAsync(cancellationToken).ConfigureAwait(false);
         return new(normal.Outcome switch
@@ -75,7 +82,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             RefutedOutcome => PassiveCallableFeasibilityKind.Feasible,
             ProvenOutcome => PassiveCallableFeasibilityKind.NoModeledNormalReturn,
             _ => PassiveCallableFeasibilityKind.Unknown
-        }, normal);
+        }, normal, entry);
     }
 
     private async Task<PassiveCallableCheckResult> VerifyAsync(VerificationQuery query,

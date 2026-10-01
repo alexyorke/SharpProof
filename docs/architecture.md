@@ -382,6 +382,12 @@ assumptions and incomplete publications cannot publish a proof or refutation.
 Normal completion has an explicit SSA definition, so even a body with no return
 instructions carries kernel-validated normal-exit provenance in a vacuity proof
 core. This total fresh definition does not constrain the admitted input domain.
+Entry feasibility is published separately, before the normal-completion query,
+and its original kernel evidence remains available after that query. A reachable
+entry remains feasible when the body always throws or bounded return search is
+inconclusive. Only the Requires query can establish contradictory entry; its
+core maps to the manifest precondition ids. Effect routing still uses legacy
+entry evidence until independent entry artifacts cover unsupported bodies.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.

@@ -10,8 +10,13 @@ internal sealed record TotalCallableClaimCheck(string ClaimId, bool Enrolled, bo
 // interruption cannot discard earlier kernel-validated claim results.
 internal static class TotalCallableVerifier
 {
-    internal static async Task VerifyAsync(CompilerCallablePreparation preparation, WorkerBudgets budgets,
+    internal static Task VerifyAsync(CompilerCallablePreparation preparation, WorkerBudgets budgets,
         Action<TotalCallableClaimCheck> publish, CancellationToken cancellationToken)
+    { return VerifyAsync(preparation, budgets, publish, null, cancellationToken); }
+
+    internal static async Task VerifyAsync(CompilerCallablePreparation preparation, WorkerBudgets budgets,
+        Action<TotalCallableClaimCheck> publish, Action<CallableEntryFeasibility>? publishEntry,
+        CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -33,7 +38,6 @@ internal static class TotalCallableVerifier
         cancellationToken.ThrowIfCancellationRequested();
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
-        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken).ConfigureAwait(false);
         var requiresByLabel = new Dictionary<string, string>(StringComparer.Ordinal);
         var requiresOrdinal = 0;
         foreach (var clause in total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
@@ -41,6 +45,8 @@ internal static class TotalCallableVerifier
             cancellationToken.ThrowIfCancellationRequested();
             requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture), clause.AssumptionId!);
         }
+        var feasibility = await solver.VerifyFeasibilityAsync(entry =>
+            publishEntry?.Invoke(ProjectEntry(entry, requiresByLabel)), cancellationToken).ConfigureAwait(false);
         var canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToArray();
         var assumesByOperation = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume)
             .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId!);
@@ -92,5 +98,18 @@ internal static class TotalCallableVerifier
                 new(null, reason, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []),
                 PassiveCallableFeasibilityKind.Unknown, WorkerVacuityKind.None, []));
         }
+    }
+
+    private static CallableEntryFeasibility ProjectEntry(PassiveCallableCheckResult entry,
+        Dictionary<string, string> requiresByLabel)
+    {
+        if (entry.Reason != WorkerClaimReason.None)
+        { return CallableEntryFeasibility.Unknown(entry.Reason); }
+        if (entry.Outcome is RefutedOutcome)
+        { return CallableEntryFeasibility.Feasible; }
+        if (entry.Outcome is not ProvenOutcome || entry.Core.Any(label => !requiresByLabel.ContainsKey(label)))
+        { return CallableEntryFeasibility.Unknown(WorkerClaimReason.MalformedBackendResult); }
+        return CallableEntryFeasibility.Contradictory(entry.Core,
+            entry.Core.Select(label => requiresByLabel[label]));
     }
 }

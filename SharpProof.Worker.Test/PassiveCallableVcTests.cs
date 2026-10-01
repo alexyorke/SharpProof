@@ -29,6 +29,8 @@ public sealed class PassiveCallableVcTests
         using var solver = new PassiveCallableSolver(plan);
         var result = await solver.VerifyFeasibilityAsync();
         Assert.That((int)result.Kind, Is.EqualTo(expectedKind));
+        Assert.That(result.EntryEvidence.Outcome,
+            impossible ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         if (result.Kind == PassiveCallableFeasibilityKind.Feasible)
         {
             Assert.That(result.Evidence.Outcome, Is.TypeOf<RefutedOutcome>());
@@ -47,6 +49,7 @@ public sealed class PassiveCallableVcTests
         var normal = await solver.VerifyFeasibilityAsync();
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
         Assert.That(normal.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+        Assert.That(normal.EntryEvidence.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
     }
     [Test]
