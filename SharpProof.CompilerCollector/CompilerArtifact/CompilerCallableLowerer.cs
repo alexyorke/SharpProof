@@ -13,6 +13,7 @@ internal sealed class CompilerCallableLowerer
     private readonly ContractBinder _contracts;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerRelationalSummaryProvider _summaries;
+    private readonly CompilerSpecificationPackConfiguration _specificationPackAuthority;
 
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention =>
         _summaries.LastImplementationIlAbstention;
@@ -43,6 +44,7 @@ internal sealed class CompilerCallableLowerer
         _capturedTrees = capturedTrees;
         _capturedReferences = capturedReferences;
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        _specificationPackAuthority = specificationPackAuthority;
         _contracts = new ContractBinder(compilation, factory);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         _summaries = new CompilerRelationalSummaryProvider(
@@ -58,7 +60,7 @@ internal sealed class CompilerCallableLowerer
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken);
         var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
-            _capturedReferences, cancellationToken);
+            _capturedReferences, _specificationPackAuthority, cancellationToken);
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,

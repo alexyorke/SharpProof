@@ -180,12 +180,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return ApplyRule(operation, rule, block);
     }
 
-    internal TotalBodyValue LowerInt32MathAbs(IInvocationOperation invocation, IrBlockId block, int depth)
+    internal TotalBodyValue LowerScalarCall(IInvocationOperation invocation, TotalScalarCallModel model, IrBlockId block, int depth)
     {
-        var argument = LowerBodyValue(invocation.Arguments[0].Value, block, depth + 1);
-        if (!argument.Classification.IsExact)
-        { return argument; }
-        return ApplyRule(invocation, CSharpOperationSemantics.Int32MathAbs(_factory, argument.Value), argument.Continuation);
+        var arguments = new IrTerm[model.ParameterCount];
+        foreach (var argument in invocation.Arguments)
+        {
+            var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return lowered; }
+            arguments[argument.Parameter!.Ordinal] = lowered.Value;
+            block = lowered.Continuation;
+        }
+        var rule = model.Apply([.. arguments]);
+        return rule.Classification.IsExact ? ApplyRule(invocation, rule, block)
+            : Approximate(invocation, block, rule.Classification.Abstention);
     }
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)

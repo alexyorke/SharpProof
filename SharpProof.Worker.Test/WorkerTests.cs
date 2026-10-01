@@ -3766,6 +3766,81 @@ public sealed class WorkerTests
             Throws.TypeOf<InvalidDataException>());
     }
 
+    [TestCase("Contract.Result<int>() == (left >= right ? left : right)", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() >= left", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() >= right", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() == left", WorkerClaimOutcome.Refuted)]
+    public async Task NativeSpecificationPackRequiresExplicitOptIn(string predicate, WorkerClaimOutcome expected)
+    {
+        using var project = TestProject.Create($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int left, int right) {
+                    Contract.Ensures({{predicate}});
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var disabledRequest = project.CreateRequest(cacheEnabled: false);
+        using var disabledWorker = SharpProofWorker.CreateNative(disabledRequest.Budgets);
+        var disabled = await disabledWorker.VerifyAsync(disabledRequest);
+        Assert.That(disabled.Errors, Is.Empty);
+        Assert.That(disabled.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(disabled.ClaimResults.Single().ProofCore, Is.Empty);
+
+        var enabledRequest = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
+        using var enabledWorker = SharpProofWorker.CreateNative(enabledRequest.Budgets);
+        var enabled = await enabledWorker.VerifyAsync(enabledRequest);
+        Assert.That(enabled.Errors, Is.Empty);
+        Assert.That(enabled.ClaimResults.Single().Outcome, Is.EqualTo(expected));
+        Assert.That(enabled.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.None));
+    }
+
+    [Test]
+    public async Task NativeSpecificationPackPreservesNamedArgumentEvaluationOrder()
+    {
+        using var project = TestProject.Create("""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value == 0);
+                    Contract.Ensures(Contract.Result<int>() == 2 && value == 2);
+                    return Math.Max(val2: ++value, val1: value *= 2);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
+        using var worker = SharpProofWorker.CreateNative(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    [Test]
+    public async Task NativeSpecificationPackDoesNotTrustAnImpersonatedFrameworkType()
+    {
+        using var project = TestProject.Create("""
+            using SharpProof.Attributes;
+            namespace System { public static class Math { public static int Max(int left, int right) => -1; } }
+            public static class Subject {
+                public static int Target(int left, int right) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return System.Math.Max(left, right);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
+        using var worker = SharpProofWorker.CreateNative(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
     [Test]
     public void UnknownSpecificationPackFailsClosed()
     {

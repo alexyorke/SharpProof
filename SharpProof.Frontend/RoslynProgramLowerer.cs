@@ -34,7 +34,7 @@ public sealed class RoslynProgramLowerer(
 
     internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
         Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
-        Func<IMethodSymbol, bool>? isKnownInt32MathAbs = null)
+        Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
@@ -44,7 +44,7 @@ public sealed class RoslynProgramLowerer(
         if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
         { return LowerCandidate(graph, context, cancellationToken); }
         return new RoslynTotalProgramLowerer(context, cancellationToken,
-            new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, isKnownInt32MathAbs)).Lower(graph);
+            new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel)).Lower(graph);
     }
 
     public FrontendProgramLoweringResult Lower(ControlFlowGraph graph)

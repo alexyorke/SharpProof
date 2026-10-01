@@ -3,25 +3,42 @@ using SharpProof.Frontend.Host;
 
 namespace SharpProof.Frontend;
 
+internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArray<IrTerm>, TotalScalarRule> apply)
+{
+    internal int ParameterCount { get; } = parameterCount;
+    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { return apply(arguments); }
+}
+
 // One compiler-owned expansion session covers the caller and every fresh frame.
-// It supplies source bodies, never relational summaries or contract premises.
+// It supplies source bodies and approved scalar models, never relational
+// summaries or contract premises.
 internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
-    Func<IMethodSymbol, bool>? isKnownInt32MathAbs = null)
+    Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null)
 {
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool ConstructionLimitExceeded { get; private set; }
 
-    internal bool IsInt32MathAbs(IInvocationOperation invocation)
+    internal TotalScalarCallModel? PrepareScalarCall(IInvocationOperation invocation)
     {
-        return invocation.Instance == null && invocation.Arguments.Length == 1 &&
-            invocation.TargetMethod.IsStatic && invocation.TargetMethod.Parameters.Length == 1 &&
-            invocation.TargetMethod.ReturnType.SpecialType == SpecialType.System_Int32 &&
-            invocation.TargetMethod.Parameters[0].Type.SpecialType == SpecialType.System_Int32 &&
-            invocation.Arguments[0].Parameter?.Ordinal == 0 &&
-            isKnownInt32MathAbs?.Invoke(invocation.TargetMethod) == true && Spend();
+        var method = invocation.TargetMethod;
+        if (invocation.Instance != null || !method.IsStatic || method.Parameters.Length > 128 ||
+            invocation.Arguments.Length != method.Parameters.Length ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None))
+        { return null; }
+        var ordinals = new HashSet<int>();
+        foreach (var argument in invocation.Arguments)
+        {
+            if (argument.Parameter is not { } parameter ||
+                !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method) ||
+                !ordinals.Add(parameter.Ordinal) || argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))
+            { return null; }
+        }
+        var model = resolveScalarModel?.Invoke(method);
+        return model != null && model.ParameterCount == method.Parameters.Length && Spend(method.Parameters.Length + 1)
+            ? model : null;
     }
 
     internal bool Spend(int amount = 1)

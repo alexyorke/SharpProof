@@ -124,6 +124,83 @@ internal sealed class CompilerSpecificationPackProvider
         return TryResolve(method, out _);
     }
 
+    internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)
+    {
+        if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
+        { return null; }
+        var parameters = method.Parameters.Select(parameter => TotalType(parameter.Type)).ToImmutableArray();
+        var resultType = TotalType(method.ReturnType);
+        if (resultType.IsDefault || parameters.Any(type => type.IsDefault))
+        { return null; }
+        var integerTypes = parameters.Add(resultType).Where(type => _factory.GetTypeInfo(type).Kind == IrTypeKind.Integer).Distinct().ToArray();
+        if (integerTypes.Length > 1)
+        { return null; }
+        var integerType = integerTypes.Length == 0 ? _factory.IntegerType : integerTypes[0];
+        return new(parameters.Length, arguments =>
+        {
+            try
+            {
+                if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
+                { throw new ArgumentException("A specification-pack argument has an invalid type."); }
+                var result = InstantiateTotal(definition.Result, arguments, integerType, 0);
+                if (result.Type != resultType)
+                { throw new ArgumentException("A specification-pack result has an invalid type."); }
+                return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
+            }
+            catch (ArgumentException)
+            {
+                return new TotalScalarRule(_factory.Boolean(false), [],
+                    FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape));
+            }
+        });
+    }
+
+    private IrTypeId TotalType(ITypeSymbol type)
+    {
+        return type.SpecialType switch
+        {
+            SpecialType.System_Boolean => _factory.BooleanType,
+            SpecialType.System_Int32 => _factory.GetOrCreateIntegerType(32, true),
+            SpecialType.System_Int64 => _factory.GetOrCreateIntegerType(64, true),
+            _ => default
+        };
+    }
+
+    private IrTerm InstantiateTotal(SpecTermDeclaration term, ImmutableArray<IrTerm> arguments, IrTypeId integerType, int depth)
+    {
+        if (depth >= 256)
+        { throw new ArgumentException("A specification-pack term is too deep."); }
+        IrTerm result = term switch
+        {
+            SpecVariableDeclaration { Role: SpecVariableRole.Parameter } parameter
+                when parameter.Ordinal >= 0 && parameter.Ordinal < arguments.Length => arguments[parameter.Ordinal],
+            SpecBooleanDeclaration value => _factory.Boolean(value.Value),
+            SpecIntegerDeclaration value when _factory.GetTypeInfo(integerType).Width == 64 ||
+                value.Value is >= int.MinValue and <= int.MaxValue => _factory.Integer(integerType, value.Value),
+            SpecUnaryDeclaration { Operator: IrUnaryOperator.Not } value =>
+                _factory.Unary(value.Operator, InstantiateTotal(value.Operand, arguments, integerType, depth + 1)),
+            SpecBinaryDeclaration value when value.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or
+                IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or IrBinaryOperator.GreaterThan or
+                IrBinaryOperator.GreaterThanOrEqual or IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
+                _factory.Binary(value.Operator, InstantiateTotal(value.Left, arguments, integerType, depth + 1),
+                    InstantiateTotal(value.Right, arguments, integerType, depth + 1)),
+            SpecConditionalDeclaration value => _factory.Conditional(
+                InstantiateTotal(value.Condition, arguments, integerType, depth + 1),
+                InstantiateTotal(value.WhenTrue, arguments, integerType, depth + 1),
+                InstantiateTotal(value.WhenFalse, arguments, integerType, depth + 1)),
+            _ => throw new ArgumentException("A specification-pack Total term is unsupported.")
+        };
+        var expectedType = term.Type switch
+        {
+            IrTypeKind.Boolean => _factory.BooleanType,
+            IrTypeKind.Integer => integerType,
+            _ => default
+        };
+        if (result.Type != expectedType)
+        { throw new ArgumentException("A specification-pack Total term has an invalid type."); }
+        return result;
+    }
+
     internal bool TryBuild(
         IMethodSymbol method,
         IrMemberId member,

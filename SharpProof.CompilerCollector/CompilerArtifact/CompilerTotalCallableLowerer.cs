@@ -28,7 +28,8 @@ internal static class CompilerTotalCallableLowerer
 
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
         ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CancellationToken cancellationToken)
+        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (target.Declaration is not MethodDeclarationSyntax declaration || target.SemanticModel == null ||
@@ -68,6 +69,7 @@ internal static class CompilerTotalCallableLowerer
         if (graph == null)
         { return null; }
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
+        var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
         var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -75,7 +77,9 @@ internal static class CompilerTotalCallableLowerer
             return contracts.IsSuccess && contracts.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
             method => apiSpecs.TryGet(method, out var spec) &&
-                spec.Template.Target.DocumentationCommentId == "M:System.Math.Abs(System.Int32)");
+                spec.Template.Target.DocumentationCommentId == "M:System.Math.Abs(System.Int32)"
+                ? new TotalScalarCallModel(1, arguments => CSharpOperationSemantics.Int32MathAbs(context.Factory, arguments[0]))
+                : specificationPacks.ResolveTotal(method));
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;

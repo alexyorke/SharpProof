@@ -398,8 +398,8 @@ Legacy comparison fixtures explicitly construct the legacy backend. An explicitl
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.
 A trial public-factory switch exposed remaining parity gaps in API specification
-models (string concatenation and `Array.Empty` result facets), opted-in
-specification packs, and source callees containing `Contract.Assume`. Existing
+models (string concatenation and `Array.Empty` result facets), and source callees
+containing `Contract.Assume`. Existing
 proof expectations remain requirements for the transition; they have not been
 weakened to accommodate these gaps. Typed scalar improvements also change several
 legacy outcome and proof-core expectations and require separate review.
@@ -409,6 +409,13 @@ emits an explicit overflow edge for `int.MinValue`; arguments are evaluated
 before that edge, and caller exception handlers remain active. Boundary cases
 are compared with compiled C# execution. A source type named `System.Math` does
 not receive this model.
+The explicitly selected scalar specification pack also lowers into typed native
+terms. Catalog version/hash, approved assembly identity and signature checks
+remain in force. Its current Int32 `Math.Max` declaration keeps 32-bit signed
+comparisons, evaluates arguments in source order and preserves their parameter
+ordinals. Unsupported term forms or mismatched argument types abstain. This
+route does not invoke the legacy relational-summary builder; disabled packs do
+not provide native call models.
 Native contract binding includes parameter and return `Positive`, `InRange`, and
 supported reference `NotNull` attributes. Numeric predicates use the value's
 signedness and width, including `ulong`; bounds outside the scalar domain fold
