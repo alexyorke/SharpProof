@@ -198,6 +198,7 @@ public sealed class IrInterpreter(IrFactory factory)
             IrIntegerTerm value => Value(_factory.CreateIntegerValueFromBits(value.Type, value.Bits)),
             IrStringTerm value => Text(_factory.GetString(value.Value)),
             IrNullTerm => Value(_factory.CreateNullValue(term.Type)),
+            IrEmptyArrayTerm => Value(_factory.CreateEmptyArrayValue(term.Type)),
             IrVariableTerm variable => EvaluateVariable(variable, state),
             IrOpaqueTerm opaque => EvaluateOpaque(opaque, state),
             IrUnaryTerm unary => EvaluateUnary(unary, state),

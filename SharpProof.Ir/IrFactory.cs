@@ -15,6 +15,7 @@ public sealed class IrFactory
     private readonly List<IrOperationInfo> _operations = [];
     private readonly Dictionary<StructuralKey, IrTerm> _termIds = [];
     private readonly List<IrTerm> _terms = [];
+    private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
     private readonly long _scope;
     private int _identityCount;
 
@@ -479,6 +480,28 @@ public sealed class IrFactory
         {
             RequireNullableTypeCore(type, nameof(type));
             return NullCore(type);
+        }
+    }
+
+    public IrEmptyArrayTerm EmptyArray(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || GetTypeInfo(type).Kind != IrTypeKind.Sequence)
+            { throw new ArgumentException("An empty array requires a Total sequence type.", nameof(type)); }
+            return Intern(new StructuralKey(IrTermKind.EmptyArray, type.Value), type,
+                static (id, valueType) => new IrEmptyArrayTerm(id, valueType));
+        }
+    }
+
+    public IrValue CreateEmptyArrayValue(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            EmptyArray(type);
+            if (!_emptyArrays.TryGetValue(type, out var value))
+            { _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
+            return value;
         }
     }
 

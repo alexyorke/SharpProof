@@ -5,6 +5,19 @@ internal sealed partial class BvEncoder
     private Sort? _referenceSort;
     private FuncDecl? _length;
     private Expr? _nullReference;
+    private readonly Dictionary<IrTypeId, Expr> _emptyArrays = [];
+    internal List<BoolExpr> ReferenceFacts { get; } = [];
+
+    private Expr EncodeEmptyArray(IrEmptyArrayTerm term, SmtQueryResourceMeter meter)
+    {
+        if (_emptyArrays.TryGetValue(term.Type, out var existing))
+        { return existing; }
+        var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
+        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
+        ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
+        _emptyArrays.Add(term.Type, value);
+        return value;
+    }
 
     private Sort ReferenceSort => _referenceSort ??= context.MkUninterpretedSort("Ref");
     private Expr NullReference => _nullReference ??= owner.Own(context.MkConst("nullRef", ReferenceSort));
@@ -32,6 +45,12 @@ internal sealed partial class BvEncoder
     {
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
+        foreach (var empty in _emptyArrays)
+        {
+            meter.Consume();
+            using var evaluated = model.Evaluate(empty.Value, true);
+            aliases.Add((empty.Key, evaluated.ToString()), factory.CreateEmptyArrayValue(empty.Key));
+        }
         var identities = new Dictionary<string, object>(StringComparer.Ordinal);
         string? emptyStringToken = null;
         var observations = DecodeArrayObservations(model, meter);

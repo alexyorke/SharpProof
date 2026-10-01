@@ -215,7 +215,8 @@ public enum IrTermKind
     Conditional = 8,
     Cast = 9,
     Length = 10,
-    SequenceAccess = 11
+    SequenceAccess = 11,
+    EmptyArray = 12
 }
 
 public enum IrOpaquePurity
@@ -367,6 +368,11 @@ public sealed class IrNullTerm : IrTerm
     internal IrNullTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.Null)
     {
     }
+}
+
+public sealed class IrEmptyArrayTerm : IrTerm
+{
+    internal IrEmptyArrayTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.EmptyArray) { }
 }
 
 public sealed class IrVariableTerm : IrTerm

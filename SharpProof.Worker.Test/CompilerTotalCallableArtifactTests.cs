@@ -10,6 +10,42 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    private const string EmptyArraySource = """
+        using System;
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static int[] Target() {
+                Contract.Ensures(Contract.Result<int[]>() != null);
+                return Array.Empty<int>();
+            }
+        }
+        """;
+
+    [Test]
+    public void EmptyArrayTermSurvivesArtifactRoundTrip()
+    {
+        var preparation = RoundTrip(EmptyArraySource);
+        var total = preparation.Total!;
+        Assert.That(total, Is.Not.Null);
+        var result = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            new Dictionary<IrVarId, IrValue>());
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(result.ReturnValue!.Kind, Is.EqualTo(IrValueKind.Sequence));
+        Assert.That(result.ReturnValue.Elements, Is.Empty);
+        Assert.That(result.ConsumedApproximation, Is.False);
+    }
+
+    [Test]
+    public void EmptyArrayTermRejectsNonSequenceArtifactType()
+    {
+        var artifact = CreateArtifact(EmptyArraySource);
+        var graph = artifact.Callables.Single().Total!.Graph;
+        var empty = graph.Terms.Single(term => term.Kind == IrTermKind.EmptyArray);
+        empty.Type = Array.FindIndex(graph.Types, type => type.Kind == IrTypeKind.Boolean);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
     private const string EntryOnlySource = """
         using SharpProof.Attributes;
         public static class Subject {

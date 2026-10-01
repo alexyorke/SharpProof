@@ -18,6 +18,7 @@ public sealed partial class IrPrinter
             IrIntegerTerm value => value.Integer.NumericValue.ToString(CultureInfo.InvariantCulture),
             IrStringTerm value => Quote(_factory.GetString(value.Value)),
             IrNullTerm => "((" + TypeName(term.Type) + ")null)",
+            IrEmptyArrayTerm => "empty(" + TypeName(term.Type) + ")",
             IrVariableTerm value => "v" + value.Variable.Value.ToString(CultureInfo.InvariantCulture),
             IrOpaqueTerm value => FormatOpaque(value, depth),
             IrUnaryTerm value => "(" + IrOperatorCatalog.Get(value.Operator).Token + FormatChild(value.Operand, depth) + ")",

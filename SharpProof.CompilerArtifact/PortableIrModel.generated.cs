@@ -254,6 +254,7 @@ internal static class PortableIrSlotCatalog
     new("Cast", ["termIndex", "unused", "unused", "unused", "unused", "unused", "empty"]),
     new("Length", ["termIndex", "unused", "unused", "unused", "unused", "unused", "empty"]),
     new("SequenceAccess", ["termIndex", "termIndex", "unused", "unused", "unused", "unused", "empty"]),
+    new("EmptyArray", ["unused", "unused", "unused", "unused", "unused", "unused", "empty"]),
     ];
 
     internal static readonly ImmutableArray<PortableIrSlotMapping> Locations = [
@@ -352,6 +353,7 @@ internal static class PortableIrGraphCodecProjections
             IrIntegerTerm value => IntegerRow(value, row),
             IrStringTerm value => row(term, -1, -1, -1, -1, 0, stringValue(value.Value), null),
             IrNullTerm => row(term, -1, -1, -1, -1, 0, null, null),
+            IrEmptyArrayTerm => row(term, -1, -1, -1, -1, 0, null, null),
             IrVariableTerm value => row(term, variableIndex(value.Variable), -1, -1, -1, 0, null, null),
             IrOpaqueTerm value => row(
                 term,
@@ -568,6 +570,7 @@ internal static class PortableIrGraphCodecProjections
                 factory.IntegerBits(type(row.Type), row.Bits),
             IrTermKind.String when row.Text != null => factory.String(row.Text),
             IrTermKind.Null => factory.Null(type(row.Type)),
+            IrTermKind.EmptyArray => factory.EmptyArray(type(row.Type)),
             IrTermKind.Variable => factory.Variable(variable(row.A)),
             IrTermKind.Opaque => DecodeOpaque(
                 row,

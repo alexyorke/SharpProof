@@ -398,7 +398,13 @@ Legacy comparison fixtures explicitly construct the legacy backend. An explicitl
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.
 A trial public-factory switch exposed remaining parity gaps in API specification
-models (string concatenation and `Array.Empty` result facets). Existing
+models (string concatenation and `Array.Empty` result facets). The native
+`Array.Empty<T>()` model now covers every supported scalar, string and object
+element type. It uses the approved compiler-resolved framework symbol and an
+exact typed empty-array term with non-nullness, zero length and cached identity.
+SMT encoding supplies those intrinsic facts, and decoded aliases replay as the
+same concrete empty array. Compiled C# runtime comparisons and artifact
+round-trip validation cover the model. String concatenation remains a gap. Existing
 proof expectations remain requirements for the transition; they have not been
 weakened to accommodate these gaps. Typed scalar improvements also change several
 legacy outcome and proof-core expectations and require separate review.
@@ -426,7 +432,7 @@ Native contract binding includes parameter and return `Positive`, `InRange`, and
 supported reference `NotNull` attributes. Numeric predicates use the value's
 signedness and width, including `ulong`; bounds outside the scalar domain fold
 to Boolean comparisons rather than wrapping. Attribute source spans and manifest
-evidence remain bound through the version 26 compiler artifact. Direct clauses
+evidence remain bound through the version 27 compiler artifact. Direct clauses
 precede return attributes, and parameter attributes use immutable entry values.
 Companion clauses bind in a separate clause context and substitute
 parameters by ordinal into the target's entry, current, and Old identities.

@@ -15,6 +15,7 @@ public static class IrSemanticTerms
             IrIntegerTerm or
             IrStringTerm or
             IrNullTerm or
+            IrEmptyArrayTerm or
             IrVariableTerm);
     }
 

@@ -149,7 +149,7 @@ internal sealed class PassiveCallableVcBuilder
                         // Forward only immutable atoms. The fresh write fact
                         // and model identity remain available to the kernel;
                         // compound evaluations keep their own SSA version.
-                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm ? value : assigned;
+                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm ? value : assigned;
                         break;
                     case IrHavocInstruction havoc:
                         if (havoc.HavocKind != IrHavocKind.Variables ||
@@ -311,7 +311,7 @@ internal sealed class PassiveCallableVcBuilder
         return !IrTraversal.Any(root, term =>
         {
             Spend();
-            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrNullTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
+            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer ||
                 term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&

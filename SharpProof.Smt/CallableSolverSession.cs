@@ -15,6 +15,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private readonly Dictionary<Assumption, BoolExpr> _assumptions = [];
     private readonly Dictionary<VerificationQuery, BoolExpr> _goals = [];
     private long _consumedResourceCount;
+    private int _assertedReferenceFacts;
 
     public CallableSolverSession(IrFactory factory, IrSmtBackendOptions options)
         : this(factory, options, static () => new Context()) { }
@@ -84,6 +85,11 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 _goals.Add(query, goalSelector);
             }
             selectors.Add(goalSelector);
+            while (_assertedReferenceFacts < _encoder.ReferenceFacts.Count)
+            {
+                meter.Consume();
+                _solver.Assert(_encoder.ReferenceFacts[_assertedReferenceFacts++]);
+            }
             using var parameters = _runner.Context.MkParams();
             IrSmtBackend.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
             _solver.Parameters = parameters;

@@ -40,11 +40,17 @@ public sealed class PortableIrGraphCodecTests
             decoded.Factory,
             decoded.Program,
             decoded.Roots);
+        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
+        var empty = totalFactory.EmptyArray(totalFactory.GetOrCreateSequenceType(totalFactory.IntegerType));
+        var encodedEmpty = PortableIrGraphCodec.Encode(totalFactory, null, [empty]);
+        var decodedEmpty = PortableIrGraphCodec.Decode(encodedEmpty.Graph);
+        Assert.That(decodedEmpty.Roots.Single(), Is.TypeOf<IrEmptyArrayTerm>());
+        AssertGraphJsonEqual(encodedEmpty.Graph, PortableIrGraphCodec.Encode(decodedEmpty.Factory, null, decodedEmpty.Roots).Graph);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                encoded.Graph.Terms.Select(static row => row.Kind).Distinct(),
+                encoded.Graph.Terms.Concat(encodedEmpty.Graph.Terms).Select(static row => row.Kind).Distinct(),
                 Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
             Assert.That(
                 encoded.Graph.Blocks

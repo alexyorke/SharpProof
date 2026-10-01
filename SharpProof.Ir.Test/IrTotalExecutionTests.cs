@@ -7,6 +7,22 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrTotalExecutionTests
 {
+    [Test]
+    public void EmptyArrayTermsRequireTotalOwnedSequenceTypes()
+    {
+        var total = new IrFactory(IrExecutionSemantics.Total);
+        var type = total.GetOrCreateSequenceType(total.IntegerType);
+        var empty = total.EmptyArray(type);
+        Assert.That(total.EmptyArray(type), Is.SameAs(empty));
+        Assert.That(total.CreateEmptyArrayValue(type), Is.SameAs(total.CreateEmptyArrayValue(type)));
+        Assert.That(new IrPrinter(total).Print(empty), Does.StartWith("empty("));
+        Assert.Throws<ArgumentException>(new Action(() => total.EmptyArray(total.IntegerType)));
+        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        Assert.Throws<ArgumentException>(new Action(() => total.EmptyArray(foreign.GetOrCreateSequenceType(foreign.IntegerType))));
+        var legacy = new IrFactory();
+        Assert.Throws<ArgumentException>(new Action(() => legacy.EmptyArray(legacy.GetOrCreateSequenceType(legacy.IntegerType))));
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public void TotalStringEqualityUsesConcreteIdentityWhileLegacyUsesContent(bool alias)

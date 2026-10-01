@@ -16,6 +16,47 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ScalarDifferentialMatrixTests
 {
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    [TestCase("bool")]
+    [TestCase("string")]
+    [TestCase("object")]
+    public void EmptyArrayFacetsAndIdentityAgreeWithCompiledRuntime(string elementType)
+    {
+        using var project = DifferentialProject.Create($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                [return: InRange(1, 1)]
+                public static int Target(int unused) {
+                    var first = Array.Empty<{{elementType}}>();
+                    var second = Array.Empty<{{elementType}}>();
+                    return first != null && first.Length == 0 && first == second ? 1 : 0;
+                }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry,
+                parameter => total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(execution.ReturnValue!.Integer, Is.EqualTo((int)method.Invoke(null, [0])!));
+        Assert.That(execution.ReturnValue.Integer, Is.EqualTo(1));
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]

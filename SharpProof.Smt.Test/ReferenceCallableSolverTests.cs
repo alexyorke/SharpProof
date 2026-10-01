@@ -7,6 +7,27 @@ namespace SharpProof.Smt.Test;
 [TestFixture]
 public sealed class ReferenceCallableSolverTests
 {
+    [Test]
+    public async Task EmptyArrayAliasesDecodeToTheSameConcreteValue()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var input = factory.CreateVariable("input", type);
+        var empty = factory.EmptyArray(type);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, [Assume(factory, Equal(factory, factory.Variable(input), empty))],
+            factory.Boolean(false), [input]);
+        var result = await session.CheckAsync(query, CancellationToken.None);
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That(result.Model!.Assignments[input], Is.SameAs(factory.CreateEmptyArrayValue(type)));
+        AssertAssumptions(factory, query, result.Model.Assignments);
+        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        var nonNull = Query(factory, [], factory.Binary(IrBinaryOperator.NotEqual, empty, factory.Null(type)), []);
+        Assert.That((await session.CheckAsync(nonNull, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+        var length = Query(factory, [], Equal(factory, factory.Length(empty), factory.Integer(0)), []);
+        Assert.That((await session.CheckAsync(length, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+    }
+
     [TestCase(true, 0)]
     [TestCase(false, 0)]
     [TestCase(true, 3)]

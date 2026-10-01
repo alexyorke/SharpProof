@@ -2,6 +2,11 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static TotalScalarRule ArrayEmpty(IrFactory factory, IrTypeId type)
+    {
+        return Exact(factory.EmptyArray(type));
+    }
+
     internal static bool IsReferenceDomain(ITypeSymbol? type)
     {
         return type?.SpecialType is SpecialType.System_Object or SpecialType.System_String ||

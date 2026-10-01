@@ -10,6 +10,77 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    [TestCase("bool")]
+    [TestCase("string")]
+    [TestCase("object")]
+    public async Task NativeEmptyArraysHaveExactResultFacets(string elementType)
+    {
+        using var project = new ShadowTestProject($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static {{elementType}}[] Target() {
+                    Contract.Ensures(Contract.Result<{{elementType}}[]>() != null);
+                    Contract.Ensures(Contract.Result<{{elementType}}[]>().Length == 0);
+                    Contract.Ensures(Contract.Result<{{elementType}}[]>().Length > 0);
+                    return Array.Empty<{{elementType}}>();
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Select(claim => claim.Outcome),
+            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task NativeEmptyArrayCallsPreserveCachedIdentity()
+    {
+        using var project = new ShadowTestProject("""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Target() {
+                    Contract.Ensures(Contract.Result<bool>());
+                    return Array.Empty<int>() == Array.Empty<int>();
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    [Test]
+    public async Task NativeEmptyArrayModelRejectsSourceTypesNamedSystemArray()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            namespace System { public static class Array { public static T[] Empty<T>() { return null; } } }
+            public static class Subject {
+                public static int[] Target() {
+                    Contract.Ensures(Contract.Result<int[]>() != null);
+                    return System.Array.Empty<int>();
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        // Generic source expansion abstains; the impersonated type must never
+        // acquire the trusted framework model or its non-null proof.
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
     [TestCase("value > 0", "Contract.Result<int>() == value", WorkerClaimOutcome.Proven)]
     [TestCase("false", "Contract.Result<int>() == value", WorkerClaimOutcome.Proven)]
     [TestCase("value > 0", "Contract.Result<int>() > 0", WorkerClaimOutcome.Refuted)]
