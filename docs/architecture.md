@@ -397,6 +397,12 @@ verification through both the static factory and injected-backend constructor.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.
+The VC golden stage checks typed public verification for the retired raw
+executor and obligation-builder fixtures: joins, faults, calls, domains, and
+assumption usage. Native construction and session tests retain cancellation,
+state-growth, graph-limit, and method-budget guards. Expression-bodied callees
+bind through transparent checked and parenthesis syntax wrappers while retaining
+Roslyn's overflow semantics.
 Legacy comparison fixtures explicitly construct the legacy backend. An explicitly
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.

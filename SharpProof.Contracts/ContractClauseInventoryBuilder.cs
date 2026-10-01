@@ -480,6 +480,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SyntaxNode declaration,
         ExpressionSyntax expression)
     {
+        // These syntax wrappers have no IOperation of their own. The inner
+        // operation retains Roslyn's checked arithmetic flags and body owner.
+        while (expression is ParenthesizedExpressionSyntax or CheckedExpressionSyntax)
+        {
+            expression = expression is ParenthesizedExpressionSyntax parenthesized
+                ? parenthesized.Expression
+                : ((CheckedExpressionSyntax)expression).Expression;
+        }
         // Roslyn exposes no operation for an isolated `ref value` syntax.
         // The declaration owns the corresponding method-body operation.
         return expression is RefExpressionSyntax ? declaration : expression;

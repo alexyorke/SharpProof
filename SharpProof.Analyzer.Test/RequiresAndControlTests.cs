@@ -1025,9 +1025,9 @@ public sealed class RequiresAndControlTests
                 }
             }
             """, "SP0027"),
-        QuietCase(
-            "NontransparentWrappersRemainFailClosedForDirectReplay",
-            NontransparentWrappersRemainFailClosedForDirectReplaySource),
+        RequiresCase(
+            "CheckedWrappersReplayRequiresWhileConversionAndSuppressionRemainQuiet",
+            CheckedWrappersReplayRequiresWhileConversionAndSuppressionRemainQuietSource, "SP0027"),
         QuietCase(
             "MemberInitializersStopAfterNonCompletingOperands",
             MemberInitializersStopAfterNonCompletingOperandsSource),
@@ -1123,7 +1123,7 @@ public sealed class RequiresAndControlTests
     }
 
 
-    private const string NontransparentWrappersRemainFailClosedForDirectReplaySource =
+    private const string CheckedWrappersReplayRequiresWhileConversionAndSuppressionRemainQuietSource =
             """
             using SharpProof.Attributes;
 

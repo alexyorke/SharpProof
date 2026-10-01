@@ -14,6 +14,31 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class TypedContractLoweringTests
 {
+    [TestCase("unchecked(value + 1)", false)]
+    [TestCase("(unchecked(value + 1))", false)]
+    [TestCase("checked(value + 1)", true)]
+    [TestCase("(checked((value + 1)))", true)]
+    public void ExpressionBodyWrappersRetainCheckedSemantics(string expression, bool throws)
+    {
+        var subject = Subject.Create($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) => {{expression}};
+            }
+            """);
+        var binding = subject.Bind();
+        Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
+        Assert.That(binding.Clauses, Is.Empty);
+        var lowering = subject.Lower();
+        Assert.That(lowering.IsExact, Is.True);
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(int.MaxValue));
+        Assert.That(execution.Status, Is.EqualTo(throws ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
+        if (!throws)
+        {
+            Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(int.MinValue)));
+        }
+    }
+
     [TestCase("Contract.Old(x) + Contract.Old(y)", int.MaxValue, 1, false)]
     [TestCase("Contract.Old(x) + Contract.Old(y)", int.MinValue, -1, false)]
     [TestCase("Contract.Old(x) - Contract.Old(y)", int.MinValue, 1, false)]
