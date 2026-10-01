@@ -33,6 +33,7 @@ internal sealed partial class BvEncoder
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
         var identities = new Dictionary<string, object>(StringComparer.Ordinal);
+        string? emptyStringToken = null;
         var observations = DecodeArrayObservations(model, meter);
         foreach (var variable in query.ModelVariables)
         {
@@ -71,6 +72,14 @@ internal sealed partial class BvEncoder
                         // Charge and check cancellation before allocating any witness data.
                         // Refusing a large SAT witness never narrows the proof input domain.
                         meter.Consume(count + 1L);
+                        if (info.Kind == IrTypeKind.String && count == 0)
+                        {
+                            // CLR construction canonicalizes empty strings. Never
+                            // replay distinct Ref tokens as that same concrete object.
+                            if (emptyStringToken != null && emptyStringToken != token)
+                            { throw new UnsupportedIrEncodingException(); }
+                            emptyStringToken = token;
+                        }
                         value = info.Kind == IrTypeKind.String ? factory.CreateStringValue(new string('\0', count))
                             : DecodeArrayWitness(type, count, token, observations);
                     }

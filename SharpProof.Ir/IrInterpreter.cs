@@ -406,7 +406,8 @@ public sealed class IrInterpreter(IrFactory factory)
             (IrValueKind.Boolean, IrValueKind.Boolean) => left.Boolean == right.Boolean,
             (IrValueKind.Integer, IrValueKind.Integer) => left.IntegerBits == right.IntegerBits,
             (IrValueKind.String, IrValueKind.String) =>
-                string.Equals(left.String, right.String, StringComparison.Ordinal),
+                _factory.Semantics == IrExecutionSemantics.Total ? ReferenceEquals(left.String, right.String) :
+                    string.Equals(left.String, right.String, StringComparison.Ordinal),
             (IrValueKind.Reference, IrValueKind.Reference) =>
                 ReferenceEquals(left.Reference, right.Reference),
             (IrValueKind.Sequence, IrValueKind.Sequence) => ReferenceEquals(left, right),

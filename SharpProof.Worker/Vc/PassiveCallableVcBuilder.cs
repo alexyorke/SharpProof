@@ -311,7 +311,7 @@ internal sealed class PassiveCallableVcBuilder
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer ||
                 term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&
-                    binary.Left is not IrNullTerm && binary.Right is not IrNullTerm;
+                    binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual);
         });
     }
     private void Spend(int amount = 1)

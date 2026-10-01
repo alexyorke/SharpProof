@@ -7,6 +7,26 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrTotalExecutionTests
 {
+    [TestCase(true)]
+    [TestCase(false)]
+    public void TotalStringEqualityUsesConcreteIdentityWhileLegacyUsesContent(bool alias)
+    {
+        var first = new string('x', 3);
+        var second = alias ? first : new string('x', 3);
+        foreach (var semantics in new[] { IrExecutionSemantics.Legacy, IrExecutionSemantics.Total })
+        {
+            var factory = new IrFactory(semantics);
+            var x = factory.CreateVariable("x", factory.StringType);
+            var y = factory.CreateVariable("y", factory.StringType);
+            var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.Variable(y));
+            var values = new Dictionary<IrVarId, IrValue>
+            { [x] = factory.CreateStringValue(first), [y] = factory.CreateStringValue(second) };
+            var evaluated = new IrInterpreter(factory).Evaluate(equal, values);
+            Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
+            Assert.That(evaluated.Value!.Boolean, Is.EqualTo(alias || semantics == IrExecutionSemantics.Legacy));
+        }
+    }
+
     [Test]
     public void TotalDefaultsUseInt32WhileParameterlessFactoryRetainsLegacy()
     {

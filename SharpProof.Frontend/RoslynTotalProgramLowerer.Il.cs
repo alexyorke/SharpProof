@@ -45,7 +45,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (result is { } initialized)
             {
                 var type = factory.GetVariableInfo(initialized).Type;
-                _builder.Assign(caller, anchor, initialized, type == factory.BooleanType ? factory.Boolean(false) : factory.Integer(type, 0));
+                _builder.Assign(caller, anchor, initialized, CSharpOperationSemantics.DefaultValue(factory, type));
             }
             foreach (var parameter in frame.Parameters)
             {
@@ -53,11 +53,12 @@ internal sealed partial class RoslynTotalProgramLowerer
                 _builder.Assign(entry, anchor, parameter.Current, factory.Variable(parameter.Entry));
                 _builder.Assign(entry, anchor, parameter.PreState, factory.Variable(parameter.Entry));
             }
-            var locals = body.Locals.Select(type => _context.Temporary(CSharpOperationSemantics.MapType(factory, type)!.Value)).ToArray();
+            var locals = body.Locals.Select(type => _context.Temporary(type == SpecialType.System_Object ? factory.ObjectType :
+                type == SpecialType.System_String ? factory.StringType : CSharpOperationSemantics.MapType(factory, type)!.Value)).ToArray();
             foreach (var local in locals)
             {
                 var type = factory.GetVariableInfo(local).Type;
-                _builder.Assign(entry, anchor, local, type == factory.BooleanType ? factory.Boolean(false) : factory.Integer(type, 0));
+                _builder.Assign(entry, anchor, local, CSharpOperationSemantics.DefaultValue(factory, type));
             }
             var blocks = new IrBlockId[shapes.Length];
             var storage = new IrVarId[shapes.Length][];
@@ -68,7 +69,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (!_calls.Spend(shape.Length + 1))
                 { throw new RegionIncompleteException(); }
                 blocks[index] = _builder.CreateBlock("il:" + body.Instructions[index].Offset.ToString(CultureInfo.InvariantCulture));
-                storage[index] = [.. shape.Select(width => _context.Temporary(factory.GetOrCreateIntegerType(Math.Abs(width), true)))];
+                storage[index] = [.. shape.Select(value => _context.Temporary(TotalIlStack.StorageType(factory, value)))];
             }
             _builder.Goto(caller, anchor, entry);
             _builder.Goto(entry, anchor, blocks[0]);
@@ -82,7 +83,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ":" + instruction.Offset.ToString("X4", CultureInfo.InvariantCulture) + ":" + body.ImageSha256,
                     factory.GetOperationInfo(anchor).SourceSpan);
                 var block = blocks[index];
-                var stack = storage[index].Select(factory.Variable).Cast<IrTerm>().ToList();
+                var stack = storage[index].Select((variable, slot) => shapes[index]!.Value[slot] == TotalIlStack.NullReference
+                    ? (IrTerm)factory.Null(factory.ObjectType) : factory.Variable(variable)).ToList();
                 IrTerm Pop()
                 { var value = stack[stack.Count - 1]; stack.RemoveAt(stack.Count - 1); return value; }
                 IrBlockId Edge(int target)
@@ -91,7 +93,10 @@ internal sealed partial class RoslynTotalProgramLowerer
                     { throw new RegionIncompleteException(); }
                     var edge = _builder.CreateBlock("il:edge");
                     for (var slot = 0; slot < stack.Count; slot++)
-                    { _builder.Assign(edge, site, storage[target][slot], stack[slot]); }
+                    {
+                        _builder.Assign(edge, site, storage[target][slot], stack[slot] is IrNullTerm
+                        ? factory.Null(factory.GetVariableInfo(storage[target][slot]).Type) : stack[slot]);
+                    }
                     _builder.Goto(edge, site, blocks[target]);
                     return edge;
                 }
@@ -136,6 +141,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case "Ldc_i8":
                         stack.Add(factory.Integer(factory.GetOrCreateIntegerType(64, true), instruction.Operand));
                         break;
+                    case "Ldnull":
+                        stack.Add(factory.Null(factory.ObjectType));
+                        break;
                     case "Dup":
                         stack.Add(stack[stack.Count - 1]);
                         break;
@@ -167,7 +175,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                         break;
                     case "Brtrue":
                     case "Brfalse":
-                        var condition = factory.Binary(IrBinaryOperator.NotEqual, Pop(), factory.Integer(factory.GetOrCreateIntegerType(Math.Abs(shapes[index]!.Value.Last()), true), 0));
+                        var tested = Pop();
+                        var condition = factory.Binary(IrBinaryOperator.NotEqual, tested, CSharpOperationSemantics.DefaultValue(factory, tested.Type));
                         if (code == "Brfalse")
                         { condition = factory.Unary(IrUnaryOperator.Not, condition); }
                         _builder.Branch(block, site, condition, Edge(instruction.Target), Edge(index + 1));
@@ -200,6 +209,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static IrTerm IlLoad(IrFactory factory, IrTerm value)
     {
         var info = factory.GetTypeInfo(value.Type);
+        if (info.Kind is IrTypeKind.Reference or IrTypeKind.String)
+        { return value; }
         var stack = factory.GetOrCreateIntegerType(info.Width == 64 ? 64 : 32, true);
         return value.Type == factory.BooleanType
             ? factory.Conditional(value, factory.Integer(stack, 1), factory.Integer(stack, 0)) : factory.Cast(stack, value);
@@ -208,6 +219,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static IrTerm IlStore(IrFactory factory, IrTerm value, IrTypeId type)
     {
         // Stack validation admits only normalized 0/1 producers at Bool stores.
+        if (factory.GetTypeInfo(type).Kind is IrTypeKind.Reference or IrTypeKind.String)
+        { return value is IrNullTerm ? factory.Null(type) : value; }
         return type == factory.BooleanType ? factory.Binary(IrBinaryOperator.NotEqual, value, factory.Integer(value.Type, 0)) : factory.Cast(type, value);
     }
 
@@ -227,6 +240,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static IrTerm IlComparison(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
+        if (factory.GetTypeInfo(left.Type).Kind is IrTypeKind.Reference or IrTypeKind.String)
+        {
+            if (left is IrNullTerm)
+            { left = factory.Null(right.Type); }
+            if (right is IrNullTerm)
+            { right = factory.Null(left.Type); }
+            return factory.Binary(code is "Bne_un" or "Cgt_un" ? IrBinaryOperator.NotEqual : IrBinaryOperator.Equal, left, right);
+        }
         if (code.EndsWith("_un", StringComparison.Ordinal))
         { var type = factory.GetOrCreateIntegerType(factory.GetTypeInfo(left.Type).Width, false); left = factory.Cast(type, left); right = factory.Cast(type, right); }
         var operation = code switch

@@ -7,6 +7,34 @@ namespace SharpProof.Smt.Test;
 [TestFixture]
 public sealed class ReferenceCallableSolverTests
 {
+    [TestCase(true, 0)]
+    [TestCase(false, 0)]
+    [TestCase(true, 3)]
+    [TestCase(false, 3)]
+    public async Task StringIdentityWitnessesMatchConcreteAliases(bool alias, int length)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var x = factory.CreateVariable("x", factory.StringType);
+        var y = factory.CreateVariable("y", factory.StringType);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, [NotNull(factory, x), NotNull(factory, y),
+            Assume(factory, factory.Binary(alias ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual, factory.Variable(x), factory.Variable(y))),
+            Assume(factory, Equal(factory, factory.Length(factory.Variable(x)), factory.Integer(length))),
+            Assume(factory, Equal(factory, factory.Length(factory.Variable(y)), factory.Integer(length)))], factory.Boolean(false), [x, y]);
+        var result = await session.CheckAsync(query, CancellationToken.None);
+        if (!alias && length == 0)
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+            return;
+        }
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        var model = result.Model!.Assignments;
+        Assert.That(ReferenceEquals(model[x].String, model[y].String), Is.EqualTo(alias));
+        AssertAssumptions(factory, query, model);
+        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public async Task ObjectWitnessesPreserveIdentity(bool same)

@@ -142,6 +142,16 @@ public sealed class WorkerVcShadowSourceGateTests
         new("metadata-caller-filter-finally", WorkerVcMetadataCallTests.FaultSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
         new("metadata-filter-fault-swallowed", WorkerVcMetadataCallTests.FilterFaultSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
         new("metadata-private-overflow-finally", WorkerVcMetadataCallTests.OverflowSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-reference-copy", """
+            using SharpProof.Attributes;
+            public static class Subject { public static object Target(object x) {
+                Contract.Requires(x != null);
+                Contract.Ensures(Contract.Result<object>() == x);
+                Contract.Ensures(Contract.Result<object>() == null);
+                return Library.Target(x);
+            } }
+            """, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted],
+            LibrarySource: "public static class Library { public static object Target(object value) { return Again(value); } private static object Again(object value) { return value; } }"),
         new("metadata-eh-closed", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
@@ -168,7 +178,7 @@ public sealed class WorkerVcShadowSourceGateTests
     public async Task DefinedSourceWorkerUniverseAccountsForEveryPostconditionWithoutEmptyExitSuccess()
     {
         Assert.That(Universe.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
-        Assert.That(Universe.Length, Is.EqualTo(53));
+        Assert.That(Universe.Length, Is.EqualTo(54));
         using var environment = new ShadowEnvironment("shadow");
         var rows = new List<WorkerVcShadowRow>();
         var manifestPostconditions = 0;
@@ -185,12 +195,12 @@ public sealed class WorkerVcShadowSourceGateTests
             rows.AddRange(report!.Rows);
             await TestContext.Out.WriteLineAsync($"source-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} oldProven={report.OldProven} newProven={report.NewProven} disagreements={report.SoundnessDisagreements}");
         }
-        Assert.That(manifestPostconditions, Is.EqualTo(85));
+        Assert.That(manifestPostconditions, Is.EqualTo(87));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(81));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(83));
         Assert.That(aggregate.Unenrolled, Is.EqualTo(4));
-        Assert.That(aggregate.Checked, Is.EqualTo(81));
+        Assert.That(aggregate.Checked, Is.EqualTo(83));
         Assert.That(aggregate.Unknown, Is.EqualTo(8));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);

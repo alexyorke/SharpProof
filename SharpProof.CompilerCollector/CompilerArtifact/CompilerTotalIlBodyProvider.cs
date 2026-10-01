@@ -44,8 +44,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             Arity: 0, ReturnsByRef: false, ReturnsByRefReadonly: false, ReducedFrom: null
         } &&
             !method.IsVararg && !method.HasUnsupportedMetadata && !method.ContainingType.IsGenericType && method.Parameters.Length <= 128 &&
-            method.Parameters.All(parameter => parameter.RefKind == RefKind.None && !parameter.IsParams && CSharpOperationSemantics.IsScalar(parameter.Type)) &&
-            (method.ReturnsVoid || CSharpOperationSemantics.IsScalar(method.ReturnType)) &&
+            method.Parameters.All(parameter => parameter.RefKind == RefKind.None && !parameter.IsParams && TotalIlStack.Supported(parameter.Type.SpecialType)) &&
+            (method.ReturnsVoid || TotalIlStack.Supported(method.ReturnType.SpecialType)) &&
             !CompilerImplementationIlSummaryLowerer.IsReferenceAssembly(method.ContainingAssembly) &&
             !method.GetAttributes().Any(attribute => attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
                 CompilerImplementationIlSummaryLowerer.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices")) &&
@@ -130,7 +130,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             if (header.ReadSignatureHeader().Kind != SignatureKind.LocalVariables || header.ReadCompressedInteger() > 128)
             { return null; }
             locals = signature.DecodeLocalSignature(new ScalarSignatureProvider(), genericContext: null);
-            if (locals.Any(type => TotalIlStack.Width(type) == 0))
+            if (locals.Any(type => !TotalIlStack.Supported(type)))
             { return null; }
         }
         var instructions = Decode(body, reader, assembly, method.ContainingModule.Name, cancellationToken);
@@ -141,8 +141,18 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     private static bool SameSignature(IMethodSymbol expected, IMethodSymbol actual)
     {
         return Candidate(actual) && expected.MetadataToken == actual.MetadataToken &&
-            expected.MetadataName == actual.MetadataName && expected.ReturnType.SpecialType == actual.ReturnType.SpecialType &&
-            expected.Parameters.Select(parameter => parameter.Type.SpecialType).SequenceEqual(actual.Parameters.Select(parameter => parameter.Type.SpecialType));
+            expected.MetadataName == actual.MetadataName && SameType(expected.ReturnType, actual.ReturnType) &&
+            expected.Parameters.Length == actual.Parameters.Length &&
+            expected.Parameters.Select((parameter, ordinal) => SameType(parameter.Type, actual.Parameters[ordinal].Type)).All(same => same);
+    }
+
+    // The all-members metadata compilation has distinct Roslyn symbol instances.
+    // This route admits only intrinsic SpecialTypes, never arbitrary classes or
+    // arrays; compare their bound assembly identities as well as the intrinsic.
+    private static bool SameType(ITypeSymbol expected, ITypeSymbol actual)
+    {
+        return expected.SpecialType == actual.SpecialType && expected.SpecialType != SpecialType.None &&
+            expected.ContainingAssembly.Identity.Equals(actual.ContainingAssembly.Identity);
     }
 
     private static ImmutableArray<TotalIlInstruction> Decode(MethodBodyBlock body, MetadataReader metadata,
@@ -269,6 +279,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                 PrimitiveTypeCode.UInt32 => SpecialType.System_UInt32,
                 PrimitiveTypeCode.Int64 => SpecialType.System_Int64,
                 PrimitiveTypeCode.UInt64 => SpecialType.System_UInt64,
+                PrimitiveTypeCode.Object => SpecialType.System_Object,
+                PrimitiveTypeCode.String => SpecialType.System_String,
                 _ => SpecialType.None
             };
         }

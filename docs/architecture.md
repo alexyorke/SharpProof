@@ -235,12 +235,18 @@ filter mutations and a later replacement search, leaving a valid postcondition
 Unknown when the bounded search is also inconclusive.
 
 The typed implementation-IL route admits bounded static scalar managed methods
+and object/string null, copy and identity transfers
 from an exact captured implementation image. The collector verifies assembly,
 module, method token, signature and backing metadata, then hashes the immutable
 bytes it actually decodes. It validates every instruction and stack merge before
 allocating an owned frame. IL operands use CLI stack widths; short storage and
 returns truncate, loads extend, and unsigned opcodes control interpretation.
-Boolean transfers require proven canonical zero/one stack values. Body and IL
+Boolean transfers require proven canonical zero/one stack values. Reference stack
+shapes preserve the object/string type and null provenance through merges;
+reference arithmetic, ordering and general conversions remain closed. The
+all-members metadata binding compares intrinsic types and assembly identities
+without requiring symbols from different compilations to be the same instance.
+Body and IL
 arithmetic share the same wrap values and overflow/division fault guards.
 Arguments, local/parameter mutation, dependencies and returns expand into original
 typed IR with fresh frame storage and one shared construction/recursion budget.
@@ -250,10 +256,16 @@ original graph and project only canonical caller inputs.
 
 Only AnyCPU and amd64 IL-only implementation images are admitted. Reference-only
 images, type/module initialization, vararg/unmanaged/synchronized methods, IL
-exception regions, reference/native operations, unsupported opcodes and
+exception regions, array/length/native operations, unsupported opcodes and
 cross-module dependency calls remain closed. Nonrecursive exact same-module
 dependencies are supported. Broader typed metadata coverage remains required
 before the Phase 2 exit.
+
+Total IR string equality denotes reference identity, matching its native Ref
+encoding and implementation-IL ceq. Legacy IR retains string content equality.
+The source semantic table still rejects non-null string content comparisons.
+Concrete string witnesses preserve aliases; distinct empty Ref tokens abstain
+because the decoder's CLR construction would return the same empty string.
 
 The compiled metadata conversion matrix checks all 162 source/target/mode pairs
 across the nine integral C# types, including char, in checked and unchecked mode.
