@@ -251,14 +251,14 @@ public sealed class WorkerVcSourceCallTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public void UnsupportedCalleeContractAndAsyncCompletionRemainClosed(bool asynchronous)
+    public void UnsupportedCalleeContractAndAsyncCompletionCannotSupplyConcreteEvidence(bool asynchronous)
     {
         var callee = asynchronous ? "private static async void Callee(int value) { throw null!; }"
             : "private static int Callee(int value) { Contract.Assume(value == 0); return value + 1; }";
         var call = asynchronous ? "Callee(x); return x;" : "return Callee(x);";
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { public static int Target(int x) { Contract.Ensures(false); " + call + " } " + callee + " }");
         var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
-        Assert.That(target.Total, Is.Null);
+        Assert.That(target.Total!.IsBodyAbstraction, Is.True);
     }
 
     [TestCase(ScalarCallSource)]

@@ -255,11 +255,16 @@ filter search, catches and finally; concrete counterexamples replay that owned
 original graph and project only canonical caller inputs.
 
 Only AnyCPU and amd64 IL-only implementation images are admitted. Reference-only
-images, type/module initialization, vararg/unmanaged/synchronized methods, IL
+images, effectful type initialization, module initialization, vararg/unmanaged/synchronized methods, IL
 exception regions, array/length/native operations, unsupported opcodes and
 cross-module dependency calls remain closed. Nonrecursive exact same-module
 dependencies are supported. Broader typed metadata coverage remains required
 before the Phase 2 exit.
+
+An implementation type initializer containing only Nop instructions and Ret is
+admitted after checking the captured PE body. Exception regions, locals,
+synchronization and declarative security reject this empty-initializer admission.
+Other initializer bodies remain unsupported by concrete lowering.
 
 Total IR string equality denotes reference identity, matching its native Ref
 encoding and implementation-IL ceq. Legacy IR retains string content equality.
@@ -386,7 +391,7 @@ Entry feasibility is published separately, before the normal-completion query,
 and its original kernel evidence remains available after that query. A reachable
 entry remains feasible when the body always throws or bounded return search is
 inconclusive. Only the Requires query can establish contradictory entry; its
-core maps to the manifest precondition ids. Manifest version 23 carries a separate
+core maps to the manifest precondition ids. Manifest version 24 carries a separate
 body-free Total entry graph. Requires binding can succeed independently of an
 unsupported body or Ensures expression. Decoding rejects bodies, result roles,
 non-Requires clauses, missing or foreign assumption ids, and predicates outside
@@ -399,6 +404,18 @@ It records enrollment and Unknown results, rejects contradictions between known
 legacy/native results, and requires every known legacy entry result to remain
 known. Native entry cores may use only manifest precondition ids. This bounded
 qualification does not establish postcondition or effect authority retirement.
+
+When concrete body lowering fails within the existing construction bound, a
+callable with only scalar parameters and result may carry an explicitly marked
+body abstraction. It preserves Entry and Old, forgets every mutable parameter
+and result, and represents an arbitrary normal return. Decoding validates that
+exact shape; reference signatures and body Assume clauses remain excluded.
+UNSAT may prove a universally valid postcondition. SAT establishes neither a
+normal-return witness nor a refutation, and publishes no model or vacuity.
+This explicit marker leaves ordinary concrete replay's unread-approximation
+behavior unchanged. Postcondition qualification also compares every claim in
+the source and worker golden universe and rejects each lost legacy proof,
+in addition to aggregate proof counts and soundness disagreements.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.

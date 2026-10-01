@@ -36,8 +36,10 @@ internal sealed class PassiveCallableSolver : IDisposable
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
     internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken = default)
     {
+        if (_plan.HasBodyAbstraction)
+        { return await VerifyBodyAsync(_plan.EnsuresQuery(ordinal), _plan.Replay(ordinal), cancellationToken).ConfigureAwait(false); }
         if (_plan.LoopSearch is not { } search)
-        { return await VerifyAsync(_plan.EnsuresQuery(ordinal), _plan.Replay(ordinal), cancellationToken).ConfigureAwait(false); }
+        { return await VerifyBodyAsync(_plan.EnsuresQuery(ordinal), _plan.Replay(ordinal), cancellationToken).ConfigureAwait(false); }
         var proof = await VerifyAsync(_plan.EnsuresQuery(ordinal), null, cancellationToken).ConfigureAwait(false);
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
@@ -48,8 +50,10 @@ internal sealed class PassiveCallableSolver : IDisposable
 
     internal async Task<PassiveCallableCheckResult> VerifyNormalCompletionAsync(CancellationToken cancellationToken = default)
     {
+        if (_plan.HasBodyAbstraction)
+        { return await VerifyBodyAsync(_plan.NormalCompletionQuery(), _plan.NormalCompletionReplay(), cancellationToken).ConfigureAwait(false); }
         if (_plan.LoopSearch is not { } search)
-        { return await VerifyAsync(_plan.NormalCompletionQuery(), _plan.NormalCompletionReplay(), cancellationToken).ConfigureAwait(false); }
+        { return await VerifyBodyAsync(_plan.NormalCompletionQuery(), _plan.NormalCompletionReplay(), cancellationToken).ConfigureAwait(false); }
         var proof = await VerifyAsync(_plan.NormalCompletionQuery(), null, cancellationToken).ConfigureAwait(false);
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
@@ -57,7 +61,16 @@ internal sealed class PassiveCallableSolver : IDisposable
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
     }
 
-    internal bool CanCheckWithoutNormalWitness => _plan.LoopSearch != null && _entryFeasible;
+    internal bool CanCheckWithoutNormalWitness => (_plan.LoopSearch != null || _plan.HasBodyAbstraction) && _entryFeasible;
+
+    private async Task<PassiveCallableCheckResult> VerifyBodyAsync(VerificationQuery query,
+        CallableReplayContext replay, CancellationToken cancellationToken)
+    {
+        var evidence = await VerifyAsync(query, _plan.HasBodyAbstraction ? null : replay, cancellationToken).ConfigureAwait(false);
+        return _plan.HasBodyAbstraction && evidence.Outcome is RefutedOutcome
+            ? new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true)
+            : evidence;
+    }
 
     private static PassiveCallableCheckResult Inconclusive()
     { return new(null, WorkerClaimReason.SolverIncomplete, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true); }

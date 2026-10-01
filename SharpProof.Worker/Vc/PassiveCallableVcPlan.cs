@@ -34,6 +34,7 @@ internal sealed class PassiveCallableVcPlan
     internal string CallableId => _candidate.CallableId;
     internal PassiveCallableVcPlan? LoopSearch { get; }
     internal bool IsBoundedSearch { get; }
+    internal bool HasBodyAbstraction => _candidate.IsBodyAbstraction;
 
     internal VerificationQuery EntryQuery()
     {

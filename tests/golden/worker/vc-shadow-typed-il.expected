@@ -3,21 +3,21 @@ authority: legacy
 request-bindings: True
 cache: Written
 postconditions: 18
-enrolled: 16
-checked: 16
-unchecked: 2
-unenrolled: 2
-unknown: 2
+enrolled: 18
+checked: 18
+unchecked: 0
+unenrolled: 0
+unknown: 1
 oldProven: 2
-newProven: 8
+newProven: 9
 oldVacuous: 0
 newVacuous: 0
 oldConditional: 0
 newConditional: 0
 soundnessDisagreements: 0
 precisionGains: 15
-precisionLosses: 1
-coverageComplete: False
+precisionLosses: 0
+coverageComplete: True
 row: M:Subject.BCapturedArguments(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
@@ -189,11 +189,11 @@ row: M:Subject.HOverflow(System.Int32)~System.Int32#1
 row: M:Subject.IExceptionRegionsClosed(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
+  totalPresent: True
+  enrolled: True
+  checked: True
   newOutcome: Unknown
-  newReason: UnsupportedBody
+  newReason: CounterexampleNotReplayable
   newVacuity: None
   feasibility: Unknown
   oldConditional: False
@@ -201,13 +201,13 @@ row: M:Subject.IExceptionRegionsClosed(System.Int32)~System.Int32#0
 row: M:Subject.JInitializationClosed(System.Int32)~System.Int32#0
   oldOutcome: Proven
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
   newVacuity: None
-  feasibility: Unknown
+  feasibility: Feasible
   oldConditional: False
   newConditional: False
 row: M:Subject.Target(System.Int32)~System.Int32#0
@@ -239,21 +239,21 @@ authority: legacy
 request-bindings: True
 cache: Hit
 postconditions: 18
-enrolled: 16
-checked: 16
-unchecked: 2
-unenrolled: 2
-unknown: 2
+enrolled: 18
+checked: 18
+unchecked: 0
+unenrolled: 0
+unknown: 1
 oldProven: 2
-newProven: 8
+newProven: 9
 oldVacuous: 0
 newVacuous: 0
 oldConditional: 0
 newConditional: 0
 soundnessDisagreements: 0
 precisionGains: 15
-precisionLosses: 1
-coverageComplete: False
+precisionLosses: 0
+coverageComplete: True
 row: M:Subject.BCapturedArguments(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
@@ -425,11 +425,11 @@ row: M:Subject.HOverflow(System.Int32)~System.Int32#1
 row: M:Subject.IExceptionRegionsClosed(System.Int32)~System.Int32#0
   oldOutcome: Unknown
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
+  totalPresent: True
+  enrolled: True
+  checked: True
   newOutcome: Unknown
-  newReason: UnsupportedBody
+  newReason: CounterexampleNotReplayable
   newVacuity: None
   feasibility: Unknown
   oldConditional: False
@@ -437,13 +437,13 @@ row: M:Subject.IExceptionRegionsClosed(System.Int32)~System.Int32#0
 row: M:Subject.JInitializationClosed(System.Int32)~System.Int32#0
   oldOutcome: Proven
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
   newVacuity: None
-  feasibility: Unknown
+  feasibility: Feasible
   oldConditional: False
   newConditional: False
 row: M:Subject.Target(System.Int32)~System.Int32#0

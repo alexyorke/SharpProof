@@ -386,8 +386,17 @@ public sealed class CompilerTotalCallableArtifactTests
             using SharpProof.Attributes;
             public static class Subject { {{annotation}} public static int Target(int x) { {{body}} } }
             """);
-        Assert.That(preparation.Total, Is.Null);
-        Assert.That(PassiveCallableArtifactAdapter.Enroll(preparation), Is.Null);
+        if (kind == "call")
+        {
+            Assert.That(preparation.Total, Is.Not.Null);
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
+            Assert.That(PassiveCallableArtifactAdapter.Enroll(preparation), Is.Not.Null);
+        }
+        else
+        {
+            Assert.That(preparation.Total, Is.Null);
+            Assert.That(PassiveCallableArtifactAdapter.Enroll(preparation), Is.Null);
+        }
     }
 
     [TestCase("mode")]

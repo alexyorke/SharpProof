@@ -99,7 +99,7 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { public static int Target(int x) {
                 Contract.Ensures(Contract.Result<int>() == x); return System.Math.Abs(x);
             } }
-            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody),
+            """, [WorkerClaimOutcome.Unknown], Reason: WorkerClaimReason.CounterexampleNotReplayable),
         new("general-division-budget", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int d) {
@@ -159,14 +159,14 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { public static int Target(int x) {
                 Contract.Ensures(true); return Library.Target(x);
             } }
-            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody,
+            """, [WorkerClaimOutcome.Proven],
             LibrarySource: "public static class Library { public static int Target(int x) { try { return 10 / x; } catch (System.DivideByZeroException) { return 1; } } }"),
         new("metadata-module-init-closed", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
                 Contract.Ensures(true); return Library.Target(x);
             } }
-            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody,
+            """, [WorkerClaimOutcome.Proven],
             LibrarySource: "public static class Boot { public static int State; [System.Runtime.CompilerServices.ModuleInitializer] public static void Initialize() { State = 5; } } public static class Library { public static int Target(int x) { return x; } }"),
         new("async-root-closed", """
             using SharpProof.Attributes;
@@ -200,10 +200,10 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(manifestPostconditions, Is.EqualTo(87));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(83));
-        Assert.That(aggregate.Unenrolled, Is.EqualTo(4));
-        Assert.That(aggregate.Checked, Is.EqualTo(83));
-        Assert.That(aggregate.Unknown, Is.EqualTo(8));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(86));
+        Assert.That(aggregate.Unenrolled, Is.EqualTo(1));
+        Assert.That(aggregate.Checked, Is.EqualTo(86));
+        Assert.That(aggregate.Unknown, Is.EqualTo(6));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);
@@ -213,17 +213,7 @@ public sealed class WorkerVcShadowSourceGateTests
     [Test]
     public async Task NativeEntryQualificationAccountsForEveryCallableInTheSourceAndGoldenUniverse()
     {
-        var goldenNames = GoldenTest.Cases("worker").ToArray();
-        Assert.That(goldenNames, Has.Length.EqualTo(64));
-        var cases = Universe.Concat(goldenNames.Select(name =>
-        {
-            var source = GoldenTest.Load("worker", name).Source;
-            const string marker = "// metadata-library";
-            var boundary = source.IndexOf(marker, StringComparison.Ordinal);
-            return boundary < 0 ? new ShadowSourceCase("golden:" + name, source, [])
-                : new ShadowSourceCase("golden:" + name, source[..boundary], [], LibrarySource: source[(boundary + marker.Length)..]);
-        })).ToArray();
-        Assert.That(cases.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(cases.Length));
+        var cases = QualificationCases();
         var sourceCount = 0;
         var callableCount = 0;
         var enrolledCount = 0;
@@ -269,8 +259,7 @@ public sealed class WorkerVcShadowSourceGateTests
                 await TestContext.Out.WriteLineAsync($"entry-worker {sourceCase.Name}: old={legacy.Kind} native={native.Kind} enrolled={preparation.TotalEntry != null}");
             }
         }
-        Assert.That(Universe, Has.Length.EqualTo(54));
-        Assert.That(sourceCount, Is.EqualTo(Universe.Length + goldenNames.Length));
+        Assert.That(sourceCount, Is.EqualTo(cases.Length));
         Assert.That(callableCount, Is.GreaterThanOrEqualTo(Universe.Length));
         Assert.That(nativeKnown + unknownCount, Is.EqualTo(callableCount));
         Assert.That(oldKnown, Is.GreaterThan(0));
@@ -278,6 +267,60 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(disagreements, Is.Zero);
         Assert.That(degradations, Is.Zero);
         await TestContext.Out.WriteLineAsync($"entry-worker universe: sources={sourceCount} callables={callableCount} enrolled={enrolledCount} old-known={oldKnown} native-known={nativeKnown} unknown={unknownCount} disagreements={disagreements} degradations={degradations}");
+    }
+
+    private static ShadowSourceCase[] QualificationCases()
+    {
+        var goldenNames = GoldenTest.Cases("worker").ToArray();
+        Assert.That(goldenNames, Has.Length.EqualTo(64));
+        var cases = Universe.Concat(goldenNames.Select(name =>
+        {
+            var source = GoldenTest.Load("worker", name).Source;
+            const string marker = "// metadata-library";
+            var boundary = source.IndexOf(marker, StringComparison.Ordinal);
+            return boundary < 0 ? new ShadowSourceCase("golden:" + name, source, [])
+                : new ShadowSourceCase("golden:" + name, source[..boundary], [], LibrarySource: source[(boundary + marker.Length)..]);
+        })).ToArray();
+        Assert.That(cases.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(cases.Length));
+        Assert.That(Universe, Has.Length.EqualTo(54));
+        return cases;
+    }
+
+    [Test]
+    public async Task NativePostconditionQualificationRetainsProofsAcrossTheSourceAndGoldenUniverse()
+    {
+        using var environment = new ShadowEnvironment("shadow");
+        var cases = QualificationCases();
+        var rows = new List<WorkerVcShadowRow>();
+        var proofLosses = new List<string>();
+        var callableCount = 0;
+        var postconditions = 0;
+        foreach (var sourceCase in cases)
+        {
+            using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
+            callableCount += project.Snapshot.Callables.Length;
+            using var worker = SharpProofWorker.Create(project.Request.Budgets);
+            WorkerVcShadowReport? report = null;
+            worker.ShadowReportSink = value => report = value;
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            Assert.That(report, Is.Not.Null, sourceCase.Name);
+            var expected = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+            Assert.That(report!.Rows.Select(row => row.ClaimId), Is.EquivalentTo(expected.Select(claim => claim.ClaimId)), sourceCase.Name);
+            postconditions += expected.Length;
+            rows.AddRange(report.Rows);
+            foreach (var row in report.Rows.Where(row => row.OldOutcome == WorkerClaimOutcome.Proven && row.NewOutcome != WorkerClaimOutcome.Proven))
+            {
+                proofLosses.Add(sourceCase.Name + ": " + row.NewReason);
+            }
+            await TestContext.Out.WriteLineAsync($"post-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} old-proven={report.OldProven} native-proven={report.NewProven} disagreements={report.SoundnessDisagreements}");
+        }
+        var aggregate = new WorkerVcShadowReport("qualification", "qualification", WorkerCacheStatus.Disabled, [.. rows]);
+        await TestContext.Out.WriteLineAsync($"post-worker universe: sources={cases.Length} callables={callableCount} posts={postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unknown={aggregate.Unknown} old-proven={aggregate.OldProven} native-proven={aggregate.NewProven} disagreements={aggregate.SoundnessDisagreements} proof-losses={proofLosses.Count}");
+        Assert.That(rows, Has.Count.EqualTo(postconditions));
+        Assert.That(aggregate.OldProven, Is.GreaterThan(0));
+        Assert.That(aggregate.NewProven, Is.GreaterThanOrEqualTo(aggregate.OldProven));
+        Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
+        Assert.That(proofLosses, Is.Empty, string.Join(", ", proofLosses));
     }
 
     private static SharpProof.CompilerArtifact.CompilerManifestArtifact CreateGateArtifact(ShadowSourceCase sourceCase)

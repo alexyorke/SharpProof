@@ -72,10 +72,39 @@ internal static class CompilerTotalCallableLowerer
             return contracts.IsSuccess && contracts.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        var program = lowering.Program;
+        var isBodyAbstraction = false;
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions)
-        { return null; }
+        {
+            if (lowering.ConstructionLimitExceeded || graph.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
+                graph.Blocks.Sum(block => block.Operations.Length) > CompilerPreparedBody.MaximumInstructions ||
+                binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume) ||
+                context.Parameters.Any(parameter => !Primitive(parameter.Entry)) ||
+                context.Result is { } resultVariable && !Primitive(resultVariable) ||
+                context.Parameters.Length * 2 + 2 > CompilerPreparedBody.MaximumInstructions)
+            { return null; }
+            var builder = new IrProgramBuilder(context.Factory);
+            var block = builder.CreateBlock();
+            var site = context.Site(target.SemanticModel.GetOperation(declaration, cancellationToken)!);
+            foreach (var parameter in context.Parameters)
+            {
+                builder.Assign(block, site, parameter.Current, context.Factory.Variable(parameter.Entry));
+                builder.Assign(block, site, parameter.PreState, context.Factory.Variable(parameter.Entry));
+            }
+            var mutable = context.Parameters.Select(parameter => parameter.Current)
+                .Concat(context.Result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
+            if (mutable.Length == 0)
+            { mutable = [context.Factory.CreateVariable("abstract-body", context.Factory.BooleanType)]; }
+            builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mutable);
+            builder.Return(block, site, context.Result is { } returned ? context.Factory.Variable(returned) : null);
+            program = builder.Build();
+            isBodyAbstraction = true;
+
+            bool Primitive(IrVarId variable)
+            { return context.Factory.GetTypeInfo(context.Factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer; }
+        }
         var instructionCount = 0;
-        foreach (var block in lowering.Program.Blocks)
+        foreach (var block in program.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (block.Instructions.Length > CompilerPreparedBody.MaximumInstructions - instructionCount)
@@ -85,13 +114,13 @@ internal static class CompilerTotalCallableLowerer
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
-        return new(target.Entry.CallableId, lowering.Program,
+        return new(target.Entry.CallableId, program,
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result,
             [.. binding.Clauses.Select(clause => new CompilerTotalClause(CompilerLoweringWireMappings.ToCompiler(clause.Kind),
                 clause.Value, clause.SafeCondition, clause.SourceOperation,
                 clause.Kind == BoundContractKind.Ensures ? target.Claims[claimOrdinal++].Entry.ClaimId : null,
                 clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id :
-                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))]);
+                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction);
     }
 }

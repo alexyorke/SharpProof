@@ -13,7 +13,7 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         if (preparation == null)
         { return null; }
-        return EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses);
+        return EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses, preparation.IsBodyAbstraction);
     }
 
     internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
@@ -22,7 +22,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
-        ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses)
+        ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses, bool isBodyAbstraction = false)
     {
         var variables = parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
             .Concat(result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
@@ -31,6 +31,7 @@ internal static class CompilerTotalCallableArtifactCodec
             operations: clauses.Select(clause => clause.Operation).ToArray());
         return new()
         {
+            IsBodyAbstraction = isBodyAbstraction,
             Graph = encoded.Graph,
             Parameters = [.. parameters.Select(parameter => new CompilerTotalParameterArtifact
             {
@@ -51,7 +52,7 @@ internal static class CompilerTotalCallableArtifactCodec
         CancellationToken cancellationToken)
     {
         var decoded = DecodeCore(artifact, entry, claims, entryOnly: false, cancellationToken);
-        return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses);
+        return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction);
     }
 
     internal static CompilerTotalEntryPreparation? DecodeEntry(CompilerTotalCallableArtifact? artifact,
@@ -70,6 +71,7 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         if (artifact == null)
         { return null; }
+        Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.Result < -1)
         { throw new InvalidDataException("The Total callable payload is incomplete."); }
@@ -171,7 +173,7 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(claimOrdinal == postconditions.Length && assumptionOrdinal == preconditions.Length && userAssumptionOrdinal == userAssumptions.Length,
             "The Total clauses do not equal the manifest.");
         if (!entryOnly)
-        { ValidateProgram(decoded.Program!, result, clauses, parameters, cancellationToken); }
+        { ValidateProgram(decoded.Program!, result, clauses, parameters, artifact.IsBodyAbstraction, cancellationToken); }
         return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable());
     }
 
@@ -194,11 +196,16 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private static void ValidateProgram(IrProgram program, IrVarId? result,
-        IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters, CancellationToken cancellationToken)
+        IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters, bool isBodyAbstraction, CancellationToken cancellationToken)
     {
         Require(program.Blocks.Length <= CompilerPreparedBody.MaximumInstructions &&
             program.Blocks.Sum(block => block.Instructions.Length) <= CompilerPreparedBody.MaximumInstructions,
             "The Total program exceeds its construction bound.");
+        if (isBodyAbstraction)
+        {
+            ValidateBodyAbstraction(program, result, clauses, parameters);
+            return;
+        }
         var assumptions = new Dictionary<OperationId, CompilerTotalClause>();
         foreach (var clause in clauses.Where(clause => clause.Kind == CompilerContractKind.Assume))
         {
@@ -262,6 +269,44 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             pendingThrows[block] = !pendingThrows.TryGetValue(block, out var previous) ? pending : previous && pending;
         }
+    }
+
+    private static void ValidateBodyAbstraction(IrProgram program, IrVarId? result,
+        IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters)
+    {
+        var canonical = parameters.ToArray();
+        Require(program.Blocks.Length == 1 && clauses.All(clause => clause.Kind != CompilerContractKind.Assume),
+            "A body abstraction must have one unconstrained normal block and no body assumptions.");
+        var instructions = program.Blocks[0].Instructions;
+        Require(instructions.Length == canonical.Length * 2 + 2, "A body abstraction has an invalid instruction shape.");
+        var mutable = canonical.Select(parameter => parameter.Current).Concat(result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
+        Require(mutable.All(variable => program.Factory.GetTypeInfo(program.Factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer),
+            "A body abstraction cannot model reference or heap observations.");
+        for (var ordinal = 0; ordinal < canonical.Length; ordinal++)
+        {
+            var parameter = canonical[ordinal];
+            Require(instructions[ordinal * 2] is IrAssignInstruction current && current.Target == parameter.Current &&
+                current.Value is IrVariableTerm input && input.Variable == parameter.Entry &&
+                instructions[ordinal * 2 + 1] is IrAssignInstruction old && old.Target == parameter.Old &&
+                old.Value is IrVariableTerm previous && previous.Variable == parameter.Entry,
+                "A body abstraction must preserve the original entry snapshots.");
+        }
+        Require(instructions[instructions.Length - 2] is IrHavocInstruction, "A body abstraction must contain its approximation marker.");
+        var havoc = (IrHavocInstruction)instructions[instructions.Length - 2];
+        if (mutable.Length == 0)
+        {
+            Require(havoc.Variables.Length == 1, "A void abstraction must have one unused approximation marker.");
+            var marker = program.Factory.GetVariableInfo(havoc.Variables[0]);
+            Require(marker.Type == program.Factory.BooleanType && program.Factory.GetString(marker.Name) == "abstract-body",
+                "A void abstraction has an invalid approximation marker.");
+            mutable = [marker.Id];
+        }
+        Require(havoc.HavocKind == IrHavocKind.Variables && havoc.Origin == IrHavocOrigin.Approximation &&
+            havoc.Variables.Length == mutable.Length && new HashSet<IrVarId>(havoc.Variables).SetEquals(mutable),
+            "A body abstraction must forget every mutable scalar value.");
+        Require(instructions[instructions.Length - 1] is IrReturnInstruction returned &&
+            (result is { } returnedId ? returned.Value is IrVariableTerm value && value.Variable == returnedId : returned.Value == null),
+            "A body abstraction cannot constrain the returned value.");
     }
 
     private static void ValidateCyclicProgram(IrProgram program, IrVarId? result,

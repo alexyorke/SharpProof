@@ -3,10 +3,10 @@ authority: legacy
 request-bindings: True
 cache: Written
 postconditions: 4
-enrolled: 3
-checked: 3
-unchecked: 1
-unenrolled: 1
+enrolled: 4
+checked: 4
+unchecked: 0
+unenrolled: 0
 unknown: 1
 oldProven: 1
 newProven: 3
@@ -17,7 +17,7 @@ newConditional: 1
 soundnessDisagreements: 0
 precisionGains: 2
 precisionLosses: 1
-coverageComplete: False
+coverageComplete: True
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
   oldOutcome: Unknown
   oldVacuity: None
@@ -57,11 +57,11 @@ row: M:Subject.CLoop(System.Int32)~System.Int32#0
 row: M:Subject.DCall(System.Int32)~System.Int32#0
   oldOutcome: Refuted
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
+  totalPresent: True
+  enrolled: True
+  checked: True
   newOutcome: Unknown
-  newReason: UnsupportedBody
+  newReason: CounterexampleNotReplayable
   newVacuity: None
   feasibility: Unknown
   oldConditional: False
@@ -71,10 +71,10 @@ authority: legacy
 request-bindings: True
 cache: Hit
 postconditions: 4
-enrolled: 3
-checked: 3
-unchecked: 1
-unenrolled: 1
+enrolled: 4
+checked: 4
+unchecked: 0
+unenrolled: 0
 unknown: 1
 oldProven: 1
 newProven: 3
@@ -85,7 +85,7 @@ newConditional: 1
 soundnessDisagreements: 0
 precisionGains: 2
 precisionLosses: 1
-coverageComplete: False
+coverageComplete: True
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
   oldOutcome: Unknown
   oldVacuity: None
@@ -125,11 +125,11 @@ row: M:Subject.CLoop(System.Int32)~System.Int32#0
 row: M:Subject.DCall(System.Int32)~System.Int32#0
   oldOutcome: Refuted
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
+  totalPresent: True
+  enrolled: True
+  checked: True
   newOutcome: Unknown
-  newReason: UnsupportedBody
+  newReason: CounterexampleNotReplayable
   newVacuity: None
   feasibility: Unknown
   oldConditional: False

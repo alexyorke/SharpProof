@@ -11,12 +11,13 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
+    internal bool ConstructionLimitExceeded { get; private set; }
 
     internal bool Spend(int amount = 1)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (amount < 0 || amount > _remaining)
-        { _remaining = 0; return false; }
+        { _remaining = 0; ConstructionLimitExceeded = true; return false; }
         _remaining -= amount;
         return true;
     }

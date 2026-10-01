@@ -16,6 +16,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private SourceCallFrame? _frame;
     private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
+    private bool _constructionLimitExceeded;
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
@@ -39,7 +40,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     {
         _cancellationToken.ThrowIfCancellationRequested();
         if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
-        { throw new RegionIncompleteException(); }
+        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");
         var entry = _builder.CreateBlock("entry");
         if (_frame == null)
@@ -216,6 +217,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             instructions += block.Instructions.Length;
             if (instructions > MaximumRegionSteps)
             {
+                _constructionLimitExceeded = true;
                 throw new RegionIncompleteException();
             }
         }

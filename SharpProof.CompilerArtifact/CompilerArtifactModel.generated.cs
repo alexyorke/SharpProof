@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 23;
+    internal const int Current = 24;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -106,7 +106,8 @@ internal sealed record CompilerTotalCallablePreparation(
     IrProgram Program,
     ImmutableArray<CompilerTotalParameter> Parameters,
     IrVarId? Result,
-    ImmutableArray<CompilerTotalClause> Clauses);
+    ImmutableArray<CompilerTotalClause> Clauses,
+    bool IsBodyAbstraction = false);
 
 internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
 
@@ -115,6 +116,8 @@ internal sealed record CompilerTotalClause(CompilerContractKind Kind, IrTerm Val
 
 internal sealed class CompilerTotalCallableArtifact
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsBodyAbstraction { get; set; }
     public PortableIrGraph Graph { get; set; } = new();
     public CompilerTotalParameterArtifact[] Parameters { get; set; } = [];
     public int Result { get; set; } = -1;

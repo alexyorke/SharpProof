@@ -48,16 +48,30 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             (method.ReturnsVoid || TotalIlStack.Supported(method.ReturnType.SpecialType)) &&
             !CompilerImplementationIlSummaryLowerer.IsReferenceAssembly(method.ContainingAssembly) &&
             !method.GetAttributes().Any(attribute => attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
-                CompilerImplementationIlSummaryLowerer.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices")) &&
-            NoInitialization(method.ContainingType);
+                CompilerImplementationIlSummaryLowerer.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices"));
     }
 
-    private static bool NoInitialization(INamedTypeSymbol type)
+    private static bool NoInitialization(PEReader pe, MetadataReader reader, TypeDefinitionHandle type)
     {
-        for (var current = type; current != null; current = current.ContainingType)
+        var remaining = 128;
+        for (var current = type; !current.IsNil; current = reader.GetTypeDefinition(current).GetDeclaringType())
         {
-            if (!current.StaticConstructors.IsEmpty)
+            if (--remaining < 0)
             { return false; }
+            foreach (var methodHandle in reader.GetTypeDefinition(current).GetMethods())
+            {
+                var method = reader.GetMethodDefinition(methodHandle);
+                if (reader.GetString(method.Name) != ".cctor")
+                { continue; }
+                if (!CompilerImplementationIlSummaryLowerer.HasManagedIlBody(method) || method.RelativeVirtualAddress == 0 ||
+                    (method.ImplAttributes & MethodImplAttributes.Synchronized) != 0 || method.GetDeclarativeSecurityAttributes().Count != 0)
+                { return false; }
+                var body = pe.GetMethodBody(method.RelativeVirtualAddress);
+                var code = body.GetILBytes() ?? Array.Empty<byte>();
+                if (!body.ExceptionRegions.IsEmpty || !body.LocalSignature.IsNil || code.Length is 0 or > 4096 ||
+                    code[code.Length - 1] != 0x2a || code.Take(code.Length - 1).Any(opcode => opcode != 0x00))
+                { return false; }
+            }
         }
         return true;
     }
@@ -117,7 +131,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             !CompilerImplementationIlSummaryLowerer.HasManagedIlBody(definition) ||
             (definition.ImplAttributes & MethodImplAttributes.Synchronized) != 0 || definition.RelativeVirtualAddress == 0 ||
             ResolveMethod(reader, assembly, handle, method.ContainingModule.Name) is not { } resolved ||
-            !SameSignature(method, resolved))
+            !SameSignature(method, resolved) || !NoInitialization(pe, reader, definition.GetDeclaringType()))
         { return null; }
         var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
         if (body.Size is <= 0 or > 65536 || body.MaxStack is < 0 or > 128 || !body.ExceptionRegions.IsEmpty)

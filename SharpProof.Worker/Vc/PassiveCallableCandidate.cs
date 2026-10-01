@@ -11,7 +11,7 @@ internal sealed class PassiveCallableCandidate
 {
     internal PassiveCallableCandidate(string callableId, IrProgram program,
         ImmutableArray<PassiveParameterBinding> parameters, IrVarId? result,
-        ImmutableArray<PassiveContractClause> requires, ImmutableArray<PassiveContractClause> ensures)
+        ImmutableArray<PassiveContractClause> requires, ImmutableArray<PassiveContractClause> ensures, bool isBodyAbstraction = false)
     {
         if (string.IsNullOrWhiteSpace(callableId))
         { throw new ArgumentException("A callable identity is required.", nameof(callableId)); }
@@ -56,10 +56,12 @@ internal sealed class PassiveCallableCandidate
         Result = result;
         Requires = requires;
         Ensures = ensures;
+        IsBodyAbstraction = isBodyAbstraction;
     }
 
     internal string CallableId { get; }
     internal IrProgram Program { get; }
+    internal bool IsBodyAbstraction { get; }
     internal IrFactory Factory => Program.Factory;
     internal ImmutableArray<PassiveParameterBinding> Parameters { get; }
     internal IrVarId? Result { get; }

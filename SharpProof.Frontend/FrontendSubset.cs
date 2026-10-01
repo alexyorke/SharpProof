@@ -176,6 +176,7 @@ public readonly struct FrontendProgramAbstention
 
 public sealed partial class FrontendProgramLoweringResult
 {
+    internal bool ConstructionLimitExceeded { get; set; }
     internal object? TotalOrigin { get; }
     internal FrontendProgramLoweringResult(
         IrProgram program, FrontendSubsetClassification classification,

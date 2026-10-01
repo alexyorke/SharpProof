@@ -36,7 +36,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         _regionGraph = graph;
         if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
-        { throw new RegionIncompleteException(); }
+        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var regions = new Stack<ControlFlowRegion>();
         regions.Push(graph.Root);
         while (regions.Count != 0)
@@ -182,7 +182,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         closed.Return(start, structural);
         _abstentions.Add(new(structural, FrontendAbstention.UnsupportedControlFlow));
         return new(closed.Build(), FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedControlFlow),
-            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin);
+            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
+        { ConstructionLimitExceeded = _constructionLimitExceeded || _calls?.ConstructionLimitExceeded == true };
     }
 
     private void RegionTerminator(BasicBlock source, IrBlockId block, OperationId structural)
@@ -497,7 +498,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         _cancellationToken.ThrowIfCancellationRequested();
         if (_calls != null ? !_calls.Spend() : --_regionRemaining < 0)
-        { throw new RegionIncompleteException(); }
+        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
     }
     private bool Inside(ControlFlowRegion candidate, ControlFlowRegion expected)
     {

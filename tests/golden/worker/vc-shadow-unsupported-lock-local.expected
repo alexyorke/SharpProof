@@ -3,29 +3,29 @@ authority: legacy
 request-bindings: True
 cache: Written
 postconditions: 1
-enrolled: 0
-checked: 0
-unchecked: 1
-unenrolled: 1
-unknown: 1
+enrolled: 1
+checked: 1
+unchecked: 0
+unenrolled: 0
+unknown: 0
 oldProven: 0
-newProven: 0
+newProven: 1
 oldVacuous: 0
 newVacuous: 0
 oldConditional: 0
 newConditional: 0
 soundnessDisagreements: 0
-precisionGains: 0
+precisionGains: 1
 precisionLosses: 0
-coverageComplete: False
+coverageComplete: True
 row: M:Subject.BContractLock#0
   oldOutcome: Unknown
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
   newVacuity: None
   feasibility: Unknown
   oldConditional: False
@@ -35,29 +35,29 @@ authority: legacy
 request-bindings: True
 cache: Hit
 postconditions: 1
-enrolled: 0
-checked: 0
-unchecked: 1
-unenrolled: 1
-unknown: 1
+enrolled: 1
+checked: 1
+unchecked: 0
+unenrolled: 0
+unknown: 0
 oldProven: 0
-newProven: 0
+newProven: 1
 oldVacuous: 0
 newVacuous: 0
 oldConditional: 0
 newConditional: 0
 soundnessDisagreements: 0
-precisionGains: 0
+precisionGains: 1
 precisionLosses: 0
-coverageComplete: False
+coverageComplete: True
 row: M:Subject.BContractLock#0
   oldOutcome: Unknown
   oldVacuity: None
-  totalPresent: False
-  enrolled: False
-  checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
   newVacuity: None
   feasibility: Unknown
   oldConditional: False

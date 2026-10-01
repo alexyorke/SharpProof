@@ -111,7 +111,7 @@ public sealed class TypedMetadataCallTests
     }
 
     [Test]
-    public void ModuleInitializerIsExplicitlyUnenrolled()
+    public void ModuleInitializerRemainsAbstract()
     {
         using var subject = new MetadataTestSubject("""
             public static class Boot {
@@ -125,7 +125,7 @@ public sealed class TypedMetadataCallTests
             """);
         Assert.That(subject.Invoke(3), Is.EqualTo(3));
         Assert.That(subject.Compilation.GetTypeByMetadataName("Library")!.StaticConstructors, Is.Empty);
-        Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Null);
+        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
     }
 
     [TestCase(-1)]
@@ -156,7 +156,7 @@ public sealed class TypedMetadataCallTests
     [TestCase("branch")]
     [TestCase("opcode")]
     [TestCase("locals")]
-    public void MalformedImplementationBodyIsExplicitlyUnenrolled(string mutation)
+    public void MalformedImplementationBodyCannotSupplyConcreteEvidence(string mutation)
     {
         var library = mutation == "locals"
             ? "public static class Library { public static int Target(int value) { int result = 0; for (int i = 0; i < value; i++) result += i; return result; } }"
@@ -188,7 +188,7 @@ public sealed class TypedMetadataCallTests
                     break;
             }
         });
-        Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Null);
+        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
     }
 
     [Test]
@@ -214,18 +214,18 @@ public sealed class TypedMetadataCallTests
     [TestCase("static Library() { }")]
     [TestCase("public static int State = Initialize(); private static int Initialize() { return 1; }")]
     [TestCase("")]
-    public void UnsupportedTypeInitializationAndDependencyStayClosed(string initialization)
+    public void TypeInitializationAndDependencyAdmissionIsExplicit(string initialization)
     {
         var body = string.IsNullOrEmpty(initialization) ? "return System.Math.Abs(value);" : "return value;";
         using var subject = new MetadataTestSubject($"public static class Library {{ {initialization} public static int Target(int value) {{ {body} }} }}", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return Library.Target(x); } }
             """);
-        Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Null);
+        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.EqualTo(initialization != "static Library() { }"));
     }
 
     [Test]
-    public void MetadataExceptionRegionsRemainExplicitlyUnenrolled()
+    public void MetadataExceptionRegionsRemainAbstract()
     {
         using var subject = new MetadataTestSubject("""
             public static class Library { public static int Target(int value) {
@@ -236,7 +236,7 @@ public sealed class TypedMetadataCallTests
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return Library.Target(x); } }
             """);
         Assert.That(subject.Invoke(0), Is.EqualTo(1));
-        Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Null);
+        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
     }
 
     [Test]
@@ -301,7 +301,7 @@ public sealed class TypedMetadataCallTests
     [TestCase("native")]
     [TestCase("arm64")]
     [TestCase("amd64-pe32")]
-    public void IncompatibleImplementationImageStaysClosed(string mutation)
+    public void IncompatibleImplementationImageCannotSupplyConcreteEvidence(string mutation)
     {
         using var subject = new MetadataTestSubject("public static class Library { public static int Target(int value) { return value; } }", """
             using SharpProof.Attributes;
@@ -322,7 +322,7 @@ public sealed class TypedMetadataCallTests
                 bytes[offset] = mutation == "32-bit" ? (byte)(bytes[offset] | 2) : (byte)(bytes[offset] & ~1);
             }
         });
-        Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Null);
+        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
     }
 
     [Test]
