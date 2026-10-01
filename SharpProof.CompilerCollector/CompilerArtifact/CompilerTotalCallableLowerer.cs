@@ -67,12 +67,15 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         if (graph == null)
         { return null; }
+        var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var contracts = new ContractBinder(compilation, context.Factory).BindTotal(frame);
             return contracts.IsSuccess && contracts.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
-        }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken);
+        }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
+            method => apiSpecs.TryGet(method, out var spec) &&
+                spec.Template.Target.DocumentationCommentId == "M:System.Math.Abs(System.Int32)");
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;

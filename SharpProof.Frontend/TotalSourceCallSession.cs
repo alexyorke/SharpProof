@@ -6,12 +6,23 @@ namespace SharpProof.Frontend;
 // One compiler-owned expansion session covers the caller and every fresh frame.
 // It supplies source bodies, never relational summaries or contract premises.
 internal sealed class TotalSourceCallSession(Compilation compilation,
-    Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken)
+    Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
+    Func<IMethodSymbol, bool>? isKnownInt32MathAbs = null)
 {
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool ConstructionLimitExceeded { get; private set; }
+
+    internal bool IsInt32MathAbs(IInvocationOperation invocation)
+    {
+        return invocation.Instance == null && invocation.Arguments.Length == 1 &&
+            invocation.TargetMethod.IsStatic && invocation.TargetMethod.Parameters.Length == 1 &&
+            invocation.TargetMethod.ReturnType.SpecialType == SpecialType.System_Int32 &&
+            invocation.TargetMethod.Parameters[0].Type.SpecialType == SpecialType.System_Int32 &&
+            invocation.Arguments[0].Parameter?.Ordinal == 0 &&
+            isKnownInt32MathAbs?.Invoke(invocation.TargetMethod) == true && Spend();
+    }
 
     internal bool Spend(int amount = 1)
     {

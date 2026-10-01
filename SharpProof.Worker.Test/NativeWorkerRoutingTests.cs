@@ -10,6 +10,66 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase("Contract.Result<int>() >= 0", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() != int.MinValue", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() > 0", WorkerClaimOutcome.Refuted)]
+    public async Task NativeMathAbsUsesOnlyNormalCompletion(string predicate, WorkerClaimOutcome expected)
+    {
+        using var project = new ShadowTestProject($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Ensures({{predicate}});
+                    return Math.Abs(value);
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task NativeMathAbsOverflowReachesTheCallerCatch()
+    {
+        using var project = new ShadowTestProject("""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value == int.MinValue);
+                    Contract.Ensures(Contract.Result<int>() == 7);
+                    try { return Math.Abs(value); }
+                    catch (OverflowException) { return 7; }
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(response.ClaimResults.Single().Vacuity, Is.Not.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+    }
+
+    [Test]
+    public async Task NativeMathAbsDoesNotTrustASourceTypeWithTheFrameworkName()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            namespace System { public static class Math { public static int Abs(int value) => -1; } }
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return System.Math.Abs(value);
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
     [Test]
     public async Task NativeFactoryDoesNotEmitLegacyShadowComparisons()
     {
@@ -175,7 +235,7 @@ public sealed class NativeWorkerRoutingTests
             }
         }
         Assert.That(posts, Is.EqualTo(253));
-        Assert.That(known, Is.EqualTo(236));
+        Assert.That(known, Is.EqualTo(238));
         await TestContext.Out.WriteLineAsync($"native-worker universe: fixtures={cases.Length} posts={posts} retained-known={known}");
     }
 

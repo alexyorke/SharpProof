@@ -7,7 +7,7 @@ enrolled: 4
 checked: 4
 unchecked: 0
 unenrolled: 0
-unknown: 1
+unknown: 0
 oldProven: 1
 newProven: 3
 oldVacuous: 0
@@ -16,7 +16,7 @@ oldConditional: 1
 newConditional: 1
 soundnessDisagreements: 0
 precisionGains: 2
-precisionLosses: 1
+precisionLosses: 0
 coverageComplete: True
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
   oldOutcome: Unknown
@@ -60,10 +60,10 @@ row: M:Subject.DCall(System.Int32)~System.Int32#0
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Unknown
-  newReason: CounterexampleNotReplayable
+  newOutcome: Refuted
+  newReason: None
   newVacuity: None
-  feasibility: Unknown
+  feasibility: Feasible
   oldConditional: False
   newConditional: False
 run: cache-hit
@@ -75,7 +75,7 @@ enrolled: 4
 checked: 4
 unchecked: 0
 unenrolled: 0
-unknown: 1
+unknown: 0
 oldProven: 1
 newProven: 3
 oldVacuous: 0
@@ -84,7 +84,7 @@ oldConditional: 1
 newConditional: 1
 soundnessDisagreements: 0
 precisionGains: 2
-precisionLosses: 1
+precisionLosses: 0
 coverageComplete: True
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
   oldOutcome: Unknown
@@ -128,9 +128,9 @@ row: M:Subject.DCall(System.Int32)~System.Int32#0
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Unknown
-  newReason: CounterexampleNotReplayable
+  newOutcome: Refuted
+  newReason: None
   newVacuity: None
-  feasibility: Unknown
+  feasibility: Feasible
   oldConditional: False
   newConditional: False

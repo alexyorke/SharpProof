@@ -2,6 +2,19 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static TotalScalarRule Int32MathAbs(IrFactory factory, IrTerm value)
+    {
+        var type = factory.GetTypeInfo(value.Type);
+        if (type.Kind != IrTypeKind.Integer || type.Width != 32 || !type.Signed)
+        { return Fail(factory, FrontendAbstention.UnsupportedType); }
+        var zero = Number(factory, value.Type, 0);
+        var negative = factory.Binary(IrBinaryOperator.LessThan, value, zero);
+        var result = factory.Conditional(negative, factory.Binary(IrBinaryOperator.Subtract, zero, value), value);
+        return new(result, [new(IrExceptionKind.Overflow,
+            factory.Binary(IrBinaryOperator.Equal, value, Number(factory, value.Type, int.MinValue)))],
+            FrontendSubsetClassification.Exact);
+    }
+
     internal static TotalScalarRule ConvertInteger(IrFactory factory, IrTerm value, IrTypeId target, bool isChecked)
     {
         if (value.Type == target)

@@ -8,6 +8,31 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CSharpOperationSemanticsTests
 {
+    [TestCase(int.MinValue)]
+    [TestCase(int.MinValue + 1)]
+    [TestCase(-65536)]
+    [TestCase(-1)]
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(65536)]
+    [TestCase(int.MaxValue)]
+    public void Int32MathAbsRuleAgreesWithCompiledRuntime(int value)
+    {
+        using var subject = TypedProgramSubject.Create("int Target(int value) => System.Math.Abs(value);");
+        var parameter = subject.Context.Parameters.Single().Current;
+        var rule = CSharpOperationSemantics.Int32MathAbs(subject.Factory, subject.Factory.Variable(parameter));
+        var interpreter = new IrInterpreter(subject.Factory);
+        var environment = new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, value) };
+        var runtime = subject.Invoke([value]);
+        var overflow = interpreter.Evaluate(rule.Throws.Single().Condition, environment).Value!.Boolean;
+        Assert.That(overflow, Is.EqualTo(runtime is OverflowException));
+        Assert.That(rule.Throws.Single().Kind, Is.EqualTo(IrExceptionKind.Overflow));
+        if (!overflow)
+        {
+            Assert.That(interpreter.Evaluate(rule.Value, environment).Value!.Integer, Is.EqualTo((int)runtime!));
+        }
+    }
+
     [Test]
     public void FrozenDecisionsCoverEveryDistinctRoslynKind()
     {

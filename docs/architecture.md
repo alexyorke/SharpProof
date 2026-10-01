@@ -398,11 +398,17 @@ Legacy comparison fixtures explicitly construct the legacy backend. An explicitl
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.
 A trial public-factory switch exposed remaining parity gaps in API specification
-models (`Math.Abs`, string concatenation and `Array.Empty` result facets), opted-in
+models (string concatenation and `Array.Empty` result facets), opted-in
 specification packs, and source callees containing `Contract.Assume`. Existing
 proof expectations remain requirements for the transition; they have not been
 weakened to accommodate these gaps. Typed scalar improvements also change several
 legacy outcome and proof-core expectations and require separate review.
+Native Int32 `Math.Abs` calls use the approved compiler-resolved API symbol and
+the shared scalar semantic rule. The rule computes typed absolute values and
+emits an explicit overflow edge for `int.MinValue`; arguments are evaluated
+before that edge, and caller exception handlers remain active. Boundary cases
+are compared with compiled C# execution. A source type named `System.Math` does
+not receive this model.
 Native contract binding includes parameter and return `Positive`, `InRange`, and
 supported reference `NotNull` attributes. Numeric predicates use the value's
 signedness and width, including `ulong`; bounds outside the scalar domain fold

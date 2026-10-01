@@ -97,7 +97,7 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { public static int Target(int x) {
                 Contract.Ensures(Contract.Result<int>() == x); return System.Math.Abs(x);
             } }
-            """, [WorkerClaimOutcome.Unknown], Reason: WorkerClaimReason.CounterexampleNotReplayable),
+            """, [WorkerClaimOutcome.Refuted]),
         new("general-division-budget", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int d) {
@@ -201,7 +201,7 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(aggregate.Enrolled, Is.EqualTo(86));
         Assert.That(aggregate.Unenrolled, Is.EqualTo(1));
         Assert.That(aggregate.Checked, Is.EqualTo(86));
-        Assert.That(aggregate.Unknown, Is.EqualTo(6));
+        Assert.That(aggregate.Unknown, Is.EqualTo(5));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);

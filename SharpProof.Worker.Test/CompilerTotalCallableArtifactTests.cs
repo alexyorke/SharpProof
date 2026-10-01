@@ -389,7 +389,7 @@ public sealed class CompilerTotalCallableArtifactTests
         if (kind is "call" or "attribute")
         {
             Assert.That(preparation.Total, Is.Not.Null);
-            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(kind == "call"));
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
             Assert.That(PassiveCallableArtifactAdapter.Enroll(preparation), Is.Not.Null);
         }
         else
