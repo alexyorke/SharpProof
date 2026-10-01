@@ -133,7 +133,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 SpendRegion();
                 return true;
             }, out var failure);
-            if (failure != IrAcyclicOrderFailure.None)
+            if (failure is not (IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow))
             { throw new RegionIncompleteException(); }
             return Result(program);
         }
@@ -209,6 +209,18 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
             branch?.Destination != null)
         { _builder.Goto(block, structural, RegionNormalTarget(branch, structural)); }
+        else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
+                 branch != null && source.ConditionalSuccessor is { } conditionalBranch)
+        {
+            // Roslyn may fold a rethrow/finally completion into one edge of a
+            // conditional block. Its guard (and mutations) must execute before
+            // selecting that terminal edge; it is not an unconditional leave.
+            var value = Value(condition, block);
+            var fall = RegionConditionalTarget(source, branch, site);
+            var conditional = RegionConditionalTarget(source, conditionalBranch, site);
+            var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
+            _builder.Branch(value.Continuation, site, value.Value, whenTrue ? conditional : fall, whenTrue ? fall : conditional);
+        }
         else if (branch?.Semantics == ControlFlowBranchSemantics.Return)
         {
             if (source.BranchValue is { } expression && _context.Result is { } result)
@@ -252,19 +264,40 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         else if (source.Kind == BasicBlockKind.Exit)
         { _builder.Return(block, site); }
-        else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
-                 branch?.Destination != null && source.ConditionalSuccessor?.Destination != null)
-        {
-            var value = Value(condition, block);
-            var fall = RegionNormalTarget(branch, site);
-            var conditional = RegionNormalTarget(source.ConditionalSuccessor, site);
-            var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
-            _builder.Branch(value.Continuation, site, value.Value, whenTrue ? conditional : fall, whenTrue ? fall : conditional);
-        }
         else if (branch?.Destination != null)
         { _builder.Goto(block, site, RegionNormalTarget(branch, site)); }
         else
         { throw new RegionIncompleteException(); }
+    }
+
+    private IrBlockId RegionConditionalTarget(BasicBlock source, ControlFlowBranch branch, OperationId site)
+    {
+        SpendRegion();
+        if (branch.Semantics == ControlFlowBranchSemantics.Regular)
+        { return RegionNormalTarget(branch, site); }
+        if (branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling)
+        { return EnclosingRegionFinally(source.EnclosingRegion).Dispatch; }
+        if (branch.Semantics == ControlFlowBranchSemantics.Return && _context.Result == null)
+        {
+            var returned = RegionBlock("return:conditional");
+            _builder.Return(returned, site);
+            return branch.FinallyRegions.IsEmpty ? returned
+                : EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true);
+        }
+        if (branch.Semantics == ControlFlowBranchSemantics.Rethrow)
+        {
+            var caught = source.EnclosingRegion;
+            while (caught != null && caught.Kind != ControlFlowRegionKind.Catch)
+            { SpendRegion(); caught = caught.EnclosingRegion; }
+            if (caught == null)
+            { throw new RegionIncompleteException(); }
+            var rethrown = RegionBlock("rethrow:conditional");
+            _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
+            return rethrown;
+        }
+        // A conditional CFG edge has no separate thrown operand here. Do not
+        // infer throw-null or a captured return value from the Boolean guard.
+        throw new RegionIncompleteException();
     }
 
     private IrBlockId RegionNormalTarget(ControlFlowBranch branch, OperationId site)

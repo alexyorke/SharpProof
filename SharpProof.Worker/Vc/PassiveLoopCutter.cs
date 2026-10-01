@@ -2,7 +2,7 @@ namespace SharpProof.Worker;
 
 // Both encodings are derived here from one owned original. A cut graph is an
 // overapproximation of finite returns; an unroll graph is only witness search.
-internal sealed class PassiveLoopCutter
+internal sealed partial class PassiveLoopCutter
 {
     internal const int SearchBackEdges = 4;
     private readonly PassiveCallableCandidate _candidate;
@@ -12,6 +12,9 @@ internal sealed class PassiveLoopCutter
     private readonly HashSet<(IrBlockId From, IrBlockId To)> _backEdges = [];
     private readonly Dictionary<IrBlockId, HashSet<IrBlockId>> _loops = [];
     private readonly HashSet<IrBlockId> _reachable = [];
+    private readonly List<IrBlockId> _finished = [];
+    private readonly Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc = [];
+    private readonly Dictionary<IrBlockId, ExceptionComponent> _exceptionComponents = [];
 
     internal sealed record Encoding(IrProgram Program, ImmutableHashSet<IrInstructionId> Stops);
     private PassiveLoopCutter(PassiveCallableCandidate candidate, CancellationToken cancellation)
@@ -49,7 +52,7 @@ internal sealed class PassiveLoopCutter
             Spend();
             var (block, exit) = stack.Pop();
             if (exit)
-            { active.Remove(block); continue; }
+            { active.Remove(block); _finished.Add(block); continue; }
             if (!_reachable.Add(block))
             { continue; }
             active.Add(block);
@@ -78,8 +81,12 @@ internal sealed class PassiveLoopCutter
                 { return false; }
             }
         }
+        if (!FindExceptionComponents())
+        { return false; }
         foreach (var (latch, header) in _backEdges.OrderBy(edge => edge.To.Value).ThenBy(edge => edge.From.Value))
         {
+            if (_exceptionComponents.ContainsKey(header))
+            { continue; }
             // A natural header must dominate its latch. Bounded reachability
             // with that header removed detects an irreducible entry.
             var seen = new HashSet<IrBlockId>();
@@ -109,37 +116,8 @@ internal sealed class PassiveLoopCutter
                 { Spend(); pending.Push(predecessor); }
             }
         }
-        var immutable = new HashSet<IrVarId>();
-        foreach (var parameter in _candidate.Parameters)
-        {
-            Spend();
-            immutable.Add(parameter.Entry);
-            immutable.Add(parameter.Old);
-        }
-        foreach (var nodes in _loops.Values)
-        {
-            foreach (var block in nodes)
-            {
-                foreach (var instruction in _candidate.Program.GetBlock(block).Instructions)
-                {
-                    Spend();
-                    // Cyclic exception contexts and point assumptions are a
-                    // later admission milestone, not an implicit invariant.
-                    if (instruction is IrThrowInstruction or IrAssumeInstruction ||
-                        instruction is IrAssignInstruction assign && immutable.Contains(assign.Target))
-                    { return false; }
-                    if (instruction is IrHavocInstruction havoc)
-                    {
-                        foreach (var variable in havoc.Variables)
-                        {
-                            Spend();
-                            if (immutable.Contains(variable))
-                            { return false; }
-                        }
-                    }
-                }
-            }
-        }
+        foreach (var (header, nodes) in _loops)
+        { Spend(); _havoc.Add(header, WrittenVariables(nodes)); }
         return true;
     }
 
@@ -150,47 +128,41 @@ internal sealed class PassiveLoopCutter
         var pending = new Queue<(IrBlockId Block, int Layer)>();
         var stops = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         var instructions = 0;
+        var allocatedBlocks = 0;
+        IrBlockId CreateBlock(string name)
+        {
+            Spend();
+            if (++allocatedBlocks > PassiveCallableVcBuilder.MaximumSteps)
+            { throw new ConstructionLimitException(); }
+            return builder.CreateBlock(name);
+        }
         IrBlockId Block(IrBlockId original, int layer)
         {
             Spend();
             var key = (original, layer);
             if (!blocks.TryGetValue(key, out var encoded))
             {
-                if (blocks.Count >= PassiveCallableVcBuilder.MaximumSteps)
-                { throw new ConstructionLimitException(); }
-                encoded = builder.CreateBlock("loop:" + original.Value.ToString(CultureInfo.InvariantCulture) + ":" + layer.ToString(CultureInfo.InvariantCulture));
+                encoded = CreateBlock("loop:" + original.Value.ToString(CultureInfo.InvariantCulture) + ":" + layer.ToString(CultureInfo.InvariantCulture));
                 blocks.Add(key, encoded);
                 pending.Enqueue(key);
             }
             return encoded;
         }
-        builder.SetEntry(Block(_candidate.Program.Entry, 0));
+        var originalEntry = _candidate.Program.Entry;
+        builder.SetEntry(!unroll && _exceptionComponents.TryGetValue(originalEntry, out var entryComponent)
+            ? Router(entryComponent, _candidate.Program.GetBlock(originalEntry).Instructions[0].Operation)
+            : Block(originalEntry, 0));
         while (pending.Count != 0)
         {
             Spend();
             var (original, layer) = pending.Dequeue();
             var encoded = blocks[(original, layer)];
             var source = _candidate.Program.GetBlock(original);
-            if (!unroll && _loops.TryGetValue(original, out var nodes))
+            if (!unroll && _havoc.TryGetValue(original, out var writes) && writes.Length != 0)
             {
-                var writes = new HashSet<IrVarId>();
-                foreach (var node in nodes)
-                {
-                    foreach (var instruction in _candidate.Program.GetBlock(node).Instructions)
-                    {
-                        Spend();
-                        if (instruction is IrAssignInstruction assign)
-                        { writes.Add(assign.Target); }
-                        else if (instruction is IrHavocInstruction havoc)
-                        { foreach (var variable in havoc.Variables) { Spend(); writes.Add(variable); } }
-                    }
-                }
-                if (writes.Count != 0)
-                {
-                    Count();
-                    builder.Havoc(encoded, source.Instructions[0].Operation, IrHavocKind.Variables, IrHavocOrigin.Approximation,
-                        [.. writes.OrderBy(variable => variable.Value)]);
-                }
+                Spend(writes.Length);
+                Count();
+                builder.Havoc(encoded, source.Instructions[0].Operation, IrHavocKind.Variables, IrHavocOrigin.Approximation, [.. writes]);
             }
             foreach (var instruction in source.Instructions)
             {
@@ -229,13 +201,14 @@ internal sealed class PassiveLoopCutter
             IrBlockId Target(IrBlockId destination, OperationId site)
             {
                 Spend();
+                if (!unroll && _exceptionComponents.TryGetValue(destination, out var component) &&
+                    (!_exceptionComponents.TryGetValue(original, out var sourceComponent) || !ReferenceEquals(component, sourceComponent)))
+                { return Router(component, site); }
                 if (!_backEdges.Contains((original, destination)))
                 { return Block(destination, layer); }
                 if (unroll && layer < SearchBackEdges)
                 { return Block(destination, layer + 1); }
-                if (blocks.Count + stops.Count >= PassiveCallableVcBuilder.MaximumSteps)
-                { throw new ConstructionLimitException(); }
-                var stop = builder.CreateBlock("loop:stop");
+                var stop = CreateBlock("loop:stop");
                 Count();
                 stops.Add(builder.Assume(stop, site, _candidate.Factory.Boolean(false)).Id);
                 Count();
@@ -250,6 +223,49 @@ internal sealed class PassiveLoopCutter
         if (failure != IrAcyclicOrderFailure.None || order.IsDefault)
         { throw new ConstructionLimitException(); }
         return new(program, stops.ToImmutable());
+
+        IrBlockId Router(ExceptionComponent component, OperationId site)
+        {
+            // Take the original finite trace after its LAST cut edge. Its suffix
+            // uses no deleted edge; the router can select that edge's target and
+            // supply its state. Only SCC writes can differ from the incoming
+            // state. This is a normal-return/poststate abstraction, not evidence
+            // that skipped operation/effect sites execute. Each original body
+            // stays shared, and no pending exception is synthesized here.
+            var length = component.Blocks.Length;
+            var missingOriginalBlocks = 0;
+            foreach (var original in component.Blocks)
+            {
+                Spend();
+                if (!blocks.ContainsKey((original, 0)))
+                { missingOriginalBlocks++; }
+            }
+            // Reserve the complete dispatch, choice terms and union mapping
+            // before allocating any router storage, blocks or instructions.
+            Spend(component.Writes.Length + 6 * length + 1);
+            if (allocatedBlocks + length + missingOriginalBlocks > PassiveCallableVcBuilder.MaximumSteps ||
+                instructions + length + 1 > PassiveCallableVcBuilder.MaximumSteps)
+            { throw new ConstructionLimitException(); }
+            var dispatch = CreateBlock("loop:exception-entry");
+            var choice = _candidate.Factory.CreateVariable("loop:choice", _candidate.Factory.IntegerType);
+            Count();
+            builder.Havoc(dispatch, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, [.. component.Writes, choice]);
+            var first = dispatch;
+            for (var ordinal = 0; ordinal < length - 1; ordinal++)
+            {
+                Spend();
+                var next = CreateBlock("loop:exception-choice");
+                Count();
+                builder.Branch(dispatch, site, _candidate.Factory.Binary(IrBinaryOperator.Equal,
+                    _candidate.Factory.Variable(choice), _candidate.Factory.Integer(ordinal)), Block(component.Blocks[ordinal], 0), next);
+                dispatch = next;
+            }
+            Count();
+            // All other choice values select the final block, so every choice
+            // is valid without a range premise or a synthetic user assumption.
+            builder.Goto(dispatch, site, Block(component.Blocks[^1], 0));
+            return first;
+        }
 
         void Count()
         {

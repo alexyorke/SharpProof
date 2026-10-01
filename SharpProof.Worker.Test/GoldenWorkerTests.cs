@@ -42,6 +42,7 @@ public sealed class GoldenWorkerTests
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
+            : scenario == "vc-exception-multi-entry" ? await VcExceptionMultiEntry()
             : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
             : scenario == "vc-shadow-meter-boundary" ? await VcShadowMeterBoundary(fixture.Source)
             : scenario == "vc-shadow-completed-boundary" ? await VcShadowCompletedBoundary(fixture.Source)
@@ -58,6 +59,24 @@ public sealed class GoldenWorkerTests
         output.AppendLine("payload: canonical re-encoding with original ID/site/predicate");
         output.AppendLine("body-to-assumption-rejected: " + WorkerVcLoopTests.PrologueReentryRejected(false, source));
         output.AppendLine("body-to-initialization-rejected: " + WorkerVcLoopTests.PrologueReentryRejected(true, source));
+        return output.ToString();
+    }
+
+    private static async Task<string> VcExceptionMultiEntry()
+    {
+        var candidate = PassiveExceptionLoopTests.MultipleEntryCandidate();
+        var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var feasibility = await solver.VerifyFeasibilityAsync();
+        var ensures = await solver.VerifyEnsuresAsync(0);
+        var output = new StringBuilder();
+        output.AppendLine("original: E(true) -> A -> B(true) -> R");
+        output.AppendLine("original-return: " + execution.ReturnValue!.IntegerNumericValue);
+        output.AppendLine("normal-completion: " + feasibility.Kind);
+        output.AppendLine("false-ensures: " + ensures.Outcome!.GetType().Name);
+        output.AppendLine("replay: unchanged owned original");
+        output.AppendLine("projection-canonical: " + ensures.EntryModel.IsEmpty);
         return output.ToString();
     }
 

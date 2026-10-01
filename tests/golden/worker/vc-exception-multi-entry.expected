@@ -1,0 +1,6 @@
+original: E(true) -> A -> B(true) -> R
+original-return: 1
+normal-completion: Feasible
+false-ensures: RefutedOutcome
+replay: unchanged owned original
+projection-canonical: True

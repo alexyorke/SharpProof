@@ -138,6 +138,7 @@
           "SharpProof.Worker/Vc/WorkerVcShadowObserver.cs",
           "SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs",
           "SharpProof.Worker/Vc/PassiveLoopCutter.cs",
+          "SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs",
           "SharpProof.Worker/Vc/PassiveCallableVcPlan.cs",
           "SharpProof.Worker/Vc/PassiveCallableSolver.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",

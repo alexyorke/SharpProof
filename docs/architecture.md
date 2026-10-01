@@ -210,7 +210,8 @@ safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
 body evaluation. Partial/generic contexts, ref locals, heap operations, ordinary
-calls, irreducible loops and cyclic exception contexts currently abstain.
+calls, ordinary irreducible loops and point Assume instructions inside cycles
+currently abstain.
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and
 unary Plus/Minus use the same wrap value and guarded overflow rules in bodies
@@ -228,17 +229,17 @@ replace an outer rethrow's provenance. Each finally region is lowered once
 with its own continuation selector. Return values are captured before finally mutates
 storage; exceptional continuations resume the original throw explicitly after
 mixed normal and exceptional joins. Construction is bounded and cancelable, and
-the final graph must remain acyclic. Scalar catch filters search in lexical order
+the original graph may be cyclic. Scalar catch filters search in lexical order
 before any finally unwind. A false or faulting filter retains its earlier storage
 effects and resumes search for the original exception. The selected handler owns
 only the finally regions left on its route; a fault during unwind replaces the
 original exception and cancels the handler. Nested and sibling finally regions
 form inner-to-outer continuation chains, preserving captured returns throughout.
 Exception-object locals, object construction, calls, and heap effects remain
-incomplete. A shared filter or finally whose dispatch creates a syntactic cycle remains
-incomplete even if individual concrete executions terminate. In particular, a
-finally fault can cause the same shared catch filter to be searched again; the
-generated exception/filter cycle is closed even without a source loop.
+incomplete. Scalar loops through catches/finally and generated cycles that search
+a shared filter again retain their original bodies for replay. Native enrollment
+uses the exception-component abstraction below; unsupported instructions and
+invalid pending-exception or missing-storage paths still close.
 Owned scalar local storage receives typed initial values at the live body entry,
 after the complete contract prologue. Valid C# definite assignment makes those
 values unobservable; they preserve normal-only local assignments across a shared
@@ -269,8 +270,21 @@ loop and cuts back edges. Every finite original return is represented by its
 last loop iteration, including zero trips, nested loops and control exits; Entry
 and Old remain immutable. Only UNSAT of this overapproximation establishes a
 proof or absence of normal completion. Cut stops are lowering facts, never user
-assumptions. Irreducible loops, cyclic exception contexts and point filters inside
-loops remain unsupported.
+assumptions. Ordinary irreducible loops and point Assume instructions inside
+cycles remain unsupported.
+
+Cyclic components containing modeled Throw flow use a separate proof tier. Each
+external entry (or program entry inside the component) has a nondeterministic
+router that havocs the union of written scalar storage and selects any component
+block. Original blocks remain shared; DFS cycle-closing edges are cut. A finite
+execution is represented by its suffix after its last cut edge: the router selects
+that target with its actual state, and the suffix crosses no deleted edge. Entry,
+Old and every unmodified variable remain exact. Internal choices and stops have
+Lowered provenance, never UserAssume IDs. No pending exception is synthesized;
+an encoded naked ExceptionalExit or missing nonmodified binding rejects
+enrollment. Router expansion is charged and capped before allocation. This tier
+establishes normal-return/poststate properties only and does not preserve skipped
+effect-site reachability. Its abstract SAT models never refute an original clause.
 
 Counterexample and normal-witness search unrolls at most four back-edge
 traversals. SAT must validate all SSA facts and replay the original cyclic body

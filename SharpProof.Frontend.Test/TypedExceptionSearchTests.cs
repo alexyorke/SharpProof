@@ -116,9 +116,7 @@ public sealed class TypedExceptionSearchTests
 
     [TestCase("int Target(int x) { try { return 10 / x; } catch (System.Exception e) when (e != null) { return 1; } }")]
     [TestCase("int Target(int x) { try { return 10 / x; } catch (System.Exception) when (System.Math.Abs(x) > 0) { return 1; } }")]
-    [TestCase("int Target(int x) { try { try { return 10 / x; } finally { x = 10 / x; } } catch (System.Exception) when (x == 0) { return 1; } }")]
-    [TestCase("int Target(int x) { while (x < 0) { try { x++; } finally { x++; } } return x; }")]
-    public void UnsupportedFilterObjectsCallsAndCyclicExceptionContextsStayClosed(string members)
+    public void UnsupportedFilterObjectsAndCallsStayClosed(string members)
     {
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Lower().IsExact, Is.False);
