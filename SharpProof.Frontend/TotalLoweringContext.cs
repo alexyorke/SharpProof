@@ -155,10 +155,21 @@ public sealed class TotalLoweringContext
         _specificationCalls.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
     }
 
+    internal void RestoreSpecificationCall(IInvocationOperation invocation)
+    {
+        var syntax = invocation.Syntax;
+        _specificationCalls.Remove((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
+    }
+
     internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site)
     {
         var syntax = invocation.Syntax;
         _assumptions.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), (condition, site));
+    }
+
+    internal void DiscardSpecificationAssumptions()
+    {
+        _assumptions.Clear();
     }
 
     internal bool TryGetSpecificationAssumption(IOperation operation, out IrTerm condition, out OperationId site)

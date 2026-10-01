@@ -70,11 +70,41 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
+        var invocationEmission = new InvocationEmissionPolicy(compilation);
         var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var contracts = new ContractBinder(compilation, context.Factory).BindTotal(frame);
-            return contracts.IsSuccess && contracts.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
+            if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
+            { return false; }
+            var syntax = frame.Target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
+            var operation = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree)
+                .GetOperation(syntax, cancellationToken);
+            if (operation == null)
+            { return false; }
+            var pending = new Stack<IOperation>();
+            pending.Push(operation);
+            var remaining = CompilerPreparedBody.MaximumInstructions;
+            while (pending.Count != 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (--remaining < 0)
+                { return false; }
+                var current = pending.Pop();
+                if (current is IInvocationOperation invocation && frame.IsSpecificationOperation(current))
+                {
+                    if (!invocationEmission.IsElided(current))
+                    { frame.RestoreSpecificationCall(invocation); }
+                    // Emitted calls and their arguments use ordinary body
+                    // lowering. Elided arguments do not execute. Neither case
+                    // imports callee proof assumptions into the caller.
+                    continue;
+                }
+                foreach (var child in current.ChildOperations)
+                { pending.Push(child); }
+            }
+            frame.DiscardSpecificationAssumptions();
+            return true;
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
             method => apiSpecs.TryGet(method, out var spec) &&
                 spec.Template.Target.DocumentationCommentId == "M:System.Math.Abs(System.Int32)"

@@ -16,6 +16,54 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ScalarDifferentialMatrixTests
 {
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void CalleeContractArgumentExecutionAgreesAcrossCompiledRuntimeAndNativeIr(bool emitted, bool caught)
+    {
+        var directive = emitted ? "#define SHARPPROOF_CONTRACTS" : "#undef SHARPPROOF_CONTRACTS";
+        var body = caught ? "try { return Helper(value); } catch (DivideByZeroException) { return 7; }" : "return Helper(value);";
+        using var project = DifferentialProject.Create($$"""
+            {{directive}}
+            using System;
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                private static int Helper(int value) { Contract.Assume(1 / value > 0); return -1; }
+                [return: InRange(7, 7)]
+                public static int Target(int value) { {{body}} }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var factory = total.Program.Factory;
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry,
+                parameter => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        object? value = null;
+        Exception? exception = null;
+        try
+        { value = method.Invoke(null, [0]); }
+        catch (TargetInvocationException failure) { exception = failure.InnerException; }
+        if (emitted && !caught)
+        {
+            Assert.That(exception, Is.TypeOf<DivideByZeroException>());
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+        }
+        else
+        {
+            Assert.That(exception, Is.Null);
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.ReturnValue!.Integer, Is.EqualTo((int)value!));
+        }
+    }
+
     private static readonly ScalarCase[] SupportedCases = [
         new(
             "SByte",

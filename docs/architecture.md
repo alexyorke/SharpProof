@@ -398,8 +398,7 @@ Legacy comparison fixtures explicitly construct the legacy backend. An explicitl
 native worker ignores the legacy shadow switch, so qualification cannot silently
 run an additional legacy comparison or emit its reports.
 A trial public-factory switch exposed remaining parity gaps in API specification
-models (string concatenation and `Array.Empty` result facets), and source callees
-containing `Contract.Assume`. Existing
+models (string concatenation and `Array.Empty` result facets). Existing
 proof expectations remain requirements for the transition; they have not been
 weakened to accommodate these gaps. Typed scalar improvements also change several
 legacy outcome and proof-core expectations and require separate review.
@@ -416,6 +415,13 @@ comparisons, evaluates arguments in source order and preserves their parameter
 ordinals. Unsupported term forms or mismatched argument types abstain. This
 route does not invoke the legacy relational-summary builder; disabled packs do
 not provide native call models.
+Source inlining discards callee specification assumptions while preserving the
+caller's own declared assumptions. Elided callee contract calls stay elided;
+emitted calls return to ordinary source/implementation-IL lowering, including
+argument evaluation and faults. An emitted argument fault can reach the caller's
+handler or eliminate normal return. No callee assumption becomes an untracked
+caller premise. Unsupported emitted calls remain incomplete, and asynchronous
+callee completion remains unsupported.
 Native contract binding includes parameter and return `Positive`, `InRange`, and
 supported reference `NotNull` attributes. Numeric predicates use the value's
 signedness and width, including `ulong`; bounds outside the scalar domain fold

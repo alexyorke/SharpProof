@@ -10,6 +10,100 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase("value > 0", "Contract.Result<int>() == value", WorkerClaimOutcome.Proven)]
+    [TestCase("false", "Contract.Result<int>() == value", WorkerClaimOutcome.Proven)]
+    [TestCase("value > 0", "Contract.Result<int>() > 0", WorkerClaimOutcome.Refuted)]
+    [TestCase("false", "false", WorkerClaimOutcome.Refuted)]
+    [TestCase("1 / value > 0", "Contract.Result<int>() == value", WorkerClaimOutcome.Proven)]
+    public async Task NativeSourceCallsDoNotImportCalleeAssumptions(string assumption, string predicate, WorkerClaimOutcome expected)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static int Helper(int value) {
+                    Contract.Assume({{assumption}});
+                    return value;
+                }
+                public static int Target(int value) {
+                    Contract.Ensures({{predicate}});
+                    return Helper(value);
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
+        Assert.That(response.ClaimResults.Single().Assumptions, Is.Empty);
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task NativeSourceCallsPreserveTheCallersOwnAssumption()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static int Helper(int value) { Contract.Assume(false); return value; }
+                public static int Target(int value) {
+                    Contract.Assume(value > 0);
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    return Helper(value);
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var claim = response.ClaimResults.Single();
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(claim.Assumptions.Single().Kind, Is.EqualTo(WorkerAssumptionKind.UserAssume));
+        Assert.That(claim.Assumptions.Single().Used, Is.True);
+    }
+
+    [TestCase(false, WorkerClaimOutcome.Refuted)]
+    [TestCase(true, WorkerClaimOutcome.Proven)]
+    public async Task NativeSourceCallsPreserveEmittedContractArguments(bool emitted, WorkerClaimOutcome expected)
+    {
+        var directive = emitted ? "#define SHARPPROOF_CONTRACTS" : "#undef SHARPPROOF_CONTRACTS";
+        using var project = new ShadowTestProject($$"""
+            {{directive}}
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static int Helper(int value) { Contract.Assume(1 / value > 0); return -1; }
+                [return: Positive]
+                public static int Target([InRange(0, 0)] int value) { return Helper(value); }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
+        Assert.That(response.ClaimResults.Single().Vacuity,
+            Is.EqualTo(emitted ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None));
+    }
+
+    [TestCase(false, WorkerClaimOutcome.Refuted)]
+    [TestCase(true, WorkerClaimOutcome.Proven)]
+    public async Task NativeSourceCallsRouteEmittedContractArgumentFaultsToCallerHandlers(bool emitted, WorkerClaimOutcome expected)
+    {
+        var directive = emitted ? "#define SHARPPROOF_CONTRACTS" : "#undef SHARPPROOF_CONTRACTS";
+        using var project = new ShadowTestProject($$"""
+            {{directive}}
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static int Helper(int value) { Contract.Assume(1 / value > 0); return -1; }
+                [return: InRange(7, 7)]
+                public static int Target([InRange(0, 0)] int value) {
+                    try { return Helper(value); }
+                    catch (DivideByZeroException) { return 7; }
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
+        Assert.That(response.ClaimResults.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+    }
+
     [TestCase("Contract.Result<int>() >= 0", WorkerClaimOutcome.Proven)]
     [TestCase("Contract.Result<int>() != int.MinValue", WorkerClaimOutcome.Proven)]
     [TestCase("Contract.Result<int>() > 0", WorkerClaimOutcome.Refuted)]
