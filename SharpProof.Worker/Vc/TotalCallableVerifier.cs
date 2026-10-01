@@ -23,6 +23,8 @@ internal static class TotalCallableVerifier
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (entry.CallableId != preparation.Entry.CallableId)
         { throw new ArgumentException("The entry preparation belongs to another callable.", nameof(preparation)); }
+        if (entry.Clauses.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
+        { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length);
         var labels = new Dictionary<ProofJustification, string>();
         var ids = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -72,6 +74,13 @@ internal static class TotalCallableVerifier
         { return; }
         var total = preparation.Total!;
         var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
+        if (candidate.Requires.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
+        {
+            publishEntry?.Invoke(CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression));
+            foreach (var clause in ensures)
+            { PublishUnchecked(clause.ClaimId!, false, WorkerClaimReason.UnsupportedExpression); }
+            return;
+        }
         var deep = ensures.Select(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth).ToArray();
         if (deep.Any(value => value))
@@ -159,6 +168,11 @@ internal static class TotalCallableVerifier
                 new(null, reason, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []),
                 PassiveCallableFeasibilityKind.Unknown, WorkerVacuityKind.None, []));
         }
+    }
+
+    private static bool ExceedsDepth(IrTerm value, IrTerm safe, int maximumDepth)
+    {
+        return IrTermAnalysis.GetDepth(value) > maximumDepth || IrTermAnalysis.GetDepth(safe) > maximumDepth;
     }
 
     private static void ValidateSession(ISmtBackend? backend, MethodResourceBudget? resourceBudget)

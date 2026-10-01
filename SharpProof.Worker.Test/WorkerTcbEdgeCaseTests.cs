@@ -29,25 +29,13 @@ public sealed class WorkerTcbEdgeCaseTests
         BackendFailureReason backendReason,
         WorkerClaimReason expectedReason)
     {
-        var verifier = new CallableVerifier(
-            new FixedBackend(BackendCheckResult.Unknown(backendReason)),
-            WorkerBudgets.DefaultMaximumExpressionDepth);
-
-        var results = (await verifier.VerifyWithEntryFeasibilityAsync(
-            CreateTrivialTarget(),
-            CreateResourceBudget(),
-            CancellationToken.None)).Postconditions;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results, Has.Length.EqualTo(1));
-            Assert.That(
-                results[0].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results[0].Reason, Is.EqualTo(expectedReason));
-        }
+        using var project = new ShadowTestProject(NativeTrivialSource);
+        var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(),
+            new FixedBackend(BackendCheckResult.Unknown(backendReason)), new WorkerBudgets());
+        Assert.That(results, Has.Length.EqualTo(1));
+        Assert.That(results[0].Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results[0].Reason, Is.EqualTo(expectedReason));
     }
-
     [TestCase(MalformedBodyKind.MissingAssignmentSource)]
     [TestCase(MalformedBodyKind.UnboundCall)]
     [TestCase(MalformedBodyKind.MissingBranchCondition)]
@@ -179,78 +167,39 @@ public sealed class WorkerTcbEdgeCaseTests
     [Test]
     public async Task MissingPreparedBodyFailsClosedBeforeBackendInvocation()
     {
-        var factory = new IrFactory();
-        var target = CreateTarget(
-            factory,
-            factory.Boolean(true),
-            [],
-            body: null);
-        var backend = new ThrowingBackend("Malformed input reached the backend.");
-
-        var results = (await new CallableVerifier(
-            backend,
-            WorkerBudgets.DefaultMaximumExpressionDepth).VerifyWithEntryFeasibilityAsync(
-                target,
-                CreateResourceBudget(),
-                CancellationToken.None)).Postconditions;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.Zero);
-            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-        }
+        using var project = new ShadowTestProject(NativeTrivialSource);
+        var target = project.Snapshot.Callables.Single() with { Total = null };
+        var backend = new ThrowingBackend("Missing typed body reached the backend.");
+        var results = await VerifyNativeClaimsAsync(target, backend, new WorkerBudgets());
+        Assert.That(backend.CallCount, Is.Zero);
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
-
     [Test]
     public async Task DeepPreconditionFailsClosedBeforeBackendInvocation()
     {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.IntegerType);
-        var target = CreateTarget(
-            factory,
-            [
-                new CompilerPreparedClause(
-                    CompilerContractKind.Requires,
-                    factory.Binary(
-                        IrBinaryOperator.Equal,
-                        factory.Variable(value),
-                        factory.Integer(1)),
-                    CompilerContractEvidence.CompilerBoundInvocation,
-                    null,
-                    null),
-                new CompilerPreparedClause(
-                    CompilerContractKind.Ensures,
-                    factory.Boolean(true),
-                    CompilerContractEvidence.CompilerBoundInvocation,
-                    "claim",
-                null)
-            ],
-            [new CompilerCanonicalVariable(
-                CompilerVariableRole.Parameter,
-                0,
-                value,
-                null,
-                null,
-                "value")],
-            CompilerPreparedBody.Trivial());
-        var backend = new ThrowingBackend("Malformed input reached the backend.");
-
-        var results = (await new CallableVerifier(
-            backend,
-            maximumExpressionDepth: 1).VerifyWithEntryFeasibilityAsync(
-                target,
-                CreateResourceBudget(),
-                CancellationToken.None)).Postconditions;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.Zero);
-            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
-        }
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value > 0);
+                    Contract.Ensures(true);
+                    return value;
+                }
+            }
+            """);
+        var target = project.Snapshot.Callables.Single();
+        var backend = new ThrowingBackend("Deep typed precondition reached the backend.");
+        var budgets = new WorkerBudgets { MaximumExpressionDepth = 1 };
+        var results = await VerifyNativeClaimsAsync(target, backend, budgets);
+        var entry = await TotalCallableVerifier.VerifyEntryAsync(target, budgets, CancellationToken.None,
+            backend, CreateResourceBudget());
+        Assert.That(backend.CallCount, Is.Zero);
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        Assert.That(entry.IsUnknown, Is.True);
+        Assert.That(entry.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
     }
-
     [Test]
     public async Task EmptySourceIntervalFailsClosedBeforeBackendInvocation()
     {
@@ -287,31 +236,16 @@ public sealed class WorkerTcbEdgeCaseTests
     [Test]
     public async Task ResourceCounterCrossingMethodLimitDiscardsBackendOutcome()
     {
+        using var project = new ShadowTestProject(NativeTrivialSource);
         long consumed = 0;
-        var backend = new ResourceConsumingBackend(
-            () => consumed = 11,
+        var backend = new ResourceConsumingBackend(() => consumed = 11,
             BackendCheckResult.Unsatisfiable([]));
-        var verifier = new CallableVerifier(
-            backend,
-            WorkerBudgets.DefaultMaximumExpressionDepth);
-        var budget = new MethodResourceBudget(
-            () => Volatile.Read(ref consumed),
-            queryRlimit: 10,
-            methodRlimit: 10);
-
-        var results = (await verifier.VerifyWithEntryFeasibilityAsync(
-            CreateTrivialTarget(),
-            budget,
-            CancellationToken.None)).Postconditions;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(1));
-            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
-        }
+        var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(), backend,
+            new WorkerBudgets { QueryRlimit = 10, MethodRlimit = 10 }, () => Volatile.Read(ref consumed));
+        Assert.That(backend.CallCount, Is.EqualTo(1));
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
-
     [TestCase(true)]
     [TestCase(false)]
     public async Task SemanticPreconditionContradictionIsExplicitVacuityEvidence(
@@ -976,6 +910,23 @@ public sealed class WorkerTcbEdgeCaseTests
             entry);
     }
 
+    private const string NativeTrivialSource = """
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static void Target() { Contract.Ensures(true); }
+        }
+        """;
+
+    private static async Task<ImmutableArray<WorkerClaimResult>> VerifyNativeClaimsAsync(
+        CompilerCallablePreparation target, ISmtBackend backend, WorkerBudgets budgets,
+        Func<long>? readConsumedResources = null)
+    {
+        using var projectBoundary = new CancellationTokenSource();
+        var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, budgets,
+            readConsumedResources, WorkerBudgets.DefaultMethodWallTimeMilliseconds,
+            projectBoundary, CancellationToken.None);
+        return result.Claims;
+    }
     private static CompilerCallablePreparation CreateTrivialTarget()
     {
         var factory = new IrFactory();

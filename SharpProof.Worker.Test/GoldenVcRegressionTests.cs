@@ -16,18 +16,25 @@ public sealed class GoldenVcRegressionTests
     {
         var fixture = GoldenTest.Load("vc", caseName);
         var depthLimited = fixture.Source.StartsWith("// vc-depth-limit: 3", StringComparison.Ordinal);
+        var entryDepthLimited = fixture.Source.StartsWith("// vc-depth-limit: 1", StringComparison.Ordinal);
+        var maximumDepth = entryDepthLimited ? 1 : depthLimited ? 3 : WorkerBudgets.DefaultMaximumExpressionDepth;
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.CreateArtifact(fixture.Source,
-            depthLimited ? 3 : WorkerBudgets.DefaultMaximumExpressionDepth));
-        if (depthLimited)
+            maximumDepth));
+        if (depthLimited || entryDepthLimited)
         {
-            project.Request.Budgets.MaximumExpressionDepth = 3;
+            project.Request.Budgets.MaximumExpressionDepth = maximumDepth;
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var snapshot = project.Bind();
         var response = await worker.VerifyAsync(project.Request, snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty, string.Join(",", response.Errors.Select(error => error.Code + ":" + error.Message)));
         Assert.That(response.ClaimResults, Is.Not.Empty);
-        if (depthLimited)
+        if (entryDepthLimited)
+        {
+            Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(response.ClaimResults.Select(result => result.Reason), Is.All.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+        else if (depthLimited)
         {
             Assert.That(response.ClaimResults.Select(result => result.Outcome),
                 Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown }));
