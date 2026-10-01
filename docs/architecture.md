@@ -390,6 +390,12 @@ completed claims across a later method interruption. Compiler effect evidence
 uses separately published entry feasibility; an unconstrained effect-only entry
 needs no SMT query. The public worker creation path remains legacy until the
 remaining contract forms and retirement gates are qualified.
+Native contract binding includes parameter and return `Positive`, `InRange`, and
+supported reference `NotNull` attributes. Numeric predicates use the value's
+signedness and width, including `ulong`; bounds outside the scalar domain fold
+to Boolean comparisons rather than wrapping. Attribute source spans and manifest
+evidence remain bound through the version 25 compiler artifact. Direct clauses
+precede return attributes, and parameter attributes use immutable entry values.
 The shadow comparison consumes the same Total-to-worker claim projection needed
 by the authority transition. It names counterexamples from canonical Total entry
 parameters rather than legacy variable ids, preserves full unsigned values, and

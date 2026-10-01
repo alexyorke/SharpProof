@@ -309,15 +309,15 @@ public sealed class TypedContractLoweringTests
         Assert.That(new ContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context, graph.OriginalOperation).IsSuccess, Is.False);
     }
 
-    [TestCase("closed-return", ContractBindingFailure.UnsupportedExpression)]
-    [TestCase("closed-parameter", ContractBindingFailure.UnsupportedExpression)]
+    [TestCase("closed-return", ContractBindingFailure.InvalidClosedAttribute)]
+    [TestCase("closed-parameter", ContractBindingFailure.InvalidClosedAttribute)]
     [TestCase("unsupported-conditional", ContractBindingFailure.UnsupportedExpression)]
     [TestCase("misplaced-clause", ContractBindingFailure.InvalidClausePlacement)]
     [TestCase("invalid-intrinsic", ContractBindingFailure.ResultOutsideEnsures)]
     public void RejectedContractsRetainEarlierClausesAndBodyMutations(string scenario, ContractBindingFailure failure)
     {
-        var returnAttribute = scenario == "closed-return" ? "[return: Positive]" : "";
-        var parameterAttribute = scenario == "closed-parameter" ? "[Positive]" : "";
+        var returnAttribute = scenario == "closed-return" ? "[return: InRange(2, 1)]" : "";
+        var parameterAttribute = scenario == "closed-parameter" ? "[InRange(2, 1)]" : "";
         var additionalClause = scenario switch
         {
             "unsupported-conditional" => "Contract.Ensures(x == 0 ? true : Helper(x));",

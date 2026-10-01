@@ -132,6 +132,12 @@ public sealed class TotalLoweringContext
                 syntax.SpanStart, syntax.Span.Length));
     }
 
+    internal OperationId AttributeSite(SyntaxNode syntax)
+    {
+        return Factory.CreateOperation("closed-attribute",
+            new IrSourceSpan(_document(syntax.SyntaxTree), syntax.SpanStart, syntax.Span.Length));
+    }
+
     internal void ExcludeSpecificationCall(IInvocationOperation invocation)
     {
         var syntax = invocation.Syntax;

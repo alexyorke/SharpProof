@@ -10,6 +10,52 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeWorkerRoutingTests
 {
+    [TestCase("int", "Positive", "1", WorkerClaimOutcome.Proven)]
+    [TestCase("int", "Positive", "0", WorkerClaimOutcome.Refuted)]
+    [TestCase("ulong", "Positive", "18446744073709551615UL", WorkerClaimOutcome.Proven)]
+    [TestCase("ulong", "Positive", "0UL", WorkerClaimOutcome.Refuted)]
+    [TestCase("sbyte", "InRange(-129, 128)", "-128", WorkerClaimOutcome.Proven)]
+    [TestCase("long", "InRange(-9223372036854775808L, 9223372036854775807L)", "-9223372036854775808L", WorkerClaimOutcome.Proven)]
+    [TestCase("byte", "InRange(-1, 256)", "255", WorkerClaimOutcome.Proven)]
+    [TestCase("byte", "InRange(256, 300)", "255", WorkerClaimOutcome.Refuted)]
+    [TestCase("ulong", "InRange(-2, -1)", "0UL", WorkerClaimOutcome.Refuted)]
+    [TestCase("string", "NotNull", "value", WorkerClaimOutcome.Proven)]
+    [TestCase("string", "NotNull", "null!", WorkerClaimOutcome.Refuted)]
+    public async Task NativeWorkerVerifiesTypedReturnAttributes(string type, string attribute, string value, WorkerClaimOutcome outcome)
+    {
+        var parameters = type == "string" ? "[NotNull] string value" : "";
+        var source = $$"""
+            using SharpProof.Attributes;
+            public static class Subject { [return: {{attribute}}] public static {{type}} Target({{parameters}}) { return {{value}}; } }
+            """;
+        using var project = new ShadowTestProject(source);
+        Assert.That(project.Snapshot.Callables.Single().Total, Is.Not.Null);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome), response.ClaimResults.Single().Reason.ToString());
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [TestCase("int")]
+    [TestCase("ulong")]
+    public async Task NativeWorkerCombinesParameterAttributesDirectClausesAndReturnAttributes(string type)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                [return: Positive] public static {{type}} Target([InRange(1, 10)] {{type}} value) {
+                    Contract.Ensures(Contract.Result<{{type}}>() == value);
+                    return value;
+                }
+            }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
     [Test]
     public async Task NativeWorkerRetainsDirectVerifierOutcomesAcrossTheQualifiedUniverse()
     {

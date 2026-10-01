@@ -373,7 +373,7 @@ public sealed class CompilerTotalCallableArtifactTests
     [TestCase("assume")]
     [TestCase("call")]
     [TestCase("attribute")]
-    public void UnsupportedSourceRemainsClosed(string kind)
+    public void SourceAdmissionDistinguishesUnsupportedBodiesAndTypedAttributes(string kind)
     {
         var body = kind switch
         {
@@ -386,10 +386,10 @@ public sealed class CompilerTotalCallableArtifactTests
             using SharpProof.Attributes;
             public static class Subject { {{annotation}} public static int Target(int x) { {{body}} } }
             """);
-        if (kind == "call")
+        if (kind is "call" or "attribute")
         {
             Assert.That(preparation.Total, Is.Not.Null);
-            Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(kind == "call"));
             Assert.That(PassiveCallableArtifactAdapter.Enroll(preparation), Is.Not.Null);
         }
         else

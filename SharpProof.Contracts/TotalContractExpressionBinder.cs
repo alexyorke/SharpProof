@@ -3,20 +3,21 @@ namespace SharpProof.Contracts;
 public sealed class BoundTotalContractClause
 {
     internal BoundTotalContractClause(BoundContractKind kind, GuardedExpression expression,
-        OperationId sourceOperation, string diagnosticText)
+        OperationId sourceOperation, string diagnosticText, BoundContractEvidence evidence = BoundContractEvidence.CompilerBoundInvocation)
     {
         Kind = kind;
         Value = expression.Value;
         SafeCondition = expression.SafeCondition;
         SourceOperation = sourceOperation;
         DiagnosticText = diagnosticText;
+        Evidence = evidence;
     }
     public BoundContractKind Kind { get; }
     public IrTerm Value { get; }
     public IrTerm SafeCondition { get; }
     public OperationId SourceOperation { get; }
     public string DiagnosticText { get; }
-    public BoundContractEvidence Evidence { get; } = BoundContractEvidence.CompilerBoundInvocation;
+    public BoundContractEvidence Evidence { get; }
 }
 
 public sealed class TotalContractBindingResult
@@ -36,7 +37,7 @@ public sealed class TotalContractBindingResult
 public sealed partial class ContractBinder
 {
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
-    // authoritative; companion and closed-attribute typing is not enabled here.
+    // authoritative; companion typing is not enabled here.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
     { return BindTotalCore(context, implementationBody, requiresOnly: false); }
 
@@ -62,11 +63,6 @@ public sealed partial class ContractBinder
             !context.OwnsBody(resolution.Inventory.ImplementationBody))
         {
             return Fail(ContractBindingFailure.UnsupportedTarget);
-        }
-        if (ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly)
-            .Any(site => site.Attributes.Any(attribute => _api.Selections.GetClosedContractKind(attribute) != ClosedContractAttributeKind.None)))
-        {
-            return Fail(ContractBindingFailure.UnsupportedExpression);
         }
         var intrinsicFailure = ValidateIntrinsics(context.Target, resolution.Inventory.ImplementationBody, requiresOnly);
         if (intrinsicFailure != ContractBindingFailure.None)
@@ -102,6 +98,9 @@ public sealed partial class ContractBinder
             { return Fail(ContractBindingFailure.NonBooleanCondition); }
             clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax)));
         }
+        var attributeFailure = BindTotalAttributes(context, requiresOnly, clauses);
+        if (attributeFailure != ContractBindingFailure.None)
+        { return Fail(attributeFailure); }
         var ordinal = 0;
         foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid &&
             (!requiresOnly || occurrence.Kind == BoundContractKind.Requires)))
@@ -120,5 +119,65 @@ public sealed partial class ContractBinder
         {
             return new([], failure, context.Origin);
         }
+    }
+
+    private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
+        ImmutableArray<BoundTotalContractClause>.Builder clauses)
+    {
+        foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
+        {
+            foreach (var attribute in site.Attributes)
+            {
+                if (_api!.Selections.IsRejectedClosedContract(attribute))
+                { return ContractBindingFailure.InvalidClosedAttribute; }
+                var validation = ClosedContractAttributeValidator.Validate(attribute, site.Type, site.RefKind, _api.Selections, includeUnsigned64: true);
+                if (!validation.IsRecognized)
+                { continue; }
+                if (!validation.IsValid || attribute.ApplicationSyntaxReference?.GetSyntax() is not { } syntax ||
+                    site.IsReturn && context.Result == null)
+                { return ContractBindingFailure.InvalidClosedAttribute; }
+                var variable = site.IsReturn ? context.Result!.Value : context.Parameters[site.ParameterIndex].Entry;
+                var value = _factory.Variable(variable);
+                var type = _factory.GetTypeInfo(value.Type);
+                IrTerm condition;
+                if (validation.Kind == ClosedContractAttributeKind.NotNull &&
+                    type.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence)
+                { condition = _factory.Binary(IrBinaryOperator.NotEqual, value, _factory.Null(value.Type)); }
+                else if (type.Kind == IrTypeKind.Integer && type.Width > 0)
+                {
+                    condition = validation.Kind switch
+                    {
+                        ClosedContractAttributeKind.Positive => Compare(IrBinaryOperator.GreaterThan, 0),
+                        ClosedContractAttributeKind.InRange => _factory.Binary(IrBinaryOperator.AndAlso,
+                            Compare(IrBinaryOperator.GreaterThanOrEqual, validation.Minimum),
+                            Compare(IrBinaryOperator.LessThanOrEqual, validation.Maximum)),
+                        _ => null!
+                    };
+                    if (condition == null)
+                    { return ContractBindingFailure.UnsupportedExpression; }
+                }
+                else
+                { return ContractBindingFailure.UnsupportedExpression; }
+                var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;
+                clauses.Add(new(site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
+                    new GuardedExpression(condition, _factory.Boolean(true), FrontendSubsetClassification.Exact),
+                    context.AttributeSite(syntax), FormatClosedAttributeDiagnosticText(attribute, validation, name),
+                    BoundContractEvidence.ClosedAttribute));
+
+                IrTerm Compare(IrBinaryOperator op, long bound)
+                {
+                    // Fold bounds outside the scalar domain; never truncate an attribute's long bound.
+                    var minimum = type.Signed ? type.Width == 64 ? long.MinValue : -(1L << (type.Width - 1)) : 0L;
+                    var maximum = type.Signed ? type.Width == 64 ? (ulong)long.MaxValue : (1UL << (type.Width - 1)) - 1 :
+                        type.Width == 64 ? ulong.MaxValue : (1UL << type.Width) - 1;
+                    if (bound < minimum)
+                    { return _factory.Boolean(op != IrBinaryOperator.LessThanOrEqual); }
+                    if (bound >= 0 && (ulong)bound > maximum)
+                    { return _factory.Boolean(op == IrBinaryOperator.LessThanOrEqual); }
+                    return _factory.Binary(op, value, _factory.Integer(value.Type, bound));
+                }
+            }
+        }
+        return ContractBindingFailure.None;
     }
 }

@@ -154,7 +154,8 @@ internal static class CompilerTotalCallableArtifactCodec
             {
                 Require(claimOrdinal < postconditions.Length, "The Total claim list exceeds the manifest.");
                 var claim = postconditions[claimOrdinal++];
-                Require(row.ClaimId == claim.ClaimId && row.AssumptionId == null && claim.Evidence == WorkerClaimEvidence.DirectClause &&
+                Require(row.ClaimId == claim.ClaimId && row.AssumptionId == null &&
+                    claim.Evidence is WorkerClaimEvidence.DirectClause or WorkerClaimEvidence.ReturnAttribute &&
                     claim.Location.Start == span!.Start && claim.Location.Length == span.Length,
                     "The Total claim binding does not equal the manifest.");
             }

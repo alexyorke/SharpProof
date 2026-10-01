@@ -52,10 +52,12 @@ internal static class CompilerTotalCallableLowerer
         {
             var claim = target.Claims[ordinal];
             var span = context.Factory.GetOperationInfo(ensures[ordinal].SourceOperation).SourceSpan;
-            if (claim.Entry.Kind != WorkerClaimKind.Postcondition || claim.Entry.Evidence != WorkerClaimEvidence.DirectClause ||
-                claim.Entry.Ordinal != ordinal || claim.SourceOperation == null || span == null ||
-                claim.SourceOperation.Syntax.SpanStart != span.Start || claim.SourceOperation.Syntax.Span.Length != span.Length ||
-                documents[claim.SourceOperation.Syntax.SyntaxTree] != span.Document)
+            var syntax = claim.SourceOperation?.Syntax ?? claim.SourceAttribute?.ApplicationSyntaxReference?.GetSyntax(cancellationToken);
+            if (claim.Entry.Kind != WorkerClaimKind.Postcondition ||
+                claim.Entry.Evidence != CompilerLoweringWireMappings.ToWorkerEvidence(ensures[ordinal].Evidence) ||
+                claim.Entry.Ordinal != ordinal || syntax == null || span == null ||
+                syntax.SpanStart != span.Start || syntax.Span.Length != span.Length ||
+                documents[syntax.SyntaxTree] != span.Document)
             { return null; }
         }
         ControlFlowGraph? graph;
