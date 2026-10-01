@@ -87,7 +87,8 @@ internal static class CompilerLoweredArtifact
             {
                 CallableId = preparation.Entry.CallableId,
                 FailureReason = preparation.FailureReason,
-                Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total)
+                Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total),
+                TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry)
             };
         }
 
@@ -142,6 +143,7 @@ internal static class CompilerLoweredArtifact
             CallableId = preparation.Entry.CallableId,
             FailureReason = WorkerClaimReason.None,
             Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total),
+            TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry),
             Graph = encoded.Graph,
             EffectClaims = preparation.EffectClaims.ToArray(),
             Clauses = [.. preparation.Clauses.Select((clause, index) =>
@@ -378,6 +380,7 @@ internal static class CompilerLoweredArtifact
         }
 
         var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
+        var totalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken);
 
         if (artifact.FailureReason !=
             CompilerCallableArtifactReasonCatalog.SuccessReason)
@@ -396,7 +399,8 @@ internal static class CompilerLoweredArtifact
                     claims,
                     cancellationToken),
                 Compilation = compilation,
-                Total = total
+                Total = total,
+                TotalEntry = totalEntry
             };
         }
         if (artifact.Graph == null || artifact.Clauses == null || artifact.Variables == null)
@@ -528,7 +532,8 @@ internal static class CompilerLoweredArtifact
                 claims,
                 cancellationToken),
             Compilation = compilation,
-            Total = total
+            Total = total,
+            TotalEntry = totalEntry
         };
     }
 

@@ -13,21 +13,32 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         if (preparation == null)
         { return null; }
-        var variables = preparation.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
-            .Concat(preparation.Result is { } result ? [result] : Array.Empty<IrVarId>()).ToArray();
-        var encoded = PortableIrGraphCodec.Encode(preparation.Program.Factory, preparation.Program,
-            preparation.Clauses.SelectMany(clause => new[] { clause.Value, clause.Safe }).ToArray(), variables,
-            operations: preparation.Clauses.Select(clause => clause.Operation).ToArray());
+        return EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses);
+    }
+
+    internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
+    {
+        return preparation == null ? null : EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses);
+    }
+
+    private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
+        ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses)
+    {
+        var variables = parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
+            .Concat(result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
+        var encoded = PortableIrGraphCodec.Encode(factory, program,
+            clauses.SelectMany(clause => new[] { clause.Value, clause.Safe }).ToArray(), variables,
+            operations: clauses.Select(clause => clause.Operation).ToArray());
         return new()
         {
             Graph = encoded.Graph,
-            Parameters = [.. preparation.Parameters.Select(parameter => new CompilerTotalParameterArtifact
+            Parameters = [.. parameters.Select(parameter => new CompilerTotalParameterArtifact
             {
                 Entry = encoded.VariableIndices[parameter.Entry], Current = encoded.VariableIndices[parameter.Current],
                 Old = encoded.VariableIndices[parameter.Old]
             })],
-            Result = preparation.Result is { } resultVariable ? encoded.VariableIndices[resultVariable] : -1,
-            Clauses = [.. preparation.Clauses.Select((clause, ordinal) => new CompilerTotalClauseArtifact
+            Result = result is { } resultVariable ? encoded.VariableIndices[resultVariable] : -1,
+            Clauses = [.. clauses.Select((clause, ordinal) => new CompilerTotalClauseArtifact
             {
                 Kind = clause.Kind, ValueRoot = ordinal * 2, SafeRoot = ordinal * 2 + 1,
                 Operation = encoded.OperationIndices[clause.Operation], ClaimId = clause.ClaimId, AssumptionId = clause.AssumptionId
@@ -38,6 +49,24 @@ internal static class CompilerTotalCallableArtifactCodec
     internal static CompilerTotalCallablePreparation? Decode(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
         CancellationToken cancellationToken)
+    {
+        var decoded = DecodeCore(artifact, entry, claims, entryOnly: false, cancellationToken);
+        return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses);
+    }
+
+    internal static CompilerTotalEntryPreparation? DecodeEntry(CompilerTotalCallableArtifact? artifact,
+        WorkerCallableManifestEntry entry, CancellationToken cancellationToken)
+    {
+        var decoded = DecodeCore(artifact, entry, [], entryOnly: true, cancellationToken);
+        return decoded == null ? null : new(entry.CallableId, decoded.Factory, decoded.Parameters, decoded.Clauses);
+    }
+
+    private sealed record DecodedTotal(IrFactory Factory, IrProgram? Program, ImmutableArray<CompilerTotalParameter> Parameters,
+        IrVarId? Result, ImmutableArray<CompilerTotalClause> Clauses);
+
+    private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
+        WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
+        bool entryOnly, CancellationToken cancellationToken)
     {
         if (artifact == null)
         { return null; }
@@ -53,7 +82,8 @@ internal static class CompilerTotalCallableArtifactCodec
         var externalOperations = artifact.Clauses.Select(clause => clause.Operation).Distinct().OrderBy(index => index).ToArray();
         var decoded = PortableIrGraphCodec.Decode(artifact.Graph!, externalVariables, externalOperations, cancellationToken);
         var factory = decoded.Factory;
-        Require(factory.Semantics == IrExecutionSemantics.Total && decoded.Program != null &&
+        Require(factory.Semantics == IrExecutionSemantics.Total &&
+            (entryOnly ? decoded.Program == null && artifact.Result == -1 : decoded.Program != null) &&
             decoded.Roots.Count == artifact.Clauses.Length * 2, "The Total graph has an invalid mode or root closure.");
         foreach (var term in artifact.Graph.Terms)
         {
@@ -94,7 +124,7 @@ internal static class CompilerTotalCallableArtifactCodec
         var currentVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Current));
         var postconditions = claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
         var preconditions = entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        var userAssumptions = entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();
+        var userAssumptions = entryOnly ? [] : entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();
         var clauses = ImmutableArray.CreateBuilder<CompilerTotalClause>(artifact.Clauses.Length);
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
@@ -103,6 +133,7 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             cancellationToken.ThrowIfCancellationRequested();
             var row = artifact.Clauses[ordinal];
+            Require(!entryOnly || row.Kind == CompilerContractKind.Requires, "An entry payload can contain only Requires clauses.");
             Require(row.Kind is CompilerContractKind.Requires or CompilerContractKind.Ensures or CompilerContractKind.Assume &&
                 row.ValueRoot == ordinal * 2 && row.SafeRoot == ordinal * 2 + 1 &&
                 row.Operation >= 0 && row.Operation < decoded.Operations.Count, "A Total clause has an invalid root or site binding.");
@@ -139,8 +170,9 @@ internal static class CompilerTotalCallableArtifactCodec
         }
         Require(claimOrdinal == postconditions.Length && assumptionOrdinal == preconditions.Length && userAssumptionOrdinal == userAssumptions.Length,
             "The Total clauses do not equal the manifest.");
-        ValidateProgram(decoded.Program!, result, clauses, parameters, cancellationToken);
-        return new(entry.CallableId, decoded.Program!, parameters.MoveToImmutable(), result, clauses.MoveToImmutable());
+        if (!entryOnly)
+        { ValidateProgram(decoded.Program!, result, clauses, parameters, cancellationToken); }
+        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable());
     }
 
     private static bool Scalar(IrFactory factory, IrTypeId type)

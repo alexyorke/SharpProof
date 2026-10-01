@@ -4,6 +4,28 @@ namespace SharpProof.CompilerArtifact;
 // preserved and does not suppress exact typed candidate evidence.
 internal static class CompilerTotalCallableLowerer
 {
+    internal static CompilerTotalEntryPreparation? PrepareEntry(CSharpCompilation compilation,
+        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
+            target.Method.Parameters.Length > CompilerPreparedBody.MaximumInstructions)
+        { return null; }
+        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
+            .ToDictionary(item => item.Tree, item => item.Path);
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
+        var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context);
+        cancellationToken.ThrowIfCancellationRequested();
+        var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
+        if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions ||
+            binding.Clauses.Length != preconditions.Length)
+        { return null; }
+        return new(target.Entry.CallableId, context.Factory,
+            [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
+            [.. binding.Clauses.Select((clause, ordinal) => new CompilerTotalClause(CompilerContractKind.Requires,
+                clause.Value, clause.SafeCondition, clause.SourceOperation, null, preconditions[ordinal].Id))]);
+    }
+
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
         ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees,
         CompilerReferenceSnapshot[]? capturedReferences, CancellationToken cancellationToken)

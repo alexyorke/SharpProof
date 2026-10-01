@@ -10,6 +10,46 @@ internal sealed record TotalCallableClaimCheck(string ClaimId, bool Enrolled, bo
 // interruption cannot discard earlier kernel-validated claim results.
 internal static class TotalCallableVerifier
 {
+    internal static async Task<CallableEntryFeasibility> VerifyEntryAsync(CompilerCallablePreparation preparation,
+        WorkerBudgets budgets, CancellationToken cancellationToken)
+    {
+        ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        cancellationToken.ThrowIfCancellationRequested();
+        var entry = preparation.TotalEntry;
+        if (entry == null)
+        { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
+        if (entry.CallableId != preparation.Entry.CallableId)
+        { throw new ArgumentException("The entry preparation belongs to another callable.", nameof(preparation)); }
+        var assumptions = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length);
+        var labels = new Dictionary<ProofJustification, string>();
+        var ids = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var clause in entry.Clauses)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var label = "requires:" + assumptions.Count.ToString(CultureInfo.InvariantCulture);
+            var assumption = new Assumption(entry.Factory,
+                entry.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value), new LoweredJustification(clause.Operation));
+            labels.Add(assumption.Justification, label);
+            ids.Add(label, clause.AssumptionId!);
+            assumptions.Add(assumption);
+        }
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        using var session = new CallableSolverSession(entry.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
+        var resourceBudget = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
+        if (!resourceBudget.TryStartQuery())
+        { return CallableEntryFeasibility.Unknown(WorkerClaimReason.ResourceLimit); }
+        var query = new VerificationQuery(entry.Factory, assumptions.MoveToImmutable(), Goal.CreateInternalConsistency(entry.Factory),
+            [.. entry.Parameters.Select(parameter => parameter.Entry)]);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (resourceBudget.IsExceeded)
+        { return CallableEntryFeasibility.Unknown(WorkerClaimReason.ResourceLimit); }
+        var reason = outcome is UnknownOutcome unknown ? WorkerProjections.MapAbstention(unknown.Reason) : WorkerClaimReason.None;
+        return ProjectEntry(new(outcome, reason, ImmutableDictionary<IrVarId, IrValue>.Empty,
+            outcome is ProvenOutcome proven ? CallableProofCore.Create(proven, labels) : [], []), ids);
+    }
+
     internal static Task VerifyAsync(CompilerCallablePreparation preparation, WorkerBudgets budgets,
         Action<TotalCallableClaimCheck> publish, CancellationToken cancellationToken)
     { return VerifyAsync(preparation, budgets, publish, null, cancellationToken); }

@@ -10,6 +10,136 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    private const string EntryOnlySource = """
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static ulong Target(ulong x) {
+                Contract.Requires(x == ulong.MaxValue);
+                Contract.Ensures(x.ToString() != null);
+                System.Console.WriteLine(x);
+                return x;
+            }
+        }
+        """;
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task EntryEvidenceSurvivesUnsupportedBodyAndPostcondition(bool contradictory)
+    {
+        var source = contradictory
+            ? EntryOnlySource.Replace("x == ulong.MaxValue", "x == ulong.MaxValue && x == 0UL", StringComparison.Ordinal)
+            : EntryOnlySource;
+        var preparation = RoundTrip(source);
+        Assert.That(preparation.Total, Is.Null);
+        var entry = preparation.TotalEntry!;
+        Assert.That(entry, Is.Not.Null);
+        Assert.That(entry.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
+        Assert.That(entry.Clauses.Select(clause => clause.Kind), Is.All.EqualTo(CompilerContractKind.Requires));
+        Assert.That(entry.Clauses.Single().AssumptionId, Is.EqualTo(preparation.Entry.Assumptions.Single().Id));
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        Assert.That(result.Kind, Is.EqualTo(contradictory ? CallableEntryFeasibilityKind.Contradictory : CallableEntryFeasibilityKind.Feasible));
+        if (contradictory)
+        { Assert.That(result.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption.Id))); }
+    }
+
+    [TestCase("body")]
+    [TestCase("ensures")]
+    [TestCase("id")]
+    [TestCase("count")]
+    [TestCase("current")]
+    [TestCase("result")]
+    [TestCase("mode")]
+    [TestCase("span")]
+    public void EntryPayloadRejectsForeignEvidence(string mutation)
+    {
+        var artifact = CreateArtifact(EntryOnlySource);
+        var entry = artifact.Callables.Single().TotalEntry!;
+        switch (mutation)
+        {
+            case "body":
+                entry.Graph.HasProgram = true;
+                break;
+            case "ensures":
+                entry.Clauses[0].Kind = CompilerContractKind.Ensures;
+                break;
+            case "id":
+                entry.Clauses[0].AssumptionId = "foreign";
+                break;
+            case "count":
+                entry.Clauses = [];
+                entry.Graph.Roots = [];
+                break;
+            case "current":
+                (entry.Parameters[0].Entry, entry.Parameters[0].Current) = (entry.Parameters[0].Current, entry.Parameters[0].Entry);
+                break;
+            case "result":
+                entry.Result = entry.Parameters[0].Entry;
+                break;
+            case "mode":
+                entry.Graph.Semantics = IrExecutionSemantics.Legacy;
+                break;
+            case "span":
+                entry.Graph.Operations[entry.Clauses[0].Operation].SourceSpan = null;
+                break;
+        }
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
+    [Test]
+    public async Task MutatingEntryDtoAfterDecodeCannotChangeNativeQuery()
+    {
+        var artifact = CreateArtifact(EntryOnlySource);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        roundTrip.Callables.Single().TotalEntry!.Graph.Roots = [];
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
+        Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
+    }
+
+    [TestCase("expression")]
+    [TestCase("placement")]
+    public async Task UnsupportedRequiresCannotEstablishEntry(string scenario)
+    {
+        var source = scenario == "expression"
+            ? EntryOnlySource.Replace("x == ulong.MaxValue", "x.ToString() != null", StringComparison.Ordinal)
+            : EntryOnlySource.Replace("Contract.Requires(x == ulong.MaxValue);", "System.Console.WriteLine(x); Contract.Requires(x == ulong.MaxValue);", StringComparison.Ordinal);
+        var preparation = RoundTrip(source);
+        Assert.That(preparation.TotalEntry, Is.Null);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Unknown));
+    }
+
+    [Test]
+    public async Task BodyAssumptionsCannotMakeEntryContradictory()
+    {
+        var preparation = RoundTrip(EntryOnlySource.Replace("System.Console.WriteLine(x);", "Contract.Assume(false);", StringComparison.Ordinal));
+        Assert.That(preparation.Entry.Assumptions, Has.Length.EqualTo(2));
+        Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(1));
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
+        Assert.That(result.UsedAssumptionIds, Is.Empty);
+    }
+
+    [Test]
+    public void IndependentEntryHonorsCancellation()
+    {
+        var preparation = RoundTrip(EntryOnlySource);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () =>
+            await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), cancellation.Token)));
+    }
+
+    [Test]
+    public async Task IndependentEntryCannotIgnoreQueryResourceLimit()
+    {
+        var preparation = RoundTrip(EntryOnlySource);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets { QueryRlimit = 1 }, CancellationToken.None);
+        Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Unknown));
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+    }
+
     internal const string DiamondSource = """
         using SharpProof.Attributes;
         public static class Subject {

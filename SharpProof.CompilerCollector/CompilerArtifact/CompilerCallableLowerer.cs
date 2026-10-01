@@ -56,10 +56,14 @@ internal sealed class CompilerCallableLowerer
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
-        var total = CompilerTotalCallableLowerer.Prepare(_compilation, target,
-            _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken),
+        var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken);
+        var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
             _capturedReferences, cancellationToken);
-        return PrepareLegacy(target, cancellationToken) with { Total = total };
+        var entry = total == null
+            ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
+            : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
+                [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)]);
+        return PrepareLegacy(target, cancellationToken) with { Total = total, TotalEntry = entry };
     }
 
     private CompilerCallablePreparation PrepareLegacy(ManifestCallableTarget target, CancellationToken cancellationToken)

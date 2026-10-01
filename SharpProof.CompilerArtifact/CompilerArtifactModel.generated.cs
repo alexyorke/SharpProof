@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 22;
+    internal const int Current = 23;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -95,7 +95,11 @@ internal sealed record CompilerCallablePreparation(
     internal ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
     internal CompilerCompilationSnapshot Compilation { get; init; } = new();
     internal CompilerTotalCallablePreparation? Total { get; init; }
+    internal CompilerTotalEntryPreparation? TotalEntry { get; init; }
 }
+
+internal sealed record CompilerTotalEntryPreparation(string CallableId, IrFactory Factory,
+    ImmutableArray<CompilerTotalParameter> Parameters, ImmutableArray<CompilerTotalClause> Clauses);
 
 internal sealed record CompilerTotalCallablePreparation(
     string CallableId,
@@ -233,6 +237,8 @@ internal sealed class CompilerCallableArtifact
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompilerTotalCallableArtifact? Total { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerTotalCallableArtifact? TotalEntry { get; set; }
 }
 
 internal sealed class CompilerEffectClaimArtifact

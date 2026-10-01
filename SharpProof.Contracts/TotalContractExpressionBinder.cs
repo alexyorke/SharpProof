@@ -38,6 +38,12 @@ public sealed partial class ContractBinder
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
     // authoritative; companion and closed-attribute typing is not enabled here.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
+    { return BindTotalCore(context, implementationBody, requiresOnly: false); }
+
+    public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody = null)
+    { return BindTotalCore(context, implementationBody, requiresOnly: true); }
+
+    private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody, bool requiresOnly)
     {
         ArgumentNullGuard.NotNull(context, nameof(context));
         if (!ReferenceEquals(_factory, context.Factory))
@@ -49,19 +55,20 @@ public sealed partial class ContractBinder
         if (!context.HasScalarSignature)
         { return Fail(ContractBindingFailure.UnsupportedTarget); }
         var resolution = _contractSources.Resolve(context.Target, implementationBody, CancellationToken.None);
-        if (resolution.Failure != ContractBindingFailure.None)
+        if (resolution.Failure != ContractBindingFailure.None &&
+            (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
         if (resolution.UsesCompanion || resolution.Inventory.ImplementationBody == null ||
             !context.OwnsBody(resolution.Inventory.ImplementationBody))
         {
             return Fail(ContractBindingFailure.UnsupportedTarget);
         }
-        if (ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: true)
+        if (ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly)
             .Any(site => site.Attributes.Any(attribute => _api.Selections.GetClosedContractKind(attribute) != ClosedContractAttributeKind.None)))
         {
             return Fail(ContractBindingFailure.UnsupportedExpression);
         }
-        var intrinsicFailure = ValidateIntrinsics(context.Target, resolution.Inventory.ImplementationBody, requiresOnly: false);
+        var intrinsicFailure = ValidateIntrinsics(context.Target, resolution.Inventory.ImplementationBody, requiresOnly);
         if (intrinsicFailure != ContractBindingFailure.None)
         { return Fail(intrinsicFailure); }
         RoslynTotalExpressionLowerer lowerer = null!;
@@ -79,7 +86,8 @@ public sealed partial class ContractBinder
         if (context.Result is { } resultVariable)
         { allowed.Add(resultVariable); }
         var clauses = ImmutableArray.CreateBuilder<BoundTotalContractClause>();
-        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
+        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid &&
+            (!requiresOnly || occurrence.Kind == BoundContractKind.Requires)))
         {
             var invocation = occurrence.Invocation;
             var state = occurrence.Kind == BoundContractKind.Requires ? TotalParameterState.Entry : TotalParameterState.Current;
@@ -95,7 +103,8 @@ public sealed partial class ContractBinder
             clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax)));
         }
         var ordinal = 0;
-        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
+        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid &&
+            (!requiresOnly || occurrence.Kind == BoundContractKind.Requires)))
         {
             context.ExcludeSpecificationCall(occurrence.Invocation);
             var clause = clauses[ordinal++];

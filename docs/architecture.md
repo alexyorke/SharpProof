@@ -386,8 +386,13 @@ Entry feasibility is published separately, before the normal-completion query,
 and its original kernel evidence remains available after that query. A reachable
 entry remains feasible when the body always throws or bounded return search is
 inconclusive. Only the Requires query can establish contradictory entry; its
-core maps to the manifest precondition ids. Effect routing still uses legacy
-entry evidence until independent entry artifacts cover unsupported bodies.
+core maps to the manifest precondition ids. Manifest version 23 carries a separate
+body-free Total entry graph. Requires binding can succeed independently of an
+unsupported body or Ensures expression. Decoding rejects bodies, result roles,
+non-Requires clauses, missing or foreign assumption ids, and predicates outside
+canonical entry inputs. Body Assume clauses cannot constrain this entry query.
+The independent native query preserves cancellation and existing resource budgets.
+Effect routing still uses legacy entry evidence pending authority qualification.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.
