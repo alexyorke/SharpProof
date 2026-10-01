@@ -386,8 +386,12 @@ The internal `SharpProofWorker.CreateNative` qualification route uses one native
 session per callable factory and keeps resource counts monotonic across each
 lane. It admits independently prepared typed callables even when legacy lowering
 failed, projects native claims into ordinary worker responses, and retains
-completed claims across a later method interruption. Compiler effect evidence
-uses separately published entry feasibility; an unconstrained effect-only entry
+completed claims across a later method interruption.
+The same native route retains settled results after project timeout or caller
+cancellation, including earlier completed callables. Only unfinished claims
+receive interruption reasons; the final response is classified from its retained
+evidence and is not written to the verification cache during interruption.
+Compiler effect evidence uses separately published entry feasibility; an unconstrained effect-only entry
 needs no SMT query. The public worker creation path remains legacy until the
 remaining contract forms and retirement gates are qualified.
 Native contract binding includes parameter and return `Positive`, `InRange`, and

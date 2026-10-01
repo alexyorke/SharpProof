@@ -96,6 +96,8 @@ public sealed class SharpProofWorker : IDisposable
         }
 
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        CompilerCallablePreparation[]? interruptedTargets = null;
+        CallableVerificationResult[]? interruptedResults = null;
         using var projectBoundary =
             CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
@@ -123,6 +125,19 @@ public sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse Interrupted(WorkerInputSnapshot? input = null)
         {
             var canceled = cancellationToken.IsCancellationRequested;
+            if (_nativeAuthority && input != null && interruptedTargets != null && interruptedResults != null)
+            {
+                // Lanes have settled before this projection. Keep their validated
+                // publications and synthesize interruption results only for work not started.
+                var settled = interruptedTargets.Select((target, index) => interruptedResults[index] ?? Unknown(target,
+                    canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout)).ToArray();
+                var projected = ProjectResults(settled);
+                var run = WorkerResultAssembler.Classify(projected.Callables, projected.Claims);
+                return WorkerResultAssembler.Create(input.InputHash, input.CompilerManifest.Manifest,
+                    run.Status, run.Failure, projected.Callables, projected.Claims, request.Budgets,
+                    WorkerCacheStatus.Disabled, Elapsed(started), requestHash: requestHash, versions: Versions());
+            }
             return WorkerResultAssembler.CreateIncomplete(
                 input?.InputHash ?? WorkerResultAssembler.EmptyInputHash, requestHash,
                 input?.CompilerManifest.Manifest ?? WorkerResultAssembler.EmptyManifest(), request.Budgets,
@@ -310,6 +325,8 @@ public sealed class SharpProofWorker : IDisposable
                         : WorkerClaimReason.InfrastructureFailure);
             }
             var results = new CallableVerificationResult[orderedTargets.Length];
+            interruptedTargets = orderedTargets;
+            interruptedResults = results;
             for (var index = 0; index < orderedTargets.Length; index++)
             {
                 if (!CanVerifyTarget(orderedTargets[index], _nativeAuthority))

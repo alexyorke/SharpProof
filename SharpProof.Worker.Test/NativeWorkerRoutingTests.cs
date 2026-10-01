@@ -180,19 +180,59 @@ public sealed class NativeWorkerRoutingTests
         { throw new AssertionException("An unconstrained effect-only entry needs no SMT query."); }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    [TestCase(false, true)]
+    public async Task ProjectInterruptionRetainsEarlierNativeProof(bool projectTimeout, bool separateCallable = false)
+    {
+        using var project = new ShadowTestProject(separateCallable ? """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int A(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; }
+                public static int B(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; }
+            }
+            """ : CompilerTotalCallableArtifactTests.DiamondSource);
+        project.Request.Budgets.MaxParallelism = 1;
+        using var cancellation = new CancellationTokenSource();
+        if (projectTimeout)
+        {
+            project.Request.Budgets.ProjectWallTimeMilliseconds = 1500;
+            project.Request.Budgets.MethodWallTimeMilliseconds = 1500;
+        }
+        var factory = project.Snapshot.Callables.OrderBy(callable => callable.Entry.CallableId, StringComparer.Ordinal).First().Total!.Program.Factory;
+        using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory,
+            project.Request.Budgets.QueryRlimit, projectTimeout ? null : cancellation.Cancel), nativeAuthority: true);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
+        Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
+        Assert.That(pending.Reason, Is.EqualTo(projectTimeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.Canceled));
+        Assert.That(response.RunStatus, Is.EqualTo(projectTimeout ? WorkerRunStatus.TimedOut : WorkerRunStatus.Canceled));
+        if (separateCallable)
+        {
+            Assert.That(response.CallableResults.First().Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(response.CallableResults.Last().Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
+        }
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
     private sealed class StallAfterQueriesBackend : ISmtBackend, IDisposable
     {
         private readonly CallableSolverSession _session;
+        private readonly Action? _beforeStall;
         private int _queries;
-        internal StallAfterQueriesBackend(IrFactory factory, uint queryRlimit)
+        internal StallAfterQueriesBackend(IrFactory factory, uint queryRlimit, Action? beforeStall = null)
         {
             ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
             _session = new(factory, new IrSmtBackendOptions(queryRlimit));
+            _beforeStall = beforeStall;
         }
         public async Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             if (++_queries == 4)
-            { await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false); }
+            {
+                _beforeStall?.Invoke();
+                await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            }
             return await _session.CheckAsync(query, cancellationToken).ConfigureAwait(false);
         }
         public void Dispose()
