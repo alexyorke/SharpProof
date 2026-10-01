@@ -393,6 +393,12 @@ non-Requires clauses, missing or foreign assumption ids, and predicates outside
 canonical entry inputs. Body Assume clauses cannot constrain this entry query.
 The independent native query preserves cancellation and existing resource budgets.
 Effect routing still uses legacy entry evidence pending authority qualification.
+Entry qualification enumerates every callable from the 54 source-comparison
+fixtures and all 64 worker golden sources, including fixtures without claims.
+It records enrollment and Unknown results, rejects contradictions between known
+legacy/native results, and requires every known legacy entry result to remain
+known. Native entry cores may use only manifest precondition ids. This bounded
+qualification does not establish postcondition or effect authority retirement.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.

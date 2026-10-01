@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.Smt;
+using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -206,6 +208,76 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);
         await TestContext.Out.WriteLineAsync($"source-worker universe: sources={Universe.Length} posts={aggregate.Postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unchecked={aggregate.Unchecked} unknown={aggregate.Unknown} disagreements={aggregate.SoundnessDisagreements} full-exit={aggregate.CoverageComplete}");
+    }
+
+    [Test]
+    public async Task NativeEntryQualificationAccountsForEveryCallableInTheSourceAndGoldenUniverse()
+    {
+        var goldenNames = GoldenTest.Cases("worker").ToArray();
+        Assert.That(goldenNames, Has.Length.EqualTo(64));
+        var cases = Universe.Concat(goldenNames.Select(name =>
+        {
+            var source = GoldenTest.Load("worker", name).Source;
+            const string marker = "// metadata-library";
+            var boundary = source.IndexOf(marker, StringComparison.Ordinal);
+            return boundary < 0 ? new ShadowSourceCase("golden:" + name, source, [])
+                : new ShadowSourceCase("golden:" + name, source[..boundary], [], LibrarySource: source[(boundary + marker.Length)..]);
+        })).ToArray();
+        Assert.That(cases.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(cases.Length));
+        var sourceCount = 0;
+        var callableCount = 0;
+        var enrolledCount = 0;
+        var oldKnown = 0;
+        var nativeKnown = 0;
+        var unknownCount = 0;
+        var disagreements = 0;
+        var degradations = 0;
+        foreach (var sourceCase in cases)
+        {
+            sourceCount++;
+            using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
+            if (project.Snapshot.Callables.IsEmpty)
+            { await TestContext.Out.WriteLineAsync($"entry-worker {sourceCase.Name}: callables=0"); }
+            foreach (var preparation in project.Snapshot.Callables)
+            {
+                callableCount++;
+                if (preparation.TotalEntry != null)
+                { enrolledCount++; }
+                var native = await TotalCallableVerifier.VerifyEntryAsync(preparation, project.Request.Budgets, CancellationToken.None);
+                CallableEntryFeasibility legacy;
+                if (!preparation.IsSuccess)
+                { legacy = CallableEntryFeasibility.Unknown(preparation.FailureReason); }
+                else
+                {
+                    using var session = new IrSmtBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
+                    legacy = await CallableEntryFeasibilityEvaluator.EvaluateAsync(preparation,
+                        new MethodResourceBudget(() => session.ConsumedResourceCount, project.Request.Budgets.QueryRlimit, project.Request.Budgets.MethodRlimit),
+                        new ProofKernel(session), project.Request.Budgets.MaximumExpressionDepth, CancellationToken.None);
+                }
+                if (!legacy.IsUnknown)
+                { oldKnown++; }
+                if (!native.IsUnknown)
+                { nativeKnown++; }
+                else
+                { unknownCount++; }
+                if (!legacy.IsUnknown && native.IsUnknown)
+                { degradations++; }
+                if (!legacy.IsUnknown && !native.IsUnknown && legacy.Kind != native.Kind)
+                { disagreements++; }
+                Assert.That(native.UsedAssumptionIds,
+                    Is.SubsetOf(preparation.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).Select(assumption => assumption.Id)), sourceCase.Name);
+                await TestContext.Out.WriteLineAsync($"entry-worker {sourceCase.Name}: old={legacy.Kind} native={native.Kind} enrolled={preparation.TotalEntry != null}");
+            }
+        }
+        Assert.That(Universe, Has.Length.EqualTo(54));
+        Assert.That(sourceCount, Is.EqualTo(Universe.Length + goldenNames.Length));
+        Assert.That(callableCount, Is.GreaterThanOrEqualTo(Universe.Length));
+        Assert.That(nativeKnown + unknownCount, Is.EqualTo(callableCount));
+        Assert.That(oldKnown, Is.GreaterThan(0));
+        Assert.That(nativeKnown, Is.GreaterThanOrEqualTo(oldKnown));
+        Assert.That(disagreements, Is.Zero);
+        Assert.That(degradations, Is.Zero);
+        await TestContext.Out.WriteLineAsync($"entry-worker universe: sources={sourceCount} callables={callableCount} enrolled={enrolledCount} old-known={oldKnown} native-known={nativeKnown} unknown={unknownCount} disagreements={disagreements} degradations={degradations}");
     }
 
     private static SharpProof.CompilerArtifact.CompilerManifestArtifact CreateGateArtifact(ShadowSourceCase sourceCase)
