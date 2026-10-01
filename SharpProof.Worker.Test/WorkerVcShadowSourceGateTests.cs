@@ -1,8 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
-using SharpProof.Smt;
-using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -214,6 +212,7 @@ public sealed class WorkerVcShadowSourceGateTests
     public async Task NativeEntryQualificationAccountsForEveryCallableInTheSourceAndGoldenUniverse()
     {
         var cases = QualificationCases();
+        var baseline = QualificationBaseline("entries", "CallableId");
         var sourceCount = 0;
         var callableCount = 0;
         var enrolledCount = 0;
@@ -234,35 +233,28 @@ public sealed class WorkerVcShadowSourceGateTests
                 if (preparation.TotalEntry != null)
                 { enrolledCount++; }
                 var native = await TotalCallableVerifier.VerifyEntryAsync(preparation, project.Request.Budgets, CancellationToken.None);
-                CallableEntryFeasibility legacy;
-                if (!preparation.IsSuccess)
-                { legacy = CallableEntryFeasibility.Unknown(preparation.FailureReason); }
-                else
-                {
-                    using var session = new IrSmtBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
-                    legacy = await CallableEntryFeasibilityEvaluator.EvaluateAsync(preparation,
-                        new MethodResourceBudget(() => session.ConsumedResourceCount, project.Request.Budgets.QueryRlimit, project.Request.Budgets.MethodRlimit),
-                        new ProofKernel(session), project.Request.Budgets.MaximumExpressionDepth, CancellationToken.None);
-                }
-                if (!legacy.IsUnknown)
+                var legacyKind = Enum.Parse<CallableEntryFeasibilityKind>(baseline[sourceCase.Name + ":" + preparation.Entry.CallableId].GetProperty("Kind").GetString()!);
+                if (legacyKind != CallableEntryFeasibilityKind.Unknown)
                 { oldKnown++; }
                 if (!native.IsUnknown)
                 { nativeKnown++; }
                 else
                 { unknownCount++; }
-                if (!legacy.IsUnknown && native.IsUnknown)
+                if (legacyKind != CallableEntryFeasibilityKind.Unknown && native.IsUnknown)
                 { degradations++; }
-                if (!legacy.IsUnknown && !native.IsUnknown && legacy.Kind != native.Kind)
+                if (legacyKind != CallableEntryFeasibilityKind.Unknown && !native.IsUnknown && legacyKind != native.Kind)
                 { disagreements++; }
                 Assert.That(native.UsedAssumptionIds,
                     Is.SubsetOf(preparation.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).Select(assumption => assumption.Id)), sourceCase.Name);
-                await TestContext.Out.WriteLineAsync($"entry-worker {sourceCase.Name}: old={legacy.Kind} native={native.Kind} enrolled={preparation.TotalEntry != null}");
+                await TestContext.Out.WriteLineAsync($"entry-worker {sourceCase.Name}: old={legacyKind} native={native.Kind} enrolled={preparation.TotalEntry != null}");
             }
         }
         Assert.That(sourceCount, Is.EqualTo(cases.Length));
         Assert.That(callableCount, Is.GreaterThanOrEqualTo(Universe.Length));
         Assert.That(nativeKnown + unknownCount, Is.EqualTo(callableCount));
+        Assert.That(callableCount, Is.EqualTo(baseline.Count));
         Assert.That(oldKnown, Is.GreaterThan(0));
+        Assert.That(oldKnown, Is.EqualTo(30));
         Assert.That(nativeKnown, Is.GreaterThanOrEqualTo(oldKnown));
         Assert.That(disagreements, Is.Zero);
         Assert.That(degradations, Is.Zero);
@@ -289,38 +281,82 @@ public sealed class WorkerVcShadowSourceGateTests
     [Test]
     public async Task NativePostconditionQualificationRetainsProofsAcrossTheSourceAndGoldenUniverse()
     {
-        using var environment = new ShadowEnvironment("shadow");
         var cases = QualificationCases();
-        var rows = new List<WorkerVcShadowRow>();
+        var baseline = QualificationBaseline("postconditions", "CallableId");
         var proofLosses = new List<string>();
         var callableCount = 0;
         var postconditions = 0;
+        var oldProven = 0;
+        var nativeProven = 0;
+        var enrolled = 0;
+        var checkedCount = 0;
+        var unknown = 0;
+        var disagreements = 0;
         foreach (var sourceCase in cases)
         {
             using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
             callableCount += project.Snapshot.Callables.Length;
-            using var worker = SharpProofWorker.Create(project.Request.Budgets);
-            WorkerVcShadowReport? report = null;
-            worker.ShadowReportSink = value => report = value;
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-            Assert.That(report, Is.Not.Null, sourceCase.Name);
-            var expected = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
-            Assert.That(report!.Rows.Select(row => row.ClaimId), Is.EquivalentTo(expected.Select(claim => claim.ClaimId)), sourceCase.Name);
-            postconditions += expected.Length;
-            rows.AddRange(report.Rows);
-            foreach (var row in report.Rows.Where(row => row.OldOutcome == WorkerClaimOutcome.Proven && row.NewOutcome != WorkerClaimOutcome.Proven))
+            var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+            foreach (var preparation in project.Snapshot.Callables)
             {
-                proofLosses.Add(sourceCase.Name + ": " + row.NewReason);
+                await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
+                    check => checks[check.ClaimId] = check, CancellationToken.None);
             }
-            await TestContext.Out.WriteLineAsync($"post-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} old-proven={report.OldProven} native-proven={report.NewProven} disagreements={report.SoundnessDisagreements}");
+            var owned = project.Snapshot.Callables.ToDictionary(preparation => preparation.Entry.CallableId, StringComparer.Ordinal);
+            var expected = project.Snapshot.CompilerManifest.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+            Assert.That(checks.Keys, Is.SubsetOf(expected.Select(claim => claim.ClaimId)), sourceCase.Name);
+            postconditions += expected.Length;
+            foreach (var claim in expected)
+            {
+                var old = baseline[sourceCase.Name + ":" + claim.CallableId + ":" + claim.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)];
+                var oldOutcome = Enum.Parse<WorkerClaimOutcome>(old.GetProperty("Outcome").GetString()!);
+                var newOutcome = WorkerClaimOutcome.Unknown;
+                var comparable = false;
+                if (checks.TryGetValue(claim.ClaimId, out var check))
+                {
+                    var result = CallableClaimResultAssembler.FromTotal(owned[claim.CallableId], check);
+                    newOutcome = result.Outcome;
+                    if (check.Enrolled)
+                    { enrolled++; }
+                    if (check.Checked)
+                    { checkedCount++; }
+                    comparable = check.Checked && result.Vacuity == WorkerVacuityKind.None &&
+                        check.Evidence.BodyAssumptions.IsEmpty && !result.Assumptions.Any(assumption => assumption.Used &&
+                            assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification);
+                }
+                if (oldOutcome == WorkerClaimOutcome.Proven)
+                {
+                    oldProven++;
+                    if (newOutcome != WorkerClaimOutcome.Proven)
+                    { proofLosses.Add(sourceCase.Name + ":" + claim.ClaimId); }
+                }
+                if (newOutcome == WorkerClaimOutcome.Proven)
+                { nativeProven++; }
+                if (newOutcome == WorkerClaimOutcome.Unknown)
+                { unknown++; }
+                if (comparable && old.GetProperty("Vacuity").GetString() == "None" && !old.GetProperty("Conditional").GetBoolean() &&
+                    (oldOutcome == WorkerClaimOutcome.Proven && newOutcome == WorkerClaimOutcome.Refuted ||
+                     oldOutcome == WorkerClaimOutcome.Refuted && newOutcome == WorkerClaimOutcome.Proven))
+                { disagreements++; }
+            }
         }
-        var aggregate = new WorkerVcShadowReport("qualification", "qualification", WorkerCacheStatus.Disabled, [.. rows]);
-        await TestContext.Out.WriteLineAsync($"post-worker universe: sources={cases.Length} callables={callableCount} posts={postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unknown={aggregate.Unknown} old-proven={aggregate.OldProven} native-proven={aggregate.NewProven} disagreements={aggregate.SoundnessDisagreements} proof-losses={proofLosses.Count}");
-        Assert.That(rows, Has.Count.EqualTo(postconditions));
-        Assert.That(aggregate.OldProven, Is.GreaterThan(0));
-        Assert.That(aggregate.NewProven, Is.GreaterThanOrEqualTo(aggregate.OldProven));
-        Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
+        await TestContext.Out.WriteLineAsync($"post-worker universe: sources={cases.Length} callables={callableCount} posts={postconditions} enrolled={enrolled} checked={checkedCount} unknown={unknown} old-proven={oldProven} native-proven={nativeProven} disagreements={disagreements} proof-losses={proofLosses.Count}");
+        Assert.That(postconditions, Is.EqualTo(baseline.Count));
+        Assert.That(oldProven, Is.EqualTo(18));
+        Assert.That(nativeProven, Is.GreaterThanOrEqualTo(oldProven));
+        Assert.That(disagreements, Is.Zero);
         Assert.That(proofLosses, Is.Empty, string.Join(", ", proofLosses));
+    }
+
+    private static Dictionary<string, JsonElement> QualificationBaseline(string section, string id)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(),
+            "tests", "qualification", "phase2-native-authority-baseline.json")));
+        Assert.That(document.RootElement.GetProperty("commit").GetString(), Is.EqualTo("86fa6ea9039a0883e1a8f2baf492738b8224fba6"));
+        return document.RootElement.GetProperty(section).EnumerateArray().ToDictionary(
+            item => item.GetProperty("Fixture").GetString() + ":" + item.GetProperty(id).GetString() +
+                (section == "postconditions" ? ":" + item.GetProperty("Ordinal").GetRawText() : ""),
+            item => item.Clone(), StringComparer.Ordinal);
     }
 
     private static SharpProof.CompilerArtifact.CompilerManifestArtifact CreateGateArtifact(ShadowSourceCase sourceCase)

@@ -416,6 +416,12 @@ This explicit marker leaves ordinary concrete replay's unread-approximation
 behavior unchanged. Postcondition qualification also compares every claim in
 the source and worker golden universe and rejects each lost legacy proof,
 in addition to aggregate proof counts and soundness disagreements.
+The native entry and postcondition gates compare directly with the qualified
+legacy baseline captured at commit 86fa6ea90. The baseline accounts for all 173
+callables and 253 postconditions, including Unknown results. Postconditions use
+fixture, callable signature and clause ordinal as their key; metadata build
+hashes are intentionally excluded. This keeps proof-retention and contradiction
+checks usable after the legacy execution path is retired.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.
