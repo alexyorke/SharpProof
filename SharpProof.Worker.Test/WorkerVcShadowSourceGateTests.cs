@@ -261,7 +261,7 @@ public sealed class WorkerVcShadowSourceGateTests
         await TestContext.Out.WriteLineAsync($"entry-worker universe: sources={sourceCount} callables={callableCount} enrolled={enrolledCount} old-known={oldKnown} native-known={nativeKnown} unknown={unknownCount} disagreements={disagreements} degradations={degradations}");
     }
 
-    private static ShadowSourceCase[] QualificationCases()
+    internal static ShadowSourceCase[] QualificationCases()
     {
         var goldenNames = GoldenTest.Cases("worker").ToArray();
         Assert.That(goldenNames, Has.Length.EqualTo(64));
@@ -359,7 +359,7 @@ public sealed class WorkerVcShadowSourceGateTests
             item => item.Clone(), StringComparer.Ordinal);
     }
 
-    private static SharpProof.CompilerArtifact.CompilerManifestArtifact CreateGateArtifact(ShadowSourceCase sourceCase)
+    internal static SharpProof.CompilerArtifact.CompilerManifestArtifact CreateGateArtifact(ShadowSourceCase sourceCase)
     {
         if (sourceCase.LibrarySource is not { } library)
         { return CompilerTotalCallableArtifactTests.CreateArtifact(sourceCase.Source); }

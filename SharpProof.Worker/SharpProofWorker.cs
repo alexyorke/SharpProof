@@ -9,6 +9,7 @@ public sealed class SharpProofWorker : IDisposable
     private readonly ISmtBackend? _backend;
     private readonly Func<ISmtBackend>? _backendFactory;
     private readonly uint? _configuredQueryRlimit;
+    private readonly bool _nativeAuthority;
     private readonly Func<long>? _readConsumedResourceCount;
     private readonly Channel<byte>? _injectedBackendRunGate;
     private bool _disposed;
@@ -21,20 +22,22 @@ public sealed class SharpProofWorker : IDisposable
         backend, ReadResources(backend))
     {
     }
-    internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount)
+    internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount, bool nativeAuthority = false)
     {
         ArgumentNullException.ThrowIfNull(backend);
         _backend = backend;
         _readConsumedResourceCount = readConsumedResourceCount;
+        _nativeAuthority = nativeAuthority;
         _injectedBackendRunGate = CreateInjectedBackendRunGate();
     }
-    internal SharpProofWorker(Func<ISmtBackend> backendFactory)
+    internal SharpProofWorker(Func<ISmtBackend> backendFactory, bool nativeAuthority = false)
     {
         ArgumentNullException.ThrowIfNull(backendFactory);
         _backendFactory = backendFactory;
+        _nativeAuthority = nativeAuthority;
     }
-    private SharpProofWorker(Func<ISmtBackend> backendFactory, uint configuredQueryRlimit)
-        : this(backendFactory)
+    private SharpProofWorker(Func<ISmtBackend> backendFactory, uint configuredQueryRlimit, bool nativeAuthority = false)
+        : this(backendFactory, nativeAuthority)
     {
         _configuredQueryRlimit = configuredQueryRlimit;
     }
@@ -51,6 +54,17 @@ public sealed class SharpProofWorker : IDisposable
                     new IrSmtBackendOptions(queryRlimit));
             }, queryRlimit);
     }
+    internal static SharpProofWorker CreateNative(WorkerBudgets budgets)
+    {
+        ArgumentNullException.ThrowIfNull(budgets);
+        var queryRlimit = budgets.QueryRlimit;
+        return new SharpProofWorker(() =>
+        {
+            ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+            return new NativeCallableBackend(new IrSmtBackendOptions(queryRlimit));
+        }, queryRlimit, nativeAuthority: true);
+    }
+
     public Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)
     {
@@ -272,7 +286,7 @@ public sealed class SharpProofWorker : IDisposable
                 static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
             var laneCreation = TryCreateLanes(
                 request.Budgets,
-                CountSolverTargets(orderedTargets),
+                CountSolverTargets(orderedTargets, _nativeAuthority),
                 out solverLanes,
                 out var laneError);
             if (laneCreation != LaneCreationResult.Success)
@@ -298,7 +312,7 @@ public sealed class SharpProofWorker : IDisposable
             var results = new CallableVerificationResult[orderedTargets.Length];
             for (var index = 0; index < orderedTargets.Length; index++)
             {
-                if (!orderedTargets[index].IsSuccess)
+                if (!CanVerifyTarget(orderedTargets[index], _nativeAuthority))
                 {
                     results[index] = CallableVerificationPolicy.FailedLowering(
                         orderedTargets[index], projectBoundary.Token);
@@ -352,15 +366,19 @@ public sealed class SharpProofWorker : IDisposable
                         return;
                     }
 
-                    if (!orderedTargets[index].IsSuccess)
+                    if (!CanVerifyTarget(orderedTargets[index], _nativeAuthority))
                     {
                         continue;
                     }
 
                     ThrowIfProjectInterrupted();
-                    var result = await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
-                        lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
-                        projectBoundary, cancellationToken).ConfigureAwait(false);
+                    var result = _nativeAuthority
+                        ? await VerifyNativeTargetAsync(lane.Backend, orderedTargets[index], request.Budgets,
+                            lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
+                            projectBoundary, cancellationToken).ConfigureAwait(false)
+                        : await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
+                            lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
+                            projectBoundary, cancellationToken).ConfigureAwait(false);
                     results[index] = result;
                     if (result.Callable.Reason ==
                             WorkerCallableCoverageReason.MethodTimeout &&
@@ -622,10 +640,13 @@ public sealed class SharpProofWorker : IDisposable
     }
 
     internal static int CountSolverTargets(
-        IEnumerable<CompilerCallablePreparation> targets)
+        IEnumerable<CompilerCallablePreparation> targets, bool nativeAuthority = false)
     {
-        return targets.Count(static target => target.IsSuccess);
+        return targets.Count(target => CanVerifyTarget(target, nativeAuthority));
     }
+
+    private static bool CanVerifyTarget(CompilerCallablePreparation target, bool nativeAuthority)
+    { return target.IsSuccess || nativeAuthority && (target.Total != null || target.TotalEntry != null); }
 
     private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectResults(CallableVerificationResult[] results)
@@ -644,7 +665,12 @@ public sealed class SharpProofWorker : IDisposable
 
     private static Func<long>? ReadResources(ISmtBackend backend)
     {
-        return backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null;
+        return backend switch
+        {
+            IrSmtBackend concrete => () => concrete.ConsumedResourceCount,
+            NativeCallableBackend native => () => native.ConsumedResourceCount,
+            _ => null
+        };
     }
 
     private sealed class VerificationLane(

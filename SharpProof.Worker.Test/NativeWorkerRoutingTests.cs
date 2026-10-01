@@ -1,0 +1,158 @@
+using NUnit.Framework;
+using SharpProof.Host;
+using SharpProof.Ir;
+using SharpProof.Smt;
+using SharpProof.Verify;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test;
+
+[TestFixture]
+public sealed class NativeWorkerRoutingTests
+{
+    [Test]
+    public async Task NativeWorkerRetainsDirectVerifierOutcomesAcrossTheQualifiedUniverse()
+    {
+        var cases = WorkerVcShadowSourceGateTests.QualificationCases();
+        var posts = 0;
+        var known = 0;
+        foreach (var sourceCase in cases)
+        {
+            using var project = new ShadowTestProject(WorkerVcShadowSourceGateTests.CreateGateArtifact(sourceCase));
+            var expected = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
+            foreach (var preparation in project.Snapshot.Callables)
+            {
+                await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, check =>
+                    expected[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), CancellationToken.None);
+            }
+            using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True, sourceCase.Name);
+            var postIds = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+                .Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
+            posts += postIds.Count;
+            var actual = response.ClaimResults.Where(result => postIds.Contains(result.ClaimId)).ToDictionary(result => result.ClaimId, StringComparer.Ordinal);
+            Assert.That(actual.Keys, Is.EquivalentTo(postIds), sourceCase.Name);
+            foreach (var result in expected.Values.Where(result => result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
+            {
+                known++;
+                Assert.That((actual[result.ClaimId].Outcome, actual[result.ClaimId].Vacuity),
+                    Is.EqualTo((result.Outcome, result.Vacuity)), sourceCase.Name + ":" + result.ClaimId);
+            }
+        }
+        Assert.That(posts, Is.EqualTo(253));
+        Assert.That(known, Is.EqualTo(236));
+        await TestContext.Out.WriteLineAsync($"native-worker universe: fixtures={cases.Length} posts={posts} retained-known={known}");
+    }
+
+    [TestCase(1, false)]
+    [TestCase(2, false)]
+    [TestCase(1, true)]
+    public async Task NativeWorkerVerifiesLegacyFailedCallablesAndReusesValidatedCache(int parallelism, bool cacheEnabled)
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static ulong A(ulong value) {
+                    Contract.Requires(value == 18446744073709551615UL);
+                    Contract.Ensures(Contract.Result<ulong>() == 0UL);
+                    return unchecked(value + 1UL);
+                }
+                public static int B(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """, cacheEnabled);
+        project.Request.Budgets.MaxParallelism = parallelism;
+        Assert.That(project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(".A(", StringComparison.Ordinal)).IsSuccess, Is.False);
+        Assert.That(SharpProofWorker.CountSolverTargets(project.Snapshot.Callables, nativeAuthority: true), Is.EqualTo(2));
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        for (var run = 0; run < 2; run++)
+        {
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+            Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(response.CallableResults.Select(result => result.Coverage), Is.All.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+            Assert.That(response.Summary.CacheStatus, Is.EqualTo(cacheEnabled
+                ? run == 0 ? WorkerCacheStatus.Written : WorkerCacheStatus.Hit : WorkerCacheStatus.Disabled));
+        }
+    }
+
+    [Test]
+    public async Task EffectOnlyEntryWithoutPreconditionsDoesNotConsumeSolverQueries()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject { [DoesNotThrow] public static void Target() { } }
+            """);
+        using var worker = new SharpProofWorker(new UnexpectedBackend(), null, nativeAuthority: true);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task ContradictoryNativeEntryMakesEffectProofVacuityExplicit()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject { [DoesNotThrow] public static void Target() {
+                Contract.Requires(false);
+                throw null!;
+            } }
+            """);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var result = response.ClaimResults.Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
+        Assert.That(result.ProofCore, Is.Not.Empty);
+        Assert.That(result.Assumptions.Single().Used, Is.True);
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public async Task MethodTimeoutRetainsEarlierNativeProofAndMarksOnlyPendingClaim()
+    {
+        using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
+        project.Request.Budgets.MethodWallTimeMilliseconds = 1500;
+        var factory = project.Snapshot.Callables.Single().Total!.Program.Factory;
+        using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory, project.Request.Budgets.QueryRlimit), nativeAuthority: true);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
+        Assert.That(pending.Reason, Is.EqualTo(WorkerClaimReason.MethodTimeout));
+        Assert.That(response.CallableResults.Single().Reason, Is.EqualTo(WorkerCallableCoverageReason.MethodTimeout));
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+    }
+
+    private sealed class UnexpectedBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        { throw new AssertionException("An unconstrained effect-only entry needs no SMT query."); }
+    }
+
+    private sealed class StallAfterQueriesBackend : ISmtBackend, IDisposable
+    {
+        private readonly CallableSolverSession _session;
+        private int _queries;
+        internal StallAfterQueriesBackend(IrFactory factory, uint queryRlimit)
+        {
+            ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+            _session = new(factory, new IrSmtBackendOptions(queryRlimit));
+        }
+        public async Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        {
+            if (++_queries == 4)
+            { await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false); }
+            return await _session.CheckAsync(query, cancellationToken).ConfigureAwait(false);
+        }
+        public void Dispose()
+        {
+            _session.Dispose();
+            GC.SuppressFinalize(this);
+        }
+    }
+}

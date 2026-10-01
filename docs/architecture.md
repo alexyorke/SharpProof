@@ -382,6 +382,14 @@ The native verifier may also borrow a worker-owned backend and its matching
 method resource budget. It never disposes that backend or resets the shared
 budget. Both full-callable and independent entry queries use ProofKernel on
 the supplied session; default standalone verification still owns its session.
+The internal `SharpProofWorker.CreateNative` qualification route uses one native
+session per callable factory and keeps resource counts monotonic across each
+lane. It admits independently prepared typed callables even when legacy lowering
+failed, projects native claims into ordinary worker responses, and retains
+completed claims across a later method interruption. Compiler effect evidence
+uses separately published entry feasibility; an unconstrained effect-only entry
+needs no SMT query. The public worker creation path remains legacy until the
+remaining contract forms and retirement gates are qualified.
 The shadow comparison consumes the same Total-to-worker claim projection needed
 by the authority transition. It names counterexamples from canonical Total entry
 parameters rather than legacy variable ids, preserves full unsigned values, and

@@ -1,6 +1,6 @@
 namespace SharpProof.Worker;
 
-internal static class CallableVerificationPolicy
+internal static partial class CallableVerificationPolicy
 {
     internal static async Task<CallableVerificationResult> VerifyTargetAsync(
         CallableVerifier verifier, CompilerCallablePreparation target, WorkerBudgets budgets,
