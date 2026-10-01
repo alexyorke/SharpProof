@@ -12,6 +12,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
 using SharpProof.Ir;
+using SharpProof.Smt;
 using SharpProof.Summaries;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -1840,8 +1841,8 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        using (var first = CreateLegacyWorker(
-                   new SpuriousModelBackend()))
+        using var firstBackend = new CountingNativeBackend();
+        using (var first = new SharpProofWorker(firstBackend))
         {
             Assert.That(
                 (await first.VerifyAsync(request)).Summary.CacheStatus,
@@ -1849,12 +1850,12 @@ public sealed class WorkerTests
         }
 
         var factoryCalls = 0;
-        using var second = CreateLegacyWorker(() =>
+        using var second = new SharpProofWorker(() =>
         {
             Interlocked.Increment(ref factoryCalls);
             return new CountingBackend(
                 BackendCheckResult.Unsatisfiable([]));
-        });
+        }, nativeAuthority: true);
 
         var response = await second.VerifyAsync(request);
 
@@ -4533,16 +4534,19 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var enabled = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var firstWorker = CreateLegacyWorker(backend);
+        using var backend = new CountingNativeBackend();
+        using var firstWorker = new SharpProofWorker(backend);
         var first = await firstWorker.VerifyAsync(enabled);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var second = await firstWorker.VerifyAsync(enabled);
-        Assert.That(backend.CallCount, Is.EqualTo(1));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries));
         AssertSemanticallyEquivalent(first, second);
 
         var disabled = project.CreateRequest(cacheEnabled: false);
-        var disabledBackend = new SpuriousModelBackend();
-        using var disabledWorker = CreateLegacyWorker(disabledBackend);
+        using var disabledBackend = new CountingNativeBackend();
+        using var disabledWorker = new SharpProofWorker(disabledBackend);
         var withoutCache = await disabledWorker.VerifyAsync(disabled);
         AssertSemanticallyEquivalent(first, withoutCache);
     }
@@ -4871,16 +4875,19 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = CreateLegacyWorker(backend);
+        using var backend = new CountingNativeBackend();
+        using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
             "*.sharp-proof-cache.json").Single();
         await File.WriteAllTextAsync(cacheFile, "{corrupt");
         var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         AssertSemanticallyEquivalent(first, second);
     }
 
@@ -4889,9 +4896,12 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = CreateLegacyWorker(backend);
+        using var backend = new CountingNativeBackend();
+        using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
             "*.sharp-proof-cache.json").Single();
@@ -4909,7 +4919,7 @@ public sealed class WorkerTests
 
         var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         AssertSemanticallyEquivalent(first, second);
     }
 
@@ -4919,14 +4929,17 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         request.Cache.MaximumBytes = 1;
-        var backend = new SpuriousModelBackend();
-        using var worker = CreateLegacyWorker(backend);
+        using var backend = new CountingNativeBackend();
+        using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var second = await worker.VerifyAsync(request);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
             Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(
@@ -5635,14 +5648,17 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = CreateLegacyWorker(backend);
+        using var backend = new CountingNativeBackend();
+        using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
 
         request.Budgets.MethodRlimit--;
         var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         Assert.That(second.InputHash, Is.Not.EqualTo(first.InputHash));
         Assert.That(
             CacheFiles(project),
@@ -5881,11 +5897,6 @@ public sealed class WorkerTests
     private static SharpProofWorker CreateLegacyWorker(ISmtBackend backend)
     {
         return new SharpProofWorker(backend, readConsumedResourceCount: null, nativeAuthority: false);
-    }
-
-    private static SharpProofWorker CreateLegacyWorker(Func<ISmtBackend> backendFactory)
-    {
-        return new SharpProofWorker(backendFactory, nativeAuthority: false);
     }
 
     private static async Task<WorkerVerifyResponse> RunAsync(
@@ -6304,6 +6315,31 @@ public sealed class WorkerTests
             return Task.FromResult(
                 BackendCheckResult.Satisfiable(
                     new BackendModel(assignments)));
+        }
+    }
+
+    private sealed class CountingNativeBackend : ISmtBackend, IDisposable
+    {
+        private readonly NativeCallableBackend _backend;
+        private int _callCount;
+
+        internal CountingNativeBackend()
+        {
+            ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+            _backend = new NativeCallableBackend(new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
+        }
+
+        internal int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            return _backend.CheckAsync(query, cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            _backend.Dispose();
         }
     }
 

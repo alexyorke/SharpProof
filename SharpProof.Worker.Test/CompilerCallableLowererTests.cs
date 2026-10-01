@@ -5,7 +5,9 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
+using SharpProof.Host;
 using SharpProof.Ir;
+using SharpProof.Smt;
 using SharpProof.Specs;
 using SharpProof.Summaries;
 using SharpProof.Verify;
@@ -463,14 +465,14 @@ public sealed class CompilerCallableLowererTests
 
     [TestCase(
         "while (value > 0) { value--; }\nreturn value;",
-        TestName = "RequiresOnlyLoopIsTypedIncomplete")]
+        TestName = "RequiresOnlyLoopHasNativeCoverage")]
     [TestCase(
         "return UnsupportedCall(value);",
-        TestName = "RequiresOnlyUnsupportedCallIsTypedIncomplete")]
+        TestName = "RequiresOnlyUnsupportedCallHasNativeCoverage")]
     [TestCase(
         "return new[] { value }[0];",
-        TestName = "RequiresOnlyHeapAccessIsTypedIncomplete")]
-    public async Task RequiresOnlyUnsupportedBodyIsTypedIncomplete(
+        TestName = "RequiresOnlyHeapAccessHasNativeCoverage")]
+    public async Task RequiresOnlyLegacyUnsupportedBodyHasNativeCoverage(
         string body)
     {
         var preparation = Prepare(
@@ -499,10 +501,10 @@ public sealed class CompilerCallableLowererTests
             Assert.That(preparation.Entry.ClaimIds, Is.Empty);
             Assert.That(
                 verification.Callable.Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(
                 verification.Callable.Reason,
-                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+                Is.EqualTo(WorkerCallableCoverageReason.None));
             Assert.That(verification.Claims, Is.Empty);
         }
     }
@@ -676,10 +678,8 @@ public sealed class CompilerCallableLowererTests
             "Identity");
         using var projectBoundary = new CancellationTokenSource();
 
-        var verification = await CallableVerificationPolicy.VerifyTargetAsync(
-            new CallableVerifier(
-                new UnsignaledCancellationBackend(),
-                WorkerBudgets.DefaultMaximumExpressionDepth),
+        var verification = await CallableVerificationPolicy.VerifyNativeTargetAsync(
+            new UnsignaledCancellationBackend(),
             preparation,
             new WorkerBudgets(),
             null,
@@ -712,20 +712,19 @@ public sealed class CompilerCallableLowererTests
     private static async Task<CallableVerificationResult> VerifyCoverageAsync(
         CompilerCallablePreparation preparation)
     {
-        var backend = new ThrowingBackend(
-            "A zero-claim callable reached the SMT backend.");
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        using var backend = new NativeCallableBackend(new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
         using var projectBoundary = new CancellationTokenSource();
-        var verification = await CallableVerificationPolicy.VerifyTargetAsync(
-            new CallableVerifier(
-                backend,
-                WorkerBudgets.DefaultMaximumExpressionDepth),
+        var verification = await CallableVerificationPolicy.VerifyNativeTargetAsync(
+            backend,
             preparation,
             new WorkerBudgets(),
-            null,
+            () => backend.ConsumedResourceCount,
             WorkerBudgets.DefaultMethodWallTimeMilliseconds,
             projectBoundary,
             CancellationToken.None);
-        Assert.That(backend.CallCount, Is.Zero);
+        Assert.That(backend.ConsumedResourceCount == 0,
+            Is.EqualTo(!preparation.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition)));
         return verification;
     }
 
