@@ -14,7 +14,8 @@ internal sealed record PassiveCallableFeasibility(PassiveCallableFeasibilityKind
 internal sealed class PassiveCallableSolver : IDisposable
 {
     private readonly PassiveCallableVcPlan _plan;
-    private readonly CallableSolverSession _session;
+    private readonly CallableSolverSession? _session;
+    private readonly Func<long>? _readConsumedResourceCount;
     private readonly MethodResourceBudget _budget;
     private readonly ProofKernel _kernel;
     private bool _entryFeasible;
@@ -31,7 +32,18 @@ internal sealed class PassiveCallableSolver : IDisposable
         _kernel = new(_session);
     }
 
-    internal long ConsumedResourceCount => _session.ConsumedResourceCount;
+    internal PassiveCallableSolver(PassiveCallableVcPlan plan, ISmtBackend backend,
+        MethodResourceBudget resourceBudget, Func<long>? readConsumedResourceCount = null)
+    {
+        _plan = ArgumentNullGuard.NotNull(plan, nameof(plan));
+        if (plan.IsBoundedSearch)
+        { throw new ArgumentException("A bounded witness encoding cannot own a proof session.", nameof(plan)); }
+        _budget = ArgumentNullGuard.NotNull(resourceBudget, nameof(resourceBudget));
+        _kernel = new(ArgumentNullGuard.NotNull(backend, nameof(backend)));
+        _readConsumedResourceCount = readConsumedResourceCount;
+    }
+
+    internal long ConsumedResourceCount => _session?.ConsumedResourceCount ?? _readConsumedResourceCount?.Invoke() ?? 0;
     internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken = default)
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
     internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken = default)
@@ -117,5 +129,5 @@ internal sealed class PassiveCallableSolver : IDisposable
     }
 
     public void Dispose()
-    { _session.Dispose(); }
+    { _session?.Dispose(); }
 }

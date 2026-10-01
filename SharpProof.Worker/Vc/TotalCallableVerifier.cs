@@ -11,10 +11,12 @@ internal sealed record TotalCallableClaimCheck(string ClaimId, bool Enrolled, bo
 internal static class TotalCallableVerifier
 {
     internal static async Task<CallableEntryFeasibility> VerifyEntryAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken)
+        WorkerBudgets budgets, CancellationToken cancellationToken,
+        ISmtBackend? backend = null, MethodResourceBudget? resourceBudget = null)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        ValidateSession(backend, resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
         var entry = preparation.TotalEntry;
         if (entry == null)
@@ -34,14 +36,15 @@ internal static class TotalCallableVerifier
             ids.Add(label, clause.AssumptionId!);
             assumptions.Add(assumption);
         }
-        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        using var session = new CallableSolverSession(entry.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
-        var resourceBudget = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
+        if (backend == null)
+        { ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }
+        using var session = backend == null ? new CallableSolverSession(entry.Factory, new IrSmtBackendOptions(budgets.QueryRlimit)) : null;
+        resourceBudget ??= new MethodResourceBudget(() => session!.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         if (!resourceBudget.TryStartQuery())
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.ResourceLimit); }
         var query = new VerificationQuery(entry.Factory, assumptions.MoveToImmutable(), Goal.CreateInternalConsistency(entry.Factory),
             [.. entry.Parameters.Select(parameter => parameter.Entry)]);
-        var outcome = await new ProofKernel(session).VerifyAsync(query, cancellationToken).ConfigureAwait(false);
+        var outcome = await new ProofKernel(backend ?? session!).VerifyAsync(query, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (resourceBudget.IsExceeded)
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.ResourceLimit); }
@@ -56,11 +59,13 @@ internal static class TotalCallableVerifier
 
     internal static async Task VerifyAsync(CompilerCallablePreparation preparation, WorkerBudgets budgets,
         Action<TotalCallableClaimCheck> publish, Action<CallableEntryFeasibility>? publishEntry,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, ISmtBackend? backend = null,
+        MethodResourceBudget? resourceBudget = null, Func<long>? readConsumedResourceCount = null)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         ArgumentNullGuard.NotNull(publish, nameof(publish));
+        ValidateSession(backend, resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         if (candidate == null)
@@ -76,8 +81,10 @@ internal static class TotalCallableVerifier
         foreach (var clause in ensures)
         { PublishUnchecked(clause.ClaimId!, true, WorkerClaimReason.UnsupportedBody); }
         cancellationToken.ThrowIfCancellationRequested();
-        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        if (backend == null)
+        { ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }
+        using var solver = backend == null ? new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit)
+            : new PassiveCallableSolver(plan!, backend, resourceBudget!, readConsumedResourceCount);
         var requiresByLabel = new Dictionary<string, string>(StringComparer.Ordinal);
         var requiresOrdinal = 0;
         foreach (var clause in total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
@@ -138,6 +145,12 @@ internal static class TotalCallableVerifier
                 new(null, reason, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []),
                 PassiveCallableFeasibilityKind.Unknown, WorkerVacuityKind.None, []));
         }
+    }
+
+    private static void ValidateSession(ISmtBackend? backend, MethodResourceBudget? resourceBudget)
+    {
+        if ((backend == null) != (resourceBudget == null))
+        { throw new ArgumentException("An injected callable backend requires its matching method resource budget.", nameof(backend)); }
     }
 
     private static CallableEntryFeasibility ProjectEntry(PassiveCallableCheckResult entry,

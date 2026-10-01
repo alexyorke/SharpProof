@@ -378,6 +378,10 @@ preparations; authoritative worker responses and cache claims remain legacy.
 lowering success and shadow reporting. It publishes each completed claim with
 canonical entry evidence and assumption usage before starting the next claim,
 so later cancellation preserves earlier kernel-validated results.
+The native verifier may also borrow a worker-owned backend and its matching
+method resource budget. It never disposes that backend or resets the shared
+budget. Both full-callable and independent entry queries use ProofKernel on
+the supplied session; default standalone verification still owns its session.
 The shadow comparison consumes the same Total-to-worker claim projection needed
 by the authority transition. It names counterexamples from canonical Total entry
 parameters rather than legacy variable ids, preserves full unsigned values, and
