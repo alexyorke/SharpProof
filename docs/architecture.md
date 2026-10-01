@@ -267,6 +267,22 @@ concrete string and array witnesses, and charges their size before allocation.
 An oversized witness abstains without restricting the proof input domain.
 These source controls do not qualify reference implementation IL or complete
 the Phase 2 exit.
+
+The fuzz campaign's schema 5 result separately accounts for generated Total
+programs. Each case compares compiled execution with the original Total IR
+interpreter and checks a true and false postcondition through the native
+callable solver and owned replay. Cases cover scalar wrapping and checked
+overflow, finally return capture, source calls, Boolean bodies, finite loops,
+and reference null, identity and length observations. Loop postconditions relate
+the result to the current parameter after a cut; compiled and original execution
+still compare the exact finite result. Escaping null faults must also have no
+modeled normal return. The campaign requires all cases to agree, and runs of
+at least 1,000 cases require every body category and all thirteen input types.
+The fuzz executable references Worker to exercise its callable solver through
+a trusted source tooling adapter; Worker still has no compiler-facing dependency.
+This bounded source-body generator does not qualify metadata IL, guarded
+indexing, or the remaining Phase 2 exit conditions.
+
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and
 unary Plus/Minus use the same wrap value and guarded overflow rules in bodies

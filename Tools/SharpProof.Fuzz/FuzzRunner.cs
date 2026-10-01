@@ -92,11 +92,12 @@ public sealed record FuzzSummary(
     int SmtAgreements,
     int PartialSmtAgreements,
     FrontendFuzzCoverage FrontendCoverage,
+    TotalProgramFuzzCoverage TotalProgramCoverage,
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
-        SchemaVersion == 4 &&
+        SchemaVersion == 5 &&
         Cases > 0 &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
@@ -104,9 +105,13 @@ public sealed record FuzzSummary(
         FrontendCoverage != null &&
         FrontendCoverage.HasValidCounts &&
         FrontendCoverage.HasValidExceptionCounts(Cases) &&
+        TotalProgramCoverage != null &&
+        TotalProgramCoverage.HasValidCounts &&
+        TotalProgramCoverage.Cases == Cases &&
+        TotalProgramCoverage.Agreements == Cases &&
         CoverageSatisfied &&
         (Cases < FuzzOptions.DefaultCases ||
-         FrontendCoverage.HasExpandedCategories) &&
+         (FrontendCoverage.HasExpandedCategories && TotalProgramCoverage.HasExpandedCategories)) &&
         Abstentions == 0 &&
         Agreements == Cases &&
         FrontendAgreements == Cases &&
@@ -351,8 +356,11 @@ public static class FuzzRunner
             }
         }
 
+        var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
+        failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
+        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
         return new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,
@@ -362,6 +370,7 @@ public static class FuzzRunner
             smtAgreements,
             partialSmtAgreements,
             frontendCoverage,
+            totalPrograms.Coverage,
             coverageSatisfied,
             [.. failures]);
     }

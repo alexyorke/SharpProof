@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
     <InternalsVisibleTo Include="SharpProof.Package.Test" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
   </ItemGroup>

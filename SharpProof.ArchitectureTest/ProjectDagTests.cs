@@ -30,7 +30,8 @@ public sealed class ProjectDagTests
                 "SharpProof.Frontend",
                 "SharpProof.Host",
                 "SharpProof.Smt",
-                "SharpProof.Testing"
+                "SharpProof.Testing",
+                "SharpProof.Worker"
             ],
             ["SharpProof.Gates"] = [
                 "SharpProof.Analyzer",

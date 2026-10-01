@@ -4,7 +4,7 @@ internal readonly record struct PassiveParameterBinding(IrVarId Entry, IrVarId C
 
 internal readonly record struct PassiveContractClause(IrTerm Value, IrTerm Safe, OperationId Operation);
 
-// Enrolled only by a decoded candidate artifact or the trusted source test
+// Enrolled only by a decoded candidate artifact or the trusted source tooling
 // adapter. No source symbols, mutable artifacts, or arbitrary query labels cross
 // this boundary. The candidate has no effect on the production worker route.
 internal sealed class PassiveCallableCandidate

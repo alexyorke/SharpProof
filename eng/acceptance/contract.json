@@ -583,6 +583,7 @@
           "Tools/SharpProof.Fuzz/FuzzRunner.cs",
           "Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs",
           "Tools/SharpProof.Fuzz/Program.cs",
+          "Tools/SharpProof.Fuzz/TotalProgramFuzzing.cs",
           "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
           "Tools/SharpProof.Fuzz/packages.lock.json",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",

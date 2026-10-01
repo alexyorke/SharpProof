@@ -87,10 +87,11 @@ public sealed class FuzzRunnerTests
         var second = await FuzzRunner.RunAsync(options);
 
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(4));
+        Assert.That(first.SchemaVersion, Is.EqualTo(5));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
+        Assert.That(first.TotalProgramCoverage.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.FrontendAgreements, Is.EqualTo(options.Cases));
         Assert.That(first.SmtAgreements, Is.EqualTo(options.Cases));
         Assert.That(
@@ -167,6 +168,7 @@ public sealed class FuzzRunnerTests
             parallel.PartialSmtAgreements,
             Is.EqualTo(serial.PartialSmtAgreements));
         Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
+        Assert.That(parallel.TotalProgramCoverage, Is.EqualTo(serial.TotalProgramCoverage));
     }
 
     [Test]
@@ -175,7 +177,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -185,6 +187,7 @@ public sealed class FuzzRunnerTests
             SmtAgreements: 1,
             PartialSmtAgreements: 1,
             FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -201,7 +204,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: cases,
             Seed: 7,
             MaximumParallelism: maximumParallelism,
@@ -211,6 +214,7 @@ public sealed class FuzzRunnerTests
             SmtAgreements: cases,
             PartialSmtAgreements: cases,
             FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -231,7 +235,7 @@ public sealed class FuzzRunnerTests
             OverflowExceptions = 1
         };
         var valid = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: FuzzOptions.DefaultCases,
             Seed: 7,
             MaximumParallelism: 1,
@@ -241,12 +245,18 @@ public sealed class FuzzRunnerTests
             SmtAgreements: FuzzOptions.DefaultCases,
             PartialSmtAgreements: FuzzOptions.DefaultCases,
             FrontendCoverage: complete,
+            TotalProgramCoverage: new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191),
             CoverageSatisfied: true,
             Failures: []);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(valid.Passed, Is.True);
+            Assert.That((valid with { TotalProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ReferenceBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { TypeMask = 1023 } }).Passed, Is.False);
             Assert.That(
                 (valid with { SchemaVersion = 999 }).Passed,
                 Is.False);

@@ -85,10 +85,45 @@ public sealed class WorkerVcReferenceTests
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
     }
 
+    [TestCase("object", "Contract.Result<object>() == Contract.Old(x)")]
+    [TestCase("int[]", "Contract.Result<int[]>() == Contract.Old(x)")]
+    [TestCase("string", "Contract.Result<string>() != null && Contract.Result<string>().Length == x.Length")]
+    public async Task ReferenceResultsCrossFreshSourceFramesWithoutLosingIdentityOrLength(string type, string predicate)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static {{type}} Target({{type}} x) {
+                    Contract.Requires(x != null);
+                    Contract.Ensures({{predicate}});
+                    Contract.Ensures(Contract.Result<{{type}}>() == null);
+                    return Forward(x);
+                }
+                private static {{type}} Forward({{type}} value) { return Copy(value); }
+                private static {{type}} Copy({{type}} value) { return value; }
+            }
+            """);
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        Assert.That(target.Total, Is.Not.Null);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var result = await solver.VerifyEnsuresAsync(1);
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.EntryModel.Keys, Is.EquivalentTo(candidate.Parameters.Select(parameter => parameter.Entry)));
+        var replay = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, result.EntryModel);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(ReferenceEquals(replay.ReturnValue, result.EntryModel[candidate.Parameters.Single().Entry]), Is.True);
+    }
+
     [TestCase("bool Target(string x, string y) { Contract.Ensures(true); return x == y; }")]
     [TestCase("object Target(string x) { Contract.Ensures(true); return x; }")]
     [TestCase("int Target(int[] x) { Contract.Ensures(true); return x[0]; }")]
     [TestCase("int[] Target() { Contract.Ensures(true); return new int[1]; }")]
+    [TestCase("int Target(string x) { Contract.Ensures(true); try { return x.Length; } catch (System.NullReferenceException error) { return error == null ? 1 : 0; } }")]
     public void UnsupportedReferenceOperationsRemainUnenrolled(string member)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
