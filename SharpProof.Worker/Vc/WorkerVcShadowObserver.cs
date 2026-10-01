@@ -1,5 +1,3 @@
-using SharpProof.Host;
-
 namespace SharpProof.Worker;
 
 internal static class WorkerVcShadowObserver
@@ -39,82 +37,26 @@ internal static class WorkerVcShadowObserver
             try
             {
                 methodBoundary.CancelAfter(budgets.MethodWallTimeMilliseconds);
-                var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-                if (candidate == null)
-                { return; }
-                if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var constructionReason, methodBoundary.Token))
-                { SetReason(claimIds, constructionReason); return; }
-                foreach (var claimId in claimIds)
-                { rows[claimId] = rows[claimId] with { Enrolled = true }; }
-                methodBoundary.Token.ThrowIfCancellationRequested();
-                ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-                using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
-                var feasibility = await solver.VerifyFeasibilityAsync(methodBoundary.Token).ConfigureAwait(false);
-                var ensures = preparation.Total!.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
-                var requiresByLabel = new Dictionary<string, string>(StringComparer.Ordinal);
-                var requiresOrdinal = 0;
-                foreach (var clause in preparation.Total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
+                await TotalCallableVerifier.VerifyAsync(preparation, budgets, check =>
                 {
-                    methodBoundary.Token.ThrowIfCancellationRequested();
-                    requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture), clause.AssumptionId!);
-                }
-                var canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToArray();
-                var assumesByOperation = preparation.Total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume)
-                    .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId!);
-                for (var ordinal = 0; ordinal < ensures.Length; ordinal++)
-                {
-                    methodBoundary.Token.ThrowIfCancellationRequested();
-                    var claimId = ensures[ordinal].ClaimId!;
-                    if (feasibility.Kind == PassiveCallableFeasibilityKind.Unknown && !solver.CanCheckWithoutNormalWitness)
-                    {
-                        rows[claimId] = rows[claimId] with { Feasibility = feasibility.Kind, NewReason = feasibility.Evidence.Reason };
-                        continue;
-                    }
-                    var vacuity = feasibility.Kind switch
-                    {
-                        PassiveCallableFeasibilityKind.ContradictoryEntry => WorkerVacuityKind.ContradictoryPreconditions,
-                        PassiveCallableFeasibilityKind.NoModeledNormalReturn => WorkerVacuityKind.NoModeledNormalReturn,
-                        _ => WorkerVacuityKind.None
-                    };
-                    var evidence = vacuity == WorkerVacuityKind.None
-                        ? await solver.VerifyEnsuresAsync(ordinal, methodBoundary.Token).ConfigureAwait(false)
-                        : feasibility.Evidence;
-                    var outcome = evidence.Outcome switch
+                    var outcome = check.Evidence.Outcome switch
                     {
                         ProvenOutcome => WorkerClaimOutcome.Proven,
                         RefutedOutcome => WorkerClaimOutcome.Refuted,
                         _ => WorkerClaimOutcome.Unknown
                     };
-                    var used = new HashSet<string>(StringComparer.Ordinal);
-                    foreach (var label in evidence.Core)
+                    rows[check.ClaimId] = rows[check.ClaimId] with
                     {
-                        methodBoundary.Token.ThrowIfCancellationRequested();
-                        if (requiresByLabel.TryGetValue(label, out var id))
-                        { used.Add(id); }
-                    }
-                    foreach (var operation in evidence.BodyAssumptions)
-                    {
-                        methodBoundary.Token.ThrowIfCancellationRequested();
-                        if (assumesByOperation.TryGetValue(operation, out var id))
-                        { used.Add(id); }
-                    }
-                    var assumptions = ImmutableArray.CreateBuilder<WorkerVcShadowAssumption>(canonicalAssumptions.Length);
-                    foreach (var assumption in canonicalAssumptions)
-                    {
-                        methodBoundary.Token.ThrowIfCancellationRequested();
-                        assumptions.Add(new(assumption.Id, assumption.Kind, used.Contains(assumption.Id)));
-                    }
-                    rows[claimId] = rows[claimId] with
-                    {
-                        Checked = evidence.Outcome != null || evidence.QueryCompleted,
+                        Enrolled = check.Enrolled,
+                        Checked = check.Checked,
                         NewOutcome = outcome,
-                        NewReason = evidence.Reason,
-                        NewVacuity = vacuity,
-                        Feasibility = feasibility.Kind,
-                        NewAssumptions = assumptions.MoveToImmutable(),
-                        HasBodyAssumptions = !evidence.BodyAssumptions.IsEmpty
+                        NewReason = check.Evidence.Reason,
+                        NewVacuity = check.Vacuity,
+                        Feasibility = check.Feasibility,
+                        NewAssumptions = Assumptions(check.Assumptions),
+                        HasBodyAssumptions = !check.Evidence.BodyAssumptions.IsEmpty
                     };
-                }
+                }, methodBoundary.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

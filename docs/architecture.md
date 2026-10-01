@@ -369,6 +369,10 @@ Late or conditional placement remains unsupported. Decoding binds each filter
 to its owned clause and requires reachable prologue placement before body
 execution. The optional Total artifact and shadow comparison reuse decoded
 preparations; authoritative worker responses and cache claims remain legacy.
+`TotalCallableVerifier` owns candidate orchestration independently of legacy
+lowering success and shadow reporting. It publishes each completed claim with
+canonical entry evidence and assumption usage before starting the next claim,
+so later cancellation preserves earlier kernel-validated results.
 
 Ordinary reducible scalar loops retain their original cyclic Total program for
 concrete replay. The worker derives two bounded encodings from that same owner.
