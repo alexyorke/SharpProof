@@ -5,7 +5,8 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerTotalCallableLowerer
 {
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
-        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
+        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees,
+        CompilerReferenceSnapshot[]? capturedReferences, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (target.Declaration is not MethodDeclarationSyntax declaration || target.SemanticModel == null ||
@@ -47,7 +48,7 @@ internal static class CompilerTotalCallableLowerer
             cancellationToken.ThrowIfCancellationRequested();
             var contracts = new ContractBinder(compilation, context.Factory).BindTotal(frame);
             return contracts.IsSuccess && contracts.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
-        }, cancellationToken);
+        }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }

@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
-    private static TotalScalarRule ConvertInteger(IrFactory factory, IrTerm value, IrTypeId target, bool isChecked)
+    internal static TotalScalarRule ConvertInteger(IrFactory factory, IrTerm value, IrTypeId target, bool isChecked)
     {
         if (value.Type == target)
         { return Exact(value); }
@@ -56,7 +56,7 @@ internal static partial class CSharpOperationSemantics
         return new(conversion.Value, [.. rule.Throws, .. conversion.Throws], conversion.Classification);
     }
 
-    private static TotalScalarRule IntegerArithmetic(IrFactory factory, IrBinaryOperator kind, IrTerm left, IrTerm right, bool isChecked)
+    internal static TotalScalarRule IntegerArithmetic(IrFactory factory, IrBinaryOperator kind, IrTerm left, IrTerm right, bool isChecked)
     {
         var value = factory.Binary(kind, left, right);
         if (!isChecked)

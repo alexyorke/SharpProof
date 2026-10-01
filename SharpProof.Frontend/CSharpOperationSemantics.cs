@@ -105,20 +105,24 @@ internal static partial class CSharpOperationSemantics
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
-        var faults = ImmutableArray.CreateBuilder<TotalThrow>();
         if (kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
         { return IntegerArithmetic(factory, kind, value, right, binary.IsChecked); }
         if (kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
-        {
-            faults.Add(new(IrExceptionKind.DivideByZero,
+        { return DivideOrRemainder(factory, kind, value, right); }
+        return new(factory.Binary(kind, value, right), [], FrontendSubsetClassification.Exact);
+    }
+
+    internal static TotalScalarRule DivideOrRemainder(IrFactory factory, IrBinaryOperator kind, IrTerm value, IrTerm right)
+    {
+        var faults = ImmutableArray.CreateBuilder<TotalThrow>();
+        faults.Add(new(IrExceptionKind.DivideByZero,
                 factory.Binary(IrBinaryOperator.Equal, right, factory.Integer(right.Type, 0L))));
-            var info = factory.GetTypeInfo(value.Type);
-            if (info.Signed && info.Width is 32 or 64)
-            {
-                faults.Add(new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.AndAlso,
+        var info = factory.GetTypeInfo(value.Type);
+        if (info.Signed && info.Width is 32 or 64)
+        {
+            faults.Add(new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.AndAlso,
                     factory.Binary(IrBinaryOperator.Equal, value, Number(factory, value.Type, Bounds(info).Minimum)),
                     factory.Binary(IrBinaryOperator.Equal, right, factory.Integer(right.Type, -1L)))));
-            }
         }
         return new(factory.Binary(kind, value, right), faults.ToImmutable(), FrontendSubsetClassification.Exact);
     }

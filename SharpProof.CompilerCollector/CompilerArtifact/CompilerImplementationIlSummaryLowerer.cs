@@ -541,7 +541,7 @@ internal static class CompilerImplementationIlSummaryLowerer
         }
     }
 
-    private static bool IsReferenceAssembly(IAssemblySymbol assembly)
+    internal static bool IsReferenceAssembly(IAssemblySymbol assembly)
     {
         return assembly.GetAttributes().Any(static attribute =>
             attribute.AttributeClass is
@@ -556,7 +556,7 @@ internal static class CompilerImplementationIlSummaryLowerer
                 "CompilerServices"));
     }
 
-    private static bool HasNamespace(
+    internal static bool HasNamespace(
         INamespaceSymbol value,
         params string[] segments)
     {
@@ -574,7 +574,7 @@ internal static class CompilerImplementationIlSummaryLowerer
         return value.IsGlobalNamespace;
     }
 
-    private static bool TryGetMethodDefinition(
+    internal static bool TryGetMethodDefinition(
         MetadataReader reader,
         int metadataToken,
         out MethodDefinitionHandle handle,
@@ -600,7 +600,7 @@ internal static class CompilerImplementationIlSummaryLowerer
         return true;
     }
 
-    private static bool HasManagedIlBody(MethodDefinition definition)
+    internal static bool HasManagedIlBody(MethodDefinition definition)
     {
         return (definition.Attributes & MethodAttributes.Abstract) == 0 &&
             (definition.Attributes & MethodAttributes.PinvokeImpl) == 0 &&

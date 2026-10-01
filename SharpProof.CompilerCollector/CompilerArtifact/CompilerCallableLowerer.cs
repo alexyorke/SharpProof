@@ -9,6 +9,7 @@ internal sealed class CompilerCallableLowerer
     private readonly IrFactory _factory;
     private readonly CSharpCompilation _compilation;
     private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
+    private readonly CompilerReferenceSnapshot[]? _capturedReferences;
     private readonly ContractBinder _contracts;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerRelationalSummaryProvider _summaries;
@@ -34,11 +35,13 @@ internal sealed class CompilerCallableLowerer
         CSharpCompilation compilation,
         IrFactory factory,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
+        CompilerSyntaxTreeSnapshot[]? capturedTrees = null,
+        CompilerReferenceSnapshot[]? capturedReferences = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _compilation = compilation;
         _capturedTrees = capturedTrees;
+        _capturedReferences = capturedReferences;
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _contracts = new ContractBinder(compilation, factory);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
@@ -54,7 +57,8 @@ internal sealed class CompilerCallableLowerer
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         var total = CompilerTotalCallableLowerer.Prepare(_compilation, target,
-            _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken), cancellationToken);
+            _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken),
+            _capturedReferences, cancellationToken);
         return PrepareLegacy(target, cancellationToken) with { Total = total };
     }
 

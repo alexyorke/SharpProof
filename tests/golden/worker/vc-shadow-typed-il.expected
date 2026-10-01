@@ -1,0 +1,472 @@
+run: normal
+authority: legacy
+request-bindings: True
+cache: Written
+postconditions: 18
+enrolled: 16
+checked: 16
+unchecked: 2
+unenrolled: 2
+unknown: 2
+oldProven: 2
+newProven: 8
+oldVacuous: 0
+newVacuous: 0
+oldConditional: 0
+newConditional: 0
+soundnessDisagreements: 0
+precisionGains: 15
+precisionLosses: 1
+coverageComplete: False
+row: M:Subject.BCapturedArguments(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.BCapturedArguments(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.CNamedArguments(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.CNamedArguments(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DStorage(System.Byte)~System.Byte#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DStorage(System.Byte)~System.Byte#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.EUlong(System.UInt64)~System.UInt64#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.EUlong(System.UInt64)~System.UInt64#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.FFilterAndFinally(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.FFilterAndFinally(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.GFilterFault(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.GFilterFault(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.HOverflow(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.HOverflow(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.IExceptionRegionsClosed(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.JInitializationClosed(System.Int32)~System.Int32#0
+  oldOutcome: Proven
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.Target(System.Int32)~System.Int32#0
+  oldOutcome: Proven
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.Target(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+run: cache-hit
+authority: legacy
+request-bindings: True
+cache: Hit
+postconditions: 18
+enrolled: 16
+checked: 16
+unchecked: 2
+unenrolled: 2
+unknown: 2
+oldProven: 2
+newProven: 8
+oldVacuous: 0
+newVacuous: 0
+oldConditional: 0
+newConditional: 0
+soundnessDisagreements: 0
+precisionGains: 15
+precisionLosses: 1
+coverageComplete: False
+row: M:Subject.BCapturedArguments(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.BCapturedArguments(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.CNamedArguments(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.CNamedArguments(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DStorage(System.Byte)~System.Byte#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.DStorage(System.Byte)~System.Byte#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.EUlong(System.UInt64)~System.UInt64#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.EUlong(System.UInt64)~System.UInt64#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.FFilterAndFinally(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.FFilterAndFinally(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.GFilterFault(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.GFilterFault(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.HOverflow(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.HOverflow(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.IExceptionRegionsClosed(System.Int32)~System.Int32#0
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.JInitializationClosed(System.Int32)~System.Int32#0
+  oldOutcome: Proven
+  oldVacuity: None
+  totalPresent: False
+  enrolled: False
+  checked: False
+  newOutcome: Unknown
+  newReason: UnsupportedBody
+  newVacuity: None
+  feasibility: Unknown
+  oldConditional: False
+  newConditional: False
+row: M:Subject.Target(System.Int32)~System.Int32#0
+  oldOutcome: Proven
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Proven
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False
+row: M:Subject.Target(System.Int32)~System.Int32#1
+  oldOutcome: Unknown
+  oldVacuity: None
+  totalPresent: True
+  enrolled: True
+  checked: True
+  newOutcome: Refuted
+  newReason: None
+  newVacuity: None
+  feasibility: Feasible
+  oldConditional: False
+  newConditional: False

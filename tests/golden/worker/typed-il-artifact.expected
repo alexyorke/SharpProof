@@ -1,0 +1,9 @@
+schema: 22
+authority: legacy
+legacy-success: False
+total-present: True
+integer-width: 64
+unsigned: True
+roots-interleaved: True
+same-claim-ids: True
+full-ulong-wrap: ProvenOutcome

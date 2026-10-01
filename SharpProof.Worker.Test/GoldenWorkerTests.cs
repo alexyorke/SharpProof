@@ -41,6 +41,8 @@ public sealed class GoldenWorkerTests
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
+            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => VcShadow(artifact))
+            : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => TotalArtifact(artifact))
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
             : scenario == "vc-exception-multi-entry" ? await VcExceptionMultiEntry()
             : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
@@ -126,6 +128,26 @@ public sealed class GoldenWorkerTests
     private static async Task<string> VcShadow(string source)
     {
         using var project = new ShadowTestProject(source, cacheEnabled: true);
+        return await VcShadow(project);
+    }
+
+    private static async Task<string> VcShadow(CompilerManifestArtifact artifact)
+    {
+        using var project = new ShadowTestProject(artifact, cacheEnabled: true);
+        return await VcShadow(project, stableClaimOrder: true);
+    }
+
+    private static async Task<string> TypedIlGolden(string source, Func<CompilerManifestArtifact, Task<string>> render)
+    {
+        const string marker = "// metadata-library";
+        var boundary = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.That(boundary, Is.GreaterThan(0));
+        using var subject = new MetadataTestSubject(source[(boundary + marker.Length)..], source[..boundary]);
+        return await render(subject.CreateArtifact());
+    }
+
+    private static async Task<string> VcShadow(ShadowTestProject project, bool stableClaimOrder = false)
+    {
         using var environment = new ShadowEnvironment("shadow");
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         using var errors = new StringWriter(CultureInfo.InvariantCulture);
@@ -152,7 +174,16 @@ public sealed class GoldenWorkerTests
                 foreach (var property in new[] { "postconditions", "enrolled", "checked", "unchecked", "unenrolled", "unknown", "oldProven", "newProven", "oldVacuous", "newVacuous", "oldConditional", "newConditional", "soundnessDisagreements", "precisionGains", "precisionLosses" })
                 { output.AppendLine(property + ": " + json.GetProperty(property).GetInt32()); }
                 output.AppendLine("coverageComplete: " + json.GetProperty("coverageComplete").GetBoolean());
-                foreach (var row in json.GetProperty("rows").EnumerateArray())
+                var rows = json.GetProperty("rows").EnumerateArray().ToArray();
+                if (stableClaimOrder)
+                {
+                    // Metadata fixtures use captured temporary document paths. Their claim
+                    // hashes vary, so render original callable/ordinal instead of hash order.
+                    var claims = response.Manifest.Claims.ToDictionary(claim => claim.ClaimId, StringComparer.Ordinal);
+                    rows = [.. rows.OrderBy(row => claims[row.GetProperty("claimId").GetString()!].CallableId, StringComparer.Ordinal)
+                        .ThenBy(row => claims[row.GetProperty("claimId").GetString()!].Ordinal)];
+                }
+                foreach (var row in rows)
                 {
                     var claim = response.Manifest.Claims.Single(claim => claim.ClaimId == row.GetProperty("claimId").GetString());
                     output.AppendLine("row: " + claim.CallableId + "#" + claim.Ordinal);
@@ -170,6 +201,11 @@ public sealed class GoldenWorkerTests
     private static async Task<string> TotalArtifact(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
+        return await TotalArtifact(artifact);
+    }
+
+    private static async Task<string> TotalArtifact(CompilerManifestArtifact artifact)
+    {
         var row = artifact.Callables.Single();
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
         var preparation = prepared.Single();

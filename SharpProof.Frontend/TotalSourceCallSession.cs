@@ -6,9 +6,10 @@ namespace SharpProof.Frontend;
 // One compiler-owned expansion session covers the caller and every fresh frame.
 // It supplies source bodies, never relational summaries or contract premises.
 internal sealed class TotalSourceCallSession(Compilation compilation,
-    Func<TotalLoweringContext, bool> prepareCallee, CancellationToken cancellationToken)
+    Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken)
 {
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
 
     internal bool Spend(int amount = 1)
@@ -29,6 +30,24 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     {
         _active.Remove(method);
     }
+
+    internal TotalIlBody? PrepareIl(IMethodSymbol method)
+    {
+        if (resolveIl == null || !Spend(method.Parameters.Length + 1) || _activeIl.Contains(IlKey(method)))
+        { return null; }
+        return resolveIl(method, cancellationToken);
+    }
+
+    internal bool EnterIl(IMethodSymbol method)
+    {
+        return Spend() && _active.Count + _activeIl.Count < 256 && _activeIl.Add(IlKey(method));
+    }
+
+    internal void LeaveIl(IMethodSymbol method)
+    { _activeIl.Remove(IlKey(method)); }
+
+    private static string IlKey(IMethodSymbol method)
+    { return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
     internal bool TryPrepare(TotalLoweringContext caller, IInvocationOperation invocation,
         out TotalLoweringContext? frame, out ControlFlowGraph? graph)

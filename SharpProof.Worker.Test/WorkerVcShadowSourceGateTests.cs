@@ -105,6 +105,28 @@ public sealed class WorkerVcShadowSourceGateTests
         new("cross-frame-captured-return", WorkerVcCrossFrameSearchTests.CapturedReturnSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("cross-frame-own-filter-fault", WorkerVcCrossFrameSearchTests.OwnFilterFaultSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("cross-frame-repeated-filter", WorkerVcCrossFrameSearchTests.RepeatedFilterSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
+        new("metadata-source-private-chain", WorkerVcMetadataCallTests.IncrementSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-argument-capture", WorkerVcMetadataCallTests.ArgumentSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-reverse-named-order", WorkerVcMetadataCallTests.ReverseArgumentSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-narrow-starg", WorkerVcMetadataCallTests.StoreSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-full-ulong", WorkerVcMetadataCallTests.UlongSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-caller-filter-finally", WorkerVcMetadataCallTests.FaultSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-filter-fault-swallowed", WorkerVcMetadataCallTests.FilterFaultSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-private-overflow-finally", WorkerVcMetadataCallTests.OverflowSource, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted], LibrarySource: WorkerVcMetadataCallTests.LibrarySource),
+        new("metadata-eh-closed", """
+            using SharpProof.Attributes;
+            public static class Subject { public static int Target(int x) {
+                Contract.Ensures(true); return Library.Target(x);
+            } }
+            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody,
+            LibrarySource: "public static class Library { public static int Target(int x) { try { return 10 / x; } catch (System.DivideByZeroException) { return 1; } } }"),
+        new("metadata-module-init-closed", """
+            using SharpProof.Attributes;
+            public static class Subject { public static int Target(int x) {
+                Contract.Ensures(true); return Library.Target(x);
+            } }
+            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody,
+            LibrarySource: "public static class Boot { public static int State; [System.Runtime.CompilerServices.ModuleInitializer] public static void Initialize() { State = 5; } } public static class Library { public static int Target(int x) { return x; } }"),
         new("async-root-closed", """
             using SharpProof.Attributes;
             public static class Subject { public static async void Target(int x) {
@@ -117,13 +139,13 @@ public sealed class WorkerVcShadowSourceGateTests
     public async Task DefinedSourceWorkerUniverseAccountsForEveryPostconditionWithoutEmptyExitSuccess()
     {
         Assert.That(Universe.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
-        Assert.That(Universe.Length, Is.EqualTo(39));
+        Assert.That(Universe.Length, Is.EqualTo(49));
         using var environment = new ShadowEnvironment("shadow");
         var rows = new List<WorkerVcShadowRow>();
         var manifestPostconditions = 0;
         foreach (var sourceCase in Universe)
         {
-            using var project = new ShadowTestProject(sourceCase.Source);
+            using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
             using var worker = SharpProofWorker.Create(project.Request.Budgets);
             WorkerVcShadowReport? report = null;
             worker.ShadowReportSink = observed => report = observed;
@@ -134,17 +156,25 @@ public sealed class WorkerVcShadowSourceGateTests
             rows.AddRange(report!.Rows);
             await TestContext.Out.WriteLineAsync($"source-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} oldProven={report.OldProven} newProven={report.NewProven} disagreements={report.SoundnessDisagreements}");
         }
-        Assert.That(manifestPostconditions, Is.EqualTo(59));
+        Assert.That(manifestPostconditions, Is.EqualTo(77));
         Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
         var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(57));
-        Assert.That(aggregate.Unenrolled, Is.EqualTo(2));
-        Assert.That(aggregate.Checked, Is.EqualTo(57));
-        Assert.That(aggregate.Unknown, Is.EqualTo(6));
+        Assert.That(aggregate.Enrolled, Is.EqualTo(73));
+        Assert.That(aggregate.Unenrolled, Is.EqualTo(4));
+        Assert.That(aggregate.Checked, Is.EqualTo(73));
+        Assert.That(aggregate.Unknown, Is.EqualTo(8));
         Assert.That(aggregate.NewConditional, Is.EqualTo(2));
         Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
         Assert.That(aggregate.CoverageComplete, Is.False);
         await TestContext.Out.WriteLineAsync($"source-worker universe: sources={Universe.Length} posts={aggregate.Postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unchecked={aggregate.Unchecked} unknown={aggregate.Unknown} disagreements={aggregate.SoundnessDisagreements} full-exit={aggregate.CoverageComplete}");
+    }
+
+    private static SharpProof.CompilerArtifact.CompilerManifestArtifact CreateGateArtifact(ShadowSourceCase sourceCase)
+    {
+        if (sourceCase.LibrarySource is not { } library)
+        { return CompilerTotalCallableArtifactTests.CreateArtifact(sourceCase.Source); }
+        using var metadata = new MetadataTestSubject(library, sourceCase.Source);
+        return metadata.CreateArtifact();
     }
 
     [Test]
@@ -201,4 +231,5 @@ public sealed class WorkerVcShadowSourceGateTests
 
 internal sealed record ShadowSourceCase(string Name, string Source, ImmutableArray<WorkerClaimOutcome> Outcomes,
     bool TotalPresent = true, bool? Checked = true, WorkerVacuityKind Vacuity = WorkerVacuityKind.None,
-    WorkerClaimReason Reason = WorkerClaimReason.None, bool Conditional = false, ImmutableArray<WorkerClaimReason> Reasons = default);
+    WorkerClaimReason Reason = WorkerClaimReason.None, bool Conditional = false, ImmutableArray<WorkerClaimReason> Reasons = default,
+    string? LibrarySource = null);

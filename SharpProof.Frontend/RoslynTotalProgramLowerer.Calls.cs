@@ -14,6 +14,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
+        if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body)
+        { return InlineMetadataCall(invocation, body, block, depth); }
         if (_calls == null || !_calls.TryPrepare(_context, invocation, out var frame, out var graph))
         { return null; }
         var callee = frame!;

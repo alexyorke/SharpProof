@@ -210,7 +210,7 @@ safety separate from value, including through Old and lazy expressions. A shared
 context gives entry inputs, mutable parameter storage, Old snapshots, and Result
 distinct identities. Validated specification calls are omitted from runtime
 body evaluation. Async and partial/generic contexts, ref locals, heap operations,
-metadata calls, ordinary irreducible loops and point Assume instructions inside cycles
+unsupported metadata bodies, ordinary irreducible loops and point Assume instructions inside cycles
 currently abstain.
 The compiler-owned source-call route admits nonrecursive same-compilation static
 scalar methods. Each invocation evaluates arguments once in source order, maps
@@ -220,7 +220,7 @@ adding their Requires or Ensures as proof premises; callee Assume closes admissi
 All nested frames share the same construction cap and cancellation boundary.
 Original expanded IR retains callee returns, finally bodies, and escaping throw
 kind/site for replay and caller catch routing. Async, iterator, generic, ref/params,
-metadata and unmodeled type-initialization calls remain unsupported. When an
+unmodeled type-initialization calls remain unsupported. When an
 outer filter can observe a callee fault, fresh frames share one program builder.
 Each frame searches its own handlers first, then continues search at the caller's
 captured lexical point before running the immutable inner-to-outer finally
@@ -232,7 +232,27 @@ Replacement exceptions can create shared filter/finally cycles; the owned loop
 proof and bounded witness encodings keep conservative completed Unknown results
 distinct from absent evidence. Havoc can lose correlations between earlier
 filter mutations and a later replacement search, leaving a valid postcondition
-Unknown when the bounded search is also inconclusive. Typed metadata IL summaries and Ref/len remain
+Unknown when the bounded search is also inconclusive.
+
+The typed implementation-IL route admits bounded static scalar managed methods
+from an exact captured implementation image. The collector verifies assembly,
+module, method token, signature and backing metadata, then hashes the immutable
+bytes it actually decodes. It validates every instruction and stack merge before
+allocating an owned frame. IL operands use CLI stack widths; short storage and
+returns truncate, loads extend, and unsigned opcodes control interpretation.
+Boolean transfers require proven canonical zero/one stack values. Body and IL
+arithmetic share the same wrap values and overflow/division fault guards.
+Arguments, local/parameter mutation, dependencies and returns expand into original
+typed IR with fresh frame storage and one shared construction/recursion budget.
+Escaping IL faults retain image/token/offset provenance and route through caller
+filter search, catches and finally; concrete counterexamples replay that owned
+original graph and project only canonical caller inputs.
+
+Only AnyCPU and amd64 IL-only implementation images are admitted. Reference-only
+images, type/module initialization, vararg/unmanaged/synchronized methods, IL
+exception regions, reference/native operations, unsupported opcodes and
+cross-module dependency calls remain closed. Nonrecursive exact same-module
+dependencies are supported. Broader typed metadata coverage and Ref/len remain
 required before the Phase 2 exit.
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and

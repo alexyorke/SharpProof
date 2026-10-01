@@ -319,10 +319,13 @@ internal sealed class ShadowTestProject : IDisposable
     internal WorkerVerifyRequest Request { get; }
     internal WorkerInputSnapshot Snapshot { get; }
     internal ShadowTestProject(string source, bool cacheEnabled = false)
+        : this(CompilerTotalCallableArtifactTests.CreateArtifact(source), cacheEnabled)
+    {
+    }
+    internal ShadowTestProject(CompilerManifestArtifact artifact, bool cacheEnabled = false)
     {
         try
         {
-            var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
             artifact.Compilation.ProjectDirectory = _directory.FullName;
             var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
             var path = Path.Combine(_directory.FullName, "compiler-manifest.json");

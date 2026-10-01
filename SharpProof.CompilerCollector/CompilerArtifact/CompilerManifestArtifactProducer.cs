@@ -53,7 +53,8 @@ internal static class CompilerManifestArtifactProducer
                     compilation,
                     new IrFactory(),
                     specificationPackAuthority,
-                    snapshot.SyntaxTrees);
+                    snapshot.SyntaxTrees,
+                    snapshot.References);
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
                 return artifact.AttachEffectEvidence(item);
