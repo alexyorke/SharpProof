@@ -257,9 +257,15 @@ before the Phase 2 exit.
 
 The Total source candidate also admits object, string and single-dimensional
 arrays of scalar, object or string elements for null, copy, identity and length
-observations. Built-in string content comparisons, general reference casts,
-allocation and element operations remain closed. Length reads emit guarded
-NullReference faults in bodies and safe conditions in clauses. The native
+observations. Reads from scalar arrays with int/uint indexes also emit ordered
+NullReference and IndexOutOfRange faults, after evaluating both operands.
+Native element functions preserve each observed scalar element in decoded
+array witnesses, including aliases. Array writes, reference-element reads,
+built-in string content comparisons, general reference casts and allocation
+remain closed. Long/ulong indexes remain closed because their native-width
+conversion can overflow before a null check and source evidence does not bind
+that architecture. Length reads emit guarded NullReference faults in bodies
+and safe conditions in clauses. The native
 candidate uses one uninterpreted Ref sort and a length function with the full
 0..Int32.MaxValue range; null has mathematical length zero, while source reads
 still fault. SAT model decoding preserves array and object aliases, creates
@@ -268,20 +274,22 @@ An oversized witness abstains without restricting the proof input domain.
 These source controls do not qualify reference implementation IL or complete
 the Phase 2 exit.
 
-The fuzz campaign's schema 5 result separately accounts for generated Total
+The fuzz campaign's schema 6 result separately accounts for generated Total
 programs. Each case compares compiled execution with the original Total IR
 interpreter and checks a true and false postcondition through the native
 callable solver and owned replay. Cases cover scalar wrapping and checked
 overflow, finally return capture, source calls, Boolean bodies, finite loops,
-and reference null, identity and length observations. Loop postconditions relate
+and reference null, identity, length and scalar-array read observations.
+Array-read cases use seed-derived elements and indexes, and have a separately
+validated coverage count. Loop postconditions relate
 the result to the current parameter after a cut; compiled and original execution
 still compare the exact finite result. Escaping null faults must also have no
 modeled normal return. The campaign requires all cases to agree, and runs of
 at least 1,000 cases require every body category and all thirteen input types.
 The fuzz executable references Worker to exercise its callable solver through
 a trusted source tooling adapter; Worker still has no compiler-facing dependency.
-This bounded source-body generator does not qualify metadata IL, guarded
-indexing, or the remaining Phase 2 exit conditions.
+This bounded source-body generator does not qualify metadata IL, native-width
+index conversions, heap writes or the remaining Phase 2 exit conditions.
 
 Ordinary reducible scalar loops use the owned proof/search route below.
 Checked scalar Add, Subtract, Multiply and

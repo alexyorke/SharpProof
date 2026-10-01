@@ -18,19 +18,19 @@ namespace SharpProof.Fuzz;
 
 public sealed record TotalProgramFuzzCoverage(int Cases, int Agreements, int NativeProofs, int NativeRefutations,
     int WrappedBodies, int CheckedBodies, int FinallyBodies, int SourceCalls, int BooleanBodies,
-    int LoopBodies, int ReferenceBodies, int ExceptionalExits, int TypeMask)
+    int LoopBodies, int ReferenceBodies, int ExceptionalExits, int TypeMask, int ArrayReadBodies)
 {
     [JsonIgnore]
     public bool HasValidCounts => Cases > 0 && Agreements >= 0 && Agreements <= Cases &&
         NativeProofs >= Agreements && NativeProofs <= Cases && NativeRefutations >= 0 && ExceptionalExits >= 0 &&
         (long)NativeRefutations + ExceptionalExits >= Agreements && (long)NativeRefutations + ExceptionalExits <= Cases &&
         WrappedBodies >= 0 && CheckedBodies >= 0 && FinallyBodies >= 0 && SourceCalls >= 0 && BooleanBodies >= 0 &&
-        LoopBodies >= 0 && ReferenceBodies >= ExceptionalExits &&
+        LoopBodies >= 0 && ReferenceBodies >= ExceptionalExits && ArrayReadBodies >= 0 && ArrayReadBodies <= ReferenceBodies &&
         (long)WrappedBodies + CheckedBodies + FinallyBodies + SourceCalls + BooleanBodies + LoopBodies + ReferenceBodies == Cases &&
         TypeMask is > 0 and <= 8191;
     [JsonIgnore]
     public bool HasExpandedCategories => TypeMask == 8191 && WrappedBodies > 0 && CheckedBodies > 0 &&
-        FinallyBodies > 0 && SourceCalls > 0 && BooleanBodies > 0 && LoopBodies > 0 && ReferenceBodies > 0 && ExceptionalExits > 0;
+        FinallyBodies > 0 && SourceCalls > 0 && BooleanBodies > 0 && LoopBodies > 0 && ReferenceBodies > 0 && ExceptionalExits > 0 && ArrayReadBodies > 0;
 }
 
 internal sealed record TotalProgramFuzzResult(TotalProgramFuzzCoverage Coverage, ImmutableArray<FuzzFailure> Failures)
@@ -54,6 +54,7 @@ internal static class TotalProgramDifferentialOracle
         var nativeProofs = 0;
         var nativeRefutations = 0;
         var exceptionalExits = 0;
+        var arrayReads = 0;
         var typeMask = 0;
         var bodies = new int[7];
         for (var offset = 0; offset < cases; offset += 128)
@@ -68,11 +69,13 @@ internal static class TotalProgramDifferentialOracle
                 var ordinal = offset + index;
                 if (ordinal / Types.Length % 5 == 3)
                 {
-                    var reference = ReferenceCase(ordinal);
+                    var reference = ReferenceCase(ordinal, random);
                     members[index] = reference.Source;
                     inputs[index] = reference.Inputs;
                     typeMask |= reference.Mask;
                     bodies[6]++;
+                    if (ordinal % 5 == 2)
+                    { arrayReads++; }
                     continue;
                 }
                 var type = Types[ordinal % Types.Length];
@@ -148,7 +151,7 @@ internal static class TotalProgramDifferentialOracle
                     IrTerm trueGoal = observed == null ? factory.Boolean(false) : factory.Binary(IrBinaryOperator.Equal,
                         factory.Variable(context.Result!.Value), loops[index] ? factory.Variable(context.Parameters[0].Current) : Term(factory, observed));
                     var requirements = entries.Select(entry => new PassiveContractClause(Observation(factory, entry.Key, entry.Value), factory.Boolean(true), site)).ToList();
-                    if (context.Parameters.Length == 2)
+                    if (context.Parameters.Length == 2 && context.Parameters.All(parameter => factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType))
                     {
                         requirements.Add(new(factory.Binary(ReferenceEquals(inputs[index][0], inputs[index][1]) ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
                             factory.Variable(context.Parameters[0].Entry), factory.Variable(context.Parameters[1].Entry)), factory.Boolean(true), site));
@@ -179,17 +182,18 @@ internal static class TotalProgramDifferentialOracle
             finally
             { assemblyContext.Unload(); }
         }
-        return new(new(cases, agreements, nativeProofs, nativeRefutations, bodies[0], bodies[1], bodies[2], bodies[3], bodies[4], bodies[5], bodies[6], exceptionalExits, typeMask), failures.ToImmutable());
+        return new(new(cases, agreements, nativeProofs, nativeRefutations, bodies[0], bodies[1], bodies[2], bodies[3], bodies[4], bodies[5], bodies[6], exceptionalExits, typeMask, arrayReads), failures.ToImmutable());
     }
 
-    private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal)
+    private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal, Random random)
     {
         var name = ordinal.ToString(CultureInfo.InvariantCulture);
         return (ordinal % 5) switch
         {
             0 => ($"public static int Target{name}(string x) {{ return x.Length; }}", [null], 1 << 10),
             1 => ($"public static int Target{name}(string x) {{ return Length{name}(x); }} private static int Length{name}(string x) {{ return x.Length; }}", ["a\ud800b"], 1 << 10),
-            2 => ($"public static int Target{name}(int[] x) {{ return x.Length; }}", [new[] { 1, 2, 3 }], 1 << 11),
+            2 => ($"public static int Target{name}(int[] x, uint index) {{ return x[index]; }}",
+                [new[] { unchecked((int)random.NextInt64()), unchecked((int)random.NextInt64()), unchecked((int)random.NextInt64()) }, (uint)random.Next(3)], (1 << 11) | (1 << 5)),
             3 => ($"public static int Target{name}(int[] x) {{ int seen = 0; try {{ return Length{name}(x); }} catch (System.NullReferenceException) when (++seen == 1) {{ return seen; }} finally {{ seen += 10; }} }} private static int Length{name}(int[] x) {{ return x.Length; }}", [null], 1 << 11),
             _ => Objects(name, ordinal / 5 % 2 == 0)
         };
@@ -215,7 +219,7 @@ internal static class TotalProgramDifferentialOracle
             "int" => edge ? minimum ? int.MinValue : int.MaxValue : unchecked((int)signedNumber),
             "uint" => edge ? uint.MaxValue : unchecked((uint)number),
             "long" => edge ? minimum ? long.MinValue : long.MaxValue : signedNumber,
-            "ulong" => edge ? ulong.MaxValue : unchecked((ulong)number),
+            "ulong" => edge ? ulong.MaxValue : unchecked((ulong)signedNumber),
             "char" => edge ? char.MaxValue : unchecked((char)number),
             _ => ordinal / Types.Length % 2 == 0
         };
@@ -254,8 +258,19 @@ internal static class TotalProgramDifferentialOracle
         if (value.Kind == IrValueKind.Null)
         { return factory.Binary(IrBinaryOperator.Equal, term, factory.Null(value.Type)); }
         var nonnull = factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(value.Type));
-        return value.Kind == IrValueKind.Reference ? nonnull : factory.Binary(IrBinaryOperator.AndAlso, nonnull,
+        if (value.Kind == IrValueKind.Reference)
+        { return nonnull; }
+        var observed = factory.Binary(IrBinaryOperator.AndAlso, nonnull,
             factory.Binary(IrBinaryOperator.Equal, factory.Length(term), factory.Integer(value.Kind == IrValueKind.String ? value.String.Length : value.Elements.Length)));
+        if (value.Kind == IrValueKind.Sequence && value.Elements.All(element => element.Kind is IrValueKind.Boolean or IrValueKind.Integer))
+        {
+            for (var index = 0; index < value.Elements.Length; index++)
+            {
+                observed = factory.Binary(IrBinaryOperator.AndAlso, observed,
+                    factory.Binary(IrBinaryOperator.Equal, factory.SequenceAccess(term, factory.Integer(index)), Term(factory, value.Elements[index])));
+            }
+        }
+        return observed;
     }
 
     private static IrTerm Term(IrFactory factory, IrValue value)

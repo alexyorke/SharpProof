@@ -610,6 +610,13 @@ internal static partial class SemanticClaimIdentity
                     ? text
                     : "ill-formed-utf16");
                 break;
+            case char codeUnit when char.IsSurrogate(codeUnit):
+                // Legal char constants need not form a Unicode scalar value.
+                // Preserve their exact UTF-16 unit without passing it through
+                // the strict UTF-8 string encoder. Other char identities stay
+                // byte-identical to the established string representation.
+                writer.Add((int)codeUnit);
+                break;
             case ITypeSymbol type:
                 WriteType(writer, type, context);
                 break;

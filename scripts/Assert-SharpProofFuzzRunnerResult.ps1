@@ -125,7 +125,7 @@ function Assert-SharpProofFuzzRunnerResult {
         $coverageSatisfied = Get-ExactJsonBoolean $root 'CoverageSatisfied'
         $passed = Get-ExactJsonBoolean $root 'Passed'
 
-        if ($schema -ne 5) { throw "Unsupported fuzz schema '$schema'." }
+        if ($schema -ne 6) { throw "Unsupported fuzz schema '$schema'." }
         if ($cases -lt 1) {
             throw 'The fuzz runner case count must be positive.'
         }
@@ -184,7 +184,7 @@ function Assert-SharpProofFuzzRunnerResult {
         $totalProperties = @(
             'Cases', 'Agreements', 'NativeProofs', 'NativeRefutations',
             'WrappedBodies', 'CheckedBodies', 'FinallyBodies', 'SourceCalls',
-            'BooleanBodies', 'LoopBodies', 'ReferenceBodies', 'ExceptionalExits', 'TypeMask')
+            'BooleanBodies', 'LoopBodies', 'ReferenceBodies', 'ExceptionalExits', 'TypeMask', 'ArrayReadBodies')
         if ($totalCoverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'Total program coverage must be a JSON object.'
         }
@@ -209,8 +209,9 @@ function Assert-SharpProofFuzzRunnerResult {
             $totalValues.NativeProofs -ne $cases -or $bodyTotal -ne $cases -or
             [long]$totalValues.NativeRefutations + $totalValues.ExceptionalExits -ne $cases -or
             $totalValues.ExceptionalExits -gt $totalValues.ReferenceBodies -or
+            $totalValues.ArrayReadBodies -gt $totalValues.ReferenceBodies -or
             $totalValues.TypeMask -lt 1 -or $totalValues.TypeMask -gt 8191 -or
-            ($cases -ge 1000 -and ($totalValues.TypeMask -ne 8191 -or $totalValues.ExceptionalExits -eq 0))) {
+            ($cases -ge 1000 -and ($totalValues.TypeMask -ne 8191 -or $totalValues.ExceptionalExits -eq 0 -or $totalValues.ArrayReadBodies -eq 0))) {
             throw 'Total program coverage does not form a complete agreement partition.'
         }
 

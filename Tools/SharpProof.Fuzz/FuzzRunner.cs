@@ -97,7 +97,7 @@ public sealed record FuzzSummary(
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
-        SchemaVersion == 5 &&
+        SchemaVersion == 6 &&
         Cases > 0 &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
@@ -360,7 +360,7 @@ public static class FuzzRunner
         failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
         coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
         return new FuzzSummary(
-            SchemaVersion: 5,
+            SchemaVersion: 6,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,

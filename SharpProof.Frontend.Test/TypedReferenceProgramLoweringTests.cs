@@ -116,6 +116,76 @@ public sealed class TypedReferenceProgramLoweringTests
         Assert.That(ReferenceEquals(replay.ReturnValue, value), Is.True);
     }
 
+    public static IEnumerable<TestCaseData> ArrayReadCases()
+    {
+        var sampleArray = new[] { 42 };
+        (string Type, Array Input, object Expected)[] scalars =
+        [
+            ("sbyte", new[] { sbyte.MinValue }, sbyte.MinValue), ("byte", new[] { byte.MaxValue }, byte.MaxValue),
+            ("short", new[] { short.MinValue }, short.MinValue), ("ushort", new[] { ushort.MaxValue }, ushort.MaxValue),
+            ("int", new[] { int.MinValue }, int.MinValue), ("uint", new[] { uint.MaxValue }, uint.MaxValue),
+            ("long", new[] { long.MinValue }, long.MinValue), ("ulong", new[] { ulong.MaxValue }, ulong.MaxValue),
+            ("char", new[] { '\ud800' }, '\ud800'), ("bool", new[] { true }, true)
+        ];
+        foreach (var (type, input, expected) in scalars)
+        { yield return Case($"{type} Target({type}[] x) => x[0];", [input], expected); }
+        (string Type, object Index)[] indexes =
+        [("int", -1), ("int", int.MaxValue), ("uint", uint.MaxValue)];
+        foreach (var (type, index) in indexes)
+        {
+            var members = $"int Target(int[] x, {type} index) => x[index];";
+            yield return Case(members, [sampleArray, index], typeof(IndexOutOfRangeException), index.ToString());
+            yield return Case(members, [null!, index], typeof(NullReferenceException), index.ToString());
+        }
+        yield return Case("int Target(int[] x) => x[(x = null) == null ? 0 : 1];", [sampleArray], 42);
+        yield return Case("int Target(int[] x, int zero) { try { return x[1 / zero]; } catch (System.DivideByZeroException) { return 3; } catch (System.NullReferenceException) { return 4; } }", [null!, 0], 3);
+        yield return Case("int Target(int[] x, int zero) { try { return x[1 / zero]; } catch (System.DivideByZeroException) { return 3; } catch (System.NullReferenceException) { return 4; } }", [null!, 1], 4);
+        yield return Case("int Target(int[] x) { int seen = 0; try { return x[seen++]; } catch (System.NullReferenceException) when (seen == 1) { return seen; } finally { seen += 10; } }", [null!], 1);
+        yield return Case("int Target(int[] x, int index) { return Read(x, index); } private static int Read(int[] value, int index) { return value[index]; }", [sampleArray, 0], 42);
+        yield return Case("int Target(int[] x, int index) { return Read(x, index); } private static int Read(int[] value, int index) { return value[index]; }", [sampleArray, 1], typeof(IndexOutOfRangeException));
+    }
+
+    [TestCaseSource(nameof(ArrayReadCases))]
+    public void GuardedArrayReadsMatchCompiledExecution(string members, object[] arguments, object expected)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var actual = subject.Invoke(arguments);
+        Assert.That(expected is Type exceptionType ? actual?.GetType() == exceptionType : Equals(actual, expected), Is.True,
+            "Compiled result type: " + actual?.GetType().FullName);
+        var lowered = subject.LowerSourceCalls();
+        Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
+        var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
+        var inputs = subject.Context.Parameters.ToDictionary(binding => binding.Entry,
+            binding => Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases));
+        var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        if (expected is Type fault)
+        {
+            Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Assert.That(replay.Exception!.Kind, Is.EqualTo(fault == typeof(NullReferenceException) ? IrExceptionKind.NullReference : IrExceptionKind.IndexOutOfRange));
+        }
+        else
+        {
+            Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            var value = Value(subject.Factory, replay.ReturnValue!.Type, expected, aliases);
+            Assert.That(replay.ReturnValue.Kind, Is.EqualTo(value.Kind));
+            Assert.That(value.Kind == IrValueKind.Boolean ? replay.ReturnValue.Boolean == value.Boolean : replay.ReturnValue.IntegerBits == value.IntegerBits, Is.True);
+        }
+    }
+
+    [TestCase("long", false)]
+    [TestCase("long", true)]
+    [TestCase("ulong", false)]
+    [TestCase("ulong", true)]
+    public void NativeWidthIndexConversionsRemainClosed(string type, bool isNull)
+    {
+        using var subject = TypedProgramSubject.Create($"int Target(int[] x, {type} index) => x[index];");
+        object index = type == "long" ? (object)4294967296L : ulong.MaxValue;
+        var actual = subject.Invoke([isNull ? null! : new int[1], index]);
+        Assert.That(actual, Is.TypeOf(type == "ulong" ? typeof(OverflowException) : isNull ? typeof(NullReferenceException) : typeof(IndexOutOfRangeException)));
+        Assert.That(subject.LowerSourceCalls().IsExact, Is.False);
+    }
+
     private static TestCaseData Case(string members, object[] arguments, object expected, string? label = null)
     {
         return new TestCaseData(members, arguments, expected).SetName("Reference observations: " + members + " #" +

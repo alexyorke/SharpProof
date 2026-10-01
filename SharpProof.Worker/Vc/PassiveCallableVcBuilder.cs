@@ -307,7 +307,8 @@ internal sealed class PassiveCallableVcBuilder
         return !IrTraversal.Any(root, term =>
         {
             Spend();
-            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrNullTerm or IrLengthTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
+            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrVariableTerm or IrNullTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
+                term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer ||
                 term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&
                     binary.Left is not IrNullTerm && binary.Right is not IrNullTerm;

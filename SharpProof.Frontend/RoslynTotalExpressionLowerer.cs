@@ -58,6 +58,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return Compose(operation, [LowerClause(conversion.Operand, state, depth + 1)]);
             case IPropertyReferenceOperation { Instance: { } receiver }:
                 return Compose(operation, [LowerClause(receiver, state, depth + 1)]);
+            case IArrayElementReferenceOperation { Indices.Length: 1 } access:
+                return Compose(operation, [LowerClause(access.ArrayReference, state, depth + 1), LowerClause(access.Indices[0], state, depth + 1)]);
             case IUnaryOperation unary:
                 return Compose(operation, [LowerClause(unary.Operand, state, depth + 1)]);
             case IBinaryOperation binary:
@@ -118,6 +120,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return ApplyBody(operation, [LowerBodyValue(conversion.Operand, block, depth + 1)]);
             case IPropertyReferenceOperation { Instance: { } receiver }:
                 return ApplyBody(operation, [LowerBodyValue(receiver, block, depth + 1)]);
+            case IArrayElementReferenceOperation { Indices.Length: 1 } access:
+                {
+                    var array = LowerBodyValue(access.ArrayReference, block, depth + 1);
+                    var index = LowerBodyValue(access.Indices[0], array.Continuation, depth + 1);
+                    return ApplyBody(operation, [array, index]);
+                }
             case IUnaryOperation unary:
                 return ApplyBody(operation, [LowerBodyValue(unary.Operand, block, depth + 1)]);
             case IBinaryOperation binary:

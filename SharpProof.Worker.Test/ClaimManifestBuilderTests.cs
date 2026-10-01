@@ -246,6 +246,31 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void SurrogateCharacterConstantsHaveDistinctStableClaimIdentities()
+    {
+        string Source(int codeUnit)
+        {
+            return $$"""
+                using SharpProof.Attributes;
+                public static class Subject {
+                    public static char Target(char value) {
+                        Contract.Ensures(Contract.Result<char>() == '\u{{codeUnit.ToString("X4", System.Globalization.CultureInfo.InvariantCulture)}}');
+                        return value;
+                    }
+                }
+                """;
+        }
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var codeUnit in new[] { 0xD800, 0xD801, 0xDC00, 0xDFFF })
+        {
+            var first = Build(("First.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
+            var repeated = Build(("Renamed.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
+            Assert.That(first, Is.EqualTo(repeated));
+            Assert.That(identities.Add(first), Is.True);
+        }
+    }
+
+    [Test]
     public void RichPredicateOperationKindsHaveStableSemanticIdentity()
     {
         const string source =

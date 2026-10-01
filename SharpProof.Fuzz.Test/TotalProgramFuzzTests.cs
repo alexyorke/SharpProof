@@ -14,5 +14,6 @@ public sealed class TotalProgramFuzzTests
         Assert.That(result.Coverage.NativeProofs, Is.EqualTo(128));
         Assert.That(result.Coverage.NativeRefutations + result.Coverage.ExceptionalExits, Is.EqualTo(128));
         Assert.That(result.Coverage.HasExpandedCategories, Is.True);
+        Assert.That(result.Coverage.ArrayReadBodies, Is.EqualTo(4));
     }
 }

@@ -55,6 +55,8 @@ internal static partial class CSharpOperationSemantics
 
     private static TotalScalarRule? ReferenceRule(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)
     {
+        if (operation is IArrayElementReferenceOperation access)
+        { return ArrayReadRule(factory, access, operands); }
         if (operation is IPropertyReferenceOperation property && IsLength(property))
         {
             var receiver = operands[0];

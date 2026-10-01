@@ -33,6 +33,7 @@ internal sealed partial class BvEncoder
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
         var identities = new Dictionary<string, object>(StringComparer.Ordinal);
+        var observations = DecodeArrayObservations(model, meter);
         foreach (var variable in query.ModelVariables)
         {
             meter.Consume();
@@ -71,7 +72,7 @@ internal sealed partial class BvEncoder
                         // Refusing a large SAT witness never narrows the proof input domain.
                         meter.Consume(count + 1L);
                         value = info.Kind == IrTypeKind.String ? factory.CreateStringValue(new string('\0', count))
-                            : factory.CreateSequenceValue(type, Enumerable.Repeat(DefaultValue(info.ElementType!.Value), count));
+                            : DecodeArrayWitness(type, count, token, observations);
                     }
                     aliases.Add((type, token), value);
                 }
@@ -94,6 +95,8 @@ internal sealed partial class BvEncoder
 
     internal void DisposeReferences()
     {
+        foreach (var element in _elements.Values)
+        { element.Dispose(); }
         _length?.Dispose();
         _referenceSort?.Dispose();
     }

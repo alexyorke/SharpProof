@@ -92,6 +92,58 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(witness.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
     }
 
+    [TestCase(0, false, 1UL)]
+    [TestCase(8, true, 255UL)]
+    [TestCase(16, false, 65535UL)]
+    [TestCase(32, true, 2147483648UL)]
+    [TestCase(32, false, 4294967295UL)]
+    [TestCase(64, true, 9223372036854775808UL)]
+    [TestCase(64, false, ulong.MaxValue)]
+    public async Task ArrayElementWitnessesPreserveScalarBitsAndAliases(int width, bool isSigned, ulong bits)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var element = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, isSigned);
+        var type = factory.GetOrCreateSequenceType(element);
+        var x = factory.CreateVariable("x", type);
+        var y = factory.CreateVariable("y", type);
+        var index = factory.CreateVariable("index", factory.IntegerType);
+        var read = factory.SequenceAccess(factory.Variable(x), factory.Variable(index));
+        IrTerm expected = width == 0 ? factory.Boolean(true) : factory.IntegerBits(element, bits);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, [NotNull(factory, x),
+            Assume(factory, Equal(factory, factory.Variable(x), factory.Variable(y))),
+            Assume(factory, Equal(factory, factory.Length(factory.Variable(x)), factory.Integer(3))),
+            Assume(factory, Equal(factory, factory.Variable(index), factory.Integer(2))),
+            Assume(factory, Equal(factory, read, expected))], factory.Boolean(false), [x, y, index]);
+        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        var result = await session.CheckAsync(query, CancellationToken.None);
+        var model = result.Model!.Assignments;
+        Assert.That(ReferenceEquals(model[x], model[y]), Is.True);
+        Assert.That(model[x].Elements[2].Kind == IrValueKind.Boolean ? (ulong)(model[x].Elements[2].Boolean ? 1 : 0) : model[x].Elements[2].IntegerBits,
+            Is.EqualTo(bits));
+        AssertAssumptions(factory, query, model);
+    }
+
+    [TestCase(-1)]
+    [TestCase(3)]
+    [TestCase(int.MaxValue)]
+    public async Task TotalArrayReadOutsideItsRangeHasTheDefaultValue(int index)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var x = factory.CreateVariable("x", type);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var read = factory.SequenceAccess(factory.Variable(x), factory.Integer(index));
+        var query = Query(factory, [NotNull(factory, x),
+            Assume(factory, Equal(factory, factory.Length(factory.Variable(x)), factory.Integer(3)))],
+            Equal(factory, read, factory.Integer(0)), [x]);
+        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<ProvenOutcome>());
+        var nullQuery = Query(factory, [Assume(factory, Equal(factory, factory.Variable(x), factory.Null(type)))],
+            Equal(factory, read, factory.Integer(0)), [x]);
+        Assert.That(await new ProofKernel(session).VerifyAsync(nullQuery), Is.TypeOf<ProvenOutcome>());
+    }
+
     private static Assumption NotNull(IrFactory factory, IrVarId variable)
     {
         return Assume(factory, factory.Binary(IrBinaryOperator.NotEqual,

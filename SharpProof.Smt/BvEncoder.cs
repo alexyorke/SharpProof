@@ -57,6 +57,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             IrVariableTerm variable => GetVariable(variable.Variable, meter),
             IrNullTerm => NullReference,
             IrLengthTerm length => EncodeLength(Encode(length.Value, meter), meter),
+            IrSequenceAccessTerm access => EncodeArrayAccess(access, meter),
             IrUnaryTerm unary => EncodeUnary(unary, meter),
             IrBinaryTerm binary => EncodeBinary(binary, meter),
             IrConditionalTerm conditional => owner.Own(context.MkITE(EncodeBoolean(conditional.Condition, meter),

@@ -13,14 +13,15 @@ public sealed class FuzzResultValidationTests
     {
         TestRepository.RequireCanonicalContainer();
         using var temporaryDirectory = new TempDirectory("SharpProof.FuzzValidation.");
-        var summary = new FuzzSummary(5, 1000, 23063, 4, 1000, 0, 1000, 1000, 1000,
+        var summary = new FuzzSummary(6, 1000, 23063, 4, 1000, 0, 1000, 1000, 1000,
             new(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191), true, []);
+            new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40), true, []);
         var valid = JsonSerializer.Serialize(summary);
         await File.WriteAllTextAsync(Path.Combine(temporaryDirectory.FullName, "valid.json"), valid);
         Action<JsonObject>[] mutations =
         [
             root => root["SchemaVersion"] = 4,
+            root => root["SchemaVersion"] = 5,
             root => root.Remove("TotalProgramCoverage"),
             root => root["TotalProgramCoverage"] = null,
             root => root["TotalProgramCoverage"]!["Agreements"] = 999,
@@ -30,6 +31,9 @@ public sealed class FuzzResultValidationTests
             root => root["TotalProgramCoverage"]!["CheckedBodies"] = -1,
             root => root["TotalProgramCoverage"]!["LoopBodies"] = 0,
             root => root["TotalProgramCoverage"]!["TypeMask"] = 1023,
+            root => root["TotalProgramCoverage"]!["ArrayReadBodies"] = 0,
+            root => root["TotalProgramCoverage"]!["ArrayReadBodies"] = -1,
+            root => root["TotalProgramCoverage"]!["ArrayReadBodies"] = 101,
             root => root["TotalProgramCoverage"]!["ExceptionalExits"] = 101,
             root => root["TotalProgramCoverage"]!["Cases"] = "1000",
             root => root["TotalProgramCoverage"]!["Unknown"] = 1

@@ -87,7 +87,7 @@ public sealed class TypedProgramLoweringTests
     }
 
     [TestCase("int Target(int x) => System.Math.Abs(x);")]
-    [TestCase("int Target(int[] x) => x[0];")]
+    [TestCase("int Target(int[] x) { x[0] = 1; return 1; }")]
     [TestCase("int Target(int x) { ref int r = ref x; r++; return x; }")]
     public void UnsupportedCandidateDoesNotChangeLegacyClassification(string members)
     {

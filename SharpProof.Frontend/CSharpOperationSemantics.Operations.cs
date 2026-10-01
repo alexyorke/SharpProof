@@ -29,7 +29,7 @@ internal static partial class CSharpOperationSemantics
             [OperationKind.Literal] = TotalOperationAdmission.Scalar,
             [OperationKind.Conversion] = TotalOperationAdmission.Scalar,
             [OperationKind.Invocation] = TotalOperationAdmission.Intrinsic,
-            [OperationKind.ArrayElementReference] = TotalOperationAdmission.Incomplete,
+            [OperationKind.ArrayElementReference] = TotalOperationAdmission.Scalar,
             [OperationKind.LocalReference] = TotalOperationAdmission.Scalar,
             [OperationKind.ParameterReference] = TotalOperationAdmission.Scalar,
             [OperationKind.FieldReference] = TotalOperationAdmission.Scalar,

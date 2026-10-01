@@ -58,8 +58,9 @@ internal static class CompilerTotalCallableArtifactCodec
         foreach (var term in artifact.Graph.Terms)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.Variable or IrTermKind.Null or IrTermKind.Length or IrTermKind.Unary or
+            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.Variable or IrTermKind.Null or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
                 IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast && SupportedType(artifact.Graph, term.Type) &&
+                (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
                     artifact.Graph.Terms[term.B].Kind == IrTermKind.Null || artifact.Graph.Terms[term.C].Kind == IrTermKind.Null),
