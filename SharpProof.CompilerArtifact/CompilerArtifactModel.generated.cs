@@ -110,11 +110,15 @@ internal sealed record CompilerTotalCallablePreparation(
     bool IsBodyAbstraction = false)
 {
     internal ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints { get; init; } = [];
+    internal ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions { get; init; } = [];
     internal bool EffectsCompleteAtEntry { get; init; }
     internal ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
 }
 
 internal sealed record CompilerTotalExceptionConstraint(string ClaimId, ImmutableArray<IrExceptionKind> AllowedKinds);
+
+internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction, string CalleeIdentity,
+    int ClauseOrdinal, OperationId ClauseSite, IrTerm Value, IrTerm Safe);
 
 internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
 
@@ -133,6 +137,17 @@ internal sealed class CompilerTotalCallableArtifact
     public int Result { get; set; } = -1;
     public CompilerTotalClauseArtifact[] Clauses { get; set; } = [];
     public CompilerTotalExceptionConstraintArtifact[] ExceptionConstraints { get; set; } = [];
+    public CompilerTotalCallPreconditionArtifact[] CallPreconditions { get; set; } = [];
+}
+
+internal sealed class CompilerTotalCallPreconditionArtifact
+{
+    public int InstructionIndex { get; set; } = -1;
+    public string CalleeIdentity { get; set; } = string.Empty;
+    public int ClauseOrdinal { get; set; } = -1;
+    public int ClauseSite { get; set; } = -1;
+    public int ValueRoot { get; set; } = -1;
+    public int SafeRoot { get; set; } = -1;
 }
 
 internal sealed class CompilerTotalExceptionConstraintArtifact

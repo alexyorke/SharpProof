@@ -23,6 +23,8 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<(IrTerm Reach, OperationId Site)> _allocations = [];
     private readonly List<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
+    private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
+    private readonly Dictionary<IrInstructionId, int> _callMarkers;
     private readonly List<IrTerm> _potentialExceptionAllocations = [];
     private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
@@ -40,6 +42,8 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
     internal ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> Writes => [.. _writes];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
+    internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> CallPreconditions =>
+        [.. _callPreconditions];
     internal ImmutableArray<IrTerm> PotentialExceptionAllocations => [.. _potentialExceptionAllocations];
     internal bool HasUnmodeledAllocations => _hasUnmodeledStringAllocations;
     internal ImmutableArray<Assumption> Facts => [.. _facts];
@@ -54,6 +58,10 @@ internal sealed class PassiveCallableVcBuilder
         _factory = candidate.Factory;
         _program = encoding?.Program ?? candidate.Program;
         _stops = encoding?.Stops ?? [];
+        var originalMarkers = candidate.CallPreconditions.Select((clause, ordinal) => (clause.Marker, Ordinal: ordinal))
+            .ToDictionary(row => row.Marker, row => row.Ordinal);
+        _callMarkers = encoding == null ? originalMarkers : encoding.CallMarkers
+            .ToDictionary(row => row.Key, row => originalMarkers[row.Value]);
         _cancellationToken = cancellationToken;
     }
 
@@ -106,7 +114,8 @@ internal sealed class PassiveCallableVcBuilder
         _hasUnmodeledStringAllocations = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
             program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-                instruction is IrAssignInstruction assign && HasStringConcat(assign.Value) && !stringAllocationSites.Contains(assign.Operation) ||
+                instruction is IrAssignInstruction assign && !_callMarkers.ContainsKey(assign.Id) &&
+                    HasStringConcat(assign.Value) && !stringAllocationSites.Contains(assign.Operation) ||
                 instruction is IrReturnInstruction returned && HasStringConcat(returned.Value) ||
                 instruction is IrBranchInstruction branch && HasStringConcat(branch.Condition) ||
                 instruction is IrAssumeInstruction assume && HasStringConcat(assume.Condition));
@@ -236,6 +245,13 @@ internal sealed class PassiveCallableVcBuilder
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
                             !TryRewrite(assign.Value, state, out var value))
                         { return null; }
+                        if (_callMarkers.TryGetValue(assign.Id, out var callOrdinal))
+                        {
+                            // Later point assumptions must not prove an earlier
+                            // call obligation by excluding its execution prefix.
+                            Spend(_facts.Count);
+                            _callPreconditions.Add((callOrdinal, reach, value, [.. _facts]));
+                        }
                         if (value is IrStringTerm || HasStringConcat(value))
                         {
                             // This domain observes strings through nullness and

@@ -13,7 +13,8 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         if (preparation == null)
         { return null; }
-        var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses, preparation.IsBodyAbstraction);
+        var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result,
+            preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions);
         artifact.EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry;
         artifact.ValidEffectClaimIds = [.. preparation.ValidEffectClaimIds];
         artifact.ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => new CompilerTotalExceptionConstraintArtifact
@@ -27,13 +28,19 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
-        ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses, bool isBodyAbstraction = false)
+        ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses,
+        bool isBodyAbstraction = false, ImmutableArray<CompilerTotalCallPrecondition> callPreconditions = default)
     {
+        var instructionOrder = program?.Blocks.OrderBy(block => block.Id.Value).SelectMany(block => block.Instructions)
+            .Select((instruction, index) => (instruction.Id, Index: index)).ToDictionary(row => row.Id, row => row.Index);
+        var calls = callPreconditions.IsDefault ? ImmutableArray<CompilerTotalCallPrecondition>.Empty :
+            [.. callPreconditions.OrderBy(call => instructionOrder![call.Instruction])];
         var variables = parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
             .Concat(result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
         var encoded = PortableIrGraphCodec.Encode(factory, program,
-            clauses.SelectMany(clause => new[] { clause.Value, clause.Safe }).ToArray(), variables,
-            operations: clauses.Select(clause => clause.Operation).ToArray());
+            clauses.SelectMany(clause => new[] { clause.Value, clause.Safe })
+                .Concat(calls.SelectMany(call => new[] { call.Value, call.Safe })).ToArray(), variables,
+            operations: clauses.Select(clause => clause.Operation).Concat(calls.Select(call => call.ClauseSite)).ToArray());
         return new()
         {
             IsBodyAbstraction = isBodyAbstraction,
@@ -48,6 +55,12 @@ internal static class CompilerTotalCallableArtifactCodec
             {
                 Kind = clause.Kind, ValueRoot = ordinal * 2, SafeRoot = ordinal * 2 + 1,
                 Operation = encoded.OperationIndices[clause.Operation], ClaimId = clause.ClaimId, AssumptionId = clause.AssumptionId
+            })],
+            CallPreconditions = [.. calls.Select((call, ordinal) => new CompilerTotalCallPreconditionArtifact
+            {
+                InstructionIndex = encoded.InstructionIndices[call.Instruction], CalleeIdentity = call.CalleeIdentity,
+                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite],
+                ValueRoot = clauses.Length * 2 + ordinal * 2, SafeRoot = clauses.Length * 2 + ordinal * 2 + 1
             })]
         };
     }
@@ -60,6 +73,7 @@ internal static class CompilerTotalCallableArtifactCodec
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
         {
             ExceptionConstraints = decoded.ExceptionConstraints,
+            CallPreconditions = decoded.CallPreconditions,
             EffectsCompleteAtEntry = artifact!.EffectsCompleteAtEntry,
             ValidEffectClaimIds = [.. artifact.ValidEffectClaimIds]
         };
@@ -73,7 +87,8 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private sealed record DecodedTotal(IrFactory Factory, IrProgram? Program, ImmutableArray<CompilerTotalParameter> Parameters,
-        IrVarId? Result, ImmutableArray<CompilerTotalClause> Clauses, ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints);
+        IrVarId? Result, ImmutableArray<CompilerTotalClause> Clauses, ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints,
+        ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions);
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
@@ -84,20 +99,27 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
         cancellationToken.ThrowIfCancellationRequested();
-        if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null || artifact.Result < -1)
+        if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null ||
+            artifact.CallPreconditions == null || artifact.Result < -1)
         { throw new InvalidDataException("The Total callable payload is incomplete."); }
         Require(artifact.Parameters!.Length <= CompilerPreparedBody.MaximumInstructions &&
-            artifact.Clauses!.Length <= CompilerPreparedBody.MaximumInstructions, "The Total callable metadata exceeds its bound.");
-        Require(artifact.Parameters.All(parameter => parameter != null) && artifact.Clauses.All(clause => clause != null),
+            artifact.Clauses!.Length <= CompilerPreparedBody.MaximumInstructions &&
+            artifact.CallPreconditions!.Length <= CompilerPreparedBody.MaximumInstructions &&
+            (!(entryOnly || artifact.IsBodyAbstraction) || artifact.CallPreconditions.Length == 0),
+            "The Total callable metadata exceeds its bound or mode.");
+        Require(artifact.Parameters.All(parameter => parameter != null) && artifact.Clauses.All(clause => clause != null) &&
+            artifact.CallPreconditions.All(call => call != null),
             "The Total callable metadata contains a missing row.");
         var externalVariables = artifact.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
             .Concat(artifact.Result == -1 ? Array.Empty<int>() : [artifact.Result]).Distinct().OrderBy(index => index).ToArray();
-        var externalOperations = artifact.Clauses.Select(clause => clause.Operation).Distinct().OrderBy(index => index).ToArray();
+        var externalOperations = artifact.Clauses.Select(clause => clause.Operation).Concat(artifact.CallPreconditions.Select(call => call.ClauseSite))
+            .Distinct().OrderBy(index => index).ToArray();
         var decoded = PortableIrGraphCodec.Decode(artifact.Graph!, externalVariables, externalOperations, cancellationToken);
         var factory = decoded.Factory;
         Require(factory.Semantics == IrExecutionSemantics.Total &&
             (entryOnly ? decoded.Program == null && artifact.Result == -1 : decoded.Program != null) &&
-            decoded.Roots.Count == artifact.Clauses.Length * 2, "The Total graph has an invalid mode or root closure.");
+            decoded.Roots.Count == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
+            "The Total graph has an invalid mode or root closure.");
         foreach (var term in artifact.Graph.Terms)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -196,7 +218,76 @@ internal static class CompilerTotalCallableArtifactCodec
             artifact.ValidEffectClaimIds.All(id => !string.IsNullOrWhiteSpace(id) &&
                 effectOwners.Contains(id)),
             "Validated effect claims must be canonical and owned by this callable.");
-        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints);
+        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities, cancellationToken);
+        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints, callPreconditions);
+    }
+
+    private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,
+        DecodedPortableIrGraph decoded, HashSet<IrVarId> canonicalRoles, CancellationToken cancellationToken)
+    {
+        if (artifact.CallPreconditions.Length == 0)
+        {
+            Require(!decoded.Variables.Any(variable => IrCallPreconditionMarker.IsReservedName(
+                decoded.Factory.GetString(decoded.Factory.GetVariableInfo(variable).Name))),
+                "Every reserved call-precondition marker must own exactly one obligation row.");
+            return [];
+        }
+        var calls = ImmutableArray.CreateBuilder<CompilerTotalCallPrecondition>(artifact.CallPreconditions.Length);
+        var targets = new HashSet<IrVarId>();
+        var reads = new HashSet<IrVarId>(artifact.Graph.Terms.Where(term => term.Kind == IrTermKind.Variable)
+            .Select(term => decoded.Variables[term.A]));
+        var writers = new Dictionary<IrVarId, int>();
+        foreach (var instruction in decoded.Instructions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IEnumerable<IrVarId> written = instruction switch
+            {
+                IrAssignInstruction assign => [assign.Target],
+                IrLoadInstruction load => [load.Target],
+                IrAllocationInstruction { Target: { } target } => [target],
+                IrCallInstruction { Target: { } target } => [target],
+                IrHavocInstruction havoc => havoc.Variables,
+                _ => []
+            };
+            foreach (var target in written)
+            { writers[target] = writers.TryGetValue(target, out var count) ? count + 1 : 1; }
+        }
+        var previous = -1;
+        for (var ordinal = 0; ordinal < artifact.CallPreconditions.Length; ordinal++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var row = artifact.CallPreconditions[ordinal];
+            Require(row.InstructionIndex > previous && row.InstructionIndex < decoded.Instructions.Count &&
+                decoded.Instructions[row.InstructionIndex] is IrAssignInstruction &&
+                !string.IsNullOrWhiteSpace(row.CalleeIdentity) && row.CalleeIdentity.Length <= 4096 &&
+                row.ClauseOrdinal >= 0 && row.ClauseOrdinal < CompilerPreparedBody.MaximumInstructions &&
+                row.ClauseSite >= 0 && row.ClauseSite < decoded.Operations.Count &&
+                row.ValueRoot == artifact.Clauses.Length * 2 + ordinal * 2 && row.SafeRoot == row.ValueRoot + 1,
+                "A Total call precondition has an invalid instruction, clause, or root binding.");
+            previous = row.InstructionIndex;
+            var marker = (IrAssignInstruction)decoded.Instructions[row.InstructionIndex];
+            var value = decoded.Roots[row.ValueRoot];
+            var safe = decoded.Roots[row.SafeRoot];
+            var factory = decoded.Factory;
+            var clauseSite = decoded.Operations[row.ClauseSite];
+            Require(value.Type == factory.BooleanType && safe.Type == factory.BooleanType &&
+                factory.GetVariableInfo(marker.Target).Type == factory.BooleanType && targets.Add(marker.Target) &&
+                !canonicalRoles.Contains(marker.Target) && !reads.Contains(marker.Target) && writers[marker.Target] == 1 &&
+                marker.Value.Id == factory.Binary(IrBinaryOperator.AndAlso, safe, value).Id &&
+                factory.GetOperationInfo(marker.Operation).SourceSpan is { Length: > 0 } &&
+                factory.GetOperationInfo(clauseSite).SourceSpan is { Length: > 0 },
+                "A Total call precondition must own a fresh, unread boolean assignment of its guarded predicate.");
+            Require(IrCallPreconditionMarker.TryCreateName(row.CalleeIdentity, row.ClauseOrdinal,
+                factory.GetOperationInfo(marker.Operation).SourceSpan,
+                factory.GetOperationInfo(clauseSite).SourceSpan, out var name) &&
+                string.Equals(factory.GetString(factory.GetVariableInfo(marker.Target).Name), name, StringComparison.Ordinal),
+                "A Total call precondition must match its independently owned marker identity.");
+            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe));
+        }
+        Require(targets.SetEquals(decoded.Variables.Where(variable => IrCallPreconditionMarker.IsReservedName(
+            decoded.Factory.GetString(decoded.Factory.GetVariableInfo(variable).Name)))),
+            "Every reserved call-precondition marker must own exactly one obligation row.");
+        return calls.MoveToImmutable();
     }
 
     private static ImmutableArray<CompilerTotalExceptionConstraint> DecodeExceptionConstraints(

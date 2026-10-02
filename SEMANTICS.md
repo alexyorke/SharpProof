@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 12 separates `WorkerRunStatus` from
+Worker protocol version 13 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -398,7 +398,7 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 18 produced
+The packaged verifier consumes compiler artifact schema version 28 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
@@ -407,8 +407,8 @@ metadata for the remaining legacy API-spec payload. Typed Total graphs carry
 composed source and metadata bodies. The artifact also contains admitted
 unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
-their source-tree identities and spans. Worker protocol version 12 and semantic
-cache schema version 14 carry the current wire break. The legacy relational-summary schema field remains in the envelope, but
+their source-tree identities and spans. Worker protocol version 13 and semantic
+cache schema version 15 carry the current wire break. The legacy relational-summary schema field remains in the envelope, but
 nonempty relational-summary descriptors are rejected. Specification-pack
 schema version 1 describes scalar-pack selection. The
 artifact further carries compiler error
@@ -555,6 +555,19 @@ contain no scalar or throw classification rules.
 
 Source calls and captured implementation IL expand directly into the caller's
 Total program. The compiler no longer produces relational-summary descriptors.
+Supported eager source calls record each callee Requires clause after argument
+evaluation and before executing the callee body. Captured arguments replace the
+callee Entry values in an owned boolean marker containing Safe && Value. The
+marker neither assumes the precondition nor changes runtime control flow.
+Artifacts validate a complete association between markers and obligation rows.
+New consumers accept legacy artifacts without these shadow rows. Older strict
+consumers reject the new field; artifact and worker-binary digests separate
+their cache identities.
+Internal native queries prove each occurrence from its execution prefix; a
+refutation requires original-IR replay of the exact false marker without
+approximation. Later exceptions or assumptions do not erase that observation.
+Bounded loop search supplies witnesses only. Mandatory public call claims,
+plain-caller discovery, metadata coverage and analyzer authority remain pending.
 An additional shadow artifact collects source methods reachable from claim
 roots once, retains recursive call edges, and excludes unrelated methods.
 Admitted bodies carry Total leaf IR or explicitly marked source-call skeletons;

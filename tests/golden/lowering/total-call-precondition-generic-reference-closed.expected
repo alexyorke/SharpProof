@@ -1,0 +1,25 @@
+mode: Total
+classification: ClosedAbstention/UnsupportedOperationKind
+entry: b0
+parameter: 0 entry=v0:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] current=v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] old=v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] source=values
+block: b0 entry
+  i0 op0 Assign v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Havoc Variables/Approximation [v4:int[width=32,signed=True]] source=total-call-precondition-generic-reference-closed.cs:221+21
+  i6 op1 Assign v3:int[width=32,signed=True] = v4 source=total-call-precondition-generic-reference-closed.cs:221+21
+  i7 op1 Return v3 source=total-call-precondition-generic-reference-closed.cs:221+21
+block: b3 cfg:2
+  i8 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+term: ir0 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32} width=0 signed=False value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v4
+term: ir2 Variable type=t1:int width=32 signed=True value=v3
+diagnostic: op3 UnsupportedOperationKind Invocation@221

@@ -128,10 +128,11 @@ public sealed partial class ContractBinder
         if (attributeFailure != ContractBindingFailure.None)
         { return Fail(attributeFailure); }
         var ordinal = 0;
-        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid &&
-            (!requiresOnly || occurrence.Kind == BoundContractKind.Requires)))
+        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
         {
             context.ExcludeSpecificationCall(occurrence.Invocation);
+            if (requiresOnly)
+            { continue; }
             var clause = clauses[ordinal++];
             if (clause.Kind == BoundContractKind.Assume)
             {

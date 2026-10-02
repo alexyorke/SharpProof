@@ -120,8 +120,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             invocation.Instance != null ||
             method.Parameters.Where((parameter, ordinal) =>
-                parameter.Type.SpecialType != method.OriginalDefinition.Parameters[ordinal].Type.SpecialType).Any() ||
-            method.ReturnType.SpecialType != method.OriginalDefinition.ReturnType.SpecialType ||
+                !SymbolEqualityComparer.Default.Equals(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type)).Any() ||
+            !SymbolEqualityComparer.Default.Equals(method.ReturnType, method.OriginalDefinition.ReturnType) ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||

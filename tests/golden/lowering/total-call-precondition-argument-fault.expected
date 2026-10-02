@@ -1,0 +1,74 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-argument-fault.cs:214+14
+  i6 op4 Assign v9:int[width=32,signed=True] = 10 source=total-call-precondition-argument-fault.cs:221+2
+  i7 op5 Assign v10:int[width=32,signed=True] = v1 source=total-call-precondition-argument-fault.cs:226+1
+  i8 op6 Branch (v10 == 0) ? b5 : b6 source=total-call-precondition-argument-fault.cs:221+6
+block: b3 cfg:2
+  i28 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 throw
+  i9 op6 Throw DivideByZero -> b4 source=total-call-precondition-argument-fault.cs:221+6
+block: b6 normal
+  i10 op7 Branch ((v9 == -2147483648) && (v10 == -1)) ? b7 : b8 source=total-call-precondition-argument-fault.cs:221+6
+block: b7 throw
+  i11 op7 Throw Overflow -> b4 source=total-call-precondition-argument-fault.cs:221+6
+block: b8 normal
+  i12 op8 Assign v11:int[width=32,signed=True] = (v9 / v10) source=total-call-precondition-argument-fault.cs:221+6
+  i13 op3 Assign v12:bool[width=0,signed=False] = (v11 > 0) source=total-call-precondition-argument-fault.cs:214+14
+  i14 op3 Assign v4:int[width=32,signed=True] = v11 source=total-call-precondition-argument-fault.cs:214+14
+  i15 op3 Goto b10 source=total-call-precondition-argument-fault.cs:214+14
+block: b9 call:continued
+  i26 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-argument-fault.cs:214+14
+  i27 op1 Return v3 source=total-call-precondition-argument-fault.cs:214+14
+block: b10 call:body
+  i16 op9 Assign v5:int[width=32,signed=True] = v4 source=none
+  i17 op9 Assign v6:int[width=32,signed=True] = v4 source=none
+  i18 op9 Goto b11 source=none
+block: b11 call:body
+  i19 op9 Goto b12 source=none
+block: b12 call:body
+  i20 op11 Assign v13:int[width=32,signed=True] = 1 source=total-call-precondition-argument-fault.cs:323+1
+  i21 op10 Assign v7:int[width=32,signed=True] = v13 source=total-call-precondition-argument-fault.cs:323+1
+  i22 op10 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-argument-fault.cs:323+1
+  i23 op10 Goto b9 source=total-call-precondition-argument-fault.cs:323+1
+block: b13 call:body
+  i24 op9 Goto b9 source=none
+block: b14 call:body
+  i25 op9 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v4
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir5 Variable type=t1:int width=32 signed=True value=v8
+term: ir6 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir7 Variable type=t1:int width=32 signed=True value=v9
+term: ir8 Variable type=t1:int width=32 signed=True value=v1
+term: ir9 Variable type=t1:int width=32 signed=True value=v10
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v10 == 0)
+term: ir11 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir12 Binary type=t0:bool width=0 signed=False value=(v9 == -2147483648)
+term: ir13 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir14 Binary type=t0:bool width=0 signed=False value=(v10 == -1)
+term: ir15 Binary type=t0:bool width=0 signed=False value=((v9 == -2147483648) && (v10 == -1))
+term: ir16 Binary type=t1:int width=32 signed=True value=(v9 / v10)
+term: ir17 Variable type=t1:int width=32 signed=True value=v11
+term: ir18 Binary type=t0:bool width=0 signed=False value=(v11 > 0)
+term: ir19 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir20 Variable type=t1:int width=32 signed=True value=v13
+term: ir21 Variable type=t1:int width=32 signed=True value=v7
+term: ir22 Variable type=t1:int width=32 signed=True value=v3
+call-execution: Exception allocations=0
+call-precondition: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32)~System.Int32 clause=0 reached=False value=none

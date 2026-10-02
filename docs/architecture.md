@@ -215,9 +215,18 @@ currently abstain.
 The compiler-owned source-call route admits nonrecursive same-compilation static
 scalar methods. Each invocation evaluates arguments once in source order, maps
 them to parameter ordinals, and owns a fresh Entry/Current/Old/Result frame.
-Default arguments must be scalar constants. Callee contracts are erased without
-adding their Requires or Ensures as proof premises; callee Assume closes admission.
+Default arguments must be scalar constants. Callee contracts are excluded without
+adding their Requires or Ensures as proof premises. Requires-only binding is
+independent of unsupported elided Ensures predicates; emitted specification
+arguments retain their executable behavior.
 All nested frames share the same construction cap and cancellation boundary.
+Eager source calls transport internal precondition markers through the Total
+artifact codec into passive candidates. Each marker owns its callee, clause and
+call/declaration sites. Occurrence queries use prefix facts, and the native
+solver validates a violation by observing that exact marker in original IR.
+Bounded loop queries can supply witnesses but cannot establish proofs. These
+shadow obligations do not depend on normal-return feasibility or change the
+public claim manifest and diagnostic authority.
 The collector also ships a shadow reachable-source table, built lazily from
 claim roots with one body per source declaration and deterministic call edges.
 Shared helpers are deduplicated and recursive edges terminate collection.

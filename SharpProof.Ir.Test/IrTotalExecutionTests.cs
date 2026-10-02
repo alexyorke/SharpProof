@@ -8,6 +8,53 @@ namespace SharpProof.Ir.Test;
 public sealed class IrTotalExecutionTests
 {
     [Test]
+    public void AssignmentObservationsRetainApproximationStateAtEachCheckpoint()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var marker = factory.CreateVariable("marker", factory.BooleanType);
+        var unknown = factory.CreateVariable("unknown", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var first = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
+        builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+        var second = builder.Assign(entry, factory.CreateOperation(), marker, factory.Variable(unknown));
+        var third = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
+        builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.DivideByZero, exit);
+        builder.ExceptionalExit(exit, factory.CreateOperation());
+        var observed = new List<(IrAssignInstruction Instruction, bool Value, bool Approximation)>();
+        var replay = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(true))
+        {
+            AssignmentObserver = (instruction, value, approximation) => observed.Add((instruction, value.Boolean, approximation))
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(result.ConsumedApproximation, Is.True);
+        Assert.That(observed, Is.EqualTo(new[] { (first, false, false), (second, true, true), (third, false, true) }));
+    }
+
+    [Test]
+    public void FailedAssignmentDoesNotEmitAnObservationOrEraseAnEarlierCheckpoint()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var marker = factory.CreateVariable("marker", factory.BooleanType);
+        var missing = factory.CreateVariable("missing", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var first = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
+        builder.Assign(entry, factory.CreateOperation(), marker, factory.Variable(missing));
+        builder.Return(entry, factory.CreateOperation());
+        var observed = new List<IrAssignInstruction>();
+        var replay = new IrProgramReplayOptions(_ => null)
+        {
+            AssignmentObserver = (instruction, _, _) => observed.Add(instruction)
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(observed, Is.EqualTo(new[] { first }));
+    }
+
+    [Test]
     public void ArgumentFaultClassificationDoesNotCollapseOtherArgumentExceptions()
     {
         Assert.That(IrExceptionKindFacts.FromException(new ArgumentException()), Is.EqualTo(IrExceptionKind.Argument));

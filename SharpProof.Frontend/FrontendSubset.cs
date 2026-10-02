@@ -178,6 +178,8 @@ public sealed partial class FrontendProgramLoweringResult
 {
     internal bool ConstructionLimitExceeded { get; set; }
     internal bool IsShadowCallSkeleton { get; set; }
+    internal ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition> CallPreconditions { get; set; } =
+        ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition>.Empty;
     internal ImmutableDictionary<IrCallInstruction, IMethodSymbol> PreservedSourceCalls { get; set; } =
         ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Empty;
     internal object? TotalOrigin { get; }

@@ -10,6 +10,22 @@ public sealed class TotalParameterBinding(IParameterSymbol parameter, IrVarId en
 
 internal enum TotalParameterState { Entry, Current, PreState }
 
+internal readonly struct TotalSourcePrecondition(IrTerm value, IrTerm safe, OperationId clauseSite)
+{
+    internal IrTerm Value { get; } = value;
+    internal IrTerm Safe { get; } = safe;
+    internal OperationId ClauseSite { get; } = clauseSite;
+}
+
+internal readonly struct TotalCallPrecondition(string calleeIdentity, int clauseOrdinal, OperationId clauseSite, IrTerm value, IrTerm safe)
+{
+    internal string CalleeIdentity { get; } = calleeIdentity;
+    internal int ClauseOrdinal { get; } = clauseOrdinal;
+    internal OperationId ClauseSite { get; } = clauseSite;
+    internal IrTerm Value { get; } = value;
+    internal IrTerm Safe { get; } = safe;
+}
+
 public sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, FrontendSubsetClassification classification)
 {
     public IrTerm Value { get; } = value;
@@ -76,6 +92,7 @@ public sealed class TotalLoweringContext
         return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
     }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
+    internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.
@@ -150,9 +167,10 @@ public sealed class TotalLoweringContext
         return variable;
     }
 
-    internal IrVarId Temporary(IrTypeId type)
+    internal IrVarId Temporary(IrTypeId type, string? ownedName = null)
     {
-        return Factory.CreateVariable("temp:" + _temporary++, type);
+        var ordinal = _temporary++;
+        return Factory.CreateVariable(ownedName ?? "temp:" + ordinal, type);
     }
 
     internal OperationId Site(IOperation operation)

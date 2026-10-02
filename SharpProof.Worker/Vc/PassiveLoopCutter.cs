@@ -16,7 +16,11 @@ internal sealed partial class PassiveLoopCutter
     private readonly Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc = [];
     private readonly Dictionary<IrBlockId, ExceptionComponent> _exceptionComponents = [];
 
-    internal sealed record Encoding(IrProgram Program, ImmutableHashSet<IrInstructionId> Stops);
+    internal sealed record Encoding(IrProgram Program, ImmutableHashSet<IrInstructionId> Stops)
+    {
+        internal ImmutableDictionary<IrInstructionId, IrInstructionId> CallMarkers { get; init; } =
+            ImmutableDictionary<IrInstructionId, IrInstructionId>.Empty;
+    }
     private PassiveLoopCutter(PassiveCallableCandidate candidate, CancellationToken cancellation)
     { _candidate = candidate; _cancellation = cancellation; }
 
@@ -127,6 +131,8 @@ internal sealed partial class PassiveLoopCutter
         var blocks = new Dictionary<(IrBlockId Block, int Layer), IrBlockId>();
         var pending = new Queue<(IrBlockId Block, int Layer)>();
         var stops = ImmutableHashSet.CreateBuilder<IrInstructionId>();
+        var callMarkers = ImmutableDictionary.CreateBuilder<IrInstructionId, IrInstructionId>();
+        var originalMarkers = _candidate.CallPreconditions.Select(clause => clause.Marker).ToHashSet();
         var instructions = 0;
         var allocatedBlocks = 0;
         IrBlockId CreateBlock(string name)
@@ -179,7 +185,9 @@ internal sealed partial class PassiveLoopCutter
                         builder.Write(encoded, write.Operation, write.Region);
                         break;
                     case IrAssignInstruction assign:
-                        builder.Assign(encoded, assign.Operation, assign.Target, assign.Value);
+                        var copied = builder.Assign(encoded, assign.Operation, assign.Target, assign.Value);
+                        if (originalMarkers.Contains(assign.Id))
+                        { callMarkers.Add(copied.Id, assign.Id); }
                         break;
                     case IrHavocInstruction havoc:
                         builder.Havoc(encoded, havoc.Operation, havoc.HavocKind, havoc.Origin, [.. havoc.Variables]);
@@ -231,7 +239,7 @@ internal sealed partial class PassiveLoopCutter
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None || order.IsDefault)
         { throw new ConstructionLimitException(); }
-        return new(program, stops.ToImmutable());
+        return new(program, stops.ToImmutable()) { CallMarkers = callMarkers.ToImmutable() };
 
         IrBlockId Router(ExceptionComponent component, OperationId site)
         {

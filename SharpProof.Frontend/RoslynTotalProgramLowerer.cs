@@ -16,6 +16,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private readonly bool _externalFilterSearch = externalFilterSearch;
     private readonly Func<IMethodSymbol, bool>? _preserveSourceCall = preserveSourceCall;
     private readonly Dictionary<IrCallInstruction, IMethodSymbol> _preservedSourceCalls = [];
+    private readonly Dictionary<IrAssignInstruction, TotalCallPrecondition> _callPreconditions = [];
     private SourceCallFrame? _frame;
     private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
@@ -246,7 +247,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
         {
             IsShadowCallSkeleton = _preserveSourceCall != null,
-            PreservedSourceCalls = _preservedSourceCalls.ToImmutableDictionary()
+            PreservedSourceCalls = _preservedSourceCalls.ToImmutableDictionary(),
+            CallPreconditions = _callPreconditions.ToImmutableDictionary()
         };
     }
 

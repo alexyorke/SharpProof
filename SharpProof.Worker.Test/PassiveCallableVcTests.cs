@@ -501,6 +501,152 @@ public sealed class PassiveCallableVcTests
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CallViolationSurvivesLaterAssumptionOrThrow(bool thrown)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        var value = factory.Boolean(false);
+        var safe = factory.Boolean(true);
+        var target = factory.CreateVariable("call-marker", factory.BooleanType);
+        var marker = subject.Builder.Assign(block, subject.Site, target,
+            factory.Binary(IrBinaryOperator.AndAlso, safe, value));
+        if (thrown)
+        {
+            var exit = subject.Builder.CreateBlock();
+            subject.Builder.Throw(block, subject.Site, IrExceptionKind.Overflow, exit);
+            subject.Builder.ExceptionalExit(exit, subject.Site);
+        }
+        else
+        {
+            subject.Builder.Assume(block, subject.Site, factory.Boolean(false));
+            subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        }
+        var candidate = new PassiveCallableCandidate("call-prefix", subject.Builder.Build(),
+            [subject.Parameter], subject.Result, [], [], callPreconditions: [new(marker.Id, value, safe)]);
+        using var solver = new PassiveCallableSolver(Build(candidate));
+        var result = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(result.CallPreconditionWitness, Is.EqualTo(subject.Site));
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task CallReplayChecksApproximationAtMarker(bool readBefore)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        var local = factory.CreateVariable("approximate", factory.IntegerType);
+        var observed = factory.CreateVariable("observed", factory.IntegerType);
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, local);
+        if (readBefore)
+        { subject.Builder.Assign(block, subject.Site, observed, factory.Variable(local)); }
+        var value = factory.Boolean(false);
+        var safe = factory.Boolean(true);
+        var target = factory.CreateVariable("call-marker", factory.BooleanType);
+        var marker = subject.Builder.Assign(block, subject.Site, target,
+            factory.Binary(IrBinaryOperator.AndAlso, safe, value));
+        if (!readBefore)
+        { subject.Builder.Assign(block, subject.Site, observed, factory.Variable(local)); }
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        var candidate = new PassiveCallableCandidate("call-taint", subject.Builder.Build(),
+            [subject.Parameter], subject.Result, [], [], callPreconditions: [new(marker.Id, value, safe)]);
+        using var solver = new PassiveCallableSolver(Build(candidate));
+        var result = await solver.VerifyCallPreconditionAsync(0);
+        if (readBefore)
+        {
+            Assert.That(result.Outcome, Is.Null);
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(result.CallPreconditionWitness, Is.Null);
+        }
+        else
+        {
+            Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That(result.CallPreconditionWitness, Is.EqualTo(subject.Site));
+        }
+    }
+
+    [TestCase("read")]
+    [TestCase("rewrite")]
+    [TestCase("canonical")]
+    [TestCase("orphan")]
+    public void CallMarkersRequireFreshUnreadOwnedTargets(string mutation)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        var site = factory.CreateOperation();
+        var predicate = factory.Boolean(true);
+        var target = factory.CreateVariable(mutation == "orphan" ? "$sharpproof.requires:v1:unowned" : "call-marker", factory.BooleanType);
+        var marker = builder.Assign(block, site, target, factory.Binary(IrBinaryOperator.AndAlso, predicate, predicate));
+        if (mutation == "rewrite")
+        { builder.Assign(block, site, target, factory.Boolean(false)); }
+        builder.Return(block, site, mutation == "read" ? factory.Variable(target) : predicate);
+        Assert.Throws<ArgumentException>(new Action(() => new PassiveCallableCandidate("call-owner", builder.Build(), [],
+            mutation == "canonical" ? target : null, [], [],
+            callPreconditions: mutation == "orphan" ? [] : [new(marker.Id, predicate, predicate)])));
+    }
+
+    [Test]
+    public async Task CallReplayPreservesInputHavocValue()
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Input, subject.Parameter.Current);
+        subject.Builder.Assign(block, subject.Site, subject.Parameter.Current, factory.Integer(42));
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Input, subject.Parameter.Current);
+        var value = factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Current), factory.Integer(0));
+        var safe = factory.Boolean(true);
+        var target = factory.CreateVariable("call-marker", factory.BooleanType);
+        var marker = subject.Builder.Assign(block, subject.Site, target, factory.Binary(IrBinaryOperator.AndAlso, safe, value));
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        var requires = factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(1));
+        var candidate = new PassiveCallableCandidate("call-input", subject.Builder.Build(), [subject.Parameter], subject.Result,
+            [new(requires, safe, subject.Site)], [], callPreconditions: [new(marker.Id, value, safe)]);
+        using var solver = new PassiveCallableSolver(Build(candidate));
+        var result = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(result.CallPreconditionWitness, Is.EqualTo(subject.Site));
+    }
+
+    [Test]
+    public async Task BoundedCallQueriesCannotRecoverAnUnknownProof()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        var site = factory.CreateOperation();
+        var predicate = factory.Boolean(true);
+        var marker = builder.Assign(block, site, factory.CreateVariable("call-marker", factory.BooleanType),
+            factory.Binary(IrBinaryOperator.AndAlso, predicate, predicate));
+        builder.Goto(block, site, block);
+        var plan = Build(new("call-loop", builder.Build(), [], null, [], [],
+            callPreconditions: [new(marker.Id, predicate, predicate)]));
+        Assert.That(plan.LoopSearch, Is.Not.Null);
+        var backend = new CutUnknownSearchUnsatBackend();
+        using var solver = new PassiveCallableSolver(plan, backend, new MethodResourceBudget(null, 1, 100));
+        var result = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That(backend.Calls, Is.EqualTo(plan.CallPreconditionQueries(0).Length + plan.LoopSearch!.CallPreconditionQueries(0).Length));
+        Assert.That(result.Outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
+        Assert.That(result.CallPreconditionWitness, Is.Null);
+    }
+
+    private sealed class CutUnknownSearchUnsatBackend : ISmtBackend
+    {
+        internal int Calls { get; private set; }
+        public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(++Calls == 1 ? BackendCheckResult.Unknown(BackendFailureReason.Incomplete)
+                : BackendCheckResult.Unsatisfiable(Enumerable.Range(0, query.Assumptions.Length)));
+        }
+    }
+
     internal static PassiveCallableCandidate StraightLineCandidate(int blockCount, int parameterCount)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);

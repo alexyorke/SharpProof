@@ -10,6 +10,87 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    [TestCase("remove-one")]
+    [TestCase("remove-all")]
+    [TestCase("callee")]
+    [TestCase("ordinal")]
+    [TestCase("site")]
+    public void CoherentCallPreconditionMutationsAreRejected(string mutation)
+    {
+        var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        var original = prepared.Single(owner => owner.Total?.CallPreconditions.Length == 2).Total!;
+        var first = original.CallPreconditions[0];
+        var second = original.CallPreconditions[1];
+        var modified = mutation switch
+        {
+            "remove-one" => original with { CallPreconditions = [first] },
+            "remove-all" => original with { CallPreconditions = [] },
+            "callee" => original with { CallPreconditions = [first, second with { CalleeIdentity = "unrelated::M:Other.Helper" }] },
+            "ordinal" => original with { CallPreconditions = [first, second with { ClauseOrdinal = 4095 }] },
+            "site" => original with
+            {
+                CallPreconditions = [first, second with { ClauseSite = original.Program.Blocks
+                .SelectMany(block => block.Instructions).Single(instruction => instruction.Id == second.Instruction).Operation }]
+            },
+            _ => throw new AssertionException("Unknown mutation.")
+        };
+        var encoded = CompilerTotalCallableArtifactCodec.Encode(modified)!;
+        artifact.Callables.Single(owner => owner.Total?.CallPreconditions.Length == 2).Total = encoded;
+        var variables = encoded.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
+            .Concat(encoded.Result == -1 ? Array.Empty<int>() : [encoded.Result]).Distinct().OrderBy(index => index).ToArray();
+        var operations = encoded.Clauses.Select(clause => clause.Operation)
+            .Concat(encoded.CallPreconditions.Select(call => call.ClauseSite)).Distinct().OrderBy(index => index).ToArray();
+        Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
+    [TestCase("missing")]
+    [TestCase("duplicate")]
+    [TestCase("index")]
+    [TestCase("callee")]
+    [TestCase("ordinal")]
+    [TestCase("site")]
+    [TestCase("root")]
+    [TestCase("abstraction")]
+    public void MalformedCallPreconditionMetadataIsRejected(string mutation)
+    {
+        var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+        var total = artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2).Total!;
+        var row = total.CallPreconditions[0];
+        switch (mutation)
+        {
+            case "missing":
+                total.CallPreconditions = [];
+                break;
+            case "duplicate":
+                total.CallPreconditions[1].InstructionIndex = row.InstructionIndex;
+                break;
+            case "index":
+                row.InstructionIndex = -1;
+                break;
+            case "callee":
+                row.CalleeIdentity = "";
+                break;
+            case "ordinal":
+                row.ClauseOrdinal = -1;
+                break;
+            case "site":
+                row.ClauseSite = -1;
+                break;
+            case "root":
+                row.ValueRoot = row.SafeRoot;
+                break;
+            case "abstraction":
+                total.IsBodyAbstraction = true;
+                break;
+        }
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
     [Test]
     public void NativeStringArtifactRejectsNonCanonicalComparisonMutation()
     {

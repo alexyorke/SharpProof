@@ -117,6 +117,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return new(marker, block, value.Classification); }
             arguments[argument.Parameter!.Ordinal] = value.Value;
         }
+        RecordCallPreconditions(callee, arguments, block, site);
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
@@ -133,6 +134,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }, (kind, operation, unwind) => ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind))
             };
             composed.LowerSharedFrame(graph!);
+            foreach (var obligation in composed._callPreconditions)
+            { _callPreconditions.Add(obligation.Key, obligation.Value); }
             foreach (var parameter in callee.Parameters)
             { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
             _builder.Goto(block, site, composed._frame.Entry);
@@ -173,7 +176,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                         _builder.Write(destination, write.Operation, write.Region);
                         break;
                     case IrAssignInstruction assign:
-                        _builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
+                        var copied = _builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
+                        if (lowering.CallPreconditions.TryGetValue(assign, out var obligation))
+                        { _callPreconditions.Add(copied, obligation); }
                         break;
                     case IrBranchInstruction branch:
                         _builder.Branch(destination, branch.Operation, branch.Condition, Target(branch.WhenTrue), Target(branch.WhenFalse));
@@ -210,6 +215,33 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (program.GetBlock(target).Terminator is IrExceptionalExitInstruction)
             { throw new RegionIncompleteException(); }
             return blocks[target];
+        }
+    }
+
+    private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site)
+    {
+        if (callee.SourceCallPreconditions.IsEmpty)
+        { return; }
+        var replacements = callee.Parameters.ToDictionary(parameter => parameter.Entry,
+            parameter => arguments[parameter.Parameter.Ordinal]);
+        for (var ordinal = 0; ordinal < callee.SourceCallPreconditions.Length; ordinal++)
+        {
+            SpendRegion();
+            if (!_calls!.Spend())
+            { throw new RegionIncompleteException(); }
+            var clause = callee.SourceCallPreconditions[ordinal];
+            var safe = IrSubstitution.Substitute(_context.Factory, clause.Safe, replacements);
+            var value = IrSubstitution.Substitute(_context.Factory, clause.Value, replacements);
+            var identity = CompilerIdentityBridge.CreateSymbolDisplay(callee.Target);
+            if (!IrCallPreconditionMarker.TryCreateName(identity, ordinal,
+                _context.Factory.GetOperationInfo(site).SourceSpan,
+                _context.Factory.GetOperationInfo(clause.ClauseSite).SourceSpan, out var name))
+            { throw new RegionIncompleteException(); }
+            // A false precondition is evidence, not a runtime branch or an
+            // imported assumption. The callee still executes normally.
+            var marker = _builder.Assign(block, site, _context.Temporary(_context.Factory.BooleanType, name),
+                _context.Factory.Binary(IrBinaryOperator.AndAlso, safe, value));
+            _callPreconditions.Add(marker, new(identity, ordinal, clause.ClauseSite, value, safe));
         }
     }
 

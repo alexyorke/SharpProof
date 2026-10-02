@@ -109,6 +109,45 @@ public sealed class GoldenLoweringTests
             var description = factory.GetOperationInfo(diagnostic.Operation).Description;
             output.AppendLine(CultureInfo.InvariantCulture, $"diagnostic: {diagnostic.Operation} {diagnostic.Reason} {(description is { } text ? factory.GetString(text) : "none")}");
         }
+        const string callInputPrefix = "// golden-call-precondition-input: ";
+        var callInput = fixture.Source.Split('\n').SingleOrDefault(line => line.StartsWith(callInputPrefix, StringComparison.Ordinal));
+        if (callInput != null)
+        {
+            Assert.That(result.IsExact, Is.True);
+            Assert.That(context!.Parameters, Has.Length.EqualTo(1));
+            var input = context.Parameters[0].Entry;
+            var allocated = 0;
+            var observations = new List<(IrAssignInstruction Marker, bool Value, bool Approximation)>();
+            var replay = new IrProgramReplayOptions(_ => null)
+            {
+                AllocationObserver = _ => allocated++,
+                AssignmentObserver = (assignment, value, approximation) =>
+                {
+                    if (result.CallPreconditions.ContainsKey(assignment))
+                    { observations.Add((assignment, value.Boolean, approximation)); }
+                }
+            };
+            var inputs = new Dictionary<IrVarId, IrValue>
+            {
+                [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type,
+                    int.Parse(callInput[callInputPrefix.Length..], CultureInfo.InvariantCulture))
+            };
+            var execution = new IrProgramInterpreter(factory).Execute(result.Program, inputs,
+                RoslynTotalProgramLowerer.MaximumRegionSteps, replay, CancellationToken.None);
+            output.AppendLine(CultureInfo.InvariantCulture, $"call-execution: {execution.Status} allocations={allocated}");
+            foreach (var marker in result.CallPreconditions.OrderBy(pair => pair.Key.Id.Value))
+            {
+                var reached = execution.Values.TryGetValue(marker.Key.Target, out var tested);
+                output.AppendLine(CultureInfo.InvariantCulture,
+                    $"call-precondition: {marker.Value.CalleeIdentity} clause={marker.Value.ClauseOrdinal} reached={reached} value={(reached ? tested!.Boolean.ToString() : "none")}");
+            }
+            foreach (var observation in observations)
+            {
+                var clause = result.CallPreconditions[observation.Marker];
+                output.AppendLine(CultureInfo.InvariantCulture,
+                    $"call-observation: {clause.CalleeIdentity} clause={clause.ClauseOrdinal} value={observation.Value} approximation={observation.Approximation}");
+            }
+        }
         GoldenTest.Compare(fixture, output.ToString());
 
         TotalScalarCallModel? FrameworkModel(IMethodSymbol target)
@@ -129,6 +168,8 @@ public sealed class GoldenLoweringTests
             if (!bindContracts)
             { return true; }
             var binding = new ContractBinder(compilation, factory).BindTotal(frame);
+            frame.SourceCallPreconditions = [.. binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires)
+                .Select(clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
             return binding.IsSuccess && binding.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
         }
 

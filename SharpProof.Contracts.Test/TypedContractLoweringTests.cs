@@ -442,6 +442,32 @@ public sealed class TypedContractLoweringTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(BigInteger.Zero));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void RequiresOnlyIgnoresUnsupportedSpecificationPredicates(bool companion)
+    {
+        var clauses = """
+            Contract.Requires(x > 0);
+            Contract.Ensures(System.DateTime.Now.Ticks > x);
+            Contract.Assume(System.DateTime.Now.Ticks != x);
+            """;
+        var source = companion
+            ? "using SharpProof.Attributes; public static class Subject { public static int Target(int x) { return x; } } " +
+                "[ContractFor(typeof(Subject))] public static class SubjectContracts { public static int Target(int x) { " + clauses + " return x; } }"
+            : "using SharpProof.Attributes; public static class Subject { public static int Target(int x) { " + clauses + " return x; } }";
+        var subject = Subject.Create(source);
+        var binding = new ContractBinder(subject.Compilation, subject.Factory).BindTotalRequires(subject.Context);
+        Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
+        Assert.That(binding.Clauses, Has.Length.EqualTo(1));
+        Assert.That(binding.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
+        Assert.That(binding.Clauses[0].Evidence, Is.EqualTo(companion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation));
+        var lowered = subject.Lower();
+        Assert.That(lowered.IsExact, Is.True);
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, subject.EntryValues(5));
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5)));
+    }
+
     private static void AssertRejectedBodyRetained(Subject subject)
     {
         var method = subject.Compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()

@@ -1,0 +1,84 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-unsafe-predicate.cs:214+9
+  i6 op4 Assign v9:int[width=32,signed=True] = v1 source=total-call-precondition-unsafe-predicate.cs:221+1
+  i7 op3 Assign v10:bool[width=0,signed=False] = ((((!(v9 == 0)) && true) && true) && ((10 / v9) > 1)) source=total-call-precondition-unsafe-predicate.cs:214+9
+  i8 op3 Assign v4:int[width=32,signed=True] = v9 source=total-call-precondition-unsafe-predicate.cs:214+9
+  i9 op3 Goto b6 source=total-call-precondition-unsafe-predicate.cs:214+9
+block: b3 cfg:2
+  i28 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 call:continued
+  i26 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-unsafe-predicate.cs:214+9
+  i27 op1 Return v3 source=total-call-precondition-unsafe-predicate.cs:214+9
+block: b6 call:body
+  i10 op5 Assign v5:int[width=32,signed=True] = v4 source=none
+  i11 op5 Assign v6:int[width=32,signed=True] = v4 source=none
+  i12 op5 Goto b7 source=none
+block: b7 call:body
+  i13 op5 Goto b8 source=none
+block: b8 call:body
+  i14 op7 Assign v11:int[width=32,signed=True] = 20 source=total-call-precondition-unsafe-predicate.cs:323+2
+  i15 op8 Assign v12:int[width=32,signed=True] = v5 source=total-call-precondition-unsafe-predicate.cs:328+5
+  i16 op9 Branch (v12 == 0) ? b11 : b12 source=total-call-precondition-unsafe-predicate.cs:323+10
+block: b9 call:body
+  i17 op5 Goto b5 source=none
+block: b10 call:body
+  i18 op5 ExceptionalExit source=none
+block: b11 call:body
+  i19 op9 Throw DivideByZero -> b4 source=total-call-precondition-unsafe-predicate.cs:323+10
+block: b12 call:body
+  i20 op10 Branch ((v11 == -2147483648) && (v12 == -1)) ? b13 : b14 source=total-call-precondition-unsafe-predicate.cs:323+10
+block: b13 call:body
+  i21 op10 Throw Overflow -> b4 source=total-call-precondition-unsafe-predicate.cs:323+10
+block: b14 call:body
+  i22 op11 Assign v13:int[width=32,signed=True] = (v11 / v12) source=total-call-precondition-unsafe-predicate.cs:323+10
+  i23 op6 Assign v7:int[width=32,signed=True] = v13 source=total-call-precondition-unsafe-predicate.cs:323+10
+  i24 op6 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-unsafe-predicate.cs:323+10
+  i25 op6 Goto b5 source=total-call-precondition-unsafe-predicate.cs:323+10
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir2 Boolean type=t0:bool width=0 signed=False value=true
+term: ir3 Variable type=t1:int width=32 signed=True value=v4
+term: ir4 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir6 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir8 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir13 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir16 Variable type=t1:int width=32 signed=True value=v8
+term: ir17 Variable type=t1:int width=32 signed=True value=v1
+term: ir18 Variable type=t1:int width=32 signed=True value=v9
+term: ir19 Binary type=t0:bool width=0 signed=False value=(v9 == 0)
+term: ir20 Unary type=t0:bool width=0 signed=False value=(!(v9 == 0))
+term: ir21 Binary type=t0:bool width=0 signed=False value=((!(v9 == 0)) && true)
+term: ir22 Binary type=t0:bool width=0 signed=False value=(((!(v9 == 0)) && true) && true)
+term: ir23 Binary type=t1:int width=32 signed=True value=(10 / v9)
+term: ir24 Binary type=t0:bool width=0 signed=False value=((10 / v9) > 1)
+term: ir25 Binary type=t0:bool width=0 signed=False value=((((!(v9 == 0)) && true) && true) && ((10 / v9) > 1))
+term: ir26 Integer type=t1:int width=32 signed=True bits=20 value=20
+term: ir27 Variable type=t1:int width=32 signed=True value=v11
+term: ir28 Variable type=t1:int width=32 signed=True value=v5
+term: ir29 Variable type=t1:int width=32 signed=True value=v12
+term: ir30 Binary type=t0:bool width=0 signed=False value=(v12 == 0)
+term: ir31 Binary type=t0:bool width=0 signed=False value=(v11 == -2147483648)
+term: ir32 Binary type=t0:bool width=0 signed=False value=(v12 == -1)
+term: ir33 Binary type=t0:bool width=0 signed=False value=((v11 == -2147483648) && (v12 == -1))
+term: ir34 Binary type=t1:int width=32 signed=True value=(v11 / v12)
+term: ir35 Variable type=t1:int width=32 signed=True value=v13
+term: ir36 Variable type=t1:int width=32 signed=True value=v7
+term: ir37 Variable type=t1:int width=32 signed=True value=v3
+call-execution: Exception allocations=0
+call-precondition: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32)~System.Int32 clause=0 reached=True value=False
+call-observation: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32)~System.Int32 clause=0 value=False approximation=False

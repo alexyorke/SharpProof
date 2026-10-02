@@ -4,6 +4,8 @@ internal readonly record struct PassiveParameterBinding(IrVarId Entry, IrVarId C
 
 internal readonly record struct PassiveContractClause(IrTerm Value, IrTerm Safe, OperationId Operation);
 
+internal readonly record struct PassiveCallPrecondition(IrInstructionId Marker, IrTerm Value, IrTerm Safe);
+
 // Enrolled only by a decoded candidate artifact or the trusted source tooling
 // adapter. No source symbols, mutable artifacts, or arbitrary query labels cross
 // this boundary. The candidate has no effect on the production worker route.
@@ -11,7 +13,8 @@ internal sealed class PassiveCallableCandidate
 {
     internal PassiveCallableCandidate(string callableId, IrProgram program,
         ImmutableArray<PassiveParameterBinding> parameters, IrVarId? result,
-        ImmutableArray<PassiveContractClause> requires, ImmutableArray<PassiveContractClause> ensures, bool isBodyAbstraction = false)
+        ImmutableArray<PassiveContractClause> requires, ImmutableArray<PassiveContractClause> ensures, bool isBodyAbstraction = false,
+        ImmutableArray<PassiveCallPrecondition> callPreconditions = default)
     {
         if (string.IsNullOrWhiteSpace(callableId))
         { throw new ArgumentException("A callable identity is required.", nameof(callableId)); }
@@ -57,6 +60,35 @@ internal sealed class PassiveCallableCandidate
         Requires = requires;
         Ensures = ensures;
         IsBodyAbstraction = isBodyAbstraction;
+        CallPreconditions = callPreconditions.IsDefault ? [] : callPreconditions;
+        if (CallPreconditions.IsEmpty)
+        {
+            if (program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().Any(marker =>
+                IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name))))
+            { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
+            return;
+        }
+        var instructions = program.Blocks.SelectMany(block => block.Instructions).ToDictionary(instruction => instruction.Id);
+        var markers = new HashSet<IrInstructionId>();
+        var markerTargets = new HashSet<IrVarId>();
+        var writers = instructions.Values.SelectMany(IrInstructionFacts.WrittenVariables)
+            .GroupBy(variable => variable).ToDictionary(group => group.Key, group => group.Count());
+        var reads = IrTraversal.CollectVariables(instructions.Values.SelectMany(IrInstructionFacts.ReadTerms)
+            .Concat(requires.Concat(ensures).SelectMany(clause => new[] { clause.Value, clause.Safe })));
+        foreach (var clause in CallPreconditions)
+        {
+            IrFactory.RequireBooleanTerm(program.Factory, clause.Value, nameof(callPreconditions));
+            IrFactory.RequireBooleanTerm(program.Factory, clause.Safe, nameof(callPreconditions));
+            if (isBodyAbstraction || !markers.Add(clause.Marker) || !instructions.TryGetValue(clause.Marker, out var instruction) ||
+                instruction is not IrAssignInstruction marker || program.Factory.GetVariableInfo(marker.Target).Type != program.Factory.BooleanType ||
+                !markerTargets.Add(marker.Target) || identities.Contains(marker.Target) || reads.Contains(marker.Target) || writers[marker.Target] != 1 ||
+                marker.Value.Id != program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id)
+            { throw new ArgumentException("Call preconditions must own distinct guarded assignments in the original body.", nameof(callPreconditions)); }
+        }
+        if (instructions.Values.OfType<IrAssignInstruction>().Any(marker =>
+            IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)) &&
+            !markers.Contains(marker.Id)))
+        { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
     }
 
     internal string CallableId { get; }
@@ -67,4 +99,5 @@ internal sealed class PassiveCallableCandidate
     internal IrVarId? Result { get; }
     internal ImmutableArray<PassiveContractClause> Requires { get; }
     internal ImmutableArray<PassiveContractClause> Ensures { get; }
+    internal ImmutableArray<PassiveCallPrecondition> CallPreconditions { get; }
 }

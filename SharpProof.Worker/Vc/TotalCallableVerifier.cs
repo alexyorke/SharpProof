@@ -88,7 +88,7 @@ internal static class TotalCallableVerifier
             candidate = new(candidate.CallableId, candidate.Program, candidate.Parameters, candidate.Result,
                 candidate.Requires, [.. candidate.Ensures.Select((clause, index) => deep[index]
                     ? new PassiveContractClause(candidate.Factory.Boolean(true), candidate.Factory.Boolean(true), clause.Operation)
-                    : clause)], candidate.IsBodyAbstraction);
+                    : clause)], candidate.IsBodyAbstraction, candidate.CallPreconditions);
         }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var constructionReason, cancellationToken))
         {

@@ -4,7 +4,7 @@ internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerC
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
     ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null,
     OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false, OperationId? WriteWitness = null,
-    OperationId? LockWitness = null);
+    OperationId? LockWitness = null, OperationId? CallPreconditionWitness = null);
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
@@ -107,6 +107,64 @@ internal sealed class PassiveCallableSolver : IDisposable
         }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }
+    internal async Task<PassiveCallableCheckResult> VerifyCallPreconditionAsync(int ordinal, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var queries = _plan.CallPreconditionQueries(ordinal);
+        if (_plan.HasBodyAbstraction)
+        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
+        PassiveCallableCheckResult? proven = null;
+        PassiveCallableCheckResult? incomplete = null;
+        var cores = new HashSet<string>(StringComparer.Ordinal);
+        var assumptions = new HashSet<OperationId>();
+        foreach (var query in queries)
+        {
+            var evidence = await VerifyAsync(query, null, cancellationToken).ConfigureAwait(false);
+            if (evidence.Reason == WorkerClaimReason.ResourceLimit)
+            { return evidence; }
+            if (evidence.Outcome is ProvenOutcome)
+            {
+                proven ??= evidence;
+                cores.UnionWith(evidence.Core);
+                assumptions.UnionWith(evidence.BodyAssumptions);
+                continue;
+            }
+            if (evidence.Outcome is RefutedOutcome &&
+                _plan.ReplayCallPrecondition(ordinal, evidence.EntryModel, cancellationToken) is { } site)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return evidence with { CallPreconditionWitness = site };
+            }
+            incomplete ??= evidence.Outcome is RefutedOutcome
+                ? new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true)
+                : evidence;
+        }
+        if (incomplete == null && proven != null)
+        {
+            return proven with
+            {
+                Core = [.. cores.OrderBy(value => value, StringComparer.Ordinal)],
+                BodyAssumptions = [.. assumptions.OrderBy(value => value.Value)]
+            };
+        }
+        if (_plan.LoopSearch is { } search)
+        {
+            foreach (var query in search.CallPreconditionQueries(ordinal))
+            {
+                var evidence = await VerifyAsync(query, null, cancellationToken, search).ConfigureAwait(false);
+                if (evidence.Reason == WorkerClaimReason.ResourceLimit)
+                { return evidence; }
+                if (evidence.Outcome is RefutedOutcome &&
+                    _plan.ReplayCallPrecondition(ordinal, evidence.EntryModel, cancellationToken) is { } site)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return evidence with { CallPreconditionWitness = site };
+                }
+            }
+        }
+        return incomplete ?? Inconclusive();
+    }
+
     internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken = default)
     {
         if (_plan.HasBodyAbstraction)

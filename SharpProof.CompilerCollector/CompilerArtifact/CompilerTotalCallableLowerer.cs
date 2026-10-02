@@ -74,9 +74,11 @@ internal static class CompilerTotalCallableLowerer
         var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var contracts = new ContractBinder(compilation, context.Factory).BindTotal(frame);
+            var contracts = new ContractBinder(compilation, context.Factory).BindTotalRequires(frame);
             if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
             { return false; }
+            frame.SourceCallPreconditions = [.. contracts.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires)
+                .Select(clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
             var syntax = frame.Target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
             var operation = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree)
                 .GetOperation(syntax, cancellationToken);
@@ -162,7 +164,10 @@ internal static class CompilerTotalCallableLowerer
             EffectsCompleteAtEntry = HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
-            ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken)
+            ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
+            CallPreconditions = isBodyAbstraction ? [] : [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
+                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
+                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe))]
         };
     }
 

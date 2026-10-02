@@ -13,6 +13,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
+    private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
@@ -29,6 +30,7 @@ internal sealed class PassiveCallableVcPlan
         _allocations = builder.Allocations;
         _writes = builder.Writes;
         _locks = builder.Locks;
+        _callPreconditions = builder.CallPreconditions;
         _potentialExceptionAllocations = builder.PotentialExceptionAllocations;
         HasUnmodeledAllocations = builder.HasUnmodeledAllocations;
         _model = builder.Model;
@@ -42,6 +44,7 @@ internal sealed class PassiveCallableVcPlan
 
     internal IrFactory Factory => _candidate.Factory;
     internal int EnsuresCount => _goals.Length;
+    internal int CallPreconditionCount => _candidate.CallPreconditions.Length;
     internal string CallableId => _candidate.CallableId;
     internal PassiveCallableVcPlan? LoopSearch { get; }
     internal bool IsBoundedSearch { get; }
@@ -58,6 +61,44 @@ internal sealed class PassiveCallableVcPlan
         RequireOrdinal(ordinal);
         return new(Factory, _entry.AddRange(_body), new Goal(Factory, BeforeSynchronization(_goals[ordinal]),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(ordinal)), _model);
+    }
+
+    internal ImmutableArray<VerificationQuery> CallPreconditionQueries(int ordinal)
+    {
+        if (ordinal < 0 || ordinal >= CallPreconditionCount)
+        { throw new ArgumentOutOfRangeException(nameof(ordinal)); }
+        var occurrences = _callPreconditions.Where(clause => clause.Ordinal == ordinal).ToArray();
+        if (occurrences.Length == 0)
+        {
+            return [new(Factory, _entry, new Goal(Factory, Factory.Boolean(true),
+                ProofDiagnosticKind.Precondition, new SourceLocationId(ordinal)), _model)];
+        }
+        return [.. occurrences.Select(clause => new VerificationQuery(Factory, _entry.AddRange(clause.Facts),
+            new Goal(Factory, Factory.Binary(IrBinaryOperator.OrElse, Factory.Unary(IrUnaryOperator.Not, clause.Reach), clause.Predicate),
+                ProofDiagnosticKind.Precondition, new SourceLocationId(ordinal)), _model))];
+    }
+
+    internal OperationId? ReplayCallPrecondition(int ordinal, ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
+    {
+        if (ordinal < 0 || ordinal >= CallPreconditionCount)
+        { throw new ArgumentOutOfRangeException(nameof(ordinal)); }
+        var marker = _candidate.CallPreconditions[ordinal].Marker;
+        OperationId? witness = null;
+        var initial = new Dictionary<IrVarId, IrValue>();
+        foreach (var parameter in _candidate.Parameters)
+        {
+            initial[parameter.Entry] = inputs[parameter.Entry];
+            initial[parameter.Current] = inputs[parameter.Entry];
+        }
+        var options = ReplayOptions(initial: initial);
+        options.AssignmentObserver = (assignment, value, approximation) =>
+        {
+            if (assignment.Id == marker && !value.Boolean && !approximation)
+            { witness ??= assignment.Operation; }
+        };
+        new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
+            PassiveCallableVcBuilder.MaximumSteps, options, cancellationToken);
+        return witness;
     }
 
     internal CallableReplayContext Replay(int ordinal)
@@ -128,13 +169,16 @@ internal sealed class PassiveCallableVcPlan
             initial[parameter.Current] = inputs[parameter.Entry];
         }
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
-            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver), cancellationToken);
+            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver, initial), cancellationToken);
     }
 
     private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
-        Action<IrLockInstruction>? lockObserver = null)
+        Action<IrLockInstruction>? lockObserver = null, Dictionary<IrVarId, IrValue>? initial = null)
     {
-        return new(request => Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
+        return new(request => request.Origin == IrHavocOrigin.Input
+            ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
+            : request.Origin == IrHavocOrigin.SpecResult ? null
+            : Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
             ? Factory.CreateBooleanValue(false)
             : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)

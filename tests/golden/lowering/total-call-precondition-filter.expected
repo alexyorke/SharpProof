@@ -1,0 +1,134 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b3 source=none
+block: b1 filter:accepted
+  i57 op14 Goto b25 source=total-call-precondition-filter.cs:542+10
+block: b2 filter:rejected
+  i58 op14 Goto b23 source=total-call-precondition-filter.cs:542+10
+block: b3 cfg:0
+  i4 op0 Goto b4 source=none
+block: b4 cfg:1
+  i5 op3 Assign v10:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:246+8
+  i6 op4 Assign v11:int[width=32,signed=True] = v1 source=total-call-precondition-filter.cs:252+1
+  i7 op3 Assign v12:bool[width=0,signed=False] = (v11 >= 0) source=total-call-precondition-filter.cs:246+8
+  i45 op3 Assign v6:int[width=32,signed=True] = v11 source=total-call-precondition-filter.cs:246+8
+  i46 op3 Goto b10 source=total-call-precondition-filter.cs:246+8
+block: b5 cfg:2
+  i49 op18 Assign v23:int[width=32,signed=True] = v1 source=total-call-precondition-filter.cs:309+1
+  i50 op19 Assign v24:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:314+1
+  i51 op20 Assign v25:bool[width=0,signed=False] = (v23 == v24) source=total-call-precondition-filter.cs:309+6
+  i52 op17 Branch v25 ? b1 : b2 source=total-call-precondition-filter.cs:309+6
+block: b6 cfg:3
+  i53 op22 Assign v26:int[width=32,signed=True] = 2 source=total-call-precondition-filter.cs:326+1
+  i54 op21 Assign v3:int[width=32,signed=True] = v26 source=total-call-precondition-filter.cs:326+1
+  i55 op21 Return v3 source=total-call-precondition-filter.cs:326+1
+block: b7 cfg:4
+  i56 op0 Return void source=none
+block: b8 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b9 call:continued
+  i47 op1 Assign v3:int[width=32,signed=True] = v10 source=total-call-precondition-filter.cs:246+8
+  i48 op1 Return v3 source=total-call-precondition-filter.cs:246+8
+block: b10 entry
+  i8 op5 Assign v7:int[width=32,signed=True] = v6 source=none
+  i9 op5 Assign v8:int[width=32,signed=True] = v6 source=none
+  i11 op5 Goto b11 source=none
+block: b11 cfg:0
+  i12 op5 Goto b12 source=none
+block: b12 cfg:1
+  i13 op8 Assign v17:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:430+12
+  i14 op9 Assign v18:int[width=32,signed=True] = v7 source=total-call-precondition-filter.cs:436+5
+  i15 op8 Assign v19:bool[width=0,signed=False] = (v18 > 0) source=total-call-precondition-filter.cs:430+12
+  i39 op8 Assign v13:int[width=32,signed=True] = v18 source=total-call-precondition-filter.cs:430+12
+  i40 op8 Goto b16 source=total-call-precondition-filter.cs:430+12
+block: b13 cfg:2
+  i44 op5 Goto b9 source=none
+block: b14 exceptional:exit
+  i10 op5 ExceptionalExit source=none
+block: b15 call:continued
+  i41 op6 Assign v9:int[width=32,signed=True] = v17 source=total-call-precondition-filter.cs:430+12
+  i42 op6 Assign v10:int[width=32,signed=True] = v9 source=total-call-precondition-filter.cs:430+12
+  i43 op6 Goto b9 source=total-call-precondition-filter.cs:430+12
+block: b16 entry
+  i16 op10 Assign v14:int[width=32,signed=True] = v13 source=none
+  i17 op10 Assign v15:int[width=32,signed=True] = v13 source=none
+  i19 op10 Goto b17 source=none
+block: b17 cfg:0
+  i20 op10 Goto b18 source=none
+block: b18 cfg:1
+  i21 op12 Assign v20:int[width=32,signed=True] = 20 source=total-call-precondition-filter.cs:542+2
+  i22 op13 Assign v21:int[width=32,signed=True] = v14 source=total-call-precondition-filter.cs:547+5
+  i23 op14 Branch (v21 == 0) ? b21 : b22 source=total-call-precondition-filter.cs:542+10
+block: b19 cfg:2
+  i38 op10 Goto b15 source=none
+block: b20 exceptional:exit
+  i18 op10 ExceptionalExit source=none
+block: b21 throw
+  i30 op14 Throw DivideByZero -> b26 source=total-call-precondition-filter.cs:542+10
+block: b22 normal
+  i31 op15 Branch ((v20 == -2147483648) && (v21 == -1)) ? b27 : b28 source=total-call-precondition-filter.cs:542+10
+block: b23 exception:searched
+  i24 op14 Throw DivideByZero -> b8 source=total-call-precondition-filter.cs:542+10
+block: b24 catch:entry
+  i25 op14 Assign v5:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:542+10
+  i26 op14 Goto b6 source=total-call-precondition-filter.cs:542+10
+block: b25 exception:searched
+  i27 op14 Throw DivideByZero -> b24 source=total-call-precondition-filter.cs:542+10
+block: b26 filter:entry
+  i28 op14 Assign v4:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:542+10
+  i29 op14 Goto b5 source=total-call-precondition-filter.cs:542+10
+block: b27 throw
+  i33 op15 Throw Overflow -> b29 source=total-call-precondition-filter.cs:542+10
+block: b28 normal
+  i34 op16 Assign v22:int[width=32,signed=True] = (v20 / v21) source=total-call-precondition-filter.cs:542+10
+  i35 op11 Assign v16:int[width=32,signed=True] = v22 source=total-call-precondition-filter.cs:542+10
+  i36 op11 Assign v17:int[width=32,signed=True] = v16 source=total-call-precondition-filter.cs:542+10
+  i37 op11 Goto b15 source=total-call-precondition-filter.cs:542+10
+block: b29 exception:searched
+  i32 op15 Throw Overflow -> b8 source=total-call-precondition-filter.cs:542+10
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v6
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir5 Variable type=t1:int width=32 signed=True value=v10
+term: ir6 Variable type=t1:int width=32 signed=True value=v1
+term: ir7 Variable type=t1:int width=32 signed=True value=v11
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v11 >= 0)
+term: ir9 Variable type=t1:int width=32 signed=True value=v13
+term: ir11 Variable type=t1:int width=32 signed=True value=v17
+term: ir12 Variable type=t1:int width=32 signed=True value=v7
+term: ir13 Variable type=t1:int width=32 signed=True value=v18
+term: ir14 Binary type=t0:bool width=0 signed=False value=(v18 > 0)
+term: ir15 Integer type=t1:int width=32 signed=True bits=20 value=20
+term: ir16 Variable type=t1:int width=32 signed=True value=v20
+term: ir17 Variable type=t1:int width=32 signed=True value=v14
+term: ir18 Variable type=t1:int width=32 signed=True value=v21
+term: ir19 Binary type=t0:bool width=0 signed=False value=(v21 == 0)
+term: ir20 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir21 Binary type=t0:bool width=0 signed=False value=(v20 == -2147483648)
+term: ir22 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir23 Binary type=t0:bool width=0 signed=False value=(v21 == -1)
+term: ir24 Binary type=t0:bool width=0 signed=False value=((v20 == -2147483648) && (v21 == -1))
+term: ir25 Binary type=t1:int width=32 signed=True value=(v20 / v21)
+term: ir26 Variable type=t1:int width=32 signed=True value=v22
+term: ir27 Variable type=t1:int width=32 signed=True value=v16
+term: ir28 Variable type=t1:int width=32 signed=True value=v9
+term: ir29 Variable type=t1:int width=32 signed=True value=v3
+term: ir30 Variable type=t1:int width=32 signed=True value=v23
+term: ir31 Variable type=t1:int width=32 signed=True value=v24
+term: ir32 Binary type=t0:bool width=0 signed=False value=(v23 == v24)
+term: ir33 Variable type=t0:bool width=0 signed=False value=v25
+term: ir34 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir35 Variable type=t1:int width=32 signed=True value=v26
+call-execution: Returned allocations=0
+call-precondition: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Outer(System.Int32)~System.Int32 clause=0 reached=True value=True
+call-precondition: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Inner(System.Int32)~System.Int32 clause=0 reached=True value=False
+call-observation: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Outer(System.Int32)~System.Int32 clause=0 value=True approximation=False
+call-observation: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Inner(System.Int32)~System.Int32 clause=0 value=False approximation=False

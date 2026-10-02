@@ -135,6 +135,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         }
 
                         values[assign.Target] = assigned.Value!;
+                        replayOptions?.AssignmentObserver?.Invoke(assign, assigned.Value!, values.ConsumedApproximation);
                         break;
                     case IrAssumeInstruction or IrAssertInstruction:
                         var testedCondition = instruction is IrAssumeInstruction assume

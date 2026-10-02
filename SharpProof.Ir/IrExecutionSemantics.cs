@@ -27,6 +27,43 @@ public sealed class IrSourceSpan
     public int Length { get; }
 }
 
+internal static class IrCallPreconditionMarker
+{
+    internal const string Prefix = "$sharpproof.requires:";
+    private static readonly System.Text.UTF8Encoding Encoding = new(false, true);
+
+    internal static bool IsReservedName(string name)
+    { return name.StartsWith(Prefix, StringComparison.Ordinal); }
+
+    internal static bool TryCreateName(string calleeIdentity, int clauseOrdinal,
+        IrSourceSpan? callSite, IrSourceSpan? clauseSite, out string name)
+    {
+        name = string.Empty;
+        if (string.IsNullOrWhiteSpace(calleeIdentity) || clauseOrdinal < 0 || clauseOrdinal >= 4096 ||
+            callSite is not { Length: > 0 } || clauseSite is not { Length: > 0 })
+        { return false; }
+        try
+        {
+            if (calleeIdentity.Length > 4096 || callSite.Document.Length > 4096 || clauseSite.Document.Length > 4096 ||
+                Encoding.GetByteCount(calleeIdentity) > 4096 || Encoding.GetByteCount(callSite.Document) > 4096 ||
+                Encoding.GetByteCount(clauseSite.Document) > 4096)
+            { return false; }
+            var callee = Encoding.GetBytes(calleeIdentity);
+            var callDocument = Encoding.GetBytes(callSite.Document);
+            var clauseDocument = Encoding.GetBytes(clauseSite.Document);
+            name = Prefix + "v1:" + Convert.ToBase64String(callee) + ":" + Number(clauseOrdinal) + ":" +
+                Convert.ToBase64String(callDocument) + ":" + Number(callSite.Start) + ":" + Number(callSite.Length) + ":" +
+                Convert.ToBase64String(clauseDocument) + ":" + Number(clauseSite.Start) + ":" + Number(clauseSite.Length);
+            return true;
+        }
+        catch (System.Text.EncoderFallbackException)
+        { return false; }
+    }
+
+    private static string Number(int value)
+    { return value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
+}
+
 public enum IrHavocOrigin
 {
     Input = 0,
@@ -47,6 +84,7 @@ public sealed class IrHavocRequest(
 
 public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
 {
+    public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; set; }
     public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
     public Action<IrWriteInstruction>? WriteObserver { get; set; }
     public Action<IrLockInstruction>? LockObserver { get; set; }

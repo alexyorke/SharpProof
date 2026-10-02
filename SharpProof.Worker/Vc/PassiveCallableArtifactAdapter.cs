@@ -21,6 +21,7 @@ internal static class PassiveCallableArtifactAdapter
         }
         return new(preparation.Entry.CallableId, total.Program,
             [.. total.Parameters.Select(parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))],
-            total.Result, Clauses(CompilerContractKind.Requires), Clauses(CompilerContractKind.Ensures), total.IsBodyAbstraction);
+            total.Result, Clauses(CompilerContractKind.Requires), Clauses(CompilerContractKind.Ensures), total.IsBodyAbstraction,
+            [.. total.CallPreconditions.Select(call => new PassiveCallPrecondition(call.Instruction, call.Value, call.Safe))]);
     }
 }

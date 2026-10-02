@@ -39,7 +39,7 @@ public sealed class GoldenWorkerTests
             : scenario == "passive-vc" ? await PassiveVc(fixture.Source)
             : scenario == "passive-ownership" ? PassiveOwnership()
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
-            : scenario == "reachable-source" ? ReachableSource(fixture.Source)
+            : scenario == "reachable-source" ? await ReachableSource(fixture.Source)
             : scenario == "total-claim-results" ? await TotalClaimResults(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
@@ -293,7 +293,7 @@ public sealed class GoldenWorkerTests
         return output.ToString();
     }
 
-    private static string ReachableSource(string source)
+    private static async Task<string> ReachableSource(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var reachable = artifact.ReachableSource!;
@@ -303,6 +303,15 @@ public sealed class GoldenWorkerTests
         output.AppendLine(CultureInfo.InvariantCulture, $"bodies: {reachable.Bodies.Length}");
         output.AppendLine(CultureInfo.InvariantCulture, $"incomplete-calls: {reachable.Bodies.Count(body => !body.CallsComplete)}");
         output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body.SourceCalls.Length)}");
+        if (source.Contains("// golden-total-call-preconditions: true", StringComparison.Ordinal))
+        {
+            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+            var encodedCount = artifact.Callables.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
+            var decodedCount = prepared.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
+            Assert.That(encodedCount, Is.EqualTo(2));
+            Assert.That(decodedCount, Is.EqualTo(encodedCount));
+            output.AppendLine(CultureInfo.InvariantCulture, $"total-call-preconditions: encoded={encodedCount} decoded={decodedCount}");
+        }
         if (source.Contains("// golden-mutation: void-call-return", StringComparison.Ordinal))
         {
             var graph = reachable.Bodies.Single(body => body.IsCallSkeleton).Graph!;
@@ -316,6 +325,96 @@ public sealed class GoldenWorkerTests
             Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
                 CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
             output.AppendLine("void-call-return-mutation: rejected");
+        }
+        if (source.Contains("// golden-native-call-preconditions: true", StringComparison.Ordinal))
+        {
+            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+            var count = 0;
+            foreach (var owner in prepared.Where(owner => owner.Total?.CallPreconditions.Length > 0))
+            {
+                var candidate = PassiveCallableArtifactAdapter.Enroll(owner)!;
+                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+                using var solver = new PassiveCallableSolver(plan!);
+                for (var ordinal = 0; ordinal < plan!.CallPreconditionCount; ordinal++)
+                {
+                    var result = await solver.VerifyCallPreconditionAsync(ordinal);
+                    var outcome = result.Outcome switch
+                    {
+                        ProvenOutcome => "Proven",
+                        RefutedOutcome => "Refuted",
+                        _ => "Unknown"
+                    };
+                    output.AppendLine(CultureInfo.InvariantCulture,
+                        $"call-precondition: {ordinal} outcome={outcome} reason={result.Reason} witness={result.CallPreconditionWitness != null}");
+                    count++;
+                }
+            }
+            Assert.That(count, Is.GreaterThan(0));
+        }
+        if (source.Contains("// golden-native-input-havoc: true", StringComparison.Ordinal))
+        { output.Append(await InputHavocWitnesses()); }
+        return output.ToString();
+    }
+
+    private static async Task<string> InputHavocWitnesses()
+    {
+        var output = new StringBuilder();
+        foreach (var kind in new[] { "call", "allocation", "write", "exception" })
+        {
+            var subject = new PassiveCallableVcTests.ScalarSubject();
+            var factory = subject.Factory;
+            var builder = subject.Builder;
+            var entry = builder.CreateBlock();
+            var effect = builder.CreateBlock();
+            var quiet = builder.CreateBlock();
+            var effectSite = factory.CreateOperation("effect-site");
+            builder.Havoc(entry, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Input, subject.Parameter.Current);
+            builder.Assign(entry, subject.Site, subject.Parameter.Current, factory.Integer(42));
+            builder.Havoc(entry, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Input, subject.Parameter.Current);
+            var predicate = factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Current), factory.Integer(0));
+            var safe = factory.Boolean(true);
+            var marker = builder.Assign(entry, subject.Site, factory.CreateVariable("call-marker", factory.BooleanType),
+                factory.Binary(IrBinaryOperator.AndAlso, safe, predicate));
+            builder.Branch(entry, subject.Site, factory.Binary(IrBinaryOperator.Equal,
+                factory.Variable(subject.Parameter.Current), factory.Integer(1)), effect, quiet);
+            builder.Return(quiet, subject.Site, factory.Integer(0));
+            if (kind == "exception")
+            {
+                var exit = builder.CreateBlock();
+                builder.Throw(effect, effectSite, IrExceptionKind.Overflow, exit);
+                builder.ExceptionalExit(exit, subject.Site);
+            }
+            else
+            {
+                if (kind == "allocation")
+                { builder.Allocate(effect, effectSite, factory.ObjectType); }
+                if (kind == "write")
+                { builder.Write(effect, effectSite, IrWriteRegion.Static); }
+                builder.Return(effect, subject.Site, factory.Integer(0));
+            }
+            var requires = factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(1));
+            var candidate = new PassiveCallableCandidate("input-havoc", builder.Build(), [subject.Parameter], subject.Result,
+                [new(requires, safe, subject.Site)], [], callPreconditions: [new(marker.Id, predicate, safe)]);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+            using var solver = new PassiveCallableSolver(plan!);
+            var result = kind switch
+            {
+                "call" => await solver.VerifyCallPreconditionAsync(0),
+                "allocation" => await solver.VerifyAllocationsAsync(),
+                "write" => await solver.VerifyPurityAsync(),
+                _ => await solver.VerifyExceptionsAsync(ImmutableHashSet<IrExceptionKind>.Empty)
+            };
+            Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That(result.EntryModel[subject.Parameter.Entry].IntegerNumericValue, Is.EqualTo(BigInteger.One));
+            var witness = kind switch
+            {
+                "call" => result.CallPreconditionWitness == subject.Site,
+                "allocation" => result.AllocationWitness == effectSite,
+                "write" => result.WriteWitness == effectSite,
+                _ => result.ExceptionWitness?.Kind == IrExceptionKind.Overflow
+            };
+            Assert.That(witness, Is.True);
+            output.AppendLine(CultureInfo.InvariantCulture, $"input-havoc: {kind} outcome=Refuted original-input=1 witness={witness}");
         }
         return output.ToString();
     }
