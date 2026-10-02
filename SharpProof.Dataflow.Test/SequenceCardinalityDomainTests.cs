@@ -3,6 +3,15 @@ namespace SharpProof.Dataflow.Test;
 [TestFixture]
 public sealed class SequenceCardinalityDomainTests
 {
+    [Test]
+    public void SparseCarrierEndpointLengthsRemainWithinTheirContainingRange()
+    {
+        var domain = SequenceCardinalityDomain.Instance;
+        var even = domain.Create(SequenceCardinalityKind.Top, IntervalValue.Congruent(0, null, 2, 0));
+        var bounded = domain.Create(SequenceCardinalityKind.Top, IntervalValue.Range(0, long.MaxValue - 1));
+        Assert.That(domain.LessThanOrEqual(even, bounded), Is.True);
+        Assert.That(domain.AreEquivalent(domain.Join(even, bounded), bounded), Is.True);
+    }
     private readonly SequenceCardinalityDomain _domain = SequenceCardinalityDomain.Instance;
 
     private static readonly IReadOnlyList<SequenceCardinalityValue> Samples = [

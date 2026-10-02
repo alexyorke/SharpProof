@@ -56,7 +56,8 @@ internal static class CompilerReachableSourceCollector
                     var current = stack.Pop();
                     // Deferred bodies belong to their own invocation, not to
                     // the enclosing method's execution.
-                    if (current is IAnonymousFunctionOperation || current is ILocalFunctionOperation && !ReferenceEquals(current, operation))
+                    if (current is INameOfOperation or IAnonymousFunctionOperation ||
+                        current is ILocalFunctionOperation && !ReferenceEquals(current, operation))
                     { continue; }
                     if (HasUncollectedCall(current, compilation))
                     { body.CallsComplete = false; complete = false; }
@@ -210,7 +211,8 @@ internal static class CompilerReachableSourceCollector
             _ => null
         };
         return method != null && SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
-            operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or IFunctionPointerInvocationOperation or
+            operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or
+                IDynamicMemberReferenceOperation or IDynamicIndexerAccessOperation or IFunctionPointerInvocationOperation or
                 IAwaitOperation or IForEachLoopOperation or IUsingOperation or IUsingDeclarationOperation;
     }
 

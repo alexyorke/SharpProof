@@ -557,13 +557,16 @@ internal sealed partial class ClaimManifestBuilder(
     private ImmutableArray<IMethodSymbol> DiscoverMethods()
     {
         var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var assemblyTrusted = _compilation.Assembly.GetAttributes().Any(attribute =>
+            ContractSelectionInventory.Is(attribute, _attributes.Trusted));
+        var trustedTrees = TrustedScopeTrees();
         foreach (var tree in _compilation.SyntaxTrees)
         {
             var root = tree.GetRoot(cancellationToken);
             // Semantic-model creation binds every nested local function. Skip
             // trees with no SharpProof syntax so an unrelated deeply nested
             // tree cannot exhaust Roslyn's binder stack during discovery.
-            if (!MayContainSharpProofSyntax(root))
+            if (!assemblyTrusted && !trustedTrees.Contains(tree) && !MayContainSharpProofSyntax(root))
             {
                 continue;
             }
@@ -656,6 +659,10 @@ internal sealed partial class ClaimManifestBuilder(
 
         static bool MayContainSharpProofSyntax(SyntaxNode root)
         {
+            // An alias declared in another tree can name any attribute. Let
+            // semantic selection decide whether attributed trees are relevant.
+            if (root.DescendantNodesAndSelf().Any(static node => node is AttributeSyntax))
+            { return true; }
             foreach (var token in root.DescendantTokens())
             {
                 if (token.ValueText is
@@ -697,6 +704,37 @@ internal sealed partial class ClaimManifestBuilder(
 
             return false;
         }
+    }
+
+    private HashSet<SyntaxTree> TrustedScopeTrees()
+    {
+        var trees = new HashSet<SyntaxTree>();
+        var pending = new Stack<(INamespaceOrTypeSymbol Scope, bool Trusted)>();
+        pending.Push((_compilation.Assembly.GlobalNamespace, false));
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (scope, inheritedTrust) = pending.Pop();
+            var trusted = inheritedTrust;
+            if (scope is INamedTypeSymbol type)
+            {
+                trusted |= type.GetAttributes().Any(attribute =>
+                    ContractSelectionInventory.Is(attribute, _attributes.Trusted));
+                if (trusted)
+                {
+                    foreach (var declaration in type.DeclaringSyntaxReferences)
+                    { trees.Add(declaration.SyntaxTree); }
+                }
+            }
+            if (scope is INamespaceSymbol @namespace)
+            {
+                foreach (var child in @namespace.GetNamespaceMembers())
+                { pending.Push((child, trusted)); }
+            }
+            foreach (var child in scope.GetTypeMembers())
+            { pending.Push((child, trusted)); }
+        }
+        return trees;
     }
 
     private CallableSeed CreateSeed(IMethodSymbol method)

@@ -199,6 +199,53 @@ public sealed class ClaimManifestBuilderTests
         }
     }
 
+    [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "Z")]
+    [TestCase("global using Z = SharpProof.Attributes;", "Z.ZeroAllocations")]
+    [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "\\u005A")]
+    public void GlobalAttributeAliasSelectsASeparateTokenFreeTree(string alias, string attribute)
+    {
+        var result = Build(
+            ("Aliases.cs", alias),
+            ("Subject.cs", $"public static class Subject {{ [{attribute}] public static int Target() => 0; }}"));
+        Assert.That(result.Targets.Values.Single().Method.Name, Is.EqualTo("Target"));
+        Assert.That(result.Manifest.Claims.Single().EffectContractKind,
+            Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
+    }
+
+    [Test]
+    public void TrustedPartialScopeSelectsASeparateTokenFreeTree()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [SharpProofTrusted(\"Reviewed boundary\")] public static partial class Subject { }"),
+            ("Implementation.cs", "public static partial class Subject { public static int Target() => 0; }"));
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.Name, Is.EqualTo("Target"));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [Test]
+    public void TrustedAssemblySelectsASeparateTokenFreeTree()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [assembly: SharpProofTrusted(\"Reviewed boundary\")]"),
+            ("Implementation.cs", "public static class Subject { public static int Target() => 0; }"));
+        Assert.That(result.Targets.Values.Single().Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [Test]
+    public void TrustedOuterScopeSelectsNestedPartialDeclarations()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [SharpProofTrusted(\"Reviewed boundary\")] public static partial class Subject { public static partial class Nested { } }"),
+            ("Implementation.cs", "public static partial class Subject { public static partial class Nested { public static int Target() => 0; } }"));
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.ContainingType.Name, Is.EqualTo("Nested"));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
     [Test]
     public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
     {
@@ -2550,6 +2597,13 @@ public sealed class ClaimManifestBuilderTests
             // its unrelated local functions.
             Assert.That(ids, Is.Empty);
         }
+        var mixed = Build(
+            ("Deep.cs", source.ToString()),
+            ("Aliases.cs", "global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;"),
+            ("Selected.cs", "public static class Selected { [Z] public static int Target() => 0; }"));
+        Assert.That(mixed.Targets.Values.Single().Method.Name, Is.EqualTo("Target"));
+        Assert.That(mixed.Manifest.Claims.Single().EffectContractKind,
+            Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
         await File.WriteAllTextAsync(
             Environment.GetEnvironmentVariable(markerVariable)!,
             "complete");
