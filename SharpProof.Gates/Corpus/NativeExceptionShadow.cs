@@ -23,13 +23,16 @@ internal sealed record NativeExceptionShadowReport(string UniverseSha256, int Un
     double RetainedPercent, bool RetentionGatePassed, int DisagreementCount,
     int RuntimeWitnesses, int RuntimeContradictions, double WallSeconds,
     ImmutableArray<NativeExceptionShadowRow> Rows,
-    ImmutableDictionary<string, int> NativeUnknownReasons, bool ComparisonPassed);
+    ImmutableDictionary<string, int> NativeUnknownReasons, bool ComparisonPassed)
+{
+    public string ContractKind { get; init; } = "DoesNotThrow";
+}
 
 // This report measures the replacement; it never publishes worker authority.
 internal static class NativeExceptionShadow
 {
     internal static async Task<NativeExceptionShadowReport> RunAsync(string root, int maximumMethods = 0,
-        CancellationToken cancellationToken = default)
+        bool allocations = false, CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
         var document = OpenSourceCorpusCatalog.Load(root);
@@ -42,15 +45,15 @@ internal static class NativeExceptionShadow
             Methods = [.. document.Methods.OrderBy(method => method.Id, StringComparer.Ordinal)
                 .Take(maximumMethods == 0 ? document.Methods.Length : maximumMethods)]
         };
-        var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken),
+        var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken, allocations),
             selected.Methods.Select(method => method.Id).ToImmutableArray(), root,
-            universeSha256, document.Methods.Length, cancellationToken).ConfigureAwait(false);
+            universeSha256, document.Methods.Length, allocations, cancellationToken).ConfigureAwait(false);
         return report with { WallSeconds = wall.Elapsed.TotalSeconds };
     }
 
     internal static async Task<NativeExceptionShadowReport> ObserveAsync(CSharpCompilation compilation,
         ImmutableArray<string> methodIds, string root, string universeSha256, int universeMethodCount,
-        CancellationToken cancellationToken = default)
+        bool allocations = false, CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
         if (methodIds.IsDefaultOrEmpty || methodIds.Any(string.IsNullOrWhiteSpace) || methodIds.Distinct(StringComparer.Ordinal).Count() != methodIds.Length ||
@@ -76,20 +79,21 @@ internal static class NativeExceptionShadow
             var target = targets[id];
             var evaluation = EffectContractDiagnostics.Evaluate(target.Method, target.Method.Locations[0], legacy,
                 static _ => { }, cancellationToken, includeDiagnosticPayload: false)
-                .Single(evaluation => evaluation.Kind == EffectEvaluationContractKind.DoesNotThrow);
+                .Single(evaluation => evaluation.Kind == (allocations ? EffectEvaluationContractKind.ZeroAllocations : EffectEvaluationContractKind.DoesNotThrow));
             var preparation = owned[target.Entry.CallableId];
-            var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == WorkerEffectContractKind.DoesNotThrow);
-            var checks = await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false);
-            var evidence = checks[claim.ClaimId];
+            var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == (allocations ? WorkerEffectContractKind.ZeroAllocations : WorkerEffectContractKind.DoesNotThrow));
+            var evidence = allocations
+                ? await NativeAllocationEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false)
+                : (await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false))[claim.ClaimId];
             var outcome = evidence.Outcome switch
             {
                 ProvenOutcome => WorkerClaimOutcome.Proven,
                 RefutedOutcome => WorkerClaimOutcome.Refuted,
                 _ => WorkerClaimOutcome.Unknown
             };
-            if (outcome == WorkerClaimOutcome.Refuted && evidence.ExceptionWitness == null)
-            { throw new InvalidDataException("A native exception refutation has no replay-validated witness."); }
-            var runtime = outcome == WorkerClaimOutcome.Refuted
+            if (outcome == WorkerClaimOutcome.Refuted && (allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
+            { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
+            var runtime = allocations ? "AllocationOracleNotRun" : outcome == WorkerClaimOutcome.Refuted
                 ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
                 : "NotRun";
             rows.Add(new(id, preparation.Entry.CallableId, CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Outcome),
@@ -97,7 +101,8 @@ internal static class NativeExceptionShadow
                 preparation.Total != null, preparation.Total?.IsBodyAbstraction == true,
                 evidence.ExceptionWitness?.Kind.ToString(), runtime));
         }
-        return Summarize(universeSha256, universeMethodCount, rows.ToImmutable(), wall.Elapsed.TotalSeconds);
+        return Summarize(universeSha256, universeMethodCount, rows.ToImmutable(), wall.Elapsed.TotalSeconds) with
+        { ContractKind = allocations ? "ZeroAllocations" : "DoesNotThrow" };
     }
 
     internal static NativeExceptionShadowReport Summarize(string universeSha256, int universeMethodCount,

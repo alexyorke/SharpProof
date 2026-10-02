@@ -59,6 +59,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
             elementType, sequence, index);
     }
 
+    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType)
+    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType)); }
+
     public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
     {
         return Append(
@@ -235,6 +238,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
         _factory.GetOperationInfo(instruction.Operation);
         switch (instruction)
         {
+            case IrAllocationInstruction allocation:
+                if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence))
+                { throw InvalidArgument("An allocation requires a reference or sequence type.", "allocatedType"); }
+                break;
             case IrAssignInstruction value:
                 RequireSameType(
                     _factory.GetVariableInfo(value.Target).Type, ValidateTerm(value.Value, "value"),

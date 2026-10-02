@@ -25,12 +25,12 @@ internal static class Program
         {
             var root = RepositoryLayout.FindRoot();
             var command = args.Length == 0 ? "corpus" : args[0];
-            if (command == "exception-shadow")
+            if (command is "exception-shadow" or "allocation-shadow")
             {
                 var maximumMethods = args.Length == 1 ? 0 : args.Length == 3 && args[1] == "--limit"
                     ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)
-                    : throw new ArgumentException("Use exception-shadow [--limit <method-count>].", nameof(args));
-                var result = await NativeExceptionShadow.RunAsync(root, maximumMethods).ConfigureAwait(false);
+                    : throw new ArgumentException("Use exception-shadow or allocation-shadow [--limit <method-count>].", nameof(args));
+                var result = await NativeExceptionShadow.RunAsync(root, maximumMethods, allocations: command == "allocation-shadow").ConfigureAwait(false);
                 Console.WriteLine(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.ComparisonPassed ? 0 : 1;
             }
@@ -50,7 +50,7 @@ internal static class Program
                 Console.WriteLine("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-shadow [--limit <method-count>]]");
+            Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-shadow|allocation-shadow] [--limit <method-count>]");
             return 2;
         }
         catch (Exception exception)

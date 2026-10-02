@@ -20,6 +20,8 @@ internal sealed class PassiveCallableVcBuilder
     private readonly Dictionary<IrBlockId, List<Edge>> _incoming = [];
     private readonly List<Exit> _returns = [];
     private readonly List<(IrTerm Reach, IrTerm Kind)> _exceptions = [];
+    private readonly List<(IrTerm Reach, OperationId Site)> _allocations = [];
+    private readonly List<IrTerm> _potentialExceptionAllocations = [];
     private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
@@ -32,6 +34,9 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<IrTerm> Goals { get; private set; }
     internal IrTerm NormalCompletion { get; private set; } = null!;
     internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => [.. _exceptions];
+    internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
+    internal ImmutableArray<IrTerm> PotentialExceptionAllocations => [.. _potentialExceptionAllocations];
+    internal bool HasUnmodeledAllocations => _hasStringConcat;
     internal ImmutableArray<Assumption> Facts => [.. _facts];
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
     internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutableDictionary();
@@ -166,6 +171,9 @@ internal sealed class PassiveCallableVcBuilder
                 Spend();
                 switch (instruction)
                 {
+                    case IrAllocationInstruction allocation:
+                        _allocations.Add((reach, allocation.Operation));
+                        break;
                     case IrAssignInstruction assign:
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
                             !TryRewrite(assign.Value, state, out var value))
@@ -228,6 +236,9 @@ internal sealed class PassiveCallableVcBuilder
                         AddEdge(go.Target, reach, state, pendingException, go.Operation);
                         break;
                     case IrThrowInstruction thrown:
+                        // Constructing a runtime fault can allocate even when
+                        // a handler prevents it from escaping the callable.
+                        _potentialExceptionAllocations.Add(reach);
                         AddEdge(thrown.Target, reach, state, _factory.Integer((int)thrown.ExceptionKind), thrown.Operation);
                         break;
                     case IrExceptionalExitInstruction:

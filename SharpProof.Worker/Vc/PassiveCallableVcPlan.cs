@@ -10,6 +10,8 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<IrTerm> _goals;
     private readonly IrTerm _normalCompletion;
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
+    private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
@@ -22,6 +24,9 @@ internal sealed class PassiveCallableVcPlan
         _goals = builder.Goals;
         _normalCompletion = builder.NormalCompletion;
         _exceptions = builder.Exceptions;
+        _allocations = builder.Allocations;
+        _potentialExceptionAllocations = builder.PotentialExceptionAllocations;
+        HasUnmodeledAllocations = builder.HasUnmodeledAllocations;
         _model = builder.Model;
         _labels = builder.Labels;
         _assumes = builder.Assumes;
@@ -37,6 +42,7 @@ internal sealed class PassiveCallableVcPlan
     internal PassiveCallableVcPlan? LoopSearch { get; }
     internal bool IsBoundedSearch { get; }
     internal bool HasBodyAbstraction => _candidate.IsBodyAbstraction;
+    internal bool HasUnmodeledAllocations { get; private set; }
 
     internal VerificationQuery EntryQuery()
     {
@@ -88,7 +94,19 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
+    internal VerificationQuery AllocationQuery()
+    {
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory,
+            EffectGoalBuilder.NoReachableSites(Factory, _allocations.Select(allocation => allocation.Reach)
+                .Concat(_potentialExceptionAllocations)),
+            ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+    }
+
     internal IrProgramExecutionResult ReplayException(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
+    { return ReplayEffects(inputs, cancellationToken); }
+
+    internal IrProgramExecutionResult ReplayEffects(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken,
+        Action<IrAllocationInstruction>? allocationObserver = null)
     {
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
@@ -97,16 +115,17 @@ internal sealed class PassiveCallableVcPlan
             initial[parameter.Current] = inputs[parameter.Entry];
         }
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
-            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(), cancellationToken);
+            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver), cancellationToken);
     }
 
-    private IrProgramReplayOptions ReplayOptions()
+    private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null)
     {
         return new(request => Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
             ? Factory.CreateBooleanValue(false)
             : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
-                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type));
+                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type))
+        { AllocationObserver = allocationObserver };
     }
 
     private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)

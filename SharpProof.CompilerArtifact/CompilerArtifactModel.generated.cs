@@ -110,6 +110,8 @@ internal sealed record CompilerTotalCallablePreparation(
     bool IsBodyAbstraction = false)
 {
     internal ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints { get; init; } = [];
+    internal bool EffectsCompleteAtEntry { get; init; }
+    internal ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
 }
 
 internal sealed record CompilerTotalExceptionConstraint(string ClaimId, ImmutableArray<IrExceptionKind> AllowedKinds);
@@ -121,6 +123,9 @@ internal sealed record CompilerTotalClause(CompilerContractKind Kind, IrTerm Val
 
 internal sealed class CompilerTotalCallableArtifact
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool EffectsCompleteAtEntry { get; set; }
+    public string[] ValidEffectClaimIds { get; set; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool IsBodyAbstraction { get; set; }
     public PortableIrGraph Graph { get; set; } = new();

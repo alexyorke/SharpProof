@@ -587,6 +587,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             return PortableIrGraphCodecProjections.EncodeInstruction(
                 instruction,
+                TypeIndex,
                 OperationIndex,
                 VariableIndex,
                 TermIndex,
@@ -923,6 +924,7 @@ internal static partial class PortableIrGraphCodec
                 builder,
                 block,
                 row,
+                Type,
                 Operation,
                 Variable,
                 Member,

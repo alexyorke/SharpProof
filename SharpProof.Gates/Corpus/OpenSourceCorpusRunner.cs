@@ -133,8 +133,9 @@ internal static class OpenSourceCorpusRunner
                     item.Diagnostic.Location)));
     }
 
-    internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken)
-    { return Prepare(document, "global::SharpProof.Attributes.DoesNotThrow", cancellationToken).Compilation; }
+    internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
+        bool allocations = false)
+    { return Prepare(document, allocations ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken).Compilation; }
 
     internal static string? CorpusMethodId(SyntaxNode? declaration)
     { return declaration?.GetAnnotations(AnnotationKind).SingleOrDefault()?.Data; }
@@ -247,7 +248,7 @@ internal static class OpenSourceCorpusRunner
         var template = AnalyzerGateHost.CreateCompilation(
             string.Empty,
             "SharpProofOssCorpus",
-            includeExternalEffectsFixture: effectAttribute != "global::SharpProof.Attributes.DoesNotThrow");
+            includeExternalEffectsFixture: effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
         var compilation = template
             .RemoveSyntaxTrees(template.SyntaxTrees)
             .AddSyntaxTrees(trees);

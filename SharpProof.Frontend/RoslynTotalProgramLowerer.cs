@@ -158,6 +158,20 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         }
         switch (operation)
         {
+            case IExpressionStatementOperation
+            {
+                Operation: IObjectCreationOperation
+                {
+                    Type.SpecialType: SpecialType.System_Object,
+                    Constructor.Parameters.Length: 0,
+                    Arguments.Length: 0,
+                    Initializer: null
+                } creation
+            }:
+                // The core Object constructor has no managed body effects.
+                // The discarded identity never enters the value domain.
+                _builder.Allocate(block, _context.Site(creation), _context.Factory.ObjectType);
+                return block;
             case IExpressionStatementOperation { Operation: IInvocationOperation invocation } when _context.IsSpecificationOperation(invocation):
                 return block;
             case IExpressionStatementOperation expression:

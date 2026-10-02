@@ -127,4 +127,34 @@ public sealed class NativeExceptionShadowTests
             [new("sample", "test", "sample.cs", span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
                 "test", "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported)]);
     }
+
+    [TestCase("return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("new object(); return x;", WorkerClaimOutcome.Refuted)]
+    [TestCase("System.Console.WriteLine(x); return x;", WorkerClaimOutcome.Unknown)]
+    public async Task AllocationShadowMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome)
+    {
+        var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
+        var report = await NativeExceptionShadow.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(outcome));
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("AllocationOracleNotRun"));
+        Assert.That(report.RuntimeWitnesses, Is.Zero);
+    }
+
+    [Test]
+    public async Task PinnedAllocationUniverseIsExhaustivelyMeasured()
+    {
+        var root = RepositoryLayout.FindRoot();
+        var report = await NativeExceptionShadow.RunAsync(root, allocations: true);
+        Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
+        Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
+        Assert.That(report.Exhaustive, Is.True);
+        Assert.That(report.UniverseSha256, Is.EqualTo("BD29688EDA47BA7EEB68093E4151D6A786901C4E41D8CE1A32DDA8CF8FA6F7ED"));
+        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
+        Assert.That(report.ComparisonPassed, Is.True);
+        Assert.That(report.DisagreementCount, Is.Zero);
+        await TestContext.Progress.WriteLineAsync($"Allocation shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; " +
+            $"{report.RetainedProven} retained; {report.WallSeconds:F1}s; runtime corpus oracle pending.");
+    }
 }

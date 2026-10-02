@@ -169,8 +169,40 @@ internal static class CompilerTotalCallableLowerer
                 clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id :
                     clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction)
         {
+            EffectsCompleteAtEntry = HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
+            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
+                .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken)
         };
+    }
+
+    private static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
+        CancellationToken cancellationToken)
+    {
+        for (var current = type; current != null; current = current.ContainingType)
+        {
+            if (current.StaticConstructors.Length != 0)
+            { return false; }
+        }
+        var pending = new Stack<INamespaceOrTypeSymbol>();
+        pending.Push(compilation.Assembly.GlobalNamespace);
+        var remaining = CompilerPreparedBody.MaximumInstructions;
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var member in pending.Pop().GetMembers())
+            {
+                if (--remaining < 0)
+                { return false; }
+                if (member is INamespaceOrTypeSymbol nested)
+                { pending.Push(nested); }
+                if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
+                        attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
+                        CompilerMetadataResolution.HasNamespace(ns, "System", "Runtime", "CompilerServices")))
+                { return false; }
+            }
+        }
+        return true;
     }
 
     private static ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints(CSharpCompilation compilation,

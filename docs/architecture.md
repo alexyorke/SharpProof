@@ -427,6 +427,21 @@ invocation shapes remain explicit oracle gaps. Runtime confirmations concern
 counterexamples only; they do not establish universal proofs. The report
 separates comparison success from the 95% old-proof retention gate and does not
 qualify allocation, write, lock, capability, or call-precondition effects.
+The first allocation row emits a typed `Allocate` instruction for discarded
+core `new object()` expressions. Its identity does not enter the scalar value
+domain. The production artifact preserves type and site ownership; passive
+SSA records guarded reachability and original-program replay observes the
+allocation site. Native ZeroAllocations qualification excludes reachable
+throw sites as potential implicit allocations, including caught faults. String concatenation,
+body abstractions and incomplete source static/module initialization abstain.
+Validated effect claim IDs are captured before legacy language admission and
+decoded as a canonical owned set. Missing admission data abstains even at a
+contradictory entry. Compiled C# tests independently measure thread allocation
+bytes on concrete paths after delegate construction and JIT warmup.
+`SharpProof.Gates allocation-shadow` measures this replacement on the same
+pinned universe with ZeroAllocations annotations. Corpus runtime allocation
+oracles remain explicit gaps; this command does not qualify an authority
+switch or complete the implicit-allocation table.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.

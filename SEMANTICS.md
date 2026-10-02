@@ -462,6 +462,17 @@ finite search can only supply replayed violations. Call abstractions abstain
 until their throwing behavior is represented. These qualification results do
 not replace compiler effect publication.
 
+Native allocation qualification begins with discarded core `new object()`
+expressions. Allocation events retain an owned type and operation site through
+artifact capture, loop transformation and passive SSA. A refutation requires
+that the original program execute an allocation site without approximation
+reads. A proof excludes all represented allocation and throw sites, including
+caught faults that can allocate runtime exceptions. Unmodeled string allocation,
+call abstractions and source static/module initialization abstain. Validated
+claim ownership and complete entry initialization must survive decoding before
+entry infeasibility can establish a vacuous result. This qualification remains
+separate from authoritative compiler effect results.
+
 Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
 cases carry explicit normal-completion predicates for arithmetic faults and
 short-circuiting, checked against independently executed C# operators. Finite

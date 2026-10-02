@@ -523,7 +523,8 @@ public enum IrInstructionKind
     Goto = 8,
     Return = 9,
     Throw = 10,
-    ExceptionalExit = 11
+    ExceptionalExit = 11,
+    Allocate = 12
 }
 
 public enum IrLocationKind
@@ -598,6 +599,15 @@ public abstract partial class IrInstruction
     public IrInstructionKind Kind { get; }
 
     public OperationId Operation { get; }
+}
+
+public sealed class IrAllocationInstruction : IrInstruction
+{
+    internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType)
+        : base(id, IrInstructionKind.Allocate, operation)
+    { AllocatedType = allocatedType; }
+
+    public IrTypeId AllocatedType { get; }
 }
 
 public sealed class IrAssignInstruction : IrInstruction

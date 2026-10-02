@@ -29,7 +29,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void RoundTripPreservesEveryTermInstructionAndLocationShape()
     {
-        var fixture = CreateFixture();
+        var fixture = CreateFixture(includeAllocation: true);
 
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
@@ -930,7 +930,7 @@ public sealed class PortableIrGraphCodecTests
         return graph;
     }
 
-    private static CodecFixture CreateFixture(bool includeExceptionEdges = true)
+    private static CodecFixture CreateFixture(bool includeExceptionEdges = true, bool includeAllocation = false)
     {
         var factory = new IrFactory();
         var boxType = factory.GetOrCreateReferenceType(
@@ -1001,6 +1001,8 @@ public sealed class PortableIrGraphCodecTests
         builder.Store(entry, factory.CreateOperation("store-member"), memberLocation, numberTerm);
         builder.Load(entry, factory.CreateOperation("load-sequence"), result, sequenceLocation);
         builder.Store(entry, factory.CreateOperation("store-sequence"), sequenceLocation, numberTerm);
+        if (includeAllocation)
+        { builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType); }
         builder.Call(
             entry,
             factory.CreateOperation("call"),

@@ -14,6 +14,8 @@ internal static class CompilerTotalCallableArtifactCodec
         if (preparation == null)
         { return null; }
         var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses, preparation.IsBodyAbstraction);
+        artifact.EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry;
+        artifact.ValidEffectClaimIds = [.. preparation.ValidEffectClaimIds];
         artifact.ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => new CompilerTotalExceptionConstraintArtifact
         { ClaimId = constraint.ClaimId, AllowedKinds = [.. constraint.AllowedKinds] })];
         return artifact;
@@ -56,7 +58,11 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         var decoded = DecodeCore(artifact, entry, claims, entryOnly: false, cancellationToken);
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
-        { ExceptionConstraints = decoded.ExceptionConstraints };
+        {
+            ExceptionConstraints = decoded.ExceptionConstraints,
+            EffectsCompleteAtEntry = artifact!.EffectsCompleteAtEntry,
+            ValidEffectClaimIds = [.. artifact.ValidEffectClaimIds]
+        };
     }
 
     internal static CompilerTotalEntryPreparation? DecodeEntry(CompilerTotalCallableArtifact? artifact,
@@ -76,6 +82,7 @@ internal static class CompilerTotalCallableArtifactCodec
         if (artifact == null)
         { return null; }
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
+        Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null || artifact.Result < -1)
         { throw new InvalidDataException("The Total callable payload is incomplete."); }
@@ -181,6 +188,14 @@ internal static class CompilerTotalCallableArtifactCodec
         if (!entryOnly)
         { ValidateProgram(decoded.Program!, result, clauses, parameters, artifact.IsBodyAbstraction, cancellationToken); }
         var exceptionConstraints = DecodeExceptionConstraints(artifact.ExceptionConstraints, claims, entryOnly, cancellationToken);
+        Require(artifact.ValidEffectClaimIds != null && artifact.ValidEffectClaimIds.Length <= CompilerPreparedBody.MaximumInstructions &&
+            (!entryOnly || artifact.ValidEffectClaimIds.Length == 0), "Validated effect claims have an invalid bound or mode.");
+        var effectOwners = claims.Where(claim => claim.Kind == WorkerClaimKind.Effect).Select(claim => claim.ClaimId)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        Require(artifact.ValidEffectClaimIds!.SequenceEqual(artifact.ValidEffectClaimIds.Distinct().OrderBy(id => id, StringComparer.Ordinal)) &&
+            artifact.ValidEffectClaimIds.All(id => !string.IsNullOrWhiteSpace(id) &&
+                effectOwners.Contains(id)),
+            "Validated effect claims must be canonical and owned by this callable.");
         return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints);
     }
 
@@ -281,7 +296,7 @@ internal static class CompilerTotalCallableArtifactCodec
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var instruction in block.Instructions)
             {
-                Require(instruction.Kind is IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
+                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
                     IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
@@ -370,7 +385,7 @@ internal static class CompilerTotalCallableArtifactCodec
             foreach (var instruction in block.Instructions)
             {
                 Spend();
-                Require(instruction.Kind is IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
+                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
                     IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
