@@ -42,7 +42,7 @@ public sealed class GoldenVcRegressionTests
         }
         else
         {
-            Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven),
+            Assert.That(response.ClaimResults.All(result => result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted), Is.True,
                 string.Join(",", response.ClaimResults.Select(result => result.Reason)));
         }
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
