@@ -183,6 +183,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             case IFlowCaptureOperation capture:
                 {
                     var value = Value(capture.Value, block);
+                    _context.RecordConcatenationOperands(capture.Id, value.ConcatenationOperands);
                     _builder.Assign(value.Continuation, _context.Site(operation), _context.Capture(capture.Id, capture.Value.Type), value.Value);
                     return value.Continuation;
                 }

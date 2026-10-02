@@ -154,7 +154,12 @@ public sealed class NativeExceptionShadowTests
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Unknown)]
-    public async Task AllocationShadowMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome)
+    [TestCase("return string.Concat(x == 0 ? \"a\" : \"b\", \"c\").Length;", WorkerClaimOutcome.Refuted)]
+    [TestCase("return string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length;", WorkerClaimOutcome.Proven, "PotentialAllocationOpcode")]
+    [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", WorkerClaimOutcome.Refuted)]
+    [TestCase("return (\"\" + (x == 0 ? \"a\" : \"b\")).Length;", WorkerClaimOutcome.Proven, "PotentialAllocationOpcode")]
+    public async Task AllocationShadowMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome,
+        string allocationIlOracle = "NoReachableAllocationOpcode")
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
@@ -168,7 +173,7 @@ public sealed class NativeExceptionShadowTests
         if (outcome == WorkerClaimOutcome.Proven)
         {
             Assert.That(row.AllocatedBytes, Is.Zero);
-            Assert.That(row.AllocationIlOracle, Is.EqualTo("NoReachableAllocationOpcode"));
+            Assert.That(row.AllocationIlOracle, Is.EqualTo(allocationIlOracle));
         }
         else if (outcome == WorkerClaimOutcome.Refuted)
         {
@@ -280,6 +285,8 @@ public sealed class NativeExceptionShadowTests
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Proven)]
     [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Proven)]
     [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("return string.Concat(x == 0 ? \"a\" : \"b\", \"c\").Length;", WorkerClaimOutcome.Proven)]
+    [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", WorkerClaimOutcome.Proven)]
     public async Task PurityShadowUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");

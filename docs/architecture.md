@@ -446,8 +446,17 @@ System.ArgumentException kind. Cached method-group/lambda conversions, generic
 targets, capturing closures and virtual, override or value-type receivers remain incomplete. The production artifact preserves type and site ownership; passive
 SSA records guarded reachability and original-program replay observes the
 allocation site. Native ZeroAllocations qualification excludes reachable
-throw sites as potential implicit allocations, including caught faults. String concatenation,
-body abstractions and incomplete source static/module initialization abstain.
+throw sites as potential implicit allocations, including caught faults.
+String/string `+` chains with at most four operands after constant merging and
+the owned two-string `String.Concat` model emit string-typed allocation sites,
+guarded by at least two nonempty operands. Null is treated as empty; constant
+strings merge before the guard. Flattened operands survive CFG flow captures,
+so a captured prefix does not allocate before a later conditional operand.
+Passive SSA substitutes concatenation expressions and their observations,
+avoiding artificial model values for abstract concatenation lengths. Unmatched
+concatenation sites still block allocation proofs. Longer chains, formatting
+overloads, params arrays, string content, body abstractions and incomplete
+source static/module initialization remain unsupported by this qualification.
 Validated effect claim IDs are captured before legacy language admission and
 decoded as a canonical owned set. Missing admission data abstains even at a
 contradictory entry. Compiled C# tests independently measure thread allocation

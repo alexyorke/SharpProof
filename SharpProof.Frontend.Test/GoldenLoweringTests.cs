@@ -116,7 +116,7 @@ public sealed class GoldenLoweringTests
             if (target.IsStatic && target.ContainingType.SpecialType == SpecialType.System_String &&
                 target.Name == "Concat" && target.Parameters.Length == 2 &&
                 target.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_String))
-            { return new(2, arguments => CSharpOperationSemantics.StringConcat(factory, arguments[0], arguments[1])); }
+            { return new(2, arguments => CSharpOperationSemantics.StringConcat(factory, arguments[0], arguments[1]), stringConcatenation: true); }
             if (target.IsStatic && target.ContainingType.SpecialType == SpecialType.System_Array &&
                 target.Name == "Empty" && target.Arity == 1 && target.Parameters.IsEmpty &&
                 CSharpOperationSemantics.IsReferenceDomain(target.ReturnType))

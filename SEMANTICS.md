@@ -477,8 +477,17 @@ short-circuits that approximation, while reads on uncertain null paths prevent
 concrete refutations. Universal proofs must hold for both choices. The exact
 argument kind remains distinct from ArgumentNullException and
 ArgumentOutOfRangeException. Generic targets,
-compiler-cached method-group/lambda conversions, capturing closures and virtual or override
-or value-type receivers remain unsupported until their semantics are represented. The shadow runtime oracle measures concrete feasible entries in
+compiler-cached method-group/lambda conversions, capturing closures and virtual,
+override or value-type receivers remain unsupported until their semantics are represented.
+String/string `+` chains with at most four operands after constant merging and
+the owned two-string `String.Concat` model emit guarded string allocation sites.
+At least two nonempty operands are required; null operands count as empty.
+Constant expressions reuse their literal, and adjacent constants merge before
+choosing the allocation guard. CFG captures preserve flattened operands and
+defer prefix allocation until the root, after later operand evaluation. Longer
+chains, object/formatting overloads and compiler-created params arrays remain
+incomplete. String content and concatenation-related length proofs are deferred.
+The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic
 closures are bounded representatives; unsupported inputs remain explicit gaps.

@@ -60,6 +60,18 @@ public sealed class NativeAllocationEffectTests
     [TestCase("Contract.Requires(x != 0); if (x == 0) new object(); return x;", true)]
     [TestCase("new object(); throw null;", false)]
     [TestCase("while (x > 0) { new object(); x--; } return x;", false)]
+    [TestCase("return string.Concat(x == 0 ? \"\" : \"a\", \"b\").Length;", false)]
+    [TestCase("return string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length;", true)]
+    [TestCase("return string.Concat((string)null, x == 0 ? \"a\" : \"b\").Length;", true)]
+    [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", false)]
+    [TestCase("return (\"\" + (x == 0 ? \"a\" : \"b\")).Length;", true)]
+    [TestCase("return (\"a\" + \"b\").Length;", true)]
+    [TestCase("Contract.Requires(x == 0); return ((x == 0 ? \"\" : \"a\") + \"b\").Length;", true)]
+    [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\" + (x == 0 ? \"d\" : \"e\")).Length;", false)]
+    [TestCase("Contract.Requires(x == 0); return ((x == 0 ? \"\" : \"x\") + \"a\" + \"b\").Length;", true)]
+    [TestCase("return ((x == 0 ? \"\" : \"x\") + \"a\" + \"b\").Length;", false)]
+    [TestCase("Contract.Requires(x == 0); return ((x == 0 ? \"\" : \"x\") + \"a\" + null + \"b\").Length;", true)]
+    [TestCase("return ((string)null + (x == 0 ? \"\" : \"x\")).Length;", true)]
     public async Task CapturedAllocationSitesQualifyAndMatchCompiledRuntime(string body, bool proven)
     {
         var source = "using SharpProof.Attributes; public static class C { public static int State; private static void Sink() {} " +
@@ -81,7 +93,8 @@ public sealed class NativeAllocationEffectTests
     [TestCase("public static object State = new object();", "return x;")]
     [TestCase("[System.Runtime.CompilerServices.ModuleInitializer] public static void Initialize() { State = new object(); } public static object State;", "return x;")]
     [TestCase("", "return (\"x\" + x.ToString()).Length;")]
-    [TestCase("", "return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;")]
+    [TestCase("", "return ((x == 0 ? \"a\" : \"b\") + x.ToString()).Length;")]
+    [TestCase("", "return ((x == 0 ? \"a\" : \"b\") + (x == 0 ? \"c\" : \"d\") + (x == 0 ? \"e\" : \"f\") + (x == 0 ? \"g\" : \"h\") + (x == 0 ? \"i\" : \"j\")).Length;")]
     [TestCase("", "throw null;")]
     [TestCase("", "try { return 10 / x; } catch (System.DivideByZeroException) { return x; }")]
     [TestCase("", "new System.Text.StringBuilder(); return x;")]
@@ -92,6 +105,59 @@ public sealed class NativeAllocationEffectTests
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(native.AllocationWitness, Is.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ConcatenationAllocationOrderMatchesCompiledControlFlow(bool conditionalOperand)
+    {
+        var source = "using SharpProof.Attributes; public static class C { private static string Pass(string text, int value) => text; " +
+            "[ZeroAllocations] public static int Target(int x) => ((x == 0 ? \"a\" : \"b\") + \"c\" + " +
+            (conditionalOperand ? "(x == 0 ? Pass(\"d\", 10 / x) : \"e\")" : "Pass(\"d\", 10 / x)") + ").Length; }";
+        var total = Prepare(source).Total!;
+        var factory = total.Program.Factory;
+        var count = 0;
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = factory.CreateIntegerValue(factory.IntegerType, 0L) },
+            1000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => count++ });
+        Assert.That(execution.Exception?.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+        var runtimeSource = source.Replace("10 / x", "Fault(x)", StringComparison.Ordinal)
+            .Replace("private static string Pass", "public static long Before; public static long After; " +
+                "private static int Fault(int x) { After = System.GC.GetAllocatedBytesForCurrentThread(); return 10 / x; } private static string Pass", StringComparison.Ordinal)
+            .Replace("public static int Target(int x) =>", "public static int Target(int x) { Before = System.GC.GetAllocatedBytesForCurrentThread(); return", StringComparison.Ordinal)
+            .Replace(").Length; }", ").Length; } }", StringComparison.Ordinal);
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("ConcatFaultRuntime", runtimeSource).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("ConcatFaultRuntime", isCollectible: true);
+        try
+        {
+            var subject = context.LoadFromStream(image).GetType("C")!;
+            var run = subject.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
+            for (var iteration = 0; iteration < 4; iteration++)
+            { Assert.Throws<DivideByZeroException>(new Action(() => run(0))); }
+            var before = (long)subject.GetField("Before")!.GetValue(null)!;
+            var after = (long)subject.GetField("After")!.GetValue(null)!;
+            Assert.That(after > before, Is.EqualTo(count > 0));
+        }
+        finally { context.Unload(); }
+    }
+
+    [Test]
+    public async Task MissingStringAllocationSiteCannotProveZeroAllocations()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ZeroAllocations] public static int Target(int x) => string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length; }");
+        foreach (var allocation in artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Where(row => row.Kind == IrInstructionKind.Allocate))
+        {
+            allocation.Kind = IrInstructionKind.Write;
+            allocation.A = (int)IrWriteRegion.Local;
+        }
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Null);
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
     [TestCase("System.Action action = Sink;")]
@@ -449,6 +515,7 @@ public sealed class NativeAllocationEffectTests
 
     [TestCase("new object();")]
     [TestCase("System.Action action = new System.Action(Sink);")]
+    [TestCase("string text = string.Concat(value == 0 ? \"a\" : \"b\", \"c\");")]
     public async Task SourceHelperAllocationSurvivesExpansionAndMatchesRuntime(string allocation)
     {
         var source = "using SharpProof.Attributes; public static class C { " +

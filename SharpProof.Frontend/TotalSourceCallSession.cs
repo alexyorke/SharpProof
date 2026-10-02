@@ -3,9 +3,11 @@ using SharpProof.Frontend.Host;
 
 namespace SharpProof.Frontend;
 
-internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArray<IrTerm>, TotalScalarRule> apply)
+internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArray<IrTerm>, TotalScalarRule> apply,
+    bool stringConcatenation = false)
 {
     internal int ParameterCount { get; } = parameterCount;
+    internal bool StringConcatenation { get; } = stringConcatenation;
     internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { return apply(arguments); }
 }
 

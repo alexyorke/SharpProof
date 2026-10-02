@@ -254,8 +254,8 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 { throw InvalidArgument("A write region is undefined.", "region"); }
                 break;
             case IrAllocationInstruction allocation:
-                if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence))
-                { throw InvalidArgument("An allocation requires a reference or sequence type.", "allocatedType"); }
+                if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
+                { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
                 if (allocation.Target is { } allocatedTarget &&
                     (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference ||
                         _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))

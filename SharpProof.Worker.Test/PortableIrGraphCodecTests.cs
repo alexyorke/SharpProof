@@ -1004,6 +1004,7 @@ public sealed class PortableIrGraphCodecTests
         if (includeAllocation)
         {
             builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType);
+            builder.Allocate(entry, factory.CreateOperation("allocate-string"), factory.StringType);
             builder.Allocate(entry, factory.CreateOperation("allocate-value"), boxType, box);
             builder.Lock(entry, factory.CreateOperation("synchronize"), boxTerm);
             foreach (var region in Enum.GetValues<IrWriteRegion>())

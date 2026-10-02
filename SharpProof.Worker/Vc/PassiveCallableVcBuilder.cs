@@ -29,6 +29,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
     private int _fresh;
     private bool _hasStringConcat;
+    private bool _hasUnmodeledStringAllocations;
     private readonly CancellationToken _cancellationToken;
     private int _remainingWork = MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
     internal PassiveCallableCandidate Candidate => _candidate;
@@ -40,7 +41,7 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> Writes => [.. _writes];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
     internal ImmutableArray<IrTerm> PotentialExceptionAllocations => [.. _potentialExceptionAllocations];
-    internal bool HasUnmodeledAllocations => _hasStringConcat;
+    internal bool HasUnmodeledAllocations => _hasUnmodeledStringAllocations;
     internal ImmutableArray<Assumption> Facts => [.. _facts];
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
     internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutableDictionary();
@@ -99,6 +100,16 @@ internal sealed class PassiveCallableVcBuilder
                     IrReturnInstruction returned => returned.Value,
                     _ => null
                 }));
+        var stringAllocationSites = program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAllocationInstruction>().Where(allocation => allocation.AllocatedType == _factory.StringType)
+            .Select(allocation => allocation.Operation).ToImmutableHashSet();
+        _hasUnmodeledStringAllocations = _candidate.Requires.Concat(_candidate.Ensures)
+            .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
+            program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+                instruction is IrAssignInstruction assign && HasStringConcat(assign.Value) && !stringAllocationSites.Contains(assign.Operation) ||
+                instruction is IrReturnInstruction returned && HasStringConcat(returned.Value) ||
+                instruction is IrBranchInstruction branch && HasStringConcat(branch.Condition) ||
+                instruction is IrAssumeInstruction assume && HasStringConcat(assume.Condition));
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None ||
             _candidate.Result is { } result && !Scalar(_factory.GetVariableInfo(result).Type) ||
@@ -203,13 +214,13 @@ internal sealed class PassiveCallableVcBuilder
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
                             !TryRewrite(assign.Value, state, out var value))
                         { return null; }
-                        if (value.Type == _factory.StringType && IrTraversal.Any(value,
-                                term => term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }))
+                        if (value is IrStringTerm || HasStringConcat(value))
                         {
                             // This domain observes strings through nullness and
                             // length, not allocation identity. Preserve the value
                             // expression instead of asking SAT replay to reproduce
-                            // a freshly allocated SSA reference.
+                            // a freshly allocated SSA reference or an abstract
+                            // observation (such as its length) of that reference.
                             state[assign.Target] = value;
                             break;
                         }

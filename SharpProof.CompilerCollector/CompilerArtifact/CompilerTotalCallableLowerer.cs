@@ -115,7 +115,7 @@ internal static class CompilerTotalCallableLowerer
                         new RoslynTypeMapper(context.Factory).GetTypeId(method.ReturnType)))
                     : apiSpecs.TryGet(method, out spec) &&
                         spec.Template.Target.DocumentationCommentId == "M:System.String.Concat(System.String,System.String)"
-                        ? new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(context.Factory, arguments[0], arguments[1]))
+                        ? new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(context.Factory, arguments[0], arguments[1]), stringConcatenation: true)
                         : specificationPacks.ResolveTotal(method));
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;

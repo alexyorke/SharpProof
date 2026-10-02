@@ -2,6 +2,33 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool IsStringConcatenation(IOperation operation)
+    {
+        return operation is IBinaryOperation
+        {
+            OperatorKind: BinaryOperatorKind.Add, OperatorMethod: null, IsLifted: false,
+            Type.SpecialType: SpecialType.System_String,
+            LeftOperand.Type.SpecialType: SpecialType.System_String,
+            RightOperand.Type.SpecialType: SpecialType.System_String
+        };
+    }
+
+    internal static IrTerm StringConcatenationAllocates(IrFactory factory, ImmutableArray<IrTerm> operands)
+    {
+        IrTerm seen = factory.Boolean(false);
+        IrTerm allocates = factory.Boolean(false);
+        foreach (var operand in operands)
+        {
+            // Total Length(null) is zero, matching String.Concat's treatment.
+            var nonempty = factory.Binary(IrBinaryOperator.GreaterThan, factory.Length(operand),
+                factory.Integer(factory.IntegerType, 0));
+            allocates = factory.Binary(IrBinaryOperator.OrElse, allocates,
+                factory.Binary(IrBinaryOperator.AndAlso, seen, nonempty));
+            seen = factory.Binary(IrBinaryOperator.OrElse, seen, nonempty);
+        }
+        return allocates;
+    }
+
     internal static bool IsCoreObjectCreation(IObjectCreationOperation creation)
     {
         return creation is

@@ -26,6 +26,7 @@ public sealed class TotalLoweringContext
     private readonly bool _allowGenericContainer;
     private readonly Dictionary<ISymbol, IrVarId> _locals = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
+    private readonly Dictionary<CaptureId, ImmutableArray<IrTerm>> _concatenationOperands = [];
     private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
     private readonly Dictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = [];
     private int _temporary;
@@ -126,6 +127,17 @@ public sealed class TotalLoweringContext
             _locals.Add(symbol, variable);
         }
         return variable;
+    }
+
+    internal ImmutableArray<IrTerm> ConcatenationOperands(CaptureId capture)
+    { return _concatenationOperands.TryGetValue(capture, out var operands) ? operands : default; }
+
+    internal void RecordConcatenationOperands(CaptureId capture, ImmutableArray<IrTerm> operands)
+    {
+        if (operands.IsDefault)
+        { _concatenationOperands.Remove(capture); }
+        else
+        { _concatenationOperands[capture] = operands; }
     }
 
     internal IrVarId Capture(CaptureId capture, ITypeSymbol? type)

@@ -1,11 +1,12 @@
 namespace SharpProof.Frontend;
 
 internal readonly struct TotalBodyValue(IrTerm value, IrBlockId continuation,
-    FrontendSubsetClassification classification)
+    FrontendSubsetClassification classification, ImmutableArray<IrTerm> concatenationOperands = default)
 {
     internal IrTerm Value { get; } = value;
     internal IrBlockId Continuation { get; } = continuation;
     internal FrontendSubsetClassification Classification { get; } = classification;
+    internal ImmutableArray<IrTerm> ConcatenationOperands { get; } = concatenationOperands;
 }
 
 // Pure clauses compose safety; body evaluation emits the same local faults as
@@ -83,6 +84,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (depth < 256 && CSharpOperationSemantics.IsStringConcatenation(operation))
+        { return LowerStringConcatenation(operation, block, depth); }
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
@@ -131,7 +134,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         if (TryLeaf(operation, TotalParameterState.Current, out var leaf))
         {
-            return Capture(operation, new(leaf!, block, FrontendSubsetClassification.Exact));
+            var parts = operation is IFlowCaptureReferenceOperation capture
+                ? _context.ConcatenationOperands(capture.Id) : default;
+            return Capture(operation, new(leaf!, block, FrontendSubsetClassification.Exact, parts));
         }
         switch (operation)
         {
@@ -188,6 +193,103 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var target = _context.Temporary(type);
         _builder!.Allocate(block, _context.Site(operation), type, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
+    }
+
+    private TotalBodyValue LowerStringConcatenation(IOperation operation, IrBlockId block, int depth)
+    {
+        var rejected = Reject(operation, depth);
+        if (rejected != FrontendAbstention.None)
+        { return Approximate(operation, block, rejected); }
+        if (operation.ConstantValue is { HasValue: true, Value: string text })
+        { return Capture(operation, new(_factory.String(text), block, FrontendSubsetClassification.Exact)); }
+        var leaves = new List<IOperation>();
+        Collect(operation, depth);
+        var operands = ImmutableArray.CreateBuilder<IrTerm>();
+        var constant = new System.Text.StringBuilder();
+        foreach (var leaf in leaves)
+        {
+            var value = LowerBodyValue(leaf, block, depth + 1);
+            if (!value.Classification.IsExact)
+            { return value; }
+            block = value.Continuation;
+            if (!value.ConcatenationOperands.IsDefault)
+            {
+                foreach (var part in value.ConcatenationOperands)
+                {
+                    if (part is IrStringTerm textPart)
+                    { constant.Append(_factory.GetString(textPart.Value)); }
+                    else
+                    {
+                        FlushConstant();
+                        operands.Add(part);
+                    }
+                }
+            }
+            else if (leaf.ConstantValue.HasValue && leaf.ConstantValue.Value is null or string)
+            { constant.Append(leaf.ConstantValue.Value as string); }
+            else
+            {
+                FlushConstant();
+                operands.Add(value.Value);
+            }
+        }
+        FlushConstant();
+        // The compiler merges adjacent constants and drops constant null/empty
+        // strings before choosing a fixed overload or creating a params array.
+        if (operands.Count > 4)
+        { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
+        if (operands.Count == 0)
+        { return Capture(operation, new(_factory.String(""), block, FrontendSubsetClassification.Exact)); }
+        if (operands.Count == 1)
+        { operands.Insert(0, _factory.String("")); }
+        var parent = operation.Syntax.Parent;
+        while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax)
+        { parent = parent.Parent; }
+        var deferred = operation.Parent is IFlowCaptureOperation &&
+            parent is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryParent &&
+            binaryParent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression);
+        return CaptureStringConcatenation(operation, operands.ToImmutable(), block, deferred);
+
+        void FlushConstant()
+        {
+            if (constant.Length != 0)
+            {
+                operands.Add(_factory.String(constant.ToString()));
+                constant.Clear();
+            }
+        }
+
+        void Collect(IOperation current, int nesting)
+        {
+            Spend?.Invoke();
+            if (nesting < 256 && CSharpOperationSemantics.IsStringConcatenation(current) && !current.ConstantValue.HasValue)
+            {
+                var binary = (IBinaryOperation)current;
+                Collect(binary.LeftOperand, nesting + 1);
+                Collect(binary.RightOperand, nesting + 1);
+            }
+            else
+            { leaves.Add(current); }
+        }
+    }
+
+    private TotalBodyValue CaptureStringConcatenation(IOperation operation, ImmutableArray<IrTerm> operands, IrBlockId block,
+        bool deferred = false)
+    {
+        var site = _context.Site(operation);
+        var allocation = _builder!.CreateBlock("concat:allocate");
+        var join = _builder.CreateBlock("concat:join");
+        // A CFG-captured prefix remains part of the emitter's flattened chain.
+        // Its value may be carried, but its allocation is deferred to the root.
+        _builder.Branch(block, site, deferred ? _factory.Boolean(false) :
+            CSharpOperationSemantics.StringConcatenationAllocates(_factory, operands), allocation, join);
+        _builder.Allocate(allocation, site, _factory.StringType);
+        _builder.Goto(allocation, site, join);
+        var result = operands[0];
+        foreach (var operand in operands.Skip(1))
+        { result = CSharpOperationSemantics.StringConcat(_factory, result, operand).Value; }
+        return Capture(operation, new(result, join, FrontendSubsetClassification.Exact,
+            deferred ? operands : default), site);
     }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
@@ -272,6 +374,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = lowered.Continuation;
         }
         var rule = model.Apply([.. arguments]);
+        if (model.StringConcatenation && rule.Classification.IsExact)
+        { return CaptureStringConcatenation(invocation, [.. arguments], block); }
         return rule.Classification.IsExact ? ApplyRule(invocation, rule, block)
             : Approximate(invocation, block, rule.Classification.Abstention);
     }
@@ -368,13 +472,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return result;
     }
 
-    private TotalBodyValue Capture(IOperation operation, TotalBodyValue value)
+    private TotalBodyValue Capture(IOperation operation, TotalBodyValue value, OperationId? site = null)
     {
         if (value.Value is IrNullTerm)
         { return value; }
         var target = _context.Temporary(value.Value.Type);
-        _builder!.Assign(value.Continuation, _context.Site(operation), target, value.Value);
-        return new(_factory.Variable(target), value.Continuation, value.Classification);
+        _builder!.Assign(value.Continuation, site ?? _context.Site(operation), target, value.Value);
+        return new(_factory.Variable(target), value.Continuation, value.Classification, value.ConcatenationOperands);
     }
 
     private bool TryLeaf(IOperation operation, TotalParameterState state, out IrTerm? value)
