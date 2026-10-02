@@ -189,7 +189,6 @@
         "name": "execution",
         "paths": [
           "SharpProof.Worker/CallableEntryFeasibility.cs",
-          "SharpProof.Worker/SpecResultDomainProjection.cs",
           "SharpProof.Worker/SharpProofWorker.cs",
           "SharpProof.Worker/WorkerHost.cs"
         ]

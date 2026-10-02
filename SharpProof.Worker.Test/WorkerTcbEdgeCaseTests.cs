@@ -9,7 +9,6 @@ using SharpProof.Dataflow;
 using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
-using SharpProof.Specs;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -519,62 +518,6 @@ public sealed class WorkerTcbEdgeCaseTests
             Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
-    [Test]
-    public void NullResultFacetProjectsToNegativeNonNullEvidence()
-    {
-        var factory = new IrFactory();
-        var result = factory.CreateVariable(
-            "result",
-            factory.ObjectType);
-
-        var succeeded = SpecResultDomainProjection.TryCreate(
-            factory,
-            CreateTemplate(
-                IrTypeKind.Reference,
-                SpecNullness.Null,
-                SpecCardinality.NotApplicable),
-            result,
-            out var projection,
-            out var evidence);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(succeeded, Is.True);
-            Assert.That(projection.NonNullVariable, Is.Not.Null);
-            Assert.That(projection.LengthVariable, Is.Null);
-            Assert.That(evidence, Has.Length.EqualTo(1));
-            Assert.That(evidence[0], Is.TypeOf<IrUnaryTerm>());
-        }
-    }
-
-    [Test]
-    public void NonEmptySequenceFacetProjectsToPositiveLengthEvidence()
-    {
-        var factory = new IrFactory();
-        var result = factory.CreateVariable(
-            "result",
-            factory.GetOrCreateSequenceType(factory.IntegerType));
-
-        var succeeded = SpecResultDomainProjection.TryCreate(
-            factory,
-            CreateTemplate(
-                IrTypeKind.Sequence,
-                SpecNullness.NonNull,
-                SpecCardinality.NonEmpty),
-            result,
-            out var projection,
-            out var evidence);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(succeeded, Is.True);
-            Assert.That(projection.NonNullVariable, Is.Not.Null);
-            Assert.That(projection.LengthVariable, Is.Not.Null);
-            Assert.That(evidence, Has.Length.EqualTo(2));
-            Assert.That(evidence[1], Is.TypeOf<IrBinaryTerm>());
-        }
-    }
-
     [TestCase(
         false,
         TestName = "CacheRejectsAHashedPayloadWithNullCallableResults")]
@@ -771,21 +714,6 @@ public sealed class WorkerTcbEdgeCaseTests
             null,
             WorkerBudgets.DefaultQueryRlimit,
             WorkerBudgets.DefaultMethodRlimit);
-    }
-
-    private static ApiSpecTemplate CreateTemplate(
-        IrTypeKind resultType,
-        SpecNullness nullness,
-        SpecCardinality cardinality)
-    {
-        return WorkerApiSpecTestFixtures.CreateTemplate(
-            "test.tcb.result",
-            "M:Test.Tcb.Result",
-            "Test.Tcb",
-            "worker-tcb-edge-test",
-            resultType,
-            nullness,
-            cardinality);
     }
 
     private sealed class FixedBackend(BackendCheckResult result)

@@ -23,8 +23,6 @@ internal sealed partial record CallableVerificationResult(
     ImmutableArray<WorkerClaimResult> Claims
 );
 
-internal readonly partial record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable);
-
 internal sealed partial class VerificationCache
 {
     private sealed partial record CacheEntry(
