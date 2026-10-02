@@ -263,6 +263,132 @@ public sealed class NativePurityEffectTests
         Assert.That(result.Reason, Is.EqualTo(initialization ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.UnsupportedContract));
     }
 
+    [TestCase("lock (gate) { x++; }")]
+    [TestCase("System.Threading.Monitor.Enter(gate);")]
+    [TestCase("System.Threading.Monitor.Exit(gate);")]
+    [TestCase("while (x > 0) { lock (gate) { x--; } }")]
+    public async Task SynchronizationAttemptsRefutePurityWithoutInventingCompletion(string body)
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(SynchronizationSource(body)));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.LockWitness, Is.Not.Null);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrLockInstruction>().Any(synchronization => synchronization.Operation == result.LockWitness), Is.True);
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.Null);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyExceptionsAsync([])).Outcome, Is.Null);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyNormalCompletionAsync()).Outcome, Is.Not.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
+    public async Task PreconditionsCanExcludeSynchronizationAndQualifyEveryGoal()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
+            SynchronizationSource("Contract.Requires(gate == null); if (gate != null) { lock (gate) { x++; } }")));
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+            Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyExceptionsAsync([])).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
+    public async Task SourceHelpersPreserveSynchronizationBarriers()
+    {
+        var source = SynchronizationSource("return Helper(gate, x);").Replace("public static class C {",
+            "public static class C { private static int Helper(object gate, int x) { lock (gate) { return x; } }",
+            StringComparison.Ordinal);
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(
+            Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source)), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.LockWitness, Is.Not.Null);
+    }
+
+    [Test]
+    public void LockReplayStopsBeforeBodyEffectsAndReturn()
+    {
+        var source = SynchronizationSource("lock (gate) { new object(); x++; }");
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        var total = preparation.Total!;
+        var factory = total.Program.Factory;
+        var attempts = 0;
+        var allocations = 0;
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry, parameter =>
+                factory.GetTypeInfo(factory.GetVariableInfo(parameter.Entry).Type).Kind == IrTypeKind.Integer ?
+                    factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1L) :
+                    factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new object())),
+            10000, new IrProgramReplayOptions(_ => null)
+            {
+                LockObserver = _ => attempts++,
+                AllocationObserver = _ => allocations++
+            });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(execution.Instruction, Is.TypeOf<IrLockInstruction>());
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(attempts, Is.EqualTo(1));
+        Assert.That(allocations, Is.Zero);
+        using var image = new MemoryStream();
+        var runtimeSource = source.Replace("Contract.Ensures(Contract.Result<int>() == x); ", "", StringComparison.Ordinal);
+        Assert.That(TestCompilation.Create("SynchronizationRuntime", runtimeSource).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("SynchronizationRuntime", isCollectible: true);
+        try
+        {
+            var method = runtime.LoadFromStream(image).GetType("C")!.GetMethod("Target")!;
+            var execute = method.CreateDelegate<Func<object, int, int>>();
+            Assert.That(execute(new object(), 1), Is.EqualTo(2));
+            Assert.Throws<ArgumentNullException>(new Action(() => execute(null!, 1)));
+        }
+        finally { runtime.Unload(); }
+    }
+
+    [Test]
+    public async Task SourceMonitorLookalikeUsesItsBodyRatherThanFrameworkSemantics()
+    {
+        var source = SynchronizationSource("System.Threading.Monitor.Enter(gate);") +
+            "namespace System.Threading { public static class Monitor { public static void Enter(object value) { } } }";
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrLockInstruction>(), Is.Empty);
+    }
+
+    [Test]
+    public async Task UnmodeledMonitorOverloadsRemainUnknown()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
+            SynchronizationSource("System.Threading.Monitor.TryEnter(gate);")));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LockRowsRequireReferenceTermsAndCanonicalUnusedSlots(bool unusedSlot)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(SynchronizationSource("System.Threading.Monitor.Enter(gate); x = 1;"));
+        var graph = artifact.Callables.Single().Total!.Graph;
+        var row = graph.Blocks.SelectMany(block => block.Instructions).Single(instruction => instruction.Kind == IrInstructionKind.Lock);
+        if (unusedSlot)
+        { row.B = 0; }
+        else
+        { row.A = Array.FindIndex(graph.Terms, term => term.Kind == IrTermKind.Integer); }
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
+    }
+
+    private static string SynchronizationSource(string body)
+    {
+        return "using SharpProof.Attributes; public static class C { [EnforcePure, ZeroAllocations] " +
+            "public static int Target(object gate, int x) { Contract.Ensures(Contract.Result<int>() == x); " + body + " return x; } }";
+    }
+
     private static string Source(string body, string members = "")
     { return "using SharpProof.Attributes; public static class C { " + members + " [EnforcePure] public static int Target(int x) { " + body + " } }"; }
 

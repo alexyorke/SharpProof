@@ -12,6 +12,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes;
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
@@ -27,6 +28,7 @@ internal sealed class PassiveCallableVcPlan
         _exceptions = builder.Exceptions;
         _allocations = builder.Allocations;
         _writes = builder.Writes;
+        _locks = builder.Locks;
         _potentialExceptionAllocations = builder.PotentialExceptionAllocations;
         HasUnmodeledAllocations = builder.HasUnmodeledAllocations;
         _model = builder.Model;
@@ -54,7 +56,7 @@ internal sealed class PassiveCallableVcPlan
     internal VerificationQuery EnsuresQuery(int ordinal)
     {
         RequireOrdinal(ordinal);
-        return new(Factory, _entry.AddRange(_body), new Goal(Factory, _goals[ordinal],
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory, BeforeSynchronization(_goals[ordinal]),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(ordinal)), _model);
     }
 
@@ -68,7 +70,7 @@ internal sealed class PassiveCallableVcPlan
     internal VerificationQuery NormalCompletionQuery()
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
-            Factory.Unary(IrUnaryOperator.Not, _normalCompletion), ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)), _model);
+            BeforeSynchronization(Factory.Unary(IrUnaryOperator.Not, _normalCompletion)), ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)), _model);
     }
 
     internal CallableReplayContext NormalCompletionReplay()
@@ -92,7 +94,7 @@ internal sealed class PassiveCallableVcPlan
             goal = Factory.Binary(IrBinaryOperator.AndAlso, goal,
                 Factory.Binary(IrBinaryOperator.OrElse, Factory.Unary(IrUnaryOperator.Not, exit.Reach), admitted));
         }
-        return new(Factory, _entry.AddRange(_body), new Goal(Factory, goal,
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory, BeforeSynchronization(goal),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
@@ -100,14 +102,15 @@ internal sealed class PassiveCallableVcPlan
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, _allocations.Select(allocation => allocation.Reach)
-                .Concat(_potentialExceptionAllocations)),
+                .Concat(_potentialExceptionAllocations).Concat(_locks.Select(synchronization => synchronization.Reach))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
     internal VerificationQuery PurityQuery()
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
-            EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => write.Region != IrWriteRegion.Local).Select(write => write.Reach)),
+            EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => write.Region != IrWriteRegion.Local).Select(write => write.Reach)
+                .Concat(_locks.Select(synchronization => synchronization.Reach))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
@@ -115,7 +118,8 @@ internal sealed class PassiveCallableVcPlan
     { return ReplayEffects(inputs, cancellationToken); }
 
     internal IrProgramExecutionResult ReplayEffects(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken,
-        Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null)
+        Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
+        Action<IrLockInstruction>? lockObserver = null)
     {
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
@@ -124,17 +128,26 @@ internal sealed class PassiveCallableVcPlan
             initial[parameter.Current] = inputs[parameter.Entry];
         }
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
-            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver), cancellationToken);
+            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver), cancellationToken);
     }
 
-    private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null)
+    private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
+        Action<IrLockInstruction>? lockObserver = null)
     {
         return new(request => Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
             ? Factory.CreateBooleanValue(false)
             : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type))
-        { AllocationObserver = allocationObserver, WriteObserver = writeObserver };
+        { AllocationObserver = allocationObserver, WriteObserver = writeObserver, LockObserver = lockObserver };
+    }
+
+    private IrTerm BeforeSynchronization(IrTerm goal)
+    {
+        if (_locks.IsEmpty)
+        { return goal; }
+        return Factory.Binary(IrBinaryOperator.AndAlso, goal,
+            EffectGoalBuilder.NoReachableSites(Factory, _locks.Select(synchronization => synchronization.Reach)));
     }
 
     private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)

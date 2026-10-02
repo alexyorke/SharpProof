@@ -22,6 +22,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<(IrTerm Reach, IrTerm Kind)> _exceptions = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _allocations = [];
     private readonly List<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes = [];
+    private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
     private readonly List<IrTerm> _potentialExceptionAllocations = [];
     private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
@@ -37,6 +38,7 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => [.. _exceptions];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
     internal ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> Writes => [.. _writes];
+    internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
     internal ImmutableArray<IrTerm> PotentialExceptionAllocations => [.. _potentialExceptionAllocations];
     internal bool HasUnmodeledAllocations => _hasStringConcat;
     internal ImmutableArray<Assumption> Facts => [.. _facts];
@@ -175,6 +177,11 @@ internal sealed class PassiveCallableVcBuilder
                 {
                     case IrAllocationInstruction allocation:
                         _allocations.Add((reach, allocation.Operation));
+                        break;
+                    case IrLockInstruction synchronization:
+                        if (!TryRewrite(synchronization.Receiver, state, out _))
+                        { return null; }
+                        _locks.Add((reach, synchronization.Operation));
                         break;
                     case IrWriteInstruction write:
                         _writes.Add((reach, write.Operation, write.Region));

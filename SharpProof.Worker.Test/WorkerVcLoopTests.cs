@@ -39,6 +39,9 @@ public sealed class WorkerVcLoopTests
                 var destination = blocks[block.Id];
                 switch (instruction)
                 {
+                    case IrLockInstruction synchronization:
+                        builder.Lock(destination, synchronization.Operation, synchronization.Receiver);
+                        break;
                     case IrWriteInstruction write:
                         builder.Write(destination, write.Operation, write.Region);
                         break;

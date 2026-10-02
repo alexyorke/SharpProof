@@ -462,6 +462,14 @@ feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.
 `SharpProof.Gates purity-shadow` compares every pinned method against raw legacy
 purity results; independent mutation oracles remain explicit gaps. Compiler
 effect authority remains in place.
+Typed Lock instructions record validated Monitor.Enter/Exit attempts, including
+C# lock statements and source-helper frames. Concrete replay observes the
+attempt and stops before synchronization. Native purity excludes reachable
+attempts; postcondition, exception, allocation and normal-completion proofs also
+require them to be unreachable. These guards preserve the boundary around
+blocking, runtime allocation and exceptions; no monitor-state model is implied.
+Preconditions can exclude a lock path. Only the compiler's matched lockTaken
+Boolean local is admitted among unnamed generated locals.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.

@@ -296,7 +296,7 @@ internal static class CompilerTotalCallableArtifactCodec
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var instruction in block.Instructions)
             {
-                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
+                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Lock or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
                     IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
@@ -385,7 +385,7 @@ internal static class CompilerTotalCallableArtifactCodec
             foreach (var instruction in block.Instructions)
             {
                 Spend();
-                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
+                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Lock or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
                     IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)

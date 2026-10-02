@@ -488,6 +488,13 @@ and incomplete initialization abstain; this shadow does not change compiler
 effect authority. Refutation requires an original-program write-site witness
 without approximation reads. Bounded loop search never establishes a proof.
 
+Lock events denote synchronization attempts, including Monitor.Enter/Exit and
+ordinary C# lock statements. Replay stops at the attempt and may refute purity
+from the owned site without claiming acquisition, release, completion or an
+exception kind. All other body proofs require synchronization sites to be
+unreachable under their preconditions. Allocation witnesses must still observe
+an explicit allocation; a reachable lock alone yields an incomplete result.
+
 Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
 cases carry explicit normal-completion predicates for arithmetic faults and
 short-circuiting, checked against independently executed C# operators. Finite

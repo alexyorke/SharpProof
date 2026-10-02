@@ -65,6 +65,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
 
+    public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
+    { return Append(block, new IrLockInstruction(NextInstructionId(), operation, receiver)); }
+
     public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
     {
         return Append(
@@ -241,6 +244,11 @@ public sealed class IrProgramBuilder(IrFactory factory)
         _factory.GetOperationInfo(instruction.Operation);
         switch (instruction)
         {
+            case IrLockInstruction synchronization:
+                if (_factory.GetTypeInfo(ValidateTerm(synchronization.Receiver, "receiver")).Kind is not
+                    (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
+                { throw InvalidArgument("Synchronization requires a reference receiver.", "receiver"); }
+                break;
             case IrWriteInstruction write:
                 if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
                 { throw InvalidArgument("A write region is undefined.", "region"); }

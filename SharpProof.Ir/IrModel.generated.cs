@@ -525,7 +525,8 @@ public enum IrInstructionKind
     Throw = 10,
     ExceptionalExit = 11,
     Allocate = 12,
-    Write = 13
+    Write = 13,
+    Lock = 14
 }
 
 public enum IrWriteRegion
@@ -619,6 +620,17 @@ public sealed class IrAllocationInstruction : IrInstruction
     { AllocatedType = allocatedType; }
 
     public IrTypeId AllocatedType { get; }
+}
+
+// A synchronization attempt is an explicit effect and a concrete replay
+// barrier. It does not claim acquisition, release, completion or exception facts.
+public sealed class IrLockInstruction : IrInstruction
+{
+    internal IrLockInstruction(IrInstructionId id, OperationId operation, IrTerm receiver)
+        : base(id, IrInstructionKind.Lock, operation)
+    { Receiver = receiver; }
+
+    public IrTerm Receiver { get; }
 }
 
 public sealed class IrWriteInstruction : IrInstruction

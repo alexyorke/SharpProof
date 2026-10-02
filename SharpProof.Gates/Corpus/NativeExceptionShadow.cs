@@ -103,7 +103,7 @@ internal static class NativeExceptionShadow
                 RefutedOutcome => WorkerClaimOutcome.Refuted,
                 _ => WorkerClaimOutcome.Unknown
             };
-            if (outcome == WorkerClaimOutcome.Refuted && (purity ? evidence.WriteWitness == null : allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
+            if (outcome == WorkerClaimOutcome.Refuted && (purity ? evidence.WriteWitness == null && evidence.LockWitness == null : allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
             { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
             var allocationObservation = allocations && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
                 ? allocationOracle.Check(target.Method, preparation.Total!, evidence, outcome, cancellationToken) : null;

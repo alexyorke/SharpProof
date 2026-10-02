@@ -176,6 +176,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 return block;
             case IExpressionStatementOperation expression:
                 return Value(expression.Operation, block).Continuation;
+            case IInvocationOperation invocation when CSharpOperationSemantics.IsMonitorAttempt(invocation):
+                return Value(invocation, block).Continuation;
             case ISimpleAssignmentOperation or IIncrementOrDecrementOperation or ICompoundAssignmentOperation:
                 return Value(operation, block).Continuation;
             case IFlowCaptureOperation capture:

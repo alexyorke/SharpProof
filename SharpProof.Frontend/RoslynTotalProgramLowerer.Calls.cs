@@ -95,6 +95,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case IrAllocationInstruction allocation:
                         _builder.Allocate(destination, allocation.Operation, allocation.AllocatedType);
                         break;
+                    case IrLockInstruction synchronization:
+                        _builder.Lock(destination, synchronization.Operation, synchronization.Receiver);
+                        break;
                     case IrWriteInstruction write:
                         _builder.Write(destination, write.Operation, write.Region);
                         break;

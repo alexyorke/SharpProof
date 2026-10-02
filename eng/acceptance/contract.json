@@ -159,6 +159,7 @@
           "SharpProof.Frontend/CSharpOperationSemantics.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Arrays.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Fields.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Synchronization.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.References.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Arithmetic.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Operations.cs",

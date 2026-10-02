@@ -83,6 +83,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (depth < 256 && operation is IInvocationOperation synchronization &&
+            CSharpOperationSemantics.IsMonitorAttempt(synchronization))
+        {
+            var receiver = LowerBodyValue(synchronization.Arguments[0].Value, block, depth + 1);
+            if (receiver.Classification.IsExact)
+            { _builder!.Lock(receiver.Continuation, _context.Site(operation), receiver.Value); }
+            return new(_factory.Boolean(false), receiver.Continuation, receiver.Classification);
+        }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }

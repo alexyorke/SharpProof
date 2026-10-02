@@ -95,6 +95,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrAllocationInstruction allocation:
                         replayOptions?.AllocationObserver?.Invoke(allocation);
                         break;
+                    case IrLockInstruction synchronization:
+                        var receiver = _terms.Evaluate(synchronization.Receiver, values.Current, values.ObserveRead, cancellationToken);
+                        if (receiver.Status != IrEvaluationStatus.Value)
+                        { return FromEvaluation(receiver, synchronization, values, steps); }
+                        replayOptions?.LockObserver?.Invoke(synchronization);
+                        return Unsupported(synchronization, values, steps,
+                            "Concrete execution stopped at a synchronization attempt.");
                     case IrWriteInstruction write:
                         replayOptions?.WriteObserver?.Invoke(write);
                         break;

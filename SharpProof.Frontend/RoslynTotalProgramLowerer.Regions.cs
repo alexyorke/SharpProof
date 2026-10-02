@@ -53,7 +53,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ControlFlowRegionKind.Try or ControlFlowRegionKind.TryAndCatch or ControlFlowRegionKind.Catch or
                     ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally or
                     ControlFlowRegionKind.FilterAndHandler or ControlFlowRegionKind.Filter) ||
-                region.Locals.Any(local => local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name) ||
+                region.Locals.Any(local => (local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name)) && !IsSynchronizationLocal(graph, local) ||
                     local.RefKind != RefKind.None || !CSharpOperationSemantics.IsValueDomain(local.Type)))
             { throw new RegionIncompleteException(); }
             if (region.Kind == ControlFlowRegionKind.Catch)
@@ -129,6 +129,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         }, out var failure);
         if (failure is not (IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow))
         { throw new RegionIncompleteException(); }
+    }
+
+    private static bool IsSynchronizationLocal(ControlFlowGraph graph, ILocalSymbol local)
+    {
+        // Admit only the compiler's lockTaken flag used by implicit Monitor.Enter.
+        return local.IsImplicitlyDeclared && local.Type.SpecialType == SpecialType.System_Boolean &&
+            graph.Blocks.Any(block => block.Operations.Any(operation =>
+                (operation is IExpressionStatementOperation statement ? statement.Operation : operation) is IInvocationOperation invocation &&
+                invocation.IsImplicit && CSharpOperationSemantics.IsMonitorAttempt(invocation) && invocation.Arguments.Length == 2 &&
+                invocation.Arguments[1].Value is ILocalReferenceOperation reference &&
+                SymbolEqualityComparer.Default.Equals(reference.Local, local)));
     }
 
     private (BasicBlock? Block, int Operation) RegionLocalInitialization()

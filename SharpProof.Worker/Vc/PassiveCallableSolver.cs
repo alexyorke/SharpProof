@@ -3,7 +3,8 @@ namespace SharpProof.Worker;
 internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerClaimReason Reason,
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
     ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null,
-    OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false, OperationId? WriteWitness = null);
+    OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false, OperationId? WriteWitness = null,
+    OperationId? LockWitness = null);
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
@@ -67,13 +68,16 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (witness.Outcome is not RefutedOutcome)
         { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
         OperationId? site = null;
+        OperationId? synchronizationSite = null;
         var replay = _plan.ReplayEffects(witness.EntryModel, cancellationToken,
             allocationObserver: allocations ? allocation => site ??= allocation.Operation : null,
             writeObserver: allocations ? null : write =>
         {
             if (write.Region != IrWriteRegion.Local)
             { site ??= write.Operation; }
-        });
+        }, lockObserver: allocations ? null : synchronization => synchronizationSite ??= synchronization.Operation);
+        if (synchronizationSite != null && !replay.ConsumedApproximation)
+        { return witness with { LockWitness = synchronizationSite }; }
         if (site != null && !replay.ConsumedApproximation)
         { return allocations ? witness with { AllocationWitness = site } : witness with { WriteWitness = site }; }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);

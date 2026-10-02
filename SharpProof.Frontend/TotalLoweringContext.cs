@@ -121,7 +121,8 @@ public sealed class TotalLoweringContext
         if (!_locals.TryGetValue(symbol, out var variable))
         {
             var local = (ILocalSymbol)symbol;
-            variable = Factory.CreateVariable(local.Name, Type(local.Type));
+            variable = string.IsNullOrEmpty(local.Name) && local.IsImplicitlyDeclared
+                ? Temporary(Type(local.Type)) : Factory.CreateVariable(local.Name, Type(local.Type));
             _locals.Add(symbol, variable);
         }
         return variable;
