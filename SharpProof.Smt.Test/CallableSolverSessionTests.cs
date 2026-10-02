@@ -400,7 +400,7 @@ public sealed class CallableSolverSessionTests
     }
 
     [Test]
-    public async Task NativeFailureAfterAnAssertionRetiresTheCandidateButKeepsLegacyRunnerReusable()
+    public async Task NativeFailureAfterAnAssertionRetiresTheSessionButKeepsNonRetiringRunnerReusable()
     {
         foreach (var candidate in new[] { true, false })
         {

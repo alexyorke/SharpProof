@@ -1,6 +1,6 @@
 namespace SharpProof.Smt;
 
-// Candidate-only total scalar solver. Each query activates its own assumption
+// Total scalar solver. Each query activates its own assumption
 // subset and goal; inactive body facts cannot alter an entry feasibility check.
 public sealed class CallableSolverSession : ISmtBackend, IDisposable
 {

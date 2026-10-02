@@ -646,7 +646,6 @@ public sealed class SharpProofWorker : IDisposable
     {
         return backend switch
         {
-            IrSmtBackend concrete => () => concrete.ConsumedResourceCount,
             NativeCallableBackend native => () => native.ConsumedResourceCount,
             _ => null
         };

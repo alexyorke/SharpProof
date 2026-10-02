@@ -7,28 +7,12 @@ using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
-public sealed class IrSmtBackendTests
+public sealed class NativeSmtRegressionTests
 {
-    [Test]
-    public async Task LegacyBackendRejectsTotalBuiltinIntegersAndBooleanOnlyQueries()
-    {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var variable = factory.CreateVariable("value", factory.IntegerType);
-        using var backend = new IrSmtBackend();
-        foreach (var variables in new IrVarId[][] { [variable], [] })
-        {
-            var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
-                ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
-            var result = await backend.CheckAsync(query, CancellationToken.None);
-            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
-            Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
-        }
-    }
-
     [Test]
     public async Task UnsatProofReturnsAHygienicCore()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("source name is irrelevant", factory.IntegerType);
         var operation = factory.CreateOperation("lowered");
         var lowerBound = factory.Binary(
@@ -48,7 +32,7 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Precondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
@@ -61,7 +45,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task SatModelMustReplayBeforeRefutation()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = factory.Binary(
             IrBinaryOperator.GreaterThan,
@@ -76,7 +60,7 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Precondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
@@ -87,7 +71,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task StrictComparisonDoesNotAcceptEqualityBoundary()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("equal to zero");
         var equalToZero = factory.Binary(
@@ -110,7 +94,7 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
@@ -122,7 +106,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task FormulaAndExplicitVariablesProduceOneExactModelSet()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var formula = factory.CreateVariable("formula", factory.BooleanType);
@@ -136,7 +120,7 @@ public sealed class IrSmtBackendTests
                 new SourceLocationId(0)),
             [boolean, integer]);
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
@@ -154,7 +138,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task NormalCompletionGuardsCheckedDivision()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("nonzero");
         var nonzero = factory.Binary(
@@ -178,22 +162,22 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
-    public async Task SignedRemainderOverflowProducesTypedUnknown()
+    public async Task SignedRemainderOverflowFailsItsExplicitCompletionGoal()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var dividendIsMinimum = factory.Binary(
             IrBinaryOperator.Equal,
             factory.Variable(dividend),
-            factory.Integer(long.MinValue));
+            factory.Integer(int.MinValue));
         var divisorIsNegativeOne = factory.Binary(
             IrBinaryOperator.Equal,
             factory.Variable(divisor),
@@ -217,19 +201,17 @@ public sealed class IrSmtBackendTests
             new Goal(
                 factory,
                 factory.Binary(
-                    IrBinaryOperator.Equal,
-                    remainder,
-                    factory.Integer(0)),
+                    IrBinaryOperator.AndAlso,
+                    factory.Unary(IrUnaryOperator.Not,
+                        factory.Binary(IrBinaryOperator.AndAlso, dividendIsMinimum, divisorIsNegativeOne)),
+                    factory.Binary(IrBinaryOperator.Equal, remainder, factory.Integer(0))),
                 ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     [TestCase(-7L, 3L, -2L, -1L)]
@@ -241,7 +223,7 @@ public sealed class IrSmtBackendTests
         long expectedQuotient,
         long expectedRemainder)
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var quotient = factory.Binary(
@@ -286,25 +268,25 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
-    public async Task UndefinedGoalStateProducesTypedUnknown()
+    public async Task DivisionByZeroFailsItsExplicitCompletionGoal()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var quotient = factory.Binary(
             IrBinaryOperator.Divide,
             factory.Integer(0),
             factory.Variable(variable));
         var goal = factory.Binary(
-            IrBinaryOperator.Equal,
-            quotient,
-            factory.Integer(0));
+            IrBinaryOperator.AndAlso,
+            factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(variable), factory.Integer(0)),
+            factory.Binary(IrBinaryOperator.Equal, quotient, factory.Integer(0)));
         var query = new VerificationQuery(
             factory,
             [],
@@ -314,43 +296,46 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
-    public async Task StringVariablesFailClosedWithoutNullTagEncoding()
+    public async Task StringLengthCannotProveAnUnconstrainedStringIsNonempty()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("text", factory.StringType);
         var goal = factory.Binary(
             IrBinaryOperator.GreaterThan,
             factory.Length(factory.Variable(variable)),
             factory.Integer(0));
-        await AssertUnsupportedEncoding(
+        await AssertRefuted(
             factory,
             goal,
             ProofDiagnosticKind.Precondition);
     }
 
     [Test]
-    public async Task EmbeddedNullStringFailsClosedWithoutTruncation()
+    public async Task EmbeddedNullStringRemainsDistinctFromItsTruncatedContent()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("text", factory.StringType);
         var goal = factory.Binary(
             IrBinaryOperator.Equal,
             factory.String("left\0right"),
             factory.Variable(variable));
-        await AssertUnsupportedEncoding(
-            factory,
-            goal,
-            ProofDiagnosticKind.Precondition);
+        var input = new Assumption(factory,
+            factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), factory.String("leftright")),
+            new LoweredJustification(factory.CreateOperation("string-input")));
+        var query = new VerificationQuery(factory, [input],
+            new Goal(factory, goal, ProofDiagnosticKind.Precondition, new SourceLocationId(0)));
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(((RefutedOutcome)outcome).Model.Assignments[variable].String,
+            Is.EqualTo("leftright"));
     }
 
     [TestCase(@"\u{41}", "A")]
@@ -362,7 +347,7 @@ public sealed class IrSmtBackendTests
         string first,
         string second)
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var selected = factory.Conditional(
             factory.Variable(flag),
@@ -381,7 +366,7 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
@@ -393,7 +378,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task NullableStringConcatCannotProduceAFalseProof()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("text", factory.StringType);
         var concatenated = factory.Binary(
             IrBinaryOperator.StringConcat,
@@ -403,57 +388,41 @@ public sealed class IrSmtBackendTests
             IrBinaryOperator.Equal,
             concatenated,
             factory.Variable(variable));
-        await AssertUnsupportedEncoding(
+        await AssertRefuted(
             factory,
             goal,
             ProofDiagnosticKind.Postcondition);
     }
 
-    private static async Task AssertUnsupportedEncoding(
-        IrFactory factory,
-        IrTerm goal,
-        ProofDiagnosticKind diagnosticKind)
+    private static async Task AssertRefuted(IrFactory factory, IrTerm goal, ProofDiagnosticKind diagnosticKind)
     {
-        var query = new VerificationQuery(
-            factory,
-            [],
-            new Goal(
-                factory,
-                goal,
-                diagnosticKind,
-                new SourceLocationId(0)));
-
-        using var backend = new IrSmtBackend();
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
-
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = new VerificationQuery(factory, [], new Goal(factory, goal, diagnosticKind, new SourceLocationId(0)));
+        Assert.That(await new ProofKernel(backend).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
-    public async Task LegacyBackendRejectsTypedVariables()
+    public async Task UnsignedMaximumCannotHaveAStrictlyGreaterValue()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(64, false);
         var variable = factory.CreateVariable("value", type);
-        await AssertUnsupportedEncoding(factory,
+        await AssertRefuted(factory,
             factory.Binary(IrBinaryOperator.GreaterThan, factory.Variable(variable),
                 factory.Integer(type, ulong.MaxValue)), ProofDiagnosticKind.Postcondition);
     }
 
     [Test]
-    public async Task LegacyBackendRejectsTypedArithmeticWithOnlyBooleanInputs()
+    public async Task TypedArithmeticCannotProvePositivityAcrossSignedWrapping()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(32, true);
         var choice = factory.CreateVariable("choice", factory.BooleanType);
         var value = factory.Conditional(factory.Variable(choice),
             factory.Integer(type, int.MaxValue), factory.Integer(type, 1));
         var wrapped = factory.Binary(IrBinaryOperator.Add, value, factory.Integer(type, 1));
-        // Mathematical Int would falsely prove positivity when max+1 wraps.
-        await AssertUnsupportedEncoding(factory,
+        // The selected maximum wraps to a negative signed bitvector.
+        await AssertRefuted(factory,
             factory.Binary(IrBinaryOperator.GreaterThan, wrapped, factory.Integer(type, 0)),
             ProofDiagnosticKind.Postcondition);
     }
@@ -461,7 +430,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task OpaqueTermsFailClosed()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var member = factory.GetOrCreateMember(
             factory.CreateIdentity(),
             factory.ObjectType,
@@ -477,7 +446,7 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.Precondition,
                 new SourceLocationId(0)));
 
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
         Assert.That(
@@ -488,7 +457,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public void PreCancelledChecksDoNotBecomeUnknown()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var query = new VerificationQuery(
             factory,
             [],
@@ -497,7 +466,7 @@ public sealed class IrSmtBackendTests
                 factory.Boolean(true),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Func<Task> action = () => backend.CheckAsync(query, cancellation.Token);
@@ -536,8 +505,8 @@ public sealed class IrSmtBackendTests
     {
         using var context = new Z3Context();
         var contextFactoryCalls = 0;
-        Action action = () => _ = new IrSmtBackend(
-            null!,
+        Action action = () => _ = new CallableSolverSession(
+            new IrFactory(IrExecutionSemantics.Total), null!,
             () =>
             {
                 contextFactoryCalls++;
@@ -570,7 +539,7 @@ public sealed class IrSmtBackendTests
     public async Task ResourceAccountingTreatsEachSolverSnapshotAsFresh()
     {
         const uint queryLimit = 1_000_000;
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var operation = factory.CreateOperation("tracked");
         var assumptions = Enumerable.Range(0, 256)
             .Select(index => new Assumption(
@@ -596,7 +565,7 @@ public sealed class IrSmtBackendTests
                 factory.Boolean(true),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
-        using var backend = new IrSmtBackend(
+        using var backend = new CallableSolverSession(factory,
             new IrSmtBackendOptions(queryLimit));
 
         _ = await backend.CheckAsync(expensive, CancellationToken.None);
@@ -620,24 +589,24 @@ public sealed class IrSmtBackendTests
             new DisposableLabel("first"),
             new DisposableLabel("second")
         };
-        var success = IrSmtBackend.CreateUnsatisfiable(
+        var success = CallableSolverSession.DecodeCore(
             successful,
             new Dictionary<string, int>(StringComparer.Ordinal)
             {
                 ["first"] = 2,
                 ["second"] = 1
             },
-            static expression => expression.Label);
+            "goal", new SmtQueryResourceMeter(1_000_000, CancellationToken.None));
 
         var malformed = new[]
         {
             new DisposableLabel("missing"),
             new DisposableLabel("unvisited")
         };
-        var failure = IrSmtBackend.CreateUnsatisfiable(
+        var failure = CallableSolverSession.DecodeCore(
             malformed,
             new Dictionary<string, int>(StringComparer.Ordinal),
-            static expression => expression.Label);
+            "goal", new SmtQueryResourceMeter(1_000_000, CancellationToken.None));
 
         using (Assert.EnterMultipleScope())
         {
@@ -715,129 +684,9 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public void ActiveCancellationDoesNotPoisonTheBackend()
-    {
-        var factory = new IrFactory();
-        var operation = factory.CreateOperation("repeated");
-        var assumption = new Assumption(
-            factory,
-            factory.Boolean(true),
-            new LoweredJustification(operation));
-        var query = new VerificationQuery(
-            factory,
-            Enumerable.Repeat(assumption, 20_000),
-            new Goal(
-                factory,
-                factory.Boolean(true),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)));
-        using var backend = new IrSmtBackend();
-        using var cancellation = new CancellationTokenSource();
-        var gate = typeof(SmtNativeRunner).GetField(
-                "_gate",
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.NonPublic)?
-            .GetValue(GetRunner(backend));
-        Assert.That(gate, Is.Not.Null);
-
-        var check = backend.CheckAsync(query, cancellation.Token);
-        var entered = SpinWait.SpinUntil(
-            () => IsMonitorHeld(gate!),
-            TimeSpan.FromSeconds(5));
-        Assert.That(entered, Is.True);
-        Thread.Sleep(10);
-        cancellation.Cancel();
-
-        Func<Task> action = async () => await check;
-        Assert.ThrowsAsync<OperationCanceledException>(action);
-        var healthyQuery = new VerificationQuery(
-            factory,
-            [],
-            new Goal(
-                factory,
-                factory.Boolean(true),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)));
-        var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
-            .GetAwaiter().GetResult();
-        Assert.That(
-            healthy.Status,
-            Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-    }
-
-    [Test]
-    public void CancellationWhileQueuedAtTheBackendGateDoesNotRunTheQuery()
-    {
-        var factory = new IrFactory();
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            factory.ObjectType,
-            "Queued",
-            factory.BooleanType,
-            isStatic: true);
-        var query = new VerificationQuery(
-            factory,
-            [],
-            new Goal(
-                factory,
-                factory.PureOpaque(member, receiver: null),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)));
-        var healthyQuery = new VerificationQuery(
-            factory,
-            [],
-            new Goal(
-                factory,
-                factory.Boolean(true),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)));
-        using var backend = new IrSmtBackend();
-        using var cancellation = new CancellationTokenSource();
-        var gate = typeof(SmtNativeRunner).GetField(
-                "_gate",
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.NonPublic)?
-            .GetValue(GetRunner(backend));
-        Assert.That(gate, Is.Not.Null);
-
-        Task<BackendCheckResult> active;
-        Task<BackendCheckResult> queued;
-        lock (gate!)
-        {
-            active = backend.CheckAsync(
-                healthyQuery,
-                CancellationToken.None);
-            queued = backend.CheckAsync(query, cancellation.Token);
-            cancellation.Cancel();
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => queued.IsCompleted,
-                    TimeSpan.FromSeconds(1)),
-                Is.True,
-                "A canceled queued check must not wait for the active solver.");
-            Assert.That(
-                queued.IsCanceled,
-                Is.True,
-                "A queued check must cancel before it enters the solver.");
-        }
-
-        Assert.That(
-            active.GetAwaiter().GetResult().Status,
-            Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-        Func<Task> action = async () => await queued;
-        Assert.That(
-            Assert.CatchAsync(action),
-            Is.InstanceOf<OperationCanceledException>());
-
-        var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
-            .GetAwaiter().GetResult();
-        Assert.That(healthy.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-    }
-
-    [Test]
     public async Task DisposeWhileQueryIsQueuedReturnsUnavailable()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var query = new VerificationQuery(
             factory,
             [],
@@ -846,7 +695,7 @@ public sealed class IrSmtBackendTests
                 factory.Boolean(true),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var queryGate = (SemaphoreSlim)typeof(SmtNativeRunner).GetField(
                 "_queryGate",
                 System.Reflection.BindingFlags.Instance |
@@ -884,9 +733,9 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public async Task UnsupportedModelVariablesAreRejectedBeforeEncoding()
+    public async Task ExplicitReferenceModelVariablesAreDecodedWithTheBooleanInput()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var text = factory.CreateVariable("text", factory.StringType);
         var query = new VerificationQuery(
@@ -898,14 +747,13 @@ public sealed class IrSmtBackendTests
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)),
             [boolean, text]);
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
         var result = await backend.CheckAsync(query, CancellationToken.None);
 
-        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
-        Assert.That(
-            result.FailureReason,
-            Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That(result.Model!.Assignments[text].Type, Is.EqualTo(factory.StringType));
+        Assert.That(result.Model.Assignments[boolean].Boolean, Is.False);
     }
 
     [Test]
@@ -913,7 +761,8 @@ public sealed class IrSmtBackendTests
     {
         const int variableCount = 512;
         var query = CreateUnusedBooleanModelQuery(variableCount);
-        using var backend = new IrSmtBackend();
+        var factory = query.Factory;
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
         var result = await backend.CheckAsync(query, CancellationToken.None);
 
@@ -933,7 +782,8 @@ public sealed class IrSmtBackendTests
     {
         const uint queryLimit = 100;
         var query = CreateUnusedBooleanModelQuery(512);
-        using var backend = new IrSmtBackend(new IrSmtBackendOptions(queryLimit));
+        var factory = query.Factory;
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions(queryLimit));
 
         var result = await backend.CheckAsync(query, CancellationToken.None);
 
@@ -951,7 +801,7 @@ public sealed class IrSmtBackendTests
     public async Task SharedAssumptionDagIsDepthValidatedOnce()
     {
         const uint queryLimit = 10_000;
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("shared-depth", factory.BooleanType);
         IrTerm sharedPredicate = factory.Variable(variable);
         for (var index = 0; index < 127; index++)
@@ -971,7 +821,7 @@ public sealed class IrSmtBackendTests
                 factory.Boolean(true),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
-        using var backend = new IrSmtBackend(new IrSmtBackendOptions(queryLimit));
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions(queryLimit));
 
         var result = await backend.CheckAsync(query, CancellationToken.None);
 
@@ -987,11 +837,11 @@ public sealed class IrSmtBackendTests
     [Test]
     public async Task PublicBackendBoundsRecursiveEncodingDepth()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("deep", factory.BooleanType);
         var atBoundary = NestNot(factory, factory.Variable(variable), 255);
         var beyondBoundary = NestNot(factory, factory.Variable(variable), 256);
-        using var backend = new IrSmtBackend();
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
         var supported = await backend.CheckAsync(
             Query(factory, variable, atBoundary), CancellationToken.None);
@@ -1030,20 +880,9 @@ public sealed class IrSmtBackendTests
         }
     }
 
-    private static bool IsMonitorHeld(object gate)
-    {
-        if (!Monitor.TryEnter(gate))
-        {
-            return true;
-        }
-
-        Monitor.Exit(gate);
-        return false;
-    }
-
     private static VerificationQuery CreateUnusedBooleanModelQuery(int variableCount)
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variables = System.Collections.Immutable.ImmutableArray.CreateRange(
             Enumerable.Range(0, variableCount)
                 .Select(index => factory.CreateVariable(
@@ -1105,7 +944,10 @@ public sealed class IrSmtBackendTests
 
     private sealed class DisposableLabel(string label) : IDisposable
     {
-        internal string Label { get; } = label;
+        public override string ToString()
+        {
+            return label;
+        }
         internal bool IsDisposed { get; private set; }
 
         public void Dispose()
@@ -1113,9 +955,9 @@ public sealed class IrSmtBackendTests
             IsDisposed = true;
         }
     }
-    private static SmtNativeRunner GetRunner(IrSmtBackend backend)
+    private static SmtNativeRunner GetRunner(CallableSolverSession backend)
     {
-        return (SmtNativeRunner)typeof(IrSmtBackend).GetField("_runner",
+        return (SmtNativeRunner)typeof(CallableSolverSession).GetField("_runner",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(backend)!;
     }
 }

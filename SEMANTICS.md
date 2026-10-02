@@ -453,6 +453,9 @@ short-circuiting, checked against independently executed C# operators. Finite
 domain checks that exhaust their symbolic-query budget retry the same bounded
 domain with exact input assignments; UNSAT requires every partition to be
 UNSAT. An unsupported or exhausted partition remains an abstention.
+The SMT backend accepts only Total IR; the legacy unbounded-integer encoder
+and its implicit Defined channel have been removed. Arithmetic faults must
+be represented explicitly in normal-completion predicates or control flow.
 
 Source calls and captured implementation IL expand directly into the caller's
 Total program. The compiler no longer produces relational-summary descriptors.

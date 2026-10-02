@@ -196,7 +196,6 @@
       {
         "name": "encoding",
         "paths": [
-          "SharpProof.Smt/IrSmtBackend.cs",
           "SharpProof.Smt/BvEncoder.cs",
           "SharpProof.Smt/BvEncoder.Arrays.cs",
           "SharpProof.Smt/BvEncoder.References.cs",

@@ -789,13 +789,11 @@ public sealed class GoldenWorkerTests
     private static async Task<string> BooleanModels()
     {
         var output = new StringBuilder();
-        foreach (var semantics in new[] { IrExecutionSemantics.Legacy, IrExecutionSemantics.Total })
+        foreach (var semantics in new[] { IrExecutionSemantics.Total })
         {
             var factory = new IrFactory(semantics);
             var parameter = factory.CreateVariable("entry", factory.BooleanType);
-            ISmtBackend backend = semantics == IrExecutionSemantics.Total
-                ? new CallableSolverSession(factory, new IrSmtBackendOptions()) : new IrSmtBackend();
-            using var lifetime = (IDisposable)backend;
+            using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
             foreach (var expected in new[] { false, true })
             {
                 var bound = factory.Binary(IrBinaryOperator.Equal, factory.Variable(parameter), factory.Boolean(expected));
