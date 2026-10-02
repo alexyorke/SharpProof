@@ -2,7 +2,7 @@ namespace SharpProof.Worker;
 
 internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerClaimReason Reason,
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
-    ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false);
+    ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null);
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
@@ -67,7 +67,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             var replay = _plan.ReplayException(witness.EntryModel, cancellationToken);
             if (replay.Status == IrProgramExecutionStatus.Exception && !replay.ConsumedApproximation &&
                 replay.Instruction is IrThrowInstruction && replay.Exception is { } exception && !allowed.Contains(exception.Kind))
-            { return witness; }
+            { return witness with { ExceptionWitness = exception }; }
         }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }

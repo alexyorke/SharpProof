@@ -1,0 +1,123 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.Analyzer;
+using SharpProof.Analyzer.Configuration;
+using SharpProof.CompilerArtifact;
+using SharpProof.Host;
+using SharpProof.Verify;
+using SharpProof.Worker;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Gates.Corpus;
+
+internal sealed record NativeExceptionShadowRow(string MethodId, string CallableId,
+    WorkerClaimOutcome LegacyOutcome, WorkerClaimReason LegacyReason,
+    WorkerClaimOutcome CompilerOutcome, WorkerClaimReason CompilerReason,
+    WorkerClaimOutcome NativeOutcome, WorkerClaimReason NativeReason,
+    bool HasTotalBody, bool HasBodyAbstraction, string? ExceptionKind, string RuntimeOracle);
+
+internal sealed record NativeExceptionShadowReport(string UniverseSha256, int UniverseMethodCount,
+    int CheckedMethodCount, bool Exhaustive, int LegacyProven, int RetainedProven,
+    double RetainedPercent, bool RetentionGatePassed, int DisagreementCount,
+    int RuntimeWitnesses, int RuntimeContradictions, double WallSeconds,
+    ImmutableArray<NativeExceptionShadowRow> Rows,
+    ImmutableDictionary<string, int> NativeUnknownReasons, bool ComparisonPassed);
+
+// This report measures the replacement; it never publishes worker authority.
+internal static class NativeExceptionShadow
+{
+    internal static async Task<NativeExceptionShadowReport> RunAsync(string root, int maximumMethods = 0,
+        CancellationToken cancellationToken = default)
+    {
+        var wall = Stopwatch.StartNew();
+        var document = OpenSourceCorpusCatalog.Load(root);
+        if (maximumMethods < 0 || maximumMethods > document.Methods.Length)
+        { throw new ArgumentOutOfRangeException(nameof(maximumMethods)); }
+        var universeSha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(
+            Path.Combine(root, "SharpProof.Gates", "Corpus", "oss-methods.json"), cancellationToken).ConfigureAwait(false)));
+        var selected = document with
+        {
+            Methods = [.. document.Methods.OrderBy(method => method.Id, StringComparer.Ordinal)
+                .Take(maximumMethods == 0 ? document.Methods.Length : maximumMethods)]
+        };
+        var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken),
+            selected.Methods.Select(method => method.Id).ToImmutableArray(), root,
+            universeSha256, document.Methods.Length, cancellationToken).ConfigureAwait(false);
+        return report with { WallSeconds = wall.Elapsed.TotalSeconds };
+    }
+
+    internal static async Task<NativeExceptionShadowReport> ObserveAsync(CSharpCompilation compilation,
+        ImmutableArray<string> methodIds, string root, string universeSha256, int universeMethodCount,
+        CancellationToken cancellationToken = default)
+    {
+        var wall = Stopwatch.StartNew();
+        if (methodIds.IsDefaultOrEmpty || methodIds.Any(string.IsNullOrWhiteSpace) || methodIds.Distinct(StringComparer.Ordinal).Count() != methodIds.Length ||
+            methodIds.Length > universeMethodCount)
+        { throw new ArgumentException("A shadow universe must have unique, nonempty method identities.", nameof(methodIds)); }
+        var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
+        var targets = discovery.Targets.Values.Where(target => OpenSourceCorpusRunner.CorpusMethodId(target.Declaration) != null)
+            .ToDictionary(target => OpenSourceCorpusRunner.CorpusMethodId(target.Declaration)!, StringComparer.Ordinal);
+        if (!targets.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(methodIds))
+        { throw new InvalidDataException("The declared exception probes do not equal the selected corpus universe."); }
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, root, "net9.0", WorkerFeatureSet.Effects,
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, cancellationToken);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken);
+        var owned = preparations.ToDictionary(preparation => preparation.Entry.CallableId, StringComparer.Ordinal);
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var legacy = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
+        using var oracle = new NativeExceptionWitnessOracle(compilation);
+        var rows = ImmutableArray.CreateBuilder<NativeExceptionShadowRow>(methodIds.Length);
+        foreach (var id in methodIds.OrderBy(id => id, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var target = targets[id];
+            var evaluation = EffectContractDiagnostics.Evaluate(target.Method, target.Method.Locations[0], legacy,
+                static _ => { }, cancellationToken, includeDiagnosticPayload: false)
+                .Single(evaluation => evaluation.Kind == EffectEvaluationContractKind.DoesNotThrow);
+            var preparation = owned[target.Entry.CallableId];
+            var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == WorkerEffectContractKind.DoesNotThrow);
+            var checks = await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false);
+            var evidence = checks[claim.ClaimId];
+            var outcome = evidence.Outcome switch
+            {
+                ProvenOutcome => WorkerClaimOutcome.Proven,
+                RefutedOutcome => WorkerClaimOutcome.Refuted,
+                _ => WorkerClaimOutcome.Unknown
+            };
+            if (outcome == WorkerClaimOutcome.Refuted && evidence.ExceptionWitness == null)
+            { throw new InvalidDataException("A native exception refutation has no replay-validated witness."); }
+            var runtime = outcome == WorkerClaimOutcome.Refuted
+                ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
+                : "NotRun";
+            rows.Add(new(id, preparation.Entry.CallableId, CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Outcome),
+                CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Reason), claim.Outcome, claim.Reason, outcome, evidence.Reason,
+                preparation.Total != null, preparation.Total?.IsBodyAbstraction == true,
+                evidence.ExceptionWitness?.Kind.ToString(), runtime));
+        }
+        return Summarize(universeSha256, universeMethodCount, rows.ToImmutable(), wall.Elapsed.TotalSeconds);
+    }
+
+    internal static NativeExceptionShadowReport Summarize(string universeSha256, int universeMethodCount,
+        ImmutableArray<NativeExceptionShadowRow> rows, double wallSeconds)
+    {
+        if (rows.IsDefaultOrEmpty || rows.Length > universeMethodCount || rows.Any(row => string.IsNullOrWhiteSpace(row.MethodId)) ||
+            rows.Select(row => row.MethodId).Distinct(StringComparer.Ordinal).Count() != rows.Length)
+        { throw new ArgumentException("Shadow rows do not define a unique covered universe.", nameof(rows)); }
+        var proven = rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven);
+        var retained = rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven && row.NativeOutcome == WorkerClaimOutcome.Proven);
+        var disagreements = rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven && row.NativeOutcome == WorkerClaimOutcome.Refuted ||
+            row.LegacyOutcome == WorkerClaimOutcome.Refuted && row.NativeOutcome == WorkerClaimOutcome.Proven);
+        var runtimeContradictions = rows.Count(row => row.RuntimeOracle == "Contradiction");
+        var exhaustive = rows.Length == universeMethodCount;
+        return new(universeSha256, universeMethodCount, rows.Length, exhaustive, proven, retained,
+            proven == 0 ? 0 : Math.Round(100d * retained / proven, 2),
+            exhaustive && proven > 0 && retained * 100L >= proven * 95L,
+            disagreements, rows.Count(row => row.RuntimeOracle == "Confirmed"), runtimeContradictions, wallSeconds, rows,
+            rows.Where(row => row.NativeOutcome == WorkerClaimOutcome.Unknown).GroupBy(row => row.NativeReason.ToString(), StringComparer.Ordinal)
+                .ToImmutableDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
+            disagreements == 0 && runtimeContradictions == 0);
+    }
+}

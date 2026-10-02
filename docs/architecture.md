@@ -406,6 +406,18 @@ Exception kinds use predecessor-guarded phi facts. Refutations require original
 IR replay and are compared with compiled C# execution in artifact qualification
 tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.
 The compiler effect assembler remains authoritative during this rollout.
+The `SharpProof.Gates exception-shadow` command separately instruments the pinned
+200-method OSS corpus with DoesNotThrow. It compares raw legacy analyzer
+outcomes, published compiler evidence, and native results after production
+artifact serialization and decoding. Every selected method remains in the
+coverage and old-proof denominator, including unsupported bodies. `--limit 10`
+runs a sorted sample; samples cannot satisfy the exhaustive retention gate.
+Concrete native refutations are independently compiled and invoked when their
+static, nongeneric scalar/string/null inputs can be represented. Unsupported
+invocation shapes remain explicit oracle gaps. Runtime confirmations concern
+counterexamples only; they do not establish universal proofs. The report
+separates comparison success from the 95% old-proof retention gate and does not
+qualify allocation, write, lock, capability, or call-precondition effects.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.

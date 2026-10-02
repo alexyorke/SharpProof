@@ -68,6 +68,8 @@ public sealed class NativeExceptionEffectTests
             var replay = plan!.ReplayException(result.EntryModel, CancellationToken.None);
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
             Assert.That(replay.ConsumedApproximation, Is.False);
+            Assert.That(result.ExceptionWitness?.Kind, Is.EqualTo(replay.Exception!.Kind));
+            Assert.That(result.ExceptionWitness?.Site, Is.EqualTo(replay.Exception.Site));
         }
     }
 

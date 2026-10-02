@@ -114,12 +114,16 @@ internal static class AnalyzerGateHost
                 DictionaryAnalyzerConfigOptions.Empty,
                 globalForFiles: false));
 
+    private static readonly Lazy<ImmutableArray<MetadataReference>> FileReferences =
+        new(CreateFileReferences);
+
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences);
 
     internal static CSharpCompilation CreateCompilation(
         string source,
-        string assemblyName = "SharpProofGate")
+        string assemblyName = "SharpProofGate",
+        bool includeExternalEffectsFixture = true)
     {
         var options = new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
@@ -128,7 +132,7 @@ internal static class AnalyzerGateHost
         return CSharpCompilation.Create(
             assemblyName,
             [CSharpSyntaxTree.ParseText(source, ParseOptions, "input.cs")],
-            References.Value,
+            includeExternalEffectsFixture ? References.Value : FileReferences.Value,
             options);
     }
 
@@ -230,7 +234,7 @@ internal static class AnalyzerGateHost
         }
     }
 
-    private static ImmutableArray<MetadataReference> CreateReferences()
+    private static ImmutableArray<MetadataReference> CreateFileReferences()
     {
         var trustedPlatformAssemblies = TrustedPlatformAssemblyPaths.Get();
         ImmutableArray<MetadataReference> references = [.. trustedPlatformAssemblies
@@ -239,6 +243,12 @@ internal static class AnalyzerGateHost
                 MetadataReference.CreateFromFile(
                     typeof(Contract).Assembly.Location))
         ];
+        return references;
+    }
+
+    private static ImmutableArray<MetadataReference> CreateReferences()
+    {
+        var references = FileReferences.Value;
         var externalTree = CSharpSyntaxTree.ParseText(
             """
             using SharpProof.Attributes;
