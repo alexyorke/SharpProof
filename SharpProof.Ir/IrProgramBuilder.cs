@@ -62,6 +62,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
     public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType)
     { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType)); }
 
+    public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
+    { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
+
     public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
     {
         return Append(
@@ -238,6 +241,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
         _factory.GetOperationInfo(instruction.Operation);
         switch (instruction)
         {
+            case IrWriteInstruction write:
+                if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
+                { throw InvalidArgument("A write region is undefined.", "region"); }
+                break;
             case IrAllocationInstruction allocation:
                 if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence))
                 { throw InvalidArgument("An allocation requires a reference or sequence type.", "allocatedType"); }

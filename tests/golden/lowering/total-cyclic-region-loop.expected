@@ -10,67 +10,71 @@ block: b0 entry
   i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op0 Goto b2 source=none
 block: b1 finally:dispatch
-  i42 op0 Branch (v5 == 0) ? b18 : b19 source=none
+  i46 op0 Branch (v5 == 0) ? b18 : b19 source=none
 block: b2 cfg:0
   i4 op0 Goto b3 source=none
 block: b3 cfg:1
   i5 op0 Assign v6:int[width=32,signed=True] = 0 source=none
   i6 op1 Assign v7:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:110+1
   i7 op2 Assign v6:int[width=32,signed=True] = v7 source=total-cyclic-region-loop.cs:106+5
-  i8 op0 Goto b4 source=none
+  i8 op2 Write Local source=total-cyclic-region-loop.cs:106+5
+  i9 op0 Goto b4 source=none
 block: b4 cfg:2
-  i9 op4 Assign v8:int[width=32,signed=True] = v6 source=total-cyclic-region-loop.cs:128+1
-  i10 op5 Assign v9:int[width=32,signed=True] = 2 source=total-cyclic-region-loop.cs:132+1
-  i11 op6 Assign v10:bool[width=0,signed=False] = (v8 < v9) source=total-cyclic-region-loop.cs:128+5
-  i12 op3 Branch v10 ? b5 : b8 source=total-cyclic-region-loop.cs:128+5
+  i10 op4 Assign v8:int[width=32,signed=True] = v6 source=total-cyclic-region-loop.cs:128+1
+  i11 op5 Assign v9:int[width=32,signed=True] = 2 source=total-cyclic-region-loop.cs:132+1
+  i12 op6 Assign v10:bool[width=0,signed=False] = (v8 < v9) source=total-cyclic-region-loop.cs:128+5
+  i13 op3 Branch v10 ? b5 : b8 source=total-cyclic-region-loop.cs:128+5
 block: b5 cfg:3
-  i13 op7 Assign v11:int[width=32,signed=True] = 10 source=total-cyclic-region-loop.cs:167+2
-  i14 op8 Assign v12:int[width=32,signed=True] = v1 source=total-cyclic-region-loop.cs:172+1
-  i15 op9 Branch (v12 == 0) ? b11 : b12 source=total-cyclic-region-loop.cs:167+6
+  i14 op7 Assign v11:int[width=32,signed=True] = 10 source=total-cyclic-region-loop.cs:167+2
+  i15 op8 Assign v12:int[width=32,signed=True] = v1 source=total-cyclic-region-loop.cs:172+1
+  i16 op9 Branch (v12 == 0) ? b11 : b12 source=total-cyclic-region-loop.cs:167+6
 block: b6 cfg:4
-  i30 op13 Assign v14:int[width=32,signed=True] = 1 source=total-cyclic-region-loop.cs:232+1
-  i31 op14 Assign v1:int[width=32,signed=True] = v14 source=total-cyclic-region-loop.cs:228+5
-  i32 op0 Goto b17 source=none
+  i32 op13 Assign v14:int[width=32,signed=True] = 1 source=total-cyclic-region-loop.cs:232+1
+  i33 op14 Assign v1:int[width=32,signed=True] = v14 source=total-cyclic-region-loop.cs:228+5
+  i34 op14 Write Local source=total-cyclic-region-loop.cs:228+5
+  i35 op0 Goto b17 source=none
 block: b7 cfg:5
-  i33 op15 Assign v15:int[width=32,signed=True] = v6 source=total-cyclic-region-loop.cs:259+3
-  i34 op16 Assign v16:int[width=32,signed=True] = (v15 + 1) source=total-cyclic-region-loop.cs:259+3
-  i35 op17 Assign v6:int[width=32,signed=True] = v16 source=total-cyclic-region-loop.cs:259+3
-  i36 op0 Goto b1 source=none
+  i36 op15 Assign v15:int[width=32,signed=True] = v6 source=total-cyclic-region-loop.cs:259+3
+  i37 op16 Assign v16:int[width=32,signed=True] = (v15 + 1) source=total-cyclic-region-loop.cs:259+3
+  i38 op17 Assign v6:int[width=32,signed=True] = v16 source=total-cyclic-region-loop.cs:259+3
+  i39 op17 Write Local source=total-cyclic-region-loop.cs:259+3
+  i40 op0 Goto b1 source=none
 block: b8 cfg:6
-  i37 op19 Assign v17:int[width=32,signed=True] = v1 source=total-cyclic-region-loop.cs:291+1
-  i38 op18 Assign v3:int[width=32,signed=True] = v17 source=total-cyclic-region-loop.cs:291+1
-  i39 op18 Return v3 source=total-cyclic-region-loop.cs:291+1
+  i41 op19 Assign v17:int[width=32,signed=True] = v1 source=total-cyclic-region-loop.cs:291+1
+  i42 op18 Assign v3:int[width=32,signed=True] = v17 source=total-cyclic-region-loop.cs:291+1
+  i43 op18 Return v3 source=total-cyclic-region-loop.cs:291+1
 block: b9 cfg:7
-  i40 op0 Return void source=none
+  i44 op0 Return void source=none
 block: b10 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b11 throw
-  i18 op9 Throw DivideByZero -> b13 source=total-cyclic-region-loop.cs:167+6
+  i19 op9 Throw DivideByZero -> b13 source=total-cyclic-region-loop.cs:167+6
 block: b12 normal
-  i19 op10 Branch ((v11 == -2147483648) && (v12 == -1)) ? b14 : b15 source=total-cyclic-region-loop.cs:167+6
+  i20 op10 Branch ((v11 == -2147483648) && (v12 == -1)) ? b14 : b15 source=total-cyclic-region-loop.cs:167+6
 block: b13 catch:entry
-  i16 op9 Assign v4:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:167+6
-  i17 op9 Goto b6 source=total-cyclic-region-loop.cs:167+6
+  i17 op9 Assign v4:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:167+6
+  i18 op9 Goto b6 source=total-cyclic-region-loop.cs:167+6
 block: b14 throw
-  i23 op10 Throw Overflow -> b16 source=total-cyclic-region-loop.cs:167+6
+  i24 op10 Throw Overflow -> b16 source=total-cyclic-region-loop.cs:167+6
 block: b15 normal
-  i24 op11 Assign v13:int[width=32,signed=True] = (v11 / v12) source=total-cyclic-region-loop.cs:167+6
-  i25 op12 Assign v1:int[width=32,signed=True] = v13 source=total-cyclic-region-loop.cs:163+10
-  i29 op0 Goto b17 source=none
+  i25 op11 Assign v13:int[width=32,signed=True] = (v11 / v12) source=total-cyclic-region-loop.cs:167+6
+  i26 op12 Assign v1:int[width=32,signed=True] = v13 source=total-cyclic-region-loop.cs:163+10
+  i27 op12 Write Local source=total-cyclic-region-loop.cs:163+10
+  i31 op0 Goto b17 source=none
 block: b16 finally:entry
-  i20 op10 Assign v3:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:167+6
-  i21 op10 Assign v5:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:167+6
-  i22 op10 Goto b7 source=total-cyclic-region-loop.cs:167+6
+  i21 op10 Assign v3:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:167+6
+  i22 op10 Assign v5:int[width=32,signed=True] = 0 source=total-cyclic-region-loop.cs:167+6
+  i23 op10 Goto b7 source=total-cyclic-region-loop.cs:167+6
 block: b17 finally:entry
-  i26 op0 Assign v3:int[width=32,signed=True] = 0 source=none
-  i27 op0 Assign v5:int[width=32,signed=True] = 1 source=none
-  i28 op0 Goto b7 source=none
+  i28 op0 Assign v3:int[width=32,signed=True] = 0 source=none
+  i29 op0 Assign v5:int[width=32,signed=True] = 1 source=none
+  i30 op0 Goto b7 source=none
 block: b18 finally:continue
-  i41 op10 Throw Overflow -> b10 source=total-cyclic-region-loop.cs:167+6
+  i45 op10 Throw Overflow -> b10 source=total-cyclic-region-loop.cs:167+6
 block: b19 finally:dispatch
-  i44 op0 Goto b20 source=none
+  i48 op0 Goto b20 source=none
 block: b20 finally:continue
-  i43 op0 Goto b4 source=none
+  i47 op0 Goto b4 source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Integer type=t1:int width=32 signed=True bits=0 value=0
 term: ir2 Variable type=t1:int width=32 signed=True value=v7

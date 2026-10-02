@@ -1,15 +1,23 @@
 namespace SharpProof.Worker;
 
 // Shadow qualification only; compiler evidence still controls publication.
-internal static class NativeAllocationEffectVerifier
+internal static class NativeEffectSiteVerifier
 {
-    internal static async Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
+    internal static Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken = default)
+    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, cancellationToken); }
+
+    internal static Task<PassiveCallableCheckResult> VerifyPurityAsync(CompilerCallablePreparation preparation,
+        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, cancellationToken); }
+
+    private static async Task<PassiveCallableCheckResult> VerifySitesAsync(CompilerCallablePreparation preparation,
+        WorkerBudgets budgets, WorkerEffectContractKind contract, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.ZeroAllocations).ToArray();
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == contract).ToArray();
         if (claims.Length != 1)
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (preparation.Total == null)
@@ -30,7 +38,9 @@ internal static class NativeAllocationEffectVerifier
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
-        var result = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
+        var result = contract == WorkerEffectContractKind.EnforcePure
+            ? await solver.VerifyPurityAsync(cancellationToken).ConfigureAwait(false)
+            : await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
         return result with
         {
             EntryModel = result.Outcome is ProvenOutcome ? entry.EntryModel : result.EntryModel,

@@ -28,11 +28,12 @@ block: b7 cfg:6
   i11 op5 Assign v5:int[width=32,signed=True] = 1 source=total-shared-entry-exit.cs:311+1
   i12 op6 Assign v6:int[width=32,signed=True] = (v4 + v5) source=total-shared-entry-exit.cs:307+5
   i13 op7 Assign v1:int[width=32,signed=True] = v6 source=total-shared-entry-exit.cs:293+20
-  i14 op9 Assign v7:int[width=32,signed=True] = v1 source=total-shared-entry-exit.cs:330+1
-  i15 op8 Assign v3:int[width=32,signed=True] = v7 source=total-shared-entry-exit.cs:330+1
-  i16 op8 Return v3 source=total-shared-entry-exit.cs:330+1
+  i14 op7 Write Local source=total-shared-entry-exit.cs:293+20
+  i15 op9 Assign v7:int[width=32,signed=True] = v1 source=total-shared-entry-exit.cs:330+1
+  i16 op8 Assign v3:int[width=32,signed=True] = v7 source=total-shared-entry-exit.cs:330+1
+  i17 op8 Return v3 source=total-shared-entry-exit.cs:330+1
 block: b8 cfg:7
-  i17 op2 Return void source=none
+  i18 op2 Return void source=none
 block: b9 exceptional:exit
   i2 op2 ExceptionalExit source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v0

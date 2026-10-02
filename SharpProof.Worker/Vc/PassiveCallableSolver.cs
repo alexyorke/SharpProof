@@ -3,7 +3,7 @@ namespace SharpProof.Worker;
 internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerClaimReason Reason,
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
     ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null,
-    OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false);
+    OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false, OperationId? WriteWitness = null);
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
@@ -48,22 +48,34 @@ internal sealed class PassiveCallableSolver : IDisposable
     internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken = default)
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
 
-    internal async Task<PassiveCallableCheckResult> VerifyAllocationsAsync(CancellationToken cancellationToken = default)
+    internal Task<PassiveCallableCheckResult> VerifyAllocationsAsync(CancellationToken cancellationToken = default)
+    { return VerifySitesAsync(allocations: true, cancellationToken); }
+
+    internal Task<PassiveCallableCheckResult> VerifyPurityAsync(CancellationToken cancellationToken = default)
+    { return VerifySitesAsync(allocations: false, cancellationToken); }
+
+    private async Task<PassiveCallableCheckResult> VerifySitesAsync(bool allocations, CancellationToken cancellationToken)
     {
-        if (_plan.HasBodyAbstraction || _plan.HasUnmodeledAllocations)
+        if (_plan.HasBodyAbstraction || allocations && _plan.HasUnmodeledAllocations)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
-        var proof = await VerifyAsync(_plan.AllocationQuery(), null, cancellationToken).ConfigureAwait(false);
+        var proof = await VerifyAsync(allocations ? _plan.AllocationQuery() : _plan.PurityQuery(), null, cancellationToken).ConfigureAwait(false);
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
         var encoding = _plan.LoopSearch ?? _plan;
         var witness = _plan.LoopSearch == null ? proof
-            : await VerifyAsync(encoding.AllocationQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
+            : await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
         OperationId? site = null;
-        var replay = _plan.ReplayEffects(witness.EntryModel, cancellationToken, allocation => site ??= allocation.Operation);
+        var replay = _plan.ReplayEffects(witness.EntryModel, cancellationToken,
+            allocationObserver: allocations ? allocation => site ??= allocation.Operation : null,
+            writeObserver: allocations ? null : write =>
+        {
+            if (write.Region != IrWriteRegion.Local)
+            { site ??= write.Operation; }
+        });
         if (site != null && !replay.ConsumedApproximation)
-        { return witness with { AllocationWitness = site }; }
+        { return allocations ? witness with { AllocationWitness = site } : witness with { WriteWitness = site }; }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }
 

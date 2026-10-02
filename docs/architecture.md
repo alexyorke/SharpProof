@@ -448,6 +448,17 @@ IL reachability checks allocation, throw and call sites, including filter handle
 A potential IL site remains a gap when preconditions may exclude its edge.
 Runtime observations do not establish a universal proof. This command does not
 qualify an authority switch or complete the implicit-allocation table.
+Typed Write events carry Local, Parameter, Field, Static, Element or
+Unknown regions and owned operation sites through artifacts, loop transformation,
+passive SSA and original-program replay. Source local assignments, increments
+and compound assignments emit Local events, including by-value parameter
+rebinding. Nonlocal source mutation lowering remains incomplete. The native
+purity shadow forbids reachable nonlocal events; allocation remains compatible
+with purity. The allocation and purity routes share claim admission, entry
+feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.
+`SharpProof.Gates purity-shadow` compares every pinned method against raw legacy
+purity results; independent mutation oracles remain explicit gaps. Compiler
+effect authority remains in place.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.

@@ -19,11 +19,12 @@ block: b1 cfg:0
 block: b2 cfg:1
   i7 op2 Assign v7:int[width=32,signed=True] = 0 source=total-old-value-and-guard.cs:222+1
   i8 op3 Assign v4:int[width=32,signed=True] = v7 source=total-old-value-and-guard.cs:218+5
-  i9 op5 Assign v8:int[width=32,signed=True] = v1 source=total-old-value-and-guard.cs:240+1
-  i10 op4 Assign v6:int[width=32,signed=True] = v8 source=total-old-value-and-guard.cs:240+1
-  i11 op4 Return v6 source=total-old-value-and-guard.cs:240+1
+  i9 op3 Write Local source=total-old-value-and-guard.cs:218+5
+  i10 op5 Assign v8:int[width=32,signed=True] = v1 source=total-old-value-and-guard.cs:240+1
+  i11 op4 Assign v6:int[width=32,signed=True] = v8 source=total-old-value-and-guard.cs:240+1
+  i12 op4 Return v6 source=total-old-value-and-guard.cs:240+1
 block: b3 cfg:2
-  i12 op1 Return void source=none
+  i13 op1 Return void source=none
 block: b4 exceptional:exit
   i4 op1 ExceptionalExit source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v2

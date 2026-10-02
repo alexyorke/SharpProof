@@ -9,44 +9,45 @@ block: b0 entry
   i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op0 Goto b3 source=none
 block: b1 filter:accepted
-  i91 op8 Goto b24 source=total-source-call-filter-closed.cs:361+10
+  i93 op8 Goto b24 source=total-source-call-filter-closed.cs:361+10
 block: b2 filter:rejected
-  i92 op8 Goto b21 source=total-source-call-filter-closed.cs:361+10
+  i94 op8 Goto b21 source=total-source-call-filter-closed.cs:361+10
 block: b3 cfg:0
   i4 op0 Goto b4 source=none
 block: b4 cfg:1
   i5 op2 Assign v11:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:145+9
   i6 op3 Assign v12:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:152+1
-  i74 op2 Assign v7:int[width=32,signed=True] = v12 source=total-source-call-filter-closed.cs:145+9
-  i75 op2 Goto b11 source=total-source-call-filter-closed.cs:145+9
+  i75 op2 Assign v7:int[width=32,signed=True] = v12 source=total-source-call-filter-closed.cs:145+9
+  i76 op2 Goto b11 source=total-source-call-filter-closed.cs:145+9
 block: b5 cfg:2
-  i78 op21 Assign v22:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:209+3
-  i79 op22 Assign v23:int[width=32,signed=True] = (v22 + 1) source=total-source-call-filter-closed.cs:209+3
-  i80 op23 Assign v1:int[width=32,signed=True] = v23 source=total-source-call-filter-closed.cs:209+3
-  i81 op24 Assign v24:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:215+1
-  i82 op25 Assign v25:bool[width=0,signed=False] = (v23 > v24) source=total-source-call-filter-closed.cs:209+7
-  i83 op20 Branch v25 ? b1 : b2 source=total-source-call-filter-closed.cs:209+7
+  i79 op21 Assign v22:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:209+3
+  i80 op22 Assign v23:int[width=32,signed=True] = (v22 + 1) source=total-source-call-filter-closed.cs:209+3
+  i81 op23 Assign v1:int[width=32,signed=True] = v23 source=total-source-call-filter-closed.cs:209+3
+  i82 op23 Write Local source=total-source-call-filter-closed.cs:209+3
+  i83 op24 Assign v24:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:215+1
+  i84 op25 Assign v25:bool[width=0,signed=False] = (v23 > v24) source=total-source-call-filter-closed.cs:209+7
+  i85 op20 Branch v25 ? b1 : b2 source=total-source-call-filter-closed.cs:209+7
 block: b6 cfg:3
-  i84 op27 Assign v26:int[width=32,signed=True] = 7 source=total-source-call-filter-closed.cs:227+1
-  i85 op26 Assign v3:int[width=32,signed=True] = v26 source=total-source-call-filter-closed.cs:227+1
-  i86 op26 Return v3 source=total-source-call-filter-closed.cs:227+1
+  i86 op27 Assign v26:int[width=32,signed=True] = 7 source=total-source-call-filter-closed.cs:227+1
+  i87 op26 Assign v3:int[width=32,signed=True] = v26 source=total-source-call-filter-closed.cs:227+1
+  i88 op26 Return v3 source=total-source-call-filter-closed.cs:227+1
 block: b7 cfg:4
-  i87 op29 Assign v27:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:282+1
-  i88 op28 Assign v3:int[width=32,signed=True] = v27 source=total-source-call-filter-closed.cs:282+1
-  i89 op28 Return v3 source=total-source-call-filter-closed.cs:282+1
+  i89 op29 Assign v27:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:282+1
+  i90 op28 Assign v3:int[width=32,signed=True] = v27 source=total-source-call-filter-closed.cs:282+1
+  i91 op28 Return v3 source=total-source-call-filter-closed.cs:282+1
 block: b8 cfg:5
-  i90 op0 Return void source=none
+  i92 op0 Return void source=none
 block: b9 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b10 call:continued
-  i76 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-filter-closed.cs:145+9
-  i77 op1 Return v3 source=total-source-call-filter-closed.cs:145+9
+  i77 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-filter-closed.cs:145+9
+  i78 op1 Return v3 source=total-source-call-filter-closed.cs:145+9
 block: b11 entry
   i7 op4 Assign v8:int[width=32,signed=True] = v7 source=none
   i8 op4 Assign v9:int[width=32,signed=True] = v7 source=none
   i10 op4 Goto b13 source=none
 block: b12 finally:dispatch
-  i67 op4 Branch (v13 == 0) ? b45 : b46 source=none
+  i68 op4 Branch (v13 == 0) ? b45 : b46 source=none
 block: b13 cfg:0
   i11 op4 Goto b14 source=none
 block: b14 cfg:1
@@ -58,7 +59,7 @@ block: b15 cfg:2
   i44 op12 Assign v18:int[width=32,signed=True] = 256 source=total-source-call-filter-closed.cs:424+3
   i45 op13 Branch ((((v17 >= 0) && (v18 >= 0)) && ((v17 + v18) < 0)) || (((v17 < 0) && (v18 < 0)) && ((v17 + v18) >= 0))) ? b33 : b34 source=total-source-call-filter-closed.cs:416+11
 block: b16 cfg:3
-  i65 op4 Goto b10 source=none
+  i66 op4 Goto b10 source=none
 block: b17 exceptional:exit
   i9 op4 ExceptionalExit source=none
 block: b18 throw
@@ -129,26 +130,27 @@ block: b42 normal
   i61 op17 Assign v20:byte[width=8,signed=False] = (("byte"#t4)v19) source=total-source-call-filter-closed.cs:409+19
   i62 op18 Assign v21:int[width=32,signed=True] = (("int"#t1)v20) source=total-source-call-filter-closed.cs:409+19
   i63 op19 Assign v8:int[width=32,signed=True] = v21 source=total-source-call-filter-closed.cs:393+36
-  i64 op4 Goto b12 source=none
+  i64 op19 Write Local source=total-source-call-filter-closed.cs:393+36
+  i65 op4 Goto b12 source=none
 block: b43 catch:entry
   i57 op16 Assign v6:int[width=32,signed=True] = 4 source=total-source-call-filter-closed.cs:409+19
   i58 op16 Goto b7 source=total-source-call-filter-closed.cs:409+19
 block: b44 exception:searched
   i59 op16 Throw Overflow -> b43 source=total-source-call-filter-closed.cs:409+19
 block: b45 finally:continue
-  i66 op8 Throw DivideByZero -> b9 source=total-source-call-filter-closed.cs:361+10
+  i67 op8 Throw DivideByZero -> b9 source=total-source-call-filter-closed.cs:361+10
 block: b46 finally:dispatch
-  i69 op4 Branch (v13 == 1) ? b47 : b48 source=none
+  i70 op4 Branch (v13 == 1) ? b47 : b48 source=none
 block: b47 finally:continue
-  i68 op8 Throw DivideByZero -> b22 source=total-source-call-filter-closed.cs:361+10
+  i69 op8 Throw DivideByZero -> b22 source=total-source-call-filter-closed.cs:361+10
 block: b48 finally:dispatch
-  i71 op4 Branch (v13 == 2) ? b49 : b50 source=none
+  i72 op4 Branch (v13 == 2) ? b49 : b50 source=none
 block: b49 finally:continue
-  i70 op9 Throw Overflow -> b28 source=total-source-call-filter-closed.cs:361+10
+  i71 op9 Throw Overflow -> b28 source=total-source-call-filter-closed.cs:361+10
 block: b50 finally:dispatch
-  i73 op4 Goto b51 source=none
+  i74 op4 Goto b51 source=none
 block: b51 finally:continue
-  i72 op5 Goto b31 source=total-source-call-filter-closed.cs:361+10
+  i73 op5 Goto b31 source=total-source-call-filter-closed.cs:361+10
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v11
 term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0

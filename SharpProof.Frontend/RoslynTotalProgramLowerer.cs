@@ -194,7 +194,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                     if (declarator.Initializer == null)
                     { return block; }
                     var value = Value(declarator.Initializer.Value, block);
-                    _builder.Assign(value.Continuation, _context.Site(operation), _context.Variable(declarator.Symbol), value.Value);
+                    var mutation = _builder.Assign(value.Continuation, _context.Site(operation), _context.Variable(declarator.Symbol), value.Value);
+                    _builder.Write(value.Continuation, mutation.Operation, IrWriteRegion.Local);
                     return value.Continuation;
                 }
             case IBlockOperation or IVariableDeclarationGroupOperation or IVariableDeclarationOperation:

@@ -524,7 +524,18 @@ public enum IrInstructionKind
     Return = 9,
     Throw = 10,
     ExceptionalExit = 11,
-    Allocate = 12
+    Allocate = 12,
+    Write = 13
+}
+
+public enum IrWriteRegion
+{
+    Local = 0,
+    Parameter = 1,
+    Field = 2,
+    Static = 3,
+    Element = 4,
+    Unknown = 5
 }
 
 public enum IrLocationKind
@@ -608,6 +619,15 @@ public sealed class IrAllocationInstruction : IrInstruction
     { AllocatedType = allocatedType; }
 
     public IrTypeId AllocatedType { get; }
+}
+
+public sealed class IrWriteInstruction : IrInstruction
+{
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
+        : base(id, IrInstructionKind.Write, operation)
+    { Region = region; }
+
+    public IrWriteRegion Region { get; }
 }
 
 public sealed class IrAssignInstruction : IrInstruction

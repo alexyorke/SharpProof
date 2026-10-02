@@ -1002,7 +1002,11 @@ public sealed class PortableIrGraphCodecTests
         builder.Load(entry, factory.CreateOperation("load-sequence"), result, sequenceLocation);
         builder.Store(entry, factory.CreateOperation("store-sequence"), sequenceLocation, numberTerm);
         if (includeAllocation)
-        { builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType); }
+        {
+            builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType);
+            foreach (var region in Enum.GetValues<IrWriteRegion>())
+            { builder.Write(entry, factory.CreateOperation("write:" + region), region); }
+        }
         builder.Call(
             entry,
             factory.CreateOperation("call"),

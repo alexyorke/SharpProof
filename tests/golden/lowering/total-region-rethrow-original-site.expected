@@ -31,11 +31,11 @@ block: b5 cfg:4
   i35 op21 Assign v19:int[width=32,signed=True] = (v17 + v18) source=total-region-rethrow-original-site.cs:260+7
   i36 op22 Branch (v19 < 0) ? b20 : b21 source=total-region-rethrow-original-site.cs:243+26
 block: b6 cfg:5
-  i48 op0 Goto b7 source=none
+  i49 op0 Goto b7 source=none
 block: b7 cfg:6
-  i51 op0 Branch (v4 == 0) ? b26 : b27 source=none
+  i52 op0 Branch (v4 == 0) ? b26 : b27 source=none
 block: b8 cfg:7
-  i49 op0 Return void source=none
+  i50 op0 Return void source=none
 block: b9 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b10 throw
@@ -77,16 +77,17 @@ block: b24 normal
   i44 op24 Assign v20:byte[width=8,signed=False] = (("byte"#t4)v19) source=total-region-rethrow-original-site.cs:243+26
   i45 op25 Assign v21:int[width=32,signed=True] = (("int"#t1)v20) source=total-region-rethrow-original-site.cs:243+26
   i46 op26 Assign v1:int[width=32,signed=True] = v21 source=total-region-rethrow-original-site.cs:231+39
-  i47 op0 Goto b7 source=none
+  i47 op26 Write Local source=total-region-rethrow-original-site.cs:231+39
+  i48 op0 Goto b7 source=none
 block: b25 catch:entry
   i41 op23 Assign v5:int[width=32,signed=True] = 5 source=total-region-rethrow-original-site.cs:243+26
   i42 op23 Goto b6 source=total-region-rethrow-original-site.cs:243+26
 block: b26 rethrow:original
-  i50 op8 Throw DivideByZero -> b9 source=total-region-rethrow-original-site.cs:127+6
+  i51 op8 Throw DivideByZero -> b9 source=total-region-rethrow-original-site.cs:127+6
 block: b27 rethrow:dispatch
-  i53 op0 Goto b28 source=none
+  i54 op0 Goto b28 source=none
 block: b28 rethrow:original
-  i52 op16 Throw DivideByZero -> b9 source=total-region-rethrow-original-site.cs:142+12
+  i53 op16 Throw DivideByZero -> b9 source=total-region-rethrow-original-site.cs:142+12
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v1
 term: ir2 Variable type=t1:int width=32 signed=True value=v6

@@ -142,6 +142,8 @@ public sealed class GoldenLoweringTests
         {
             return instruction switch
             {
+                IrAllocationInstruction value => $"Allocate {value.AllocatedType}:{factory.GetString(factory.GetTypeInfo(value.AllocatedType).Name)}",
+                IrWriteInstruction value => $"Write {value.Region}",
                 IrAssignInstruction value => $"Assign {Variable(value.Target)} = {printer.Print(value.Value)}",
                 IrLoadInstruction value => $"Load {Variable(value.Target)} = {Location(value.Location)}",
                 IrStoreInstruction value => $"Store {Location(value.Location)} = {printer.Print(value.Value)}",

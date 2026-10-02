@@ -238,7 +238,7 @@ public sealed class NativeExceptionShadowTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var preparation = preparations.Single();
-        var evidence = await NativeAllocationEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), CancellationToken.None);
         using var oracle = new NativeAllocationWitnessOracle(compilation);
         var observation = oracle.Check(target.Method, preparation.Total!, evidence, WorkerClaimOutcome.Proven, CancellationToken.None);
         Assert.That(observation.RuntimeOracle, Is.EqualTo("Contradiction"));
@@ -250,5 +250,32 @@ public sealed class NativeExceptionShadowTests
         try
         { return 1 / x == 0 ? null : null; }
         catch (DivideByZeroException) when (x == 0) { return new object(); }
+    }
+
+    [TestCase("var y = x; y++; return y;", WorkerClaimOutcome.Proven)]
+    [TestCase("new object(); return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("System.Console.WriteLine(x); return x;", WorkerClaimOutcome.Unknown)]
+    public async Task PurityShadowUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
+    {
+        var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
+        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+            CancellationToken.None, purity: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, purity: true);
+        Assert.That(report.ContractKind, Is.EqualTo("EnforcePure"));
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(expected));
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("PurityOracleNotRun"));
+    }
+
+    [Test]
+    public async Task PinnedPurityUniverseIncludesEveryMethodAndEveryLegacyProof()
+    {
+        var root = RepositoryLayout.FindRoot();
+        var report = await NativeExceptionShadow.RunAsync(root, purity: true);
+        Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
+        Assert.That(report.Exhaustive, Is.True);
+        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
+        Assert.That(report.UniverseSha256, Is.EqualTo("BD29688EDA47BA7EEB68093E4151D6A786901C4E41D8CE1A32DDA8CF8FA6F7ED"));
+        Assert.That(report.LegacyProven, Is.EqualTo(report.Rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven)));
+        Assert.That(report.DisagreementCount, Is.Zero);
+        await TestContext.Progress.WriteLineAsync($"Purity shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; {report.RetainedProven} retained.");
     }
 }

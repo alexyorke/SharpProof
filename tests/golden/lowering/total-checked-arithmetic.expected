@@ -12,7 +12,7 @@ block: b0 entry
   i1 op2 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op2 Goto b2 source=none
 block: b1 finally:dispatch
-  i40 op2 Branch (v5 == 0) ? b23 : b24 source=none
+  i43 op2 Branch (v5 == 0) ? b23 : b24 source=none
 block: b2 cfg:0
   i4 op2 Goto b3 source=none
 block: b3 cfg:1
@@ -30,15 +30,16 @@ block: b8 cfg:6
   i11 op6 Assign v7:int[width=32,signed=True] = v1 source=total-checked-arithmetic.cs:345+3
   i12 op7 Branch ((((v7 >= 0) && true) && ((v7 + 1) < 0)) || (((v7 < 0) && false) && ((v7 + 1) >= 0))) ? b13 : b14 source=total-checked-arithmetic.cs:345+3
 block: b9 cfg:7
-  i29 op14 Assign v10:int[width=32,signed=True] = v1 source=total-checked-arithmetic.cs:407+1
-  i30 op13 Assign v3:int[width=32,signed=True] = v10 source=total-checked-arithmetic.cs:407+1
-  i34 op13 Goto b22 source=total-checked-arithmetic.cs:407+1
+  i31 op14 Assign v10:int[width=32,signed=True] = v1 source=total-checked-arithmetic.cs:407+1
+  i32 op13 Assign v3:int[width=32,signed=True] = v10 source=total-checked-arithmetic.cs:407+1
+  i36 op13 Goto b22 source=total-checked-arithmetic.cs:407+1
 block: b10 cfg:8
-  i35 op15 Assign v11:int[width=32,signed=True] = 7 source=total-checked-arithmetic.cs:444+1
-  i36 op16 Assign v1:int[width=32,signed=True] = v11 source=total-checked-arithmetic.cs:440+5
-  i37 op2 Goto b1 source=none
+  i37 op15 Assign v11:int[width=32,signed=True] = 7 source=total-checked-arithmetic.cs:444+1
+  i38 op16 Assign v1:int[width=32,signed=True] = v11 source=total-checked-arithmetic.cs:440+5
+  i39 op16 Write Local source=total-checked-arithmetic.cs:440+5
+  i40 op2 Goto b1 source=none
 block: b11 cfg:9
-  i38 op2 Return void source=none
+  i41 op2 Return void source=none
 block: b12 exceptional:exit
   i2 op2 ExceptionalExit source=none
 block: b13 throw
@@ -46,36 +47,38 @@ block: b13 throw
 block: b14 normal
   i16 op8 Assign v8:int[width=32,signed=True] = (v7 + 1) source=total-checked-arithmetic.cs:345+3
   i17 op9 Assign v1:int[width=32,signed=True] = v8 source=total-checked-arithmetic.cs:345+3
-  i18 op10 Branch ((((v6 >= 0) && (v7 >= 0)) && ((v6 + v7) < 0)) || (((v6 < 0) && (v7 < 0)) && ((v6 + v7) >= 0))) ? b16 : b17 source=total-checked-arithmetic.cs:340+8
+  i18 op9 Write Local source=total-checked-arithmetic.cs:345+3
+  i19 op10 Branch ((((v6 >= 0) && (v7 >= 0)) && ((v6 + v7) < 0)) || (((v6 < 0) && (v7 < 0)) && ((v6 + v7) >= 0))) ? b16 : b17 source=total-checked-arithmetic.cs:340+8
 block: b15 catch:entry
   i13 op7 Assign v4:int[width=32,signed=True] = 0 source=total-checked-arithmetic.cs:345+3
   i14 op7 Goto b9 source=total-checked-arithmetic.cs:345+3
 block: b16 throw
-  i21 op10 Throw Overflow -> b18 source=total-checked-arithmetic.cs:340+8
+  i22 op10 Throw Overflow -> b18 source=total-checked-arithmetic.cs:340+8
 block: b17 normal
-  i22 op11 Assign v9:int[width=32,signed=True] = (v6 + v7) source=total-checked-arithmetic.cs:340+8
-  i23 op12 Assign v1:int[width=32,signed=True] = v9 source=total-checked-arithmetic.cs:340+8
-  i24 op4 Assign v3:int[width=32,signed=True] = v9 source=total-checked-arithmetic.cs:340+8
-  i28 op4 Goto b20 source=total-checked-arithmetic.cs:340+8
+  i23 op11 Assign v9:int[width=32,signed=True] = (v6 + v7) source=total-checked-arithmetic.cs:340+8
+  i24 op12 Assign v1:int[width=32,signed=True] = v9 source=total-checked-arithmetic.cs:340+8
+  i25 op12 Write Local source=total-checked-arithmetic.cs:340+8
+  i26 op4 Assign v3:int[width=32,signed=True] = v9 source=total-checked-arithmetic.cs:340+8
+  i30 op4 Goto b20 source=total-checked-arithmetic.cs:340+8
 block: b18 catch:entry
-  i19 op10 Assign v4:int[width=32,signed=True] = 1 source=total-checked-arithmetic.cs:340+8
-  i20 op10 Goto b9 source=total-checked-arithmetic.cs:340+8
+  i20 op10 Assign v4:int[width=32,signed=True] = 1 source=total-checked-arithmetic.cs:340+8
+  i21 op10 Goto b9 source=total-checked-arithmetic.cs:340+8
 block: b19 return:captured
-  i25 op4 Return v3 source=total-checked-arithmetic.cs:340+8
+  i27 op4 Return v3 source=total-checked-arithmetic.cs:340+8
 block: b20 finally:entry
-  i26 op4 Assign v5:int[width=32,signed=True] = 0 source=total-checked-arithmetic.cs:340+8
-  i27 op4 Goto b10 source=total-checked-arithmetic.cs:340+8
+  i28 op4 Assign v5:int[width=32,signed=True] = 0 source=total-checked-arithmetic.cs:340+8
+  i29 op4 Goto b10 source=total-checked-arithmetic.cs:340+8
 block: b21 return:captured
-  i31 op13 Return v3 source=total-checked-arithmetic.cs:407+1
+  i33 op13 Return v3 source=total-checked-arithmetic.cs:407+1
 block: b22 finally:entry
-  i32 op13 Assign v5:int[width=32,signed=True] = 1 source=total-checked-arithmetic.cs:407+1
-  i33 op13 Goto b10 source=total-checked-arithmetic.cs:407+1
+  i34 op13 Assign v5:int[width=32,signed=True] = 1 source=total-checked-arithmetic.cs:407+1
+  i35 op13 Goto b10 source=total-checked-arithmetic.cs:407+1
 block: b23 finally:continue
-  i39 op4 Goto b19 source=total-checked-arithmetic.cs:340+8
+  i42 op4 Goto b19 source=total-checked-arithmetic.cs:340+8
 block: b24 finally:dispatch
-  i42 op2 Goto b25 source=none
+  i45 op2 Goto b25 source=none
 block: b25 finally:continue
-  i41 op13 Goto b21 source=total-checked-arithmetic.cs:407+1
+  i44 op13 Goto b21 source=total-checked-arithmetic.cs:407+1
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Boolean type=t0:bool width=0 signed=False value=true
 term: ir2 Integer type=t1:int width=32 signed=True bits=1073741824 value=1073741824

@@ -39,6 +39,9 @@ public sealed class WorkerVcLoopTests
                 var destination = blocks[block.Id];
                 switch (instruction)
                 {
+                    case IrWriteInstruction write:
+                        builder.Write(destination, write.Operation, write.Region);
+                        break;
                     case IrAssignInstruction assign:
                         builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
                         break;

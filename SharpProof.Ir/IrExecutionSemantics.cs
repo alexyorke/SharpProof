@@ -48,6 +48,7 @@ public sealed class IrHavocRequest(
 public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
 {
     public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
+    public Action<IrWriteInstruction>? WriteObserver { get; set; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =
         ArgumentNullGuard.NotNull(havocValueProvider, nameof(havocValueProvider));

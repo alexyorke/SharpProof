@@ -276,6 +276,7 @@ internal static class PortableIrSlotCatalog
     new("Throw", ["exceptionKind", "blockIndex", "unused", "unused", "empty", "unused"]),
     new("ExceptionalExit", ["unused", "unused", "unused", "unused", "empty", "unused"]),
     new("Allocate", ["typeIndex", "unused", "unused", "unused", "empty", "unused"]),
+    new("Write", ["writeRegion", "unused", "unused", "unused", "empty", "unused"]),
     ];
 }
 
@@ -453,6 +454,8 @@ internal static class PortableIrGraphCodecProjections
         {
             IrAllocationInstruction allocation => row(instruction, operationIndex(instruction.Operation),
                 typeIndex(allocation.AllocatedType), -1, -1, null, null),
+            IrWriteInstruction write => row(instruction, operationIndex(instruction.Operation),
+                (int)write.Region, -1, -1, null, null),
             IrAssignInstruction value => row(
                 instruction,
                 operationIndex(instruction.Operation),
@@ -673,6 +676,7 @@ internal static class PortableIrGraphCodecProjections
         return row.Kind switch
         {
             IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A)),
+            IrInstructionKind.Write => builder.Write(block, operation(row.Operation), (IrWriteRegion)row.A),
             IrInstructionKind.Assign => builder.Assign(
                 block,
                 operation(row.Operation),

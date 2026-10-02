@@ -15,11 +15,12 @@ block: b2 cfg:1
   i6 op3 Assign v5:int[width=32,signed=True] = v1 source=total-ref-readonly-local-rejected.cs:140+3
   i7 op4 Assign v6:int[width=32,signed=True] = (v5 + 1) source=total-ref-readonly-local-rejected.cs:140+3
   i8 op5 Assign v1:int[width=32,signed=True] = v6 source=total-ref-readonly-local-rejected.cs:140+3
-  i9 op7 Havoc Variables/Approximation [v7:int[width=32,signed=True]] source=total-ref-readonly-local-rejected.cs:160+1
-  i10 op6 Assign v3:int[width=32,signed=True] = v7 source=total-ref-readonly-local-rejected.cs:160+1
-  i11 op6 Return v3 source=total-ref-readonly-local-rejected.cs:160+1
+  i9 op5 Write Local source=total-ref-readonly-local-rejected.cs:140+3
+  i10 op7 Havoc Variables/Approximation [v7:int[width=32,signed=True]] source=total-ref-readonly-local-rejected.cs:160+1
+  i11 op6 Assign v3:int[width=32,signed=True] = v7 source=total-ref-readonly-local-rejected.cs:160+1
+  i12 op6 Return v3 source=total-ref-readonly-local-rejected.cs:160+1
 block: b3 cfg:2
-  i12 op0 Return void source=none
+  i13 op0 Return void source=none
 block: b4 exceptional:exit
   i2 op0 ExceptionalExit source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v0

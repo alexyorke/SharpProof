@@ -15,13 +15,15 @@ block: b2 cfg:1
   i6 op2 Assign v5:int[width=32,signed=True] = v1 source=total-mutation-snapshot.cs:109+3
   i7 op3 Assign v6:int[width=32,signed=True] = (v5 + 1) source=total-mutation-snapshot.cs:109+3
   i8 op4 Assign v1:int[width=32,signed=True] = v6 source=total-mutation-snapshot.cs:109+3
-  i9 op5 Assign v7:int[width=32,signed=True] = (v4 + v5) source=total-mutation-snapshot.cs:104+8
-  i10 op6 Assign v1:int[width=32,signed=True] = v7 source=total-mutation-snapshot.cs:104+8
-  i11 op8 Assign v8:int[width=32,signed=True] = v1 source=total-mutation-snapshot.cs:129+1
-  i12 op7 Assign v3:int[width=32,signed=True] = v8 source=total-mutation-snapshot.cs:129+1
-  i13 op7 Return v3 source=total-mutation-snapshot.cs:129+1
+  i9 op4 Write Local source=total-mutation-snapshot.cs:109+3
+  i10 op5 Assign v7:int[width=32,signed=True] = (v4 + v5) source=total-mutation-snapshot.cs:104+8
+  i11 op6 Assign v1:int[width=32,signed=True] = v7 source=total-mutation-snapshot.cs:104+8
+  i12 op6 Write Local source=total-mutation-snapshot.cs:104+8
+  i13 op8 Assign v8:int[width=32,signed=True] = v1 source=total-mutation-snapshot.cs:129+1
+  i14 op7 Assign v3:int[width=32,signed=True] = v8 source=total-mutation-snapshot.cs:129+1
+  i15 op7 Return v3 source=total-mutation-snapshot.cs:129+1
 block: b3 cfg:2
-  i14 op0 Return void source=none
+  i16 op0 Return void source=none
 block: b4 exceptional:exit
   i2 op0 ExceptionalExit source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v0

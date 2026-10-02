@@ -9,9 +9,9 @@ block: b0 entry
   i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op0 Goto b3 source=none
 block: b1 finally:dispatch
-  i29 op0 Goto b12 source=none
+  i31 op0 Goto b12 source=none
 block: b2 finally:dispatch
-  i31 op0 Goto b13 source=none
+  i33 op0 Goto b13 source=none
 block: b3 cfg:0
   i4 op0 Goto b4 source=none
 block: b4 cfg:1
@@ -25,17 +25,19 @@ block: b5 cfg:2
   i16 op6 Assign v10:int[width=32,signed=True] = 1 source=total-region-nested-finally.cs:149+1
   i17 op7 Assign v11:int[width=32,signed=True] = (v9 + v10) source=total-region-nested-finally.cs:140+10
   i18 op8 Assign v1:int[width=32,signed=True] = v11 source=total-region-nested-finally.cs:136+14
-  i19 op0 Goto b1 source=none
+  i19 op8 Write Local source=total-region-nested-finally.cs:136+14
+  i20 op0 Goto b1 source=none
 block: b6 cfg:3
-  i20 op9 Assign v12:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:178+1
-  i21 op10 Assign v13:int[width=32,signed=True] = 10 source=total-region-nested-finally.cs:182+2
-  i22 op11 Assign v14:int[width=32,signed=True] = (v12 * v13) source=total-region-nested-finally.cs:178+6
-  i23 op12 Assign v15:int[width=32,signed=True] = 2 source=total-region-nested-finally.cs:187+1
-  i24 op13 Assign v16:int[width=32,signed=True] = (v14 + v15) source=total-region-nested-finally.cs:178+10
-  i25 op14 Assign v1:int[width=32,signed=True] = v16 source=total-region-nested-finally.cs:174+14
-  i26 op0 Goto b2 source=none
+  i21 op9 Assign v12:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:178+1
+  i22 op10 Assign v13:int[width=32,signed=True] = 10 source=total-region-nested-finally.cs:182+2
+  i23 op11 Assign v14:int[width=32,signed=True] = (v12 * v13) source=total-region-nested-finally.cs:178+6
+  i24 op12 Assign v15:int[width=32,signed=True] = 2 source=total-region-nested-finally.cs:187+1
+  i25 op13 Assign v16:int[width=32,signed=True] = (v14 + v15) source=total-region-nested-finally.cs:178+10
+  i26 op14 Assign v1:int[width=32,signed=True] = v16 source=total-region-nested-finally.cs:174+14
+  i27 op14 Write Local source=total-region-nested-finally.cs:174+14
+  i28 op0 Goto b2 source=none
 block: b7 cfg:4
-  i27 op0 Return void source=none
+  i29 op0 Return void source=none
 block: b8 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b9 return:captured
@@ -47,9 +49,9 @@ block: b11 finally:entry
   i10 op1 Assign v4:int[width=32,signed=True] = 0 source=total-region-nested-finally.cs:121+1
   i11 op1 Goto b5 source=total-region-nested-finally.cs:121+1
 block: b12 finally:continue
-  i28 op1 Goto b10 source=total-region-nested-finally.cs:121+1
+  i30 op1 Goto b10 source=total-region-nested-finally.cs:121+1
 block: b13 finally:continue
-  i30 op1 Goto b9 source=total-region-nested-finally.cs:121+1
+  i32 op1 Goto b9 source=total-region-nested-finally.cs:121+1
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v1
 term: ir2 Variable type=t1:int width=32 signed=True value=v6

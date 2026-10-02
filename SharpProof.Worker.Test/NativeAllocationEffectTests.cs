@@ -21,7 +21,7 @@ public sealed class NativeAllocationEffectTests
             "[ZeroAllocations, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining | System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static int Target(int x) { " + body + " } }";
         var preparation = Prepare(source);
-        var native = await NativeAllocationEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(native.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), native.Reason.ToString());
         Assert.That(native.AllocationWitness.HasValue, Is.EqualTo(!proven));
         if (!proven)
@@ -44,7 +44,7 @@ public sealed class NativeAllocationEffectTests
     {
         var preparation = Prepare("using SharpProof.Attributes; public static class C { " + members +
             " [ZeroAllocations] public static int Target(int x) { " + body + " } }");
-        var native = await NativeAllocationEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(native.AllocationWitness, Is.Null);
     }
@@ -55,7 +55,7 @@ public sealed class NativeAllocationEffectTests
         var preparation = Prepare("using SharpProof.Attributes; public class Node<T> {} public static class C { " +
             "[ZeroAllocations] public static bool Target<T>(Node<T> node) => node == null; }");
         Assert.That(preparation.Total!.ValidEffectClaimIds, Does.Contain(preparation.EffectClaims.Single().ClaimId));
-        var native = await NativeAllocationEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -108,7 +108,7 @@ public sealed class NativeAllocationEffectTests
         else
         { total.ValidEffectClaimIds = []; }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var native = await NativeAllocationEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
         Assert.That(native.Outcome, Is.Null);
         Assert.That(native.Reason, Is.EqualTo(initialization ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.UnsupportedContract));
     }
@@ -119,7 +119,7 @@ public sealed class NativeAllocationEffectTests
         const string source = "using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static int Target(int x) { try { return 10 / x; } catch (System.DivideByZeroException) { return x; } } }";
-        var native = await NativeAllocationEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(AllocatedBytes(source, 0), Is.GreaterThan(0));
     }
@@ -157,6 +157,20 @@ public sealed class NativeAllocationEffectTests
             return GC.GetAllocatedBytesForCurrentThread() - before;
         }
         finally { context.Unload(); }
+    }
+
+    [Test]
+    public async Task SourceHelperAllocationSurvivesExpansionAndMatchesRuntime()
+    {
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
+            "private static int Helper(int value) { new object(); value++; return value; } " +
+            "[ZeroAllocations] public static int Target(int x) { return Helper(x); } }";
+        var preparation = Prepare(source);
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.AllocationWitness, Is.Not.Null);
+        Assert.That(AllocatedBytes(source, (int)result.EntryModel.Values.Single().IntegerNumericValue), Is.GreaterThan(0));
     }
 
     private static CompilerCallablePreparation Prepare(string source)

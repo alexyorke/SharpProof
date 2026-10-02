@@ -9,11 +9,11 @@ block: b0 entry
   i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op0 Goto b4 source=none
 block: b1 finally:dispatch
-  i60 op0 Branch (v4 == 0) ? b25 : b26 source=none
+  i62 op0 Branch (v4 == 0) ? b25 : b26 source=none
 block: b2 filter:accepted
-  i57 op4 Goto b17 source=total-region-filter-unwind.cs:141+6
+  i59 op4 Goto b17 source=total-region-filter-unwind.cs:141+6
 block: b3 filter:rejected
-  i58 op4 Goto b14 source=total-region-filter-unwind.cs:141+6
+  i60 op4 Goto b14 source=total-region-filter-unwind.cs:141+6
 block: b4 cfg:0
   i4 op0 Goto b5 source=none
 block: b5 cfg:1
@@ -27,27 +27,29 @@ block: b6 cfg:2
   i36 op10 Assign v13:int[width=32,signed=True] = 2 source=total-region-filter-unwind.cs:186+1
   i37 op11 Assign v14:int[width=32,signed=True] = (v12 + v13) source=total-region-filter-unwind.cs:177+10
   i38 op12 Assign v1:int[width=32,signed=True] = v14 source=total-region-filter-unwind.cs:173+14
-  i39 op0 Goto b1 source=none
+  i39 op12 Write Local source=total-region-filter-unwind.cs:173+14
+  i40 op0 Goto b1 source=none
 block: b7 cfg:3
-  i40 op14 Assign v15:int[width=32,signed=True] = v1 source=total-region-filter-unwind.cs:257+1
-  i41 op15 Assign v16:int[width=32,signed=True] = 10 source=total-region-filter-unwind.cs:261+2
-  i42 op16 Assign v17:int[width=32,signed=True] = (v15 * v16) source=total-region-filter-unwind.cs:257+6
-  i43 op17 Assign v18:int[width=32,signed=True] = 1 source=total-region-filter-unwind.cs:266+1
-  i44 op18 Assign v19:int[width=32,signed=True] = (v17 + v18) source=total-region-filter-unwind.cs:257+10
-  i45 op19 Assign v1:int[width=32,signed=True] = v19 source=total-region-filter-unwind.cs:253+14
-  i46 op20 Assign v20:int[width=32,signed=True] = 0 source=total-region-filter-unwind.cs:271+1
-  i47 op21 Assign v21:bool[width=0,signed=False] = (v19 > v20) source=total-region-filter-unwind.cs:252+20
-  i48 op13 Branch v21 ? b2 : b3 source=total-region-filter-unwind.cs:252+20
+  i41 op14 Assign v15:int[width=32,signed=True] = v1 source=total-region-filter-unwind.cs:257+1
+  i42 op15 Assign v16:int[width=32,signed=True] = 10 source=total-region-filter-unwind.cs:261+2
+  i43 op16 Assign v17:int[width=32,signed=True] = (v15 * v16) source=total-region-filter-unwind.cs:257+6
+  i44 op17 Assign v18:int[width=32,signed=True] = 1 source=total-region-filter-unwind.cs:266+1
+  i45 op18 Assign v19:int[width=32,signed=True] = (v17 + v18) source=total-region-filter-unwind.cs:257+10
+  i46 op19 Assign v1:int[width=32,signed=True] = v19 source=total-region-filter-unwind.cs:253+14
+  i47 op19 Write Local source=total-region-filter-unwind.cs:253+14
+  i48 op20 Assign v20:int[width=32,signed=True] = 0 source=total-region-filter-unwind.cs:271+1
+  i49 op21 Assign v21:bool[width=0,signed=False] = (v19 > v20) source=total-region-filter-unwind.cs:252+20
+  i50 op13 Branch v21 ? b2 : b3 source=total-region-filter-unwind.cs:252+20
 block: b8 cfg:4
-  i49 op23 Assign v22:int[width=32,signed=True] = v1 source=total-region-filter-unwind.cs:291+1
-  i50 op24 Assign v23:int[width=32,signed=True] = 10 source=total-region-filter-unwind.cs:295+2
-  i51 op25 Assign v24:int[width=32,signed=True] = (v22 * v23) source=total-region-filter-unwind.cs:291+6
-  i52 op26 Assign v25:int[width=32,signed=True] = 3 source=total-region-filter-unwind.cs:300+1
-  i53 op27 Assign v26:int[width=32,signed=True] = (v24 + v25) source=total-region-filter-unwind.cs:291+10
-  i54 op22 Assign v3:int[width=32,signed=True] = v26 source=total-region-filter-unwind.cs:291+10
-  i55 op22 Return v3 source=total-region-filter-unwind.cs:291+10
+  i51 op23 Assign v22:int[width=32,signed=True] = v1 source=total-region-filter-unwind.cs:291+1
+  i52 op24 Assign v23:int[width=32,signed=True] = 10 source=total-region-filter-unwind.cs:295+2
+  i53 op25 Assign v24:int[width=32,signed=True] = (v22 * v23) source=total-region-filter-unwind.cs:291+6
+  i54 op26 Assign v25:int[width=32,signed=True] = 3 source=total-region-filter-unwind.cs:300+1
+  i55 op27 Assign v26:int[width=32,signed=True] = (v24 + v25) source=total-region-filter-unwind.cs:291+10
+  i56 op22 Assign v3:int[width=32,signed=True] = v26 source=total-region-filter-unwind.cs:291+10
+  i57 op22 Return v3 source=total-region-filter-unwind.cs:291+10
 block: b9 cfg:5
-  i56 op0 Return void source=none
+  i58 op0 Return void source=none
 block: b10 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b11 throw
@@ -90,19 +92,19 @@ block: b24 finally:entry
   i30 op1 Assign v4:int[width=32,signed=True] = 3 source=total-region-filter-unwind.cs:141+6
   i31 op1 Goto b6 source=total-region-filter-unwind.cs:141+6
 block: b25 finally:continue
-  i59 op4 Throw DivideByZero -> b10 source=total-region-filter-unwind.cs:141+6
+  i61 op4 Throw DivideByZero -> b10 source=total-region-filter-unwind.cs:141+6
 block: b26 finally:dispatch
-  i62 op0 Branch (v4 == 1) ? b27 : b28 source=none
+  i64 op0 Branch (v4 == 1) ? b27 : b28 source=none
 block: b27 finally:continue
-  i61 op4 Throw DivideByZero -> b15 source=total-region-filter-unwind.cs:141+6
+  i63 op4 Throw DivideByZero -> b15 source=total-region-filter-unwind.cs:141+6
 block: b28 finally:dispatch
-  i64 op0 Branch (v4 == 2) ? b29 : b30 source=none
+  i66 op0 Branch (v4 == 2) ? b29 : b30 source=none
 block: b29 finally:continue
-  i63 op5 Throw Overflow -> b10 source=total-region-filter-unwind.cs:141+6
+  i65 op5 Throw Overflow -> b10 source=total-region-filter-unwind.cs:141+6
 block: b30 finally:dispatch
-  i66 op0 Goto b31 source=none
+  i68 op0 Goto b31 source=none
 block: b31 finally:continue
-  i65 op1 Goto b23 source=total-region-filter-unwind.cs:141+6
+  i67 op1 Goto b23 source=total-region-filter-unwind.cs:141+6
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Integer type=t1:int width=32 signed=True bits=10 value=10
 term: ir2 Variable type=t1:int width=32 signed=True value=v7

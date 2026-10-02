@@ -134,15 +134,20 @@ internal static class OpenSourceCorpusRunner
     }
 
     internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
-        bool allocations = false)
-    { return Prepare(document, allocations ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken).Compilation; }
+        bool allocations = false, bool purity = false)
+    {
+        return Prepare(document, purity ? "global::SharpProof.Attributes.EnforcePure" : allocations
+            ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken,
+            includeExternalEffectsFixture: purity).Compilation;
+    }
 
     internal static string? CorpusMethodId(SyntaxNode? declaration)
     { return declaration?.GetAnnotations(AnnotationKind).SingleOrDefault()?.Data; }
 
     private sealed record PreparedCorpus(CSharpCompilation Compilation, ImmutableDictionary<TargetKey, TargetInfo> Targets);
 
-    private static PreparedCorpus Prepare(OpenSourceCorpusDocument document, string effectAttribute, CancellationToken cancellationToken)
+    private static PreparedCorpus Prepare(OpenSourceCorpusDocument document, string effectAttribute, CancellationToken cancellationToken,
+        bool includeExternalEffectsFixture = true)
     {
         var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(document);
         var declarationIndexes = OpenSourceCorpusCatalog.GetDeclarationIndexes(document);
@@ -248,7 +253,7 @@ internal static class OpenSourceCorpusRunner
         var template = AnalyzerGateHost.CreateCompilation(
             string.Empty,
             "SharpProofOssCorpus",
-            includeExternalEffectsFixture: effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
+            includeExternalEffectsFixture: includeExternalEffectsFixture && effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
         var compilation = template
             .RemoveSyntaxTrees(template.SyntaxTrees)
             .AddSyntaxTrees(trees);

@@ -76,7 +76,7 @@ internal sealed partial class PassiveLoopCutter
             foreach (var instruction in _candidate.Program.GetBlock(block).Instructions)
             {
                 Spend();
-                if (instruction is not (IrAllocationInstruction or IrAssignInstruction or IrHavocInstruction or IrAssumeInstruction or
+                if (instruction is not (IrAllocationInstruction or IrWriteInstruction or IrAssignInstruction or IrHavocInstruction or IrAssumeInstruction or
                     IrBranchInstruction or IrGotoInstruction or IrThrowInstruction or IrExceptionalExitInstruction or IrReturnInstruction))
                 { return false; }
             }
@@ -171,6 +171,9 @@ internal sealed partial class PassiveLoopCutter
                 {
                     case IrAllocationInstruction allocation:
                         builder.Allocate(encoded, allocation.Operation, allocation.AllocatedType);
+                        break;
+                    case IrWriteInstruction write:
+                        builder.Write(encoded, write.Operation, write.Region);
                         break;
                     case IrAssignInstruction assign:
                         builder.Assign(encoded, assign.Operation, assign.Target, assign.Value);

@@ -284,7 +284,12 @@ internal static class AnalyzerGateHost
                         diagnostic.ToString())));
         }
 
-        return references.Add(MetadataReference.CreateFromImage(stream.ToArray()));
+        // The production artifact capture requires a file-backed reference.
+        // Keep the generated image alive for this process's compilation cache.
+        var directory = Directory.CreateTempSubdirectory("sharpproof-gates-reference-");
+        var path = Path.Combine(directory.FullName, "SharpProof.Gates.ExternalEffects.dll");
+        File.WriteAllBytes(path, stream.ToArray());
+        return references.Add(MetadataReference.CreateFromFile(path));
     }
 
     private sealed class RecordingAnalyzerSessionFactory(

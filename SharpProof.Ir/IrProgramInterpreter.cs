@@ -95,6 +95,9 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrAllocationInstruction allocation:
                         replayOptions?.AllocationObserver?.Invoke(allocation);
                         break;
+                    case IrWriteInstruction write:
+                        replayOptions?.WriteObserver?.Invoke(write);
+                        break;
                     case IrAssignInstruction assign:
                         var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, cancellationToken);
                         if (assigned.Status != IrEvaluationStatus.Value)

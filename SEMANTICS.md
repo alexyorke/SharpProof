@@ -479,6 +479,13 @@ claim ownership and complete entry initialization must survive decoding before
 entry infeasibility can establish a vacuous result. This qualification remains
 separate from authoritative compiler effect results.
 
+Write events classify Local, Parameter, Field, Static, Element and Unknown
+regions. Native purity forbids reachable nonlocal events and permits allocation.
+By-value parameter rebinding is Local. Source heap mutations, unsupported calls
+and incomplete initialization abstain; this shadow does not change compiler
+effect authority. Refutation requires an original-program write-site witness
+without approximation reads. Bounded loop search never establishes a proof.
+
 Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
 cases carry explicit normal-completion predicates for arithmetic faults and
 short-circuiting, checked against independently executed C# operators. Finite

@@ -23,70 +23,72 @@ block: b1 cfg:0
 block: b2 cfg:1
   i9 op1 Assign v11:<no-assembly>::System.Int32[][width=0,signed=False] = empty("<no-assembly>::System.Int32[]"#t4) source=total-framework-string-array.cs:196+18
   i10 op2 Assign v10:<no-assembly>::System.Int32[][width=0,signed=False] = v11 source=total-framework-string-array.cs:188+26
-  i11 op0 Goto b3 source=none
+  i11 op2 Write Local source=total-framework-string-array.cs:188+26
+  i12 op0 Goto b3 source=none
 block: b3 cfg:2
-  i12 op4 Assign v12:int[width=32,signed=True] = 1 source=total-framework-string-array.cs:253+1
-  i13 op5 Assign v13:int[width=32,signed=True] = v7 source=total-framework-string-array.cs:257+7
-  i14 op6 Branch (v13 == 0) ? b15 : b16 source=total-framework-string-array.cs:253+11
+  i13 op4 Assign v12:int[width=32,signed=True] = 1 source=total-framework-string-array.cs:253+1
+  i14 op5 Assign v13:int[width=32,signed=True] = v7 source=total-framework-string-array.cs:257+7
+  i15 op6 Branch (v13 == 0) ? b15 : b16 source=total-framework-string-array.cs:253+11
 block: b4 cfg:4
-  i22 op11 Assign v17:string[width=0,signed=False] = v1 source=total-framework-string-array.cs:277+4
-  i23 op12 Assign v18:string[width=0,signed=False] = v17 source=total-framework-string-array.cs:277+4
-  i24 op0 Goto b6 source=none
+  i23 op11 Assign v17:string[width=0,signed=False] = v1 source=total-framework-string-array.cs:277+4
+  i24 op12 Assign v18:string[width=0,signed=False] = v17 source=total-framework-string-array.cs:277+4
+  i25 op0 Goto b6 source=none
 block: b5 cfg:3
-  i25 op13 Assign v19:string[width=0,signed=False] = "" source=total-framework-string-array.cs:272+2
-  i26 op14 Assign v18:string[width=0,signed=False] = v19 source=total-framework-string-array.cs:272+2
-  i27 op0 Goto b6 source=none
+  i26 op13 Assign v19:string[width=0,signed=False] = "" source=total-framework-string-array.cs:272+2
+  i27 op14 Assign v18:string[width=0,signed=False] = v19 source=total-framework-string-array.cs:272+2
+  i28 op0 Goto b6 source=none
 block: b6 cfg:5
-  i28 op15 Assign v21:string[width=0,signed=False] = v18 source=total-framework-string-array.cs:253+28
-  i29 op16 Assign v22:string[width=0,signed=False] = v4 source=total-framework-string-array.cs:283+5
-  i30 op17 Assign v23:string[width=0,signed=False] = (v21 ++ v22) source=total-framework-string-array.cs:239+50
-  i31 op18 Assign v20:string[width=0,signed=False] = v23 source=total-framework-string-array.cs:228+61
-  i32 op0 Goto b7 source=none
+  i29 op15 Assign v21:string[width=0,signed=False] = v18 source=total-framework-string-array.cs:253+28
+  i30 op16 Assign v22:string[width=0,signed=False] = v4 source=total-framework-string-array.cs:283+5
+  i31 op17 Assign v23:string[width=0,signed=False] = (v21 ++ v22) source=total-framework-string-array.cs:239+50
+  i32 op18 Assign v20:string[width=0,signed=False] = v23 source=total-framework-string-array.cs:228+61
+  i33 op18 Write Local source=total-framework-string-array.cs:228+61
+  i34 op0 Goto b7 source=none
 block: b7 cfg:6
-  i33 op20 Assign v24:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:306+5
-  i34 op21 Assign v25:bool[width=0,signed=False] = (v24 != (("<no-assembly>::System.Int32[]"#t4)null)) source=total-framework-string-array.cs:306+13
-  i35 op19 Branch v25 ? b8 : b10 source=total-framework-string-array.cs:306+13
+  i35 op20 Assign v24:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:306+5
+  i36 op21 Assign v25:bool[width=0,signed=False] = (v24 != (("<no-assembly>::System.Int32[]"#t4)null)) source=total-framework-string-array.cs:306+13
+  i37 op19 Branch v25 ? b8 : b10 source=total-framework-string-array.cs:306+13
 block: b8 cfg:7
-  i36 op23 Assign v26:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:323+5
-  i37 op24 Branch (v26 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b19 : b20 source=total-framework-string-array.cs:323+12
+  i38 op23 Assign v26:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:323+5
+  i39 op24 Branch (v26 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b19 : b20 source=total-framework-string-array.cs:323+12
 block: b9 cfg:8
-  i43 op29 Assign v30:string[width=0,signed=False] = v20 source=total-framework-string-array.cs:344+8
-  i44 op30 Assign v31:bool[width=0,signed=False] = (v30 != (("string"#t2)null)) source=total-framework-string-array.cs:344+16
-  i45 op28 Branch v31 ? b11 : b10 source=total-framework-string-array.cs:344+16
+  i45 op29 Assign v30:string[width=0,signed=False] = v20 source=total-framework-string-array.cs:344+8
+  i46 op30 Assign v31:bool[width=0,signed=False] = (v30 != (("string"#t2)null)) source=total-framework-string-array.cs:344+16
+  i47 op28 Branch v31 ? b11 : b10 source=total-framework-string-array.cs:344+16
 block: b10 cfg:10
-  i46 op31 Assign v32:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:367+1
-  i47 op32 Assign v33:int[width=32,signed=True] = v32 source=total-framework-string-array.cs:367+1
-  i48 op0 Goto b12 source=none
+  i48 op31 Assign v32:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:367+1
+  i49 op32 Assign v33:int[width=32,signed=True] = v32 source=total-framework-string-array.cs:367+1
+  i50 op0 Goto b12 source=none
 block: b11 cfg:9
-  i49 op33 Assign v34:int[width=32,signed=True] = 1 source=total-framework-string-array.cs:363+1
-  i50 op34 Assign v33:int[width=32,signed=True] = v34 source=total-framework-string-array.cs:363+1
-  i51 op0 Goto b12 source=none
+  i51 op33 Assign v34:int[width=32,signed=True] = 1 source=total-framework-string-array.cs:363+1
+  i52 op34 Assign v33:int[width=32,signed=True] = v34 source=total-framework-string-array.cs:363+1
+  i53 op0 Goto b12 source=none
 block: b12 cfg:11
-  i52 op36 Assign v35:int[width=32,signed=True] = v33 source=total-framework-string-array.cs:306+62
-  i53 op35 Assign v9:int[width=32,signed=True] = v35 source=total-framework-string-array.cs:306+62
-  i54 op35 Return v9 source=total-framework-string-array.cs:306+62
+  i54 op36 Assign v35:int[width=32,signed=True] = v33 source=total-framework-string-array.cs:306+62
+  i55 op35 Assign v9:int[width=32,signed=True] = v35 source=total-framework-string-array.cs:306+62
+  i56 op35 Return v9 source=total-framework-string-array.cs:306+62
 block: b13 cfg:12
-  i55 op0 Return void source=none
+  i57 op0 Return void source=none
 block: b14 exceptional:exit
   i6 op0 ExceptionalExit source=none
 block: b15 throw
-  i15 op6 Throw DivideByZero -> b14 source=total-framework-string-array.cs:253+11
+  i16 op6 Throw DivideByZero -> b14 source=total-framework-string-array.cs:253+11
 block: b16 normal
-  i16 op7 Branch ((v12 == -2147483648) && (v13 == -1)) ? b17 : b18 source=total-framework-string-array.cs:253+11
+  i17 op7 Branch ((v12 == -2147483648) && (v13 == -1)) ? b17 : b18 source=total-framework-string-array.cs:253+11
 block: b17 throw
-  i17 op7 Throw Overflow -> b14 source=total-framework-string-array.cs:253+11
+  i18 op7 Throw Overflow -> b14 source=total-framework-string-array.cs:253+11
 block: b18 normal
-  i18 op8 Assign v14:int[width=32,signed=True] = (v12 / v13) source=total-framework-string-array.cs:253+11
-  i19 op9 Assign v15:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:268+1
-  i20 op10 Assign v16:bool[width=0,signed=False] = (v14 == v15) source=total-framework-string-array.cs:253+16
-  i21 op3 Branch v16 ? b5 : b4 source=total-framework-string-array.cs:253+16
+  i19 op8 Assign v14:int[width=32,signed=True] = (v12 / v13) source=total-framework-string-array.cs:253+11
+  i20 op9 Assign v15:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:268+1
+  i21 op10 Assign v16:bool[width=0,signed=False] = (v14 == v15) source=total-framework-string-array.cs:253+16
+  i22 op3 Branch v16 ? b5 : b4 source=total-framework-string-array.cs:253+16
 block: b19 throw
-  i38 op24 Throw NullReference -> b14 source=total-framework-string-array.cs:323+12
+  i40 op24 Throw NullReference -> b14 source=total-framework-string-array.cs:323+12
 block: b20 normal
-  i39 op25 Assign v27:int[width=32,signed=True] = len(v26) source=total-framework-string-array.cs:323+12
-  i40 op26 Assign v28:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:339+1
-  i41 op27 Assign v29:bool[width=0,signed=False] = (v27 == v28) source=total-framework-string-array.cs:323+17
-  i42 op22 Branch v29 ? b9 : b10 source=total-framework-string-array.cs:323+17
+  i41 op25 Assign v27:int[width=32,signed=True] = len(v26) source=total-framework-string-array.cs:323+12
+  i42 op26 Assign v28:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:339+1
+  i43 op27 Assign v29:bool[width=0,signed=False] = (v27 == v28) source=total-framework-string-array.cs:323+17
+  i44 op22 Branch v29 ? b9 : b10 source=total-framework-string-array.cs:323+17
 term: ir0 Variable type=t2:string width=0 signed=False value=v0
 term: ir1 Variable type=t2:string width=0 signed=False value=v3
 term: ir2 Variable type=t1:int width=32 signed=True value=v6

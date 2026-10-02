@@ -92,6 +92,12 @@ internal sealed partial class RoslynTotalProgramLowerer
                 var destination = blocks[source.Id];
                 switch (instruction)
                 {
+                    case IrAllocationInstruction allocation:
+                        _builder.Allocate(destination, allocation.Operation, allocation.AllocatedType);
+                        break;
+                    case IrWriteInstruction write:
+                        _builder.Write(destination, write.Operation, write.Region);
+                        break;
                     case IrAssignInstruction assign:
                         _builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
                         break;

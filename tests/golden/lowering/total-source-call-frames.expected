@@ -16,50 +16,52 @@ block: b2 cfg:1
   i7 op4 Assign v13:int[width=32,signed=True] = v1 source=total-source-call-frames.cs:150+3
   i8 op5 Assign v14:int[width=32,signed=True] = (v13 + 1) source=total-source-call-frames.cs:150+3
   i9 op6 Assign v1:int[width=32,signed=True] = v14 source=total-source-call-frames.cs:150+3
-  i10 op2 Assign v4:int[width=32,signed=True] = v12 source=total-source-call-frames.cs:127+27
-  i11 op2 Assign v7:int[width=32,signed=True] = v13 source=total-source-call-frames.cs:127+27
-  i12 op2 Goto b6 source=total-source-call-frames.cs:127+27
+  i10 op6 Write Local source=total-source-call-frames.cs:150+3
+  i11 op2 Assign v4:int[width=32,signed=True] = v12 source=total-source-call-frames.cs:127+27
+  i12 op2 Assign v7:int[width=32,signed=True] = v13 source=total-source-call-frames.cs:127+27
+  i13 op2 Goto b6 source=total-source-call-frames.cs:127+27
 block: b3 cfg:2
-  i39 op0 Return void source=none
+  i41 op0 Return void source=none
 block: b4 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b5 call:continued
-  i37 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-frames.cs:127+27
-  i38 op1 Return v3 source=total-source-call-frames.cs:127+27
+  i39 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-frames.cs:127+27
+  i40 op1 Return v3 source=total-source-call-frames.cs:127+27
 block: b6 call:body
-  i13 op7 Assign v5:int[width=32,signed=True] = v4 source=none
-  i14 op7 Assign v6:int[width=32,signed=True] = v4 source=none
-  i15 op7 Assign v8:int[width=32,signed=True] = v7 source=none
-  i16 op7 Assign v9:int[width=32,signed=True] = v7 source=none
-  i17 op7 Goto b8 source=none
+  i14 op7 Assign v5:int[width=32,signed=True] = v4 source=none
+  i15 op7 Assign v6:int[width=32,signed=True] = v4 source=none
+  i16 op7 Assign v8:int[width=32,signed=True] = v7 source=none
+  i17 op7 Assign v9:int[width=32,signed=True] = v7 source=none
+  i18 op7 Goto b8 source=none
 block: b7 call:body
-  i18 op7 Goto b15 source=none
+  i19 op7 Goto b15 source=none
 block: b8 call:body
-  i19 op7 Goto b9 source=none
+  i20 op7 Goto b9 source=none
 block: b9 call:body
-  i20 op9 Assign v16:int[width=32,signed=True] = v5 source=total-source-call-frames.cs:236+5
-  i21 op10 Assign v17:int[width=32,signed=True] = 10 source=total-source-call-frames.cs:244+2
-  i22 op11 Assign v18:int[width=32,signed=True] = (v16 * v17) source=total-source-call-frames.cs:236+10
-  i23 op12 Assign v19:int[width=32,signed=True] = v8 source=total-source-call-frames.cs:249+6
-  i24 op13 Assign v20:int[width=32,signed=True] = (v18 + v19) source=total-source-call-frames.cs:236+19
-  i25 op8 Assign v10:int[width=32,signed=True] = v20 source=total-source-call-frames.cs:236+19
-  i26 op8 Goto b14 source=total-source-call-frames.cs:236+19
+  i21 op9 Assign v16:int[width=32,signed=True] = v5 source=total-source-call-frames.cs:236+5
+  i22 op10 Assign v17:int[width=32,signed=True] = 10 source=total-source-call-frames.cs:244+2
+  i23 op11 Assign v18:int[width=32,signed=True] = (v16 * v17) source=total-source-call-frames.cs:236+10
+  i24 op12 Assign v19:int[width=32,signed=True] = v8 source=total-source-call-frames.cs:249+6
+  i25 op13 Assign v20:int[width=32,signed=True] = (v18 + v19) source=total-source-call-frames.cs:236+19
+  i26 op8 Assign v10:int[width=32,signed=True] = v20 source=total-source-call-frames.cs:236+19
+  i27 op8 Goto b14 source=total-source-call-frames.cs:236+19
 block: b10 call:body
-  i27 op14 Assign v21:int[width=32,signed=True] = 99 source=total-source-call-frames.cs:285+2
-  i28 op15 Assign v5:int[width=32,signed=True] = v21 source=total-source-call-frames.cs:277+10
-  i29 op7 Goto b7 source=none
+  i28 op14 Assign v21:int[width=32,signed=True] = 99 source=total-source-call-frames.cs:285+2
+  i29 op15 Assign v5:int[width=32,signed=True] = v21 source=total-source-call-frames.cs:277+10
+  i30 op15 Write Local source=total-source-call-frames.cs:277+10
+  i31 op7 Goto b7 source=none
 block: b11 call:body
-  i30 op7 Goto b5 source=none
+  i32 op7 Goto b5 source=none
 block: b12 call:body
-  i31 op7 ExceptionalExit source=none
+  i33 op7 ExceptionalExit source=none
 block: b13 call:body
-  i32 op8 Assign v11:int[width=32,signed=True] = v10 source=total-source-call-frames.cs:236+19
-  i33 op8 Goto b5 source=total-source-call-frames.cs:236+19
+  i34 op8 Assign v11:int[width=32,signed=True] = v10 source=total-source-call-frames.cs:236+19
+  i35 op8 Goto b5 source=total-source-call-frames.cs:236+19
 block: b14 call:body
-  i34 op8 Assign v15:int[width=32,signed=True] = 0 source=total-source-call-frames.cs:236+19
-  i35 op8 Goto b10 source=total-source-call-frames.cs:236+19
+  i36 op8 Assign v15:int[width=32,signed=True] = 0 source=total-source-call-frames.cs:236+19
+  i37 op8 Goto b10 source=total-source-call-frames.cs:236+19
 block: b15 call:body
-  i36 op8 Goto b13 source=total-source-call-frames.cs:236+19
+  i38 op8 Goto b13 source=total-source-call-frames.cs:236+19
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v11
 term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0

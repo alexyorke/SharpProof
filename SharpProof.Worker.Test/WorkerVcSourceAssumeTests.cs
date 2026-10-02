@@ -220,6 +220,9 @@ public sealed class WorkerVcSourceAssumeTests
                 var destination = blocks[block.Id];
                 switch (instruction)
                 {
+                    case IrWriteInstruction write:
+                        builder.Write(destination, write.Operation, write.Region);
+                        break;
                     case IrAssignInstruction assign:
                         builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
                         if (!unreachable && assign.Target == total.Parameters[0].Current &&

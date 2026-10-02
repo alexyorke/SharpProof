@@ -16,7 +16,7 @@ block: b0 entry
   i3 op2 Assign v5:bool[width=0,signed=False] = v3 source=none
   i5 op2 Goto b2 source=none
 block: b1 finally:dispatch
-  i36 op2 Branch (v7 == 0) ? b18 : b19 source=none
+  i38 op2 Branch (v7 == 0) ? b18 : b19 source=none
 block: b2 cfg:0
   i6 op2 Goto b3 source=none
 block: b3 cfg:1
@@ -41,17 +41,19 @@ block: b10 cfg:8
   i21 op8 Assign v10:int[width=32,signed=True] = v1 source=total-region-shared-finally.cs:339+3
   i22 op9 Assign v11:int[width=32,signed=True] = (v10 + 1) source=total-region-shared-finally.cs:339+3
   i23 op10 Assign v1:int[width=32,signed=True] = v11 source=total-region-shared-finally.cs:339+3
-  i27 op2 Goto b17 source=none
+  i24 op10 Write Local source=total-region-shared-finally.cs:339+3
+  i28 op2 Goto b17 source=none
 block: b11 cfg:9
-  i28 op11 Assign v12:int[width=32,signed=True] = 7 source=total-region-shared-finally.cs:368+1
-  i29 op12 Assign v1:int[width=32,signed=True] = v12 source=total-region-shared-finally.cs:364+5
-  i30 op2 Goto b1 source=none
+  i29 op11 Assign v12:int[width=32,signed=True] = 7 source=total-region-shared-finally.cs:368+1
+  i30 op12 Assign v1:int[width=32,signed=True] = v12 source=total-region-shared-finally.cs:364+5
+  i31 op12 Write Local source=total-region-shared-finally.cs:364+5
+  i32 op2 Goto b1 source=none
 block: b12 cfg:10
-  i31 op14 Assign v13:int[width=32,signed=True] = v1 source=total-region-shared-finally.cs:388+1
-  i32 op13 Assign v6:int[width=32,signed=True] = v13 source=total-region-shared-finally.cs:388+1
-  i33 op13 Return v6 source=total-region-shared-finally.cs:388+1
+  i33 op14 Assign v13:int[width=32,signed=True] = v1 source=total-region-shared-finally.cs:388+1
+  i34 op13 Assign v6:int[width=32,signed=True] = v13 source=total-region-shared-finally.cs:388+1
+  i35 op13 Return v6 source=total-region-shared-finally.cs:388+1
 block: b13 cfg:11
-  i34 op2 Return void source=none
+  i36 op2 Return void source=none
 block: b14 exceptional:exit
   i4 op2 ExceptionalExit source=none
 block: b15 return:captured
@@ -60,15 +62,15 @@ block: b16 finally:entry
   i18 op6 Assign v7:int[width=32,signed=True] = 0 source=total-region-shared-finally.cs:336+1
   i19 op6 Goto b11 source=total-region-shared-finally.cs:336+1
 block: b17 finally:entry
-  i24 op2 Assign v6:int[width=32,signed=True] = 0 source=none
-  i25 op2 Assign v7:int[width=32,signed=True] = 1 source=none
-  i26 op2 Goto b11 source=none
+  i25 op2 Assign v6:int[width=32,signed=True] = 0 source=none
+  i26 op2 Assign v7:int[width=32,signed=True] = 1 source=none
+  i27 op2 Goto b11 source=none
 block: b18 finally:continue
-  i35 op6 Goto b15 source=total-region-shared-finally.cs:336+1
+  i37 op6 Goto b15 source=total-region-shared-finally.cs:336+1
 block: b19 finally:dispatch
-  i38 op2 Goto b20 source=none
+  i40 op2 Goto b20 source=none
 block: b20 finally:continue
-  i37 op2 Goto b12 source=none
+  i39 op2 Goto b12 source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v1
 term: ir1 Boolean type=t0:bool width=0 signed=False value=true
 term: ir2 Integer type=t1:int width=32 signed=True bits=3 value=3

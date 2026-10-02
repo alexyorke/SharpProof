@@ -104,7 +104,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                     var right = LowerBodyValue(assignment.Value, block, depth + 1);
                     if (right.Classification.IsExact)
                     {
-                        _builder!.Assign(right.Continuation, _context.Site(operation), target, right.Value);
+                        var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, right.Value);
+                        _builder.Write(right.Continuation, mutation.Operation, IrWriteRegion.Local);
                     }
                     return right;
                 }
@@ -266,7 +267,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (!rule.Classification.IsExact)
         { return Approximate(operation, block, rule.Classification.Abstention); }
         var next = ApplyRule(operation, rule, old.Continuation);
-        _builder!.Assign(next.Continuation, _context.Site(operation), target, next.Value);
+        var mutation = _builder!.Assign(next.Continuation, _context.Site(operation), target, next.Value);
+        _builder.Write(next.Continuation, mutation.Operation, IrWriteRegion.Local);
         return operation.IsPostfix ? new(old.Value, next.Continuation, next.Classification) : next;
     }
 
@@ -282,7 +284,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (!rule.Classification.IsExact)
         { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
         var result = ApplyRule(operation, rule, right.Continuation);
-        _builder!.Assign(result.Continuation, _context.Site(operation), target, result.Value);
+        var mutation = _builder!.Assign(result.Continuation, _context.Site(operation), target, result.Value);
+        _builder.Write(result.Continuation, mutation.Operation, IrWriteRegion.Local);
         return result;
     }
 
