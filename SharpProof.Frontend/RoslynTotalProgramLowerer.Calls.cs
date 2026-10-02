@@ -93,7 +93,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
-                        _builder.Allocate(destination, allocation.Operation, allocation.AllocatedType, allocation.Target);
+                        _builder.Allocate(destination, allocation.Operation, allocation.AllocatedType, allocation.Target, allocation.Length);
                         break;
                     case IrLockInstruction synchronization:
                         _builder.Lock(destination, synchronization.Operation, synchronization.Receiver);

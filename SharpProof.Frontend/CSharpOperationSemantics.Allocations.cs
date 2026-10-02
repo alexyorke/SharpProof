@@ -2,6 +2,12 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool IsDefaultArrayCreation(IArrayCreationOperation creation)
+    {
+        return creation is { Type: IArrayTypeSymbol { IsSZArray: true }, DimensionSizes.Length: 1, Initializer: null } &&
+            creation.DimensionSizes[0].Type?.SpecialType == SpecialType.System_Int32 && IsReferenceDomain(creation.Type);
+    }
+
     internal static bool IsStringConcatenation(IOperation operation)
     {
         return operation is IBinaryOperation

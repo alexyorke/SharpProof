@@ -148,6 +148,7 @@ public sealed class NativeExceptionShadowTests
 
     [TestCase("return x;", WorkerClaimOutcome.Proven)]
     [TestCase("new object(); return x;", WorkerClaimOutcome.Refuted)]
+    [TestCase("int[] values = new int[2]; return values.Length;", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Console.WriteLine(x); return x;", WorkerClaimOutcome.Unknown)]
     [TestCase("System.Threading.Monitor.Enter(null); return x;", WorkerClaimOutcome.Unknown)]
     [TestCase("object value = x; return x;", WorkerClaimOutcome.Refuted)]
@@ -278,6 +279,7 @@ public sealed class NativeExceptionShadowTests
 
     [TestCase("var y = x; y++; return y;", WorkerClaimOutcome.Proven)]
     [TestCase("new object(); return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("int[] values = new int[2]; return values.Length;", WorkerClaimOutcome.Proven)]
     [TestCase("System.Console.WriteLine(x); return x;", WorkerClaimOutcome.Unknown)]
     [TestCase("System.Threading.Monitor.Enter(null); return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("lock ((object)null) { x++; } return x;", WorkerClaimOutcome.Refuted)]

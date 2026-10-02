@@ -60,6 +60,11 @@ public sealed class NativeAllocationEffectTests
     [TestCase("Contract.Requires(x != 0); if (x == 0) new object(); return x;", true)]
     [TestCase("new object(); throw null;", false)]
     [TestCase("while (x > 0) { new object(); x--; } return x;", false)]
+    [TestCase("int[] values = new int[0]; return values.Length;", false)]
+    [TestCase("int[] values = new int[2]; return values.Length;", false)]
+    [TestCase("Contract.Requires(x >= 0); int[] values = new int[x]; return x;", false)]
+    [TestCase("Contract.Requires(x != 0); if (x == 0) { int[] values = new int[x]; } return x;", true)]
+    [TestCase("while (x > 0) { int[] values = new int[x]; x--; } return x;", false)]
     [TestCase("return string.Concat(x == 0 ? \"\" : \"a\", \"b\").Length;", false)]
     [TestCase("return string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length;", true)]
     [TestCase("return string.Concat((string)null, x == 0 ? \"a\" : \"b\").Length;", true)]
@@ -158,6 +163,80 @@ public sealed class NativeAllocationEffectTests
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+    [Test]
+    public async Task FreshEmptyArraysKeepDistinctIdentitiesAndNativeEffectGoals()
+    {
+        var preparation = Prepare("using SharpProof.Attributes; public static class C { " +
+            "[ZeroAllocations, DoesNotThrow, EnforcePure] public static bool Target(int x) { " +
+            "Contract.Ensures(!Contract.Result<bool>()); int[] first = new int[0]; int[] second = new int[0]; return first == second; } }");
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+            Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        var total = preparation.Total!;
+        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(0) });
+        Assert.That(execution.ReturnValue!.Boolean, Is.False);
+    }
+
+    [TestCase(0, IrExceptionKind.DivideByZero)]
+    [TestCase(-1, IrExceptionKind.Overflow)]
+    public void ArrayDimensionFaultPrecedesAllocation(int input, IrExceptionKind expected)
+    {
+        const string source = "using SharpProof.Attributes; public static class C { [ZeroAllocations] " +
+            "public static int Target(int x) { int[] values = new int[10 / x]; return values.Length; } }";
+        var total = Prepare(source).Total!;
+        var count = 0;
+        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(input) },
+            1000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => count++ });
+        Assert.That(execution.Exception?.Kind, Is.EqualTo(expected));
+        Assert.That(count, Is.Zero);
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("ArrayFaultRuntime", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("ArrayFaultRuntime", isCollectible: true);
+        try
+        {
+            var run = context.LoadFromStream(image).GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
+            var fault = Assert.Catch<Exception>(new Action(() => run(input)));
+            Assert.That(fault!.GetType(), Is.EqualTo(expected == IrExceptionKind.DivideByZero
+                ? typeof(DivideByZeroException) : typeof(OverflowException)));
+        }
+        finally { context.Unload(); }
+    }
+
+    [TestCase("missing-length")]
+    [TestCase("missing-target")]
+    [TestCase("invalid-length")]
+    [TestCase("wrong-length-type")]
+    public void ArrayAllocationDecoderRejectsMalformedStorageAndDimensions(string mutation)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ZeroAllocations] public static int Target(int x) { int[] values = new int[x]; return values.Length; } }");
+        var graph = artifact.Callables.Single().Total!.Graph;
+        var allocation = graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
+        switch (mutation)
+        {
+            case "missing-length":
+                allocation.C = -1;
+                break;
+            case "missing-target":
+                allocation.B = -1;
+                break;
+            case "invalid-length":
+                allocation.C = int.MaxValue;
+                break;
+            case "wrong-length-type":
+                allocation.C = Array.FindIndex(graph.Terms, term => graph.Types[term.Type].Kind == IrTypeKind.Boolean);
+                break;
+        }
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
     }
 
     [TestCase("System.Action action = Sink;")]
@@ -516,6 +595,7 @@ public sealed class NativeAllocationEffectTests
     [TestCase("new object();")]
     [TestCase("System.Action action = new System.Action(Sink);")]
     [TestCase("string text = string.Concat(value == 0 ? \"a\" : \"b\", \"c\");")]
+    [TestCase("int[] values = new int[2];")]
     public async Task SourceHelperAllocationSurvivesExpansionAndMatchesRuntime(string allocation)
     {
         var source = "using SharpProof.Attributes; public static class C { " +

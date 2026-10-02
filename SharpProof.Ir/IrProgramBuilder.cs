@@ -59,8 +59,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
             elementType, sequence, index);
     }
 
-    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null)
-    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target)); }
+    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
+        IrTerm? length = null)
+    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length)); }
 
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
@@ -257,9 +258,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
                 { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
                 if (allocation.Target is { } allocatedTarget &&
-                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference ||
+                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference &&
+                        !(_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence && allocation.Length != null) ||
                         _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
                 { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
+                if (allocation.Length is { } length &&
+                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
+                        ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
+                { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
                 break;
             case IrAssignInstruction value:
                 RequireSameType(

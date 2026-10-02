@@ -84,6 +84,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (depth < 256 && operation is IArrayCreationOperation arrayCreation && CSharpOperationSemantics.IsDefaultArrayCreation(arrayCreation))
+        {
+            var dimension = LowerBodyValue(arrayCreation.DimensionSizes[0], block, depth + 1);
+            if (!dimension.Classification.IsExact)
+            { return dimension; }
+            var rule = new TotalScalarRule(dimension.Value,
+                [new(IrExceptionKind.Overflow, _factory.Binary(IrBinaryOperator.LessThan, dimension.Value, _factory.Integer(0)))],
+                FrontendSubsetClassification.Exact);
+            block = ApplyRule(operation, rule, dimension.Continuation).Continuation;
+            var type = _context.Type(operation.Type);
+            var target = _context.Temporary(type);
+            _builder!.Allocate(block, _context.Site(operation), type, target, dimension.Value);
+            return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && CSharpOperationSemantics.IsStringConcatenation(operation))
         { return LowerStringConcatenation(operation, block, depth); }
         if (depth < 256 && operation is IObjectCreationOperation creation &&

@@ -467,6 +467,12 @@ boxing of supported scalar values to `object`. Value-producing allocations
 create fresh nonnull reference identities. Boxing evaluates its operand before
 the allocation event, including any operand fault. Boxed contents, unboxing and
 runtime type tests remain unsupported.
+Single-dimensional zero-initialized arrays with Int32 dimensions produce fresh
+sequence identities and their exact lengths. Dimension evaluation and negative
+length Overflow faults precede allocation. Concrete replay initializes elements
+to their CLR defaults and charges array size to its work budget; this never caps
+symbolic inputs. Array element contents remain an overapproximation in the VC,
+and initializers, params expansion and array mutation are not yet represented.
 Explicit delegate construction for static or nonvirtual reference receivers
 records a fresh allocation without executing the target. Instance receiver
 evaluation precedes construction. Directly escaping delegates retain the null

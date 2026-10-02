@@ -148,7 +148,7 @@ internal sealed class PassiveCallableVcBuilder
             var block = program.GetBlock(blockId);
             var site = block.Instructions[0].Operation;
             var predecessors = _incoming[blockId];
-            var reach = Fresh(_factory.BooleanType);
+            IrTerm reach = Fresh(_factory.BooleanType);
             Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge.Reach))), site, "reach");
             var state = new Dictionary<IrVarId, IrTerm>();
             foreach (var variable in predecessors[0].State.Keys.OrderBy(variable => variable.Value))
@@ -187,6 +187,17 @@ internal sealed class PassiveCallableVcBuilder
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
+                        IrTerm? arrayLength = null;
+                        if (allocation.Length is { } dimension)
+                        {
+                            if (!TryRewrite(dimension, state, out arrayLength))
+                            { return null; }
+                            var validLength = _factory.Binary(IrBinaryOperator.GreaterThanOrEqual, arrayLength, _factory.Integer(0));
+                            var invalidLength = And(reach, Not(validLength));
+                            _exceptions.Add((invalidLength, _factory.Integer((int)IrExceptionKind.Overflow)));
+                            _potentialExceptionAllocations.Add(invalidLength);
+                            reach = And(reach, validLength);
+                        }
                         _allocations.Add((reach, allocation.Operation));
                         if (allocation.Target is { } allocatedTarget)
                         {
@@ -194,6 +205,8 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                             var allocated = Fresh(allocation.AllocatedType);
                             Fact(Guard(reach, Not(Equal(allocated, _factory.Null(allocated.Type)))), allocation.Operation, "allocation-nonnull");
+                            if (arrayLength != null)
+                            { Fact(Guard(reach, Equal(_factory.Length(allocated), arrayLength)), allocation.Operation, "array-length"); }
                             foreach (var existing in state.Values.Where(value => value.Type == allocated.Type).Distinct())
                             {
                                 Spend();

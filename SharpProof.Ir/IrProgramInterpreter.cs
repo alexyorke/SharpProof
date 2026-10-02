@@ -93,7 +93,26 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
-                        if (allocation.Target is { } allocatedTarget)
+                        if (allocation.Length is { } length)
+                        {
+                            var size = _terms.Evaluate(length, values.Current, values.ObserveRead, cancellationToken);
+                            if (size.Status != IrEvaluationStatus.Value)
+                            { return FromEvaluation(size, allocation, values, steps); }
+                            var count = (int)size.Value!.IntegerNumericValue;
+                            if (count < 0)
+                            { return FromEvaluation(IrEvaluationResult.FromException(IrExceptionKind.Overflow, "An array length was negative."), allocation, values, steps); }
+                            // This bounds concrete replay work, never the symbolic input domain.
+                            if (count > maximumSteps - steps)
+                            { return Result(IrProgramExecutionStatus.StepLimit, null, values, steps); }
+                            steps += count;
+                            var element = _factory.GetTypeInfo(allocation.AllocatedType).ElementType!.Value;
+                            var info = _factory.GetTypeInfo(element);
+                            var initial = info.Kind == IrTypeKind.Boolean ? _factory.CreateBooleanValue(false)
+                                : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
+                            values[allocation.Target!.Value] = _factory.CreateSequenceValue(allocation.AllocatedType,
+                                Enumerable.Repeat(initial, count));
+                        }
+                        else if (allocation.Target is { } allocatedTarget)
                         { values[allocatedTarget] = _factory.CreateReferenceValue(allocation.AllocatedType, new object()); }
                         replayOptions?.AllocationObserver?.Invoke(allocation);
                         break;

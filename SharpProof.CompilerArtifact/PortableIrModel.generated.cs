@@ -275,7 +275,7 @@ internal static class PortableIrSlotCatalog
     new("Return", ["optionalTermIndex", "unused", "unused", "unused", "empty", "unused"]),
     new("Throw", ["exceptionKind", "blockIndex", "unused", "unused", "empty", "unused"]),
     new("ExceptionalExit", ["unused", "unused", "unused", "unused", "empty", "unused"]),
-    new("Allocate", ["typeIndex", "optionalVariableIndex", "unused", "unused", "empty", "unused"]),
+    new("Allocate", ["typeIndex", "optionalVariableIndex", "optionalTermIndex", "unused", "empty", "unused"]),
     new("Write", ["writeRegion", "unused", "unused", "unused", "empty", "unused"]),
     new("Lock", ["termIndex", "unused", "unused", "unused", "empty", "unused"]),
     ];
@@ -454,7 +454,7 @@ internal static class PortableIrGraphCodecProjections
         return instruction switch
         {
             IrAllocationInstruction allocation => row(instruction, operationIndex(instruction.Operation),
-                typeIndex(allocation.AllocatedType), optionalVariableIndex(allocation.Target), -1, null, null),
+                typeIndex(allocation.AllocatedType), optionalVariableIndex(allocation.Target), optionalTermIndex(allocation.Length), null, null),
             IrLockInstruction synchronization => row(instruction, operationIndex(instruction.Operation),
                 termIndex(synchronization.Receiver), -1, -1, null, null),
             IrWriteInstruction write => row(instruction, operationIndex(instruction.Operation),
@@ -678,7 +678,7 @@ internal static class PortableIrGraphCodecProjections
     {
         return row.Kind switch
         {
-            IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A), optionalVariable(row.B)),
+            IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A), optionalVariable(row.B), optionalTerm(row.C)),
             IrInstructionKind.Write => builder.Write(block, operation(row.Operation), (IrWriteRegion)row.A),
             IrInstructionKind.Lock => builder.Lock(block, operation(row.Operation), term(row.A)),
             IrInstructionKind.Assign => builder.Assign(

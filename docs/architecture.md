@@ -432,6 +432,12 @@ scalar boxing to `object`. An optional reference target receives a fresh nonnull
 identity, with guarded freshness facts against tracked references of the same
 type. Replay creates a distinct identity on each execution. Boxing lowers its
 operand before allocation; boxed contents and unboxing remain unsupported.
+An optional Int32 length extends Allocate to fresh zero-initialized sequences.
+Source dimension faults and negative-length Overflow edges precede allocation.
+SSA constrains the fresh reference, exact length and normal continuation;
+concrete replay creates CLR-default elements within its work budget. Symbolic
+array sizes stay unbounded. Initializers, params expansion and array writes
+remain incomplete; array element contents are overapproximated in the VC.
 The allocation table also recognizes explicit delegate construction for static
 or nonvirtual reference receivers. Receiver evaluation precedes a null guard
 that throws the appended Argument exception kind before allocation when the

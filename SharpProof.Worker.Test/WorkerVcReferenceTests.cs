@@ -225,12 +225,31 @@ public sealed class WorkerVcReferenceTests
     [TestCase("string Target(string[] x) { Contract.Ensures(true); return x[0]; }")]
     [TestCase("int Target(int[] x, long index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int Target(int[] x, ulong index) { Contract.Ensures(true); return x[index]; }")]
-    [TestCase("int[] Target() { Contract.Ensures(true); return new int[1]; }")]
+    [TestCase("int[] Target() { Contract.Ensures(true); return new int[] { 1 }; }")]
     [TestCase("int Target(string x) { Contract.Ensures(true); try { return x.Length; } catch (System.NullReferenceException error) { return error == null ? 1 : 0; } }")]
     public void UnsupportedReferenceOperationsRemainUnenrolled(string member)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class Subject { public static " + member + " }");
         Assert.That(artifact.Callables.Single().Total, Is.Null);
+    }
+
+    [Test]
+    public async Task FreshArrayReturnPreservesExactLength()
+    {
+        var subject = PassiveSourceSubject.Create("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int[] Target() {
+                    Contract.Ensures(Contract.Result<int[]>() != null && Contract.Result<int[]>().Length == 1);
+                    return new int[1];
+                }
+            }
+            """);
+        var candidate = subject.Enroll();
+        Assert.That(candidate, Is.Not.Null);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 }
