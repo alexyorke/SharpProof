@@ -23,7 +23,7 @@ internal static partial class CSharpOperationSemantics
                 Method: { MethodKind: MethodKind.Ordinary, Arity: 0, ContainingType.Arity: 0 }
             } target &&
             (target is { Instance: null, Method.IsStatic: true } ||
-                target is { Instance.Type.IsReferenceType: true, Method: { IsStatic: false, IsVirtual: false, IsAbstract: false } });
+                target is { Instance.Type.IsReferenceType: true, Method: { IsStatic: false, IsVirtual: false, IsOverride: false, IsAbstract: false } });
     }
 
     internal static TotalScalarRule DelegateReceiver(IrFactory factory, IrTerm receiver, IrTerm? mayCheckNull = null)

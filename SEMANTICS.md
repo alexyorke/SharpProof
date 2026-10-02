@@ -477,7 +477,7 @@ short-circuits that approximation, while reads on uncertain null paths prevent
 concrete refutations. Universal proofs must hold for both choices. The exact
 argument kind remains distinct from ArgumentNullException and
 ArgumentOutOfRangeException. Generic targets,
-compiler-cached method-group/lambda conversions, capturing closures and virtual
+compiler-cached method-group/lambda conversions, capturing closures and virtual or override
 or value-type receivers remain unsupported until their semantics are represented. The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic

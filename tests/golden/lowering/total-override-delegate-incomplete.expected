@@ -1,0 +1,24 @@
+mode: Total
+classification: ClosedAbstention/UnsupportedOperationKind
+entry: b0
+parameter: 0 entry=v0:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False] current=v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False] old=v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False]
+result: v3:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False]
+variable: v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False] source=receiver
+block: b0 entry
+  i0 op0 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Havoc Variables/Approximation [v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False]] source=total-override-delegate-incomplete.cs:262+32
+  i6 op1 Assign v3:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] = v4 source=total-override-delegate-incomplete.cs:262+32
+  i7 op1 Return v3 source=total-override-delegate-incomplete.cs:262+32
+block: b3 cfg:2
+  i8 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver width=0 signed=False value=v0
+term: ir1 Variable type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v4
+term: ir2 Variable type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v3
+diagnostic: op3 UnsupportedOperationKind DelegateCreation@262

@@ -443,7 +443,7 @@ Havoc, excluding parameters and result storage, Input/SpecResult origins and
 memory effects. The fresh delegate value never calls its target. Exception capture, portable validation,
 catch dispatch and native allowed-exception constraints preserve the exact
 System.ArgumentException kind. Cached method-group/lambda conversions, generic
-targets, capturing closures and virtual/value-type receivers remain incomplete. The production artifact preserves type and site ownership; passive
+targets, capturing closures and virtual, override or value-type receivers remain incomplete. The production artifact preserves type and site ownership; passive
 SSA records guarded reachability and original-program replay observes the
 allocation site. Native ZeroAllocations qualification excludes reachable
 throw sites as potential implicit allocations, including caught faults. String concatenation,

@@ -110,6 +110,30 @@ public sealed class NativeAllocationEffectTests
         Assert.That(result.AllocationWitness, Is.Null);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task OverriddenDelegateTargetsRequireVirtualDispatchSemantics(bool sealedOverride)
+    {
+        var source = "using SharpProof.Attributes; public class Base { public virtual void Sink() {} } " +
+            "public class Receiver : Base { public " + (sealedOverride ? "sealed " : "") + "override void Sink() {} } " +
+            "public static class C { [DoesNotThrow] public static System.Action Target(Receiver receiver) => new System.Action(receiver.Sink); }";
+        using var image = new MemoryStream();
+        var compilation = TestCompilation.Create("OverrideDelegateRuntime", source);
+        Assert.That(compilation.Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("OverrideDelegateOracle", isCollectible: true);
+        try
+        {
+            var target = context.LoadFromStream(image).GetType("C")!.GetMethod("Target")!;
+            var fault = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => target.Invoke(null, new object?[] { null })));
+            Assert.That(fault!.InnerException, Is.TypeOf<NullReferenceException>());
+        }
+        finally { context.Unload(); }
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        Assert.That(native.ExceptionWitness, Is.Null);
+        Assert.That(native.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+    }
+
     [Test]
     public async Task ValidGenericReferenceClaimSurvivesLegacyLanguageAdmission()
     {
