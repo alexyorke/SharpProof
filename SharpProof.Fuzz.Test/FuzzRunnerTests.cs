@@ -86,6 +86,7 @@ public sealed class FuzzRunnerTests
         var first = await FuzzRunner.RunAsync(options);
         var second = await FuzzRunner.RunAsync(options);
 
+        Assert.That(first.Passed, Is.True, string.Join(Environment.NewLine, first.Failures));
         Assert.That(first, Is.EqualTo(second));
         Assert.That(first.SchemaVersion, Is.EqualTo(7));
         Assert.That(first.Passed, Is.True);
@@ -419,7 +420,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var enabled = factory.CreateVariable("enabled", factory.BooleanType);
         var satisfiable = factory.Binary(
@@ -491,7 +492,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         IrTerm any = factory.Boolean(false);
         for (var index = 0; index < 32; index++)
         {
@@ -544,7 +545,7 @@ public sealed class FuzzRunnerTests
         int expectedFalse,
         int expectedUndefined)
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
 
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
@@ -564,9 +565,20 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public async Task GuardedPartialTermCampaignMatchesCSharpAcrossEveryControlBit([Range(0, 31)] int seed)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
+        Assert.That(result.ScenarioCount, Is.EqualTo(2));
+        Assert.That(result.DefinedTrueCount + result.DefinedFalseCount + result.UndefinedCount, Is.EqualTo(2));
+    }
+
+    [Test]
     public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var first = PartialTermSmtCaseGenerator.Create(factory, 0);
         var second = PartialTermSmtCaseGenerator.Create(factory, 8);
         var printer = new IrPrinter(factory);
@@ -577,7 +589,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = new Goal(
             factory,
@@ -646,7 +658,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task IrShrinkerIsDeterministicAndPreservesMismatch()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var variableTerm = factory.Variable(variable);
         var formula = factory.Binary(

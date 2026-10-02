@@ -864,11 +864,11 @@ public sealed class GoldenWorkerTests
                 try
                 {
                     using var solver = runner.Context.MkSolver();
-                    var before = IrSmtBackend.ReadResourceCount(solver);
+                    var before = SmtNativeUtilities.ReadResourceCount(solver);
                     Assert.That(solver.Check(), Is.EqualTo(Microsoft.Z3.Status.SATISFIABLE));
-                    var after = IrSmtBackend.ReadResourceCount(solver);
+                    var after = SmtNativeUtilities.ReadResourceCount(solver);
                     Assert.That(after, Is.Not.Null);
-                    nativeCost = IrSmtBackend.ComputeResourceDelta(before.GetValueOrDefault(), after!.Value);
+                    nativeCost = SmtNativeUtilities.ComputeResourceDelta(before.GetValueOrDefault(), after!.Value);
                     Assert.That(nativeCost, Is.GreaterThan(0));
                     cancellation.Cancel();
                     meter.ConsumeNative(nativeCost);

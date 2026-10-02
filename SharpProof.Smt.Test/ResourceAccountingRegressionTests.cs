@@ -7,7 +7,7 @@ public sealed class ResourceAccountingRegressionTests
     public void NativeResourceCounterWrapIsChargedAsUnsignedDelta()
     {
         Assert.That(
-            IrSmtBackend.ComputeResourceDelta(uint.MaxValue - 2, 1),
+            SmtNativeUtilities.ComputeResourceDelta(uint.MaxValue - 2, 1),
             Is.EqualTo(4));
     }
 
@@ -24,11 +24,11 @@ public sealed class ResourceAccountingRegressionTests
             try
             {
                 using var solver = runner.Context.MkSolver();
-                var before = IrSmtBackend.ReadResourceCount(solver);
+                var before = SmtNativeUtilities.ReadResourceCount(solver);
                 Assert.That(solver.Check(), Is.EqualTo(Microsoft.Z3.Status.SATISFIABLE));
-                var after = IrSmtBackend.ReadResourceCount(solver);
+                var after = SmtNativeUtilities.ReadResourceCount(solver);
                 Assert.That(after, Is.Not.Null);
-                nativeCost = IrSmtBackend.ComputeResourceDelta(before.GetValueOrDefault(), after!.Value);
+                nativeCost = SmtNativeUtilities.ComputeResourceDelta(before.GetValueOrDefault(), after!.Value);
                 Assert.That(nativeCost, Is.GreaterThan(0));
                 cancellation.Cancel();
                 meter.ConsumeNative(nativeCost);
@@ -89,7 +89,7 @@ public sealed class ResourceAccountingRegressionTests
     public async Task NativeResourceAccountingChargesOnlyTheCurrentQuery()
     {
         const uint queryLimit = 1_000_000;
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var operation = factory.CreateOperation("tracked");
         var expensive = CreateTrackedQuery(factory, operation, 256);
         var inexpensive = new VerificationQuery(
@@ -100,7 +100,7 @@ public sealed class ResourceAccountingRegressionTests
                 factory.Boolean(true),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
-        using var backend = new IrSmtBackend(
+        using var backend = new CallableSolverSession(factory,
             new IrSmtBackendOptions(queryLimit));
 
         var first = await backend.CheckAsync(expensive, CancellationToken.None);
@@ -125,10 +125,10 @@ public sealed class ResourceAccountingRegressionTests
     public async Task RepeatedQueriesDoNotHitResourceLimitFromPriorQueries()
     {
         const uint queryLimit = 50_000;
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var operation = factory.CreateOperation("tracked");
         var query = CreateTrackedQuery(factory, operation, 256);
-        using var backend = new IrSmtBackend(
+        using var backend = new CallableSolverSession(factory,
             new IrSmtBackendOptions(queryLimit));
 
         for (var index = 0; index < 40; index++)

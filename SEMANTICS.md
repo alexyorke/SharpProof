@@ -447,6 +447,13 @@ a refutation only through original-body replay; a bounded UNSAT result cannot
 prove a cyclic program. Unsupported async and iterator callables abstain.
 Compiler-produced effect evidence remains authoritative for effect claims.
 
+Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
+cases carry explicit normal-completion predicates for arithmetic faults and
+short-circuiting, checked against independently executed C# operators. Finite
+domain checks that exhaust their symbolic-query budget retry the same bounded
+domain with exact input assignments; UNSAT requires every partition to be
+UNSAT. An unsupported or exhausted partition remains an abstention.
+
 Source calls and captured implementation IL expand directly into the caller's
 Total program. The compiler no longer produces relational-summary descriptors.
 Closed generic outer types may share a source helper body when its intrinsic

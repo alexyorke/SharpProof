@@ -91,14 +91,14 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 _solver.Assert(_encoder.ReferenceFacts[_assertedReferenceFacts++]);
             }
             using var parameters = _runner.Context.MkParams();
-            IrSmtBackend.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
+            SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
             _solver.Parameters = parameters;
             var status = SmtNativeCheck.Run(_solver, selectors.ToArray(), meter);
             return status switch
             {
                 Status.UNSATISFIABLE => DecodeCore(_solver.UnsatCore, active, goalSelector.ToString(), meter),
                 Status.SATISFIABLE => CreateModel(query, meter),
-                _ => BackendCheckResult.Unknown(IrSmtBackend.ClassifyUnknown(_solver.ReasonUnknown))
+                _ => BackendCheckResult.Unknown(SmtNativeUtilities.ClassifyUnknown(_solver.ReasonUnknown))
             };
         }
         finally

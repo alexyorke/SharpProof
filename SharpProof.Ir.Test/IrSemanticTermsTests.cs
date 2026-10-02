@@ -7,27 +7,6 @@ namespace SharpProof.Ir.Test;
 public sealed class IrSemanticTermsTests
 {
     [Test]
-    public void SuccessfulEvaluationFastPathRejectsInvalidPredicates()
-    {
-        var factory = new IrFactory();
-        var foreignFactory = new IrFactory();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.Throws<ArgumentException>(
-                (Action)(() => IrSemanticTerms.ConstrainSuccessfulEvaluation(
-                    factory,
-                    factory.Integer(1),
-                    evaluated: null)));
-            Assert.Throws<ArgumentException>(
-                (Action)(() => IrSemanticTerms.ConstrainSuccessfulEvaluation(
-                    factory,
-                    foreignFactory.Boolean(true),
-                    evaluated: null)));
-        }
-    }
-
-    [Test]
     public void SingletonBooleanCombinationsRejectInvalidTerms()
     {
         var factory = new IrFactory();

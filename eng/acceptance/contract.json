@@ -203,6 +203,7 @@
           "SharpProof.Smt/CallableSolverSession.cs",
           "SharpProof.Smt/SmtNativeRunner.cs",
           "SharpProof.Smt/SmtQueryResourceMeter.cs",
+          "SharpProof.Smt/SmtNativeUtilities.cs",
           "SharpProof.Verify/Backend.cs"
         ]
       },

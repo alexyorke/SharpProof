@@ -1,51 +1,11 @@
 namespace SharpProof.Ir;
 
 /// <summary>
-/// Canonical Boolean constructions used by symbolic execution and relational
-/// summaries. Keeping these operations in the IR layer prevents each consumer
-/// from inventing subtly different normal-completion semantics.
+/// Canonical Boolean constructions used by callable verification.
+/// Each input belongs to the same factory and has Boolean type.
 /// </summary>
 public static class IrSemanticTerms
 {
-    public static bool RequiresDefinednessWitness(IrTerm? term)
-    {
-        return term is not (
-            null or
-            IrBooleanTerm or
-            IrIntegerTerm or
-            IrStringTerm or
-            IrNullTerm or
-            IrEmptyArrayTerm or
-            IrVariableTerm);
-    }
-
-    public static IrTerm ConstrainSuccessfulEvaluation(
-        IrFactory factory,
-        IrTerm predicate,
-        IrTerm? evaluated)
-    {
-        ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(predicate, nameof(predicate));
-
-        if (!RequiresDefinednessWitness(evaluated))
-        {
-            return IrFactory.RequireBooleanTerm(
-                factory,
-                predicate,
-                nameof(predicate),
-                "The term must be boolean.");
-        }
-
-        var successfulEvaluation = factory.Binary(
-            IrBinaryOperator.Equal,
-            evaluated!,
-            evaluated!);
-        return factory.Binary(
-            IrBinaryOperator.AndAlso,
-            predicate,
-            successfulEvaluation);
-    }
-
     public static IrTerm Guard(
         IrFactory factory,
         IrTerm condition,

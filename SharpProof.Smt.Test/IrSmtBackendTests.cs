@@ -508,7 +508,7 @@ public sealed class IrSmtBackendTests
     [Test]
     public void NativeUnknownReasonsAreClassifiedPrecisely()
     {
-        var classify = typeof(IrSmtBackend).GetMethod(
+        var classify = typeof(SmtNativeUtilities).GetMethod(
             "ClassifyUnknown",
             System.Reflection.BindingFlags.Static |
             System.Reflection.BindingFlags.NonPublic);
@@ -561,7 +561,7 @@ public sealed class IrSmtBackendTests
         var symbol = context.MkSymbol("rlimit");
         Assert.That(NativeObject(symbol), Is.Not.EqualTo(IntPtr.Zero));
 
-        IrSmtBackend.AddOwnedParameter(parameters, symbol, 100);
+        SmtNativeUtilities.AddOwnedParameter(parameters, symbol, 100);
 
         Assert.That(NativeObject(symbol), Is.EqualTo(IntPtr.Zero));
     }

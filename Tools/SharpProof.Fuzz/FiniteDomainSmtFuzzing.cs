@@ -269,7 +269,7 @@ public static class FiniteDomainSmtDifferentialOracle
                 factory.Unary(IrUnaryOperator.Not, formula),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
-        using var session = FuzzSmtSession.Create();
+        using var session = FuzzSmtSession.Create(factory);
         var outcome = await session.Kernel
             .VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);
@@ -279,6 +279,11 @@ public static class FiniteDomainSmtDifferentialOracle
             ProvenOutcome => FiniteDomainSatisfiability.Unsatisfiable,
             _ => (FiniteDomainSatisfiability?)null
         };
+        if (outcome is UnknownOutcome { Reason: AbstentionReason.ResourceLimit })
+        {
+            actual = await CheckConcreteDomainAsync(factory, formula, variables,
+                assignmentCount, cancellationToken).ConfigureAwait(false);
+        }
         if (actual == null)
         {
             var detail = outcome is UnknownOutcome unknown
@@ -305,6 +310,48 @@ public static class FiniteDomainSmtDifferentialOracle
                   " while SMT reported " +
                   actual +
                   ".");
+    }
+
+    private static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
+        IrFactory factory, IrTerm formula, ImmutableArray<IrVarId> variables,
+        int assignmentCount, CancellationToken cancellationToken)
+    {
+        // Nested bitvector division can exhaust a symbolic domain check even
+        // with few inputs. Partition that same bounded domain into exact input
+        // assignments; every partition must be UNSAT before reporting UNSAT.
+        using var session = FuzzSmtSession.Create(factory);
+        var goal = new Goal(factory, factory.Unary(IrUnaryOperator.Not, formula),
+            ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0));
+        for (var assignment = 0; assignment < assignmentCount; assignment++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var remaining = assignment;
+            var assumptions = ImmutableArray.CreateBuilder<Assumption>(variables.Length);
+            foreach (var variable in variables)
+            {
+                var type = factory.GetVariableInfo(variable).Type;
+                var boolean = type == factory.BooleanType;
+                var domainSize = boolean ? BooleanDomain.Length : IntegerDomain.Length;
+                var ordinal = remaining % domainSize;
+                remaining /= domainSize;
+                IrTerm literal = boolean ? factory.Boolean(BooleanDomain[ordinal])
+                    : factory.Integer(type, IntegerDomain[ordinal]);
+                assumptions.Add(new Assumption(factory,
+                    factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
+                    new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
+            }
+            var proof = await session.Kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
+                cancellationToken).ConfigureAwait(false);
+            if (proof is RefutedOutcome)
+            {
+                return FiniteDomainSatisfiability.Satisfiable;
+            }
+            if (proof is not ProvenOutcome)
+            {
+                return null;
+            }
+        }
+        return FiniteDomainSatisfiability.Unsatisfiable;
     }
 
     private static void ValidateFormula(IrFactory factory, IrTerm formula)

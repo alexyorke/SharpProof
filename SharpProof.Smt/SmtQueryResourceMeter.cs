@@ -60,17 +60,17 @@ internal static class SmtNativeCheck
     internal static Status Run(Solver solver, Expr[] assumptions, SmtQueryResourceMeter meter)
     {
         meter.PollCancellation();
-        var before = IrSmtBackend.ReadResourceCount(solver);
+        var before = SmtNativeUtilities.ReadResourceCount(solver);
         try
         {
             return solver.Check(assumptions);
         }
         finally
         {
-            var after = IrSmtBackend.ReadResourceCount(solver);
+            var after = SmtNativeUtilities.ReadResourceCount(solver);
             if (after.HasValue)
             {
-                meter.ConsumeNative(IrSmtBackend.ComputeResourceDelta(before.GetValueOrDefault(), after.Value));
+                meter.ConsumeNative(SmtNativeUtilities.ComputeResourceDelta(before.GetValueOrDefault(), after.Value));
             }
             meter.PollCancellation();
         }

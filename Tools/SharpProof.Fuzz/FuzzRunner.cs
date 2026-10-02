@@ -202,7 +202,7 @@ public static class FuzzRunner
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
 
-                var factory = new IrFactory();
+                var factory = new IrFactory(IrExecutionSemantics.Total);
                 var preparedFormula = CreateTotalFiniteDomainFormula(
                     factory,
                     caseSeed,
@@ -302,7 +302,7 @@ public static class FuzzRunner
                         minimizedFrontendResult.Detail));
                     break;
                 case "finite-domain-smt":
-                    var factory = new IrFactory();
+                    var factory = new IrFactory(IrExecutionSemantics.Total);
                     var preparedFormula = CreateTotalFiniteDomainFormula(
                         factory,
                         caseSeed,
@@ -336,7 +336,7 @@ public static class FuzzRunner
                         minimizedSmtResult.Detail));
                     break;
                 case "partial-term-smt":
-                    var partialFactory = new IrFactory();
+                    var partialFactory = new IrFactory(IrExecutionSemantics.Total);
                     var partialCase = PartialTermSmtCaseGenerator.Create(
                         partialFactory,
                         unchecked(caseSeed ^ 0x243F6A88));

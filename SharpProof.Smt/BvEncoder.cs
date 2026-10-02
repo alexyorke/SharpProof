@@ -154,7 +154,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         var info = factory.GetTypeInfo(type);
         if (info.Kind == IrTypeKind.Boolean)
         {
-            return IrSmtBackend.CreateBooleanValue(factory, expression);
+            return SmtNativeUtilities.CreateBooleanValue(factory, expression);
         }
         if (!IsInteger(info) || expression is not BitVecNum integer)
         {
