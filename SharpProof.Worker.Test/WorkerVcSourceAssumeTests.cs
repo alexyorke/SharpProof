@@ -33,23 +33,15 @@ public sealed class WorkerVcSourceAssumeTests
         Assert.That(point.Operation, Is.EqualTo(clause.Operation));
         Assert.That(point.Condition.Id, Is.EqualTo(total.Program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id));
         Assert.That(clause.AssumptionId, Is.EqualTo(assumption.Id));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        var row = report!.Rows.Single();
-        Assert.That(row.OldOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(row.OldConditional, Is.True);
-        Assert.That(row.OldAssumptions.Single().Used, Is.True);
-        Assert.That(row.TotalPresent, Is.True);
-        Assert.That(row.Checked, Is.True);
-        Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(row.NewReason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(row.NewConditional, Is.True);
-        Assert.That(row.NewAssumptions.Single(), Is.EqualTo(new WorkerVcShadowAssumption(assumption.Id, WorkerAssumptionKind.UserAssume, true)));
-        await TestContext.Out.WriteLineAsync($"source Assume: old={row.OldOutcome} conditional={row.OldConditional} total={row.TotalPresent} checked={row.Checked} new={row.NewOutcome}/{row.NewReason}");
+        var result = Postcondition(response);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+        var used = result.Assumptions.Single();
+        Assert.That((used.Id, used.Kind, used.Used),
+            Is.EqualTo((assumption.Id, WorkerAssumptionKind.UserAssume, true)));
     }
 
     [TestCase("mutation", WorkerClaimOutcome.Proven, WorkerVacuityKind.None)]
@@ -93,20 +85,18 @@ public sealed class WorkerVcSourceAssumeTests
         { Assert.That(ensures.EntryModel.Single().Value.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(7))); }
         else
         { Assert.That(ensures.BodyAssumptions, Is.Not.Empty); }
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        var row = report!.Rows.Single();
-        Assert.That(row.NewOutcome, Is.EqualTo(expected));
-        Assert.That(row.NewVacuity, Is.EqualTo(vacuity));
+        var result = Postcondition(response);
+        Assert.That(result.Outcome, Is.EqualTo(expected));
+        Assert.That(result.Vacuity, Is.EqualTo(vacuity));
         if (expected == WorkerClaimOutcome.Proven)
         {
-            Assert.That(row.NewConditional, Is.True);
-            Assert.That(row.NewAssumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Any(assumption => assumption.Used), Is.True);
+            Assert.That(result.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.True);
         }
+        else
+        { Assert.That(result.Model, Is.Not.Empty); }
     }
 
     [Test]
@@ -119,17 +109,20 @@ public sealed class WorkerVcSourceAssumeTests
                 Contract.Ensures(Contract.Result<int>() == 42); return x;
             } }
             """);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        var row = report!.Rows.Single();
-        Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(row.NewVacuity, Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
-        Assert.That(row.NewConditional, Is.False);
-        Assert.That(row.NewAssumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.False);
+        var result = Postcondition(response);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
+        Assert.That(result.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.False);
+    }
+
+    private static WorkerClaimResult Postcondition(WorkerVerifyResponse response)
+    {
+        Assert.That(response.Errors, Is.Empty);
+        var id = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition).ClaimId;
+        return response.ClaimResults.Single(result => result.ClaimId == id);
     }
 
     [TestCase("x++; Contract.Assume(x > 0); return x;")]

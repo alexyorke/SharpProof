@@ -133,21 +133,18 @@ public sealed class WorkerVcLoopTests
         var refuted = await solver.VerifyEnsuresAsync(1);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), kind + ": " + refuted.Reason);
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            Assert.That(report!.Checked, Is.EqualTo(2), kind);
-            Assert.That(report.NewProven, Is.EqualTo(1), kind);
-            Assert.That(report.Rows.Select(row => row.NewOutcome), Does.Contain(WorkerClaimOutcome.Refuted));
-            Assert.That(report.NewConditional, Is.Zero);
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            var posts = Postconditions(response);
+            Assert.That(posts.Select(result => result.Outcome),
+                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }), kind);
+            Assert.That(posts.SelectMany(result => result.Assumptions).Any(assumption => assumption.Used), Is.False);
+            Assert.That(posts[1].Model, Is.Not.Empty, kind);
         }
     }
 
@@ -155,20 +152,17 @@ public sealed class WorkerVcLoopTests
     public async Task FiniteReturnBeyondSearchCannotProveFalseOrInventVacuity()
     {
         using var project = new ShadowTestProject(BeyondSearchSource);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
-        await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-        var proven = report!.Rows.Single(row => row.NewOutcome == WorkerClaimOutcome.Proven);
-        Assert.That(proven.Feasibility, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
-        Assert.That(proven.Checked, Is.True);
-        Assert.That(proven.NewVacuity, Is.EqualTo(WorkerVacuityKind.None));
-        var unknown = report.Rows.Single(row => row.NewOutcome == WorkerClaimOutcome.Unknown);
-        Assert.That(unknown.NewReason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
-        Assert.That(unknown.Checked, Is.True);
-        Assert.That(unknown.NewVacuity, Is.EqualTo(WorkerVacuityKind.None));
-        Assert.That(report.CoverageComplete, Is.True, "This finite fixture is fully checked; bounded Unknown is not a full Phase 2 exit.");
+        var preparation = project.Snapshot.Callables.Single();
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure), Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var posts = Postconditions(response);
+        Assert.That(posts.Select(result => result.Outcome),
+            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown }));
+        Assert.That(posts[1].Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
+        Assert.That(posts.All(result => result.Vacuity == WorkerVacuityKind.None), Is.True);
     }
 
     [TestCase("assume", WorkerVacuityKind.NoModeledNormalReturn, true)]
@@ -184,14 +178,12 @@ public sealed class WorkerVcLoopTests
                 {{prologue}} Contract.Ensures(false); {{body}}
             } }
             """);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
-        await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-        Assert.That(report!.Rows.Single().NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(report.Rows.Single().NewVacuity, Is.EqualTo(expected));
-        Assert.That(report.Rows.Single().NewConditional, Is.EqualTo(conditional));
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var post = Postconditions(response).Single();
+        Assert.That(post.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(post.Vacuity, Is.EqualTo(expected));
+        Assert.That(post.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.EqualTo(conditional));
     }
 
     [Test]
@@ -207,15 +199,19 @@ public sealed class WorkerVcLoopTests
         var refuted = await solver.VerifyEnsuresAsync(1);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
-        await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-        Assert.That(report!.Postconditions, Is.EqualTo(2));
-        Assert.That(report.Unenrolled, Is.Zero);
-        Assert.That(report.Checked, Is.EqualTo(2));
-        Assert.That(report.NewProven, Is.EqualTo(1));
-        Assert.That(report.Rows.Select(row => row.NewOutcome), Does.Contain(WorkerClaimOutcome.Refuted));
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var posts = Postconditions(response);
+        Assert.That(posts.Select(result => result.Outcome),
+            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+        Assert.That(posts[1].Model, Is.Not.Empty);
+    }
+
+    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response)
+    {
+        Assert.That(response.Errors, Is.Empty);
+        var ids = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+            .Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToArray();
     }
 }
