@@ -930,7 +930,7 @@ internal sealed class ManagedAbstractFlow
             ? Refine(
                 state,
                 rightStorage,
-                CSharpScalarSemantics.ReverseBinary(@operator),
+                CSharpOperationSemantics.ReverseBinary(@operator),
                 leftValue,
                 expected)
             : state;
@@ -1004,7 +1004,7 @@ internal sealed class ManagedAbstractFlow
 
         var normalized = expected
             ? @operator
-            : CSharpScalarSemantics.NegateBinary(@operator);
+            : CSharpOperationSemantics.NegateBinary(@operator);
         var domain = IntervalDomain.Instance;
         var refined = normalized switch
         {
@@ -2794,7 +2794,7 @@ internal readonly record struct ManagedAbstractValue
     /// Binary evaluation over IR scalars, where no Roslyn type symbol is
     /// available to bound the result. The IR integer domain is exactly Int64 —
     /// the frontend admits exact arithmetic only for <c>long</c>, see
-    /// <c>CSharpScalarSemantics.SupportsExactIrArithmetic</c> — and
+    /// <c>CSharpOperationSemantics.SupportsExactIrArithmetic</c> — and
     /// <see cref="TryArithmetic"/> already refuses any interval that leaves that
     /// range, so a computed interval is kept rather than discarded for want of a
     /// type to check it against.
@@ -2937,7 +2937,7 @@ internal readonly record struct ManagedAbstractValue
 
     internal static bool IntegerType(ITypeSymbol? type, out CSharpIntegerSemantics semantics)
     {
-        return CSharpScalarSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
+        return CSharpOperationSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
     }
 
     internal static bool IsNullableType(ITypeSymbol? type)

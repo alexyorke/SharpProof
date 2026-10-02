@@ -35,12 +35,12 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
                 CompilerIdentityBridge.InternType(_factory, array), element,
                 CompilerIdentityBridge.CreateTypeDisplay(array));
         }
-        if (CSharpScalarSemantics.IsSupportedInteger(type.SpecialType))
+        if (CSharpOperationSemantics.IsSupportedInteger(type.SpecialType))
         {
             return _factory.IntegerType;
         }
 
-        return CSharpScalarSemantics.TryGetBuiltInType(
+        return CSharpOperationSemantics.TryGetBuiltInType(
                 _factory, type.SpecialType) ??
             _factory.GetOrCreateReferenceType(
                 CompilerIdentityBridge.InternType(_factory, type),

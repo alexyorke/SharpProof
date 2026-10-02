@@ -74,7 +74,7 @@ internal static class ManagedContractFacts
                         definitelyStrings,
                         stringType)),
             IrBinaryTerm binary => ManagedAbstractValue.BinaryOverIrScalars(
-                CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
+                CSharpOperationSemantics.MapBinaryToRoslyn(binary.Operator),
                 Evaluate(
                     binary.Left,
                     variables,
@@ -166,13 +166,13 @@ internal static class ManagedContractFacts
                 ManagedAbstractFlow.Refine(
                     state,
                     leftSymbol,
-                    CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
+                    CSharpOperationSemantics.MapBinaryToRoslyn(binary.Operator),
                     Evaluate(binary.Right, values), expected),
             IrBinaryTerm { Right: IrVariableTerm right } binary
                 when variables.TryGetValue(right.Variable, out var rightSymbol) =>
                 ManagedAbstractFlow.Refine(state, rightSymbol,
-                    CSharpScalarSemantics.ReverseBinary(
-                        CSharpScalarSemantics.MapBinaryToRoslyn(
+                    CSharpOperationSemantics.ReverseBinary(
+                        CSharpOperationSemantics.MapBinaryToRoslyn(
                             binary.Operator)),
                     Evaluate(binary.Left, values), expected),
             _ => state

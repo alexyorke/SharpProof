@@ -456,6 +456,12 @@ UNSAT. An unsupported or exhausted partition remains an abstention.
 The SMT backend accepts only Total IR; the legacy unbounded-integer encoder
 and its implicit Defined channel have been removed. Arithmetic faults must
 be represented explicitly in normal-completion predicates or control flow.
+CSharpOperationSemantics owns the scalar type/operator metadata, explicit
+Roslyn operation decisions, stage-support flags and local throw classification.
+Source and IL scalar lowering share integer widths and operator rules. The
+remaining analyzer range domain uses an explicit signed-long projection of
+the same metadata; it does not admit UInt64 arithmetic. CFG reachability helpers
+contain no scalar or throw classification rules.
 
 Source calls and captured implementation IL expand directly into the caller's
 Total program. The compiler no longer produces relational-summary descriptors.

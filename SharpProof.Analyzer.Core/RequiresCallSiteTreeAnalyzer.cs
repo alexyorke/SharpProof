@@ -884,7 +884,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     {
                         if (exceptionalStateSurvivesKill)
                         {
-                            foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
+                            foreach (var successor in SharpProof.Frontend.RoslynCfgReachability.ExceptionalSuccessors(
                                          graph,
                                          block))
                             {
@@ -899,7 +899,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     }
                     if (BlockMayThrow(block, after))
                     {
-                        foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
+                        foreach (var successor in SharpProof.Frontend.RoslynCfgReachability.ExceptionalSuccessors(
                                      graph,
                                      block))
                         {
@@ -1240,7 +1240,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 .SelectMany(static operation =>
                     operation.DescendantsAndSelf())
                 .Any(static operation =>
-                    RoslynCfgThrowFacts.OperationMayThrow(operation));
+                    SharpProof.Frontend.CSharpOperationSemantics.OperationMayThrow(operation));
         }
 
         private static ISimpleAssignmentOperation? GetEnclosingSimpleAssignment(
@@ -1316,7 +1316,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     candidate.Syntax.SpanStart < commitEnd)
                 .SelectMany(static candidate => candidate.DescendantsAndSelf())
                 .Any(static candidate =>
-                    RoslynCfgThrowFacts.OperationMayThrow(candidate));
+                    SharpProof.Frontend.CSharpOperationSemantics.OperationMayThrow(candidate));
             cache.Add(key, result);
             return result;
         }

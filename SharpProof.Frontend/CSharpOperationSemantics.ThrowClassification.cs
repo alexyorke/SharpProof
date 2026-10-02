@@ -1,28 +1,7 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using Microsoft.CodeAnalysis.Operations;
+namespace SharpProof.Frontend;
 
-namespace SharpProof.Roslyn;
-
-internal static class RoslynCfgThrowFacts
+internal static partial class CSharpOperationSemantics
 {
-    internal static IEnumerable<BasicBlock> ReachableBlocks(
-        ControlFlowGraph graph,
-        CancellationToken cancellationToken = default)
-    {
-        foreach (var block in graph.Blocks)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (block.IsReachable)
-            {
-                yield return block;
-            }
-        }
-    }
-
     internal static bool BuiltInOperationMayThrow(IOperation operation)
     {
         if (operation is IIncrementOrDecrementOperation increment &&
@@ -155,21 +134,11 @@ internal static class RoslynCfgThrowFacts
         return operation switch
         {
             IBinaryOperation binary when binary.OperatorMethod == null &&
-                binary.OperatorKind is
-                    BinaryOperatorKind.Add or
-                    BinaryOperatorKind.Subtract or
-                    BinaryOperatorKind.Multiply or
-                    BinaryOperatorKind.Divide or
-                    BinaryOperatorKind.Remainder =>
+                IsIntegerArithmetic(binary.OperatorKind) =>
                 IsDecimalOperation(binary),
             ICompoundAssignmentOperation assignment when
                 assignment.OperatorMethod == null &&
-                assignment.OperatorKind is
-                    BinaryOperatorKind.Add or
-                    BinaryOperatorKind.Subtract or
-                    BinaryOperatorKind.Multiply or
-                    BinaryOperatorKind.Divide or
-                    BinaryOperatorKind.Remainder =>
+                IsIntegerArithmetic(assignment.OperatorKind) =>
                 IsDecimalOperation(assignment),
             IUnaryOperation unary when unary.OperatorMethod == null &&
                 unary.OperatorKind == UnaryOperatorKind.Minus =>
@@ -277,35 +246,4 @@ internal static class RoslynCfgThrowFacts
             : null;
     }
 
-    internal static IEnumerable<BasicBlock> ExceptionalSuccessors(
-        ControlFlowGraph graph,
-        BasicBlock block,
-        CancellationToken cancellationToken = default)
-    {
-        var yielded = new HashSet<int>();
-        for (var region = block.EnclosingRegion;
-             region != null;
-             region = region.EnclosingRegion)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (region.Kind != ControlFlowRegionKind.Try ||
-                region.EnclosingRegion is not { } owner)
-            {
-                continue;
-            }
-
-            foreach (var handler in owner.NestedRegions.Where(candidate =>
-                         candidate.Kind is ControlFlowRegionKind.Filter or
-                             ControlFlowRegionKind.Catch or
-                             ControlFlowRegionKind.FilterAndHandler or
-                             ControlFlowRegionKind.Finally))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (yielded.Add(handler.FirstBlockOrdinal))
-                {
-                    yield return graph.Blocks[handler.FirstBlockOrdinal];
-                }
-            }
-        }
-    }
 }

@@ -4,21 +4,23 @@
 // </auto-generated>
 #nullable enable
 
+using System.Numerics;
+
 namespace SharpProof.Frontend;
 
 internal readonly struct CSharpIntegerSemantics(
     SpecialType specialType,
     bool isSigned,
     int bitWidth,
-    long minimum,
-    long maximum,
     bool supportsExactIrArithmetic = false)
 {
     internal SpecialType SpecialType { get; } = specialType;
     internal bool IsSigned { get; } = isSigned;
     internal int BitWidth { get; } = bitWidth;
-    internal long Minimum { get; } = minimum;
-    internal long Maximum { get; } = maximum;
+    internal BigInteger MinimumValue { get; } = isSigned ? -(BigInteger.One << (bitWidth - 1)) : BigInteger.Zero;
+    internal BigInteger MaximumValue { get; } = (BigInteger.One << (isSigned ? bitWidth - 1 : bitWidth)) - 1;
+    internal long Minimum => (long)MinimumValue;
+    internal long Maximum => (long)MaximumValue;
     internal bool SupportsExactIrArithmetic { get; } =
         supportsExactIrArithmetic;
 }
@@ -68,23 +70,29 @@ internal readonly struct CSharpUnarySemantics(
         requiresExactIntegerDomain;
 }
 
-internal static class CSharpScalarSemantics
+internal static partial class CSharpOperationSemantics
 {
     private static readonly ImmutableArray<CSharpIntegerSemantics> Integers = [
-        new(SpecialType.System_SByte, true, 8, -128L, 127L),
-        new(SpecialType.System_Byte, false, 8, 0L, 255L),
-        new(SpecialType.System_Int16, true, 16, -32768L, 32767L),
-        new(SpecialType.System_UInt16, false, 16, 0L, 65535L),
-        new(SpecialType.System_Char, false, 16, 0L, 65535L),
-        new(SpecialType.System_Int32, true, 32, -2147483648L, 2147483647L),
-        new(SpecialType.System_UInt32, false, 32, 0L, 4294967295L),
-        new(SpecialType.System_Int64, true, 64, long.MinValue, long.MaxValue, supportsExactIrArithmetic: true)
+        new(SpecialType.System_SByte, true, 8),
+        new(SpecialType.System_Byte, false, 8),
+        new(SpecialType.System_Int16, true, 16),
+        new(SpecialType.System_UInt16, false, 16),
+        new(SpecialType.System_Char, false, 16),
+        new(SpecialType.System_Int32, true, 32),
+        new(SpecialType.System_UInt32, false, 32),
+        new(SpecialType.System_Int64, true, 64, supportsExactIrArithmetic: true),
+        new(SpecialType.System_UInt64, false, 64)
     ];
+
+    // The old advisory range domain uses signed long bounds. Total lowering
+    // consumes the full catalogue, including UInt64, through IntegerLookup.
+    private static readonly ImmutableArray<CSharpIntegerSemantics> LegacyIntegers =
+        [.. Integers.Where(static integer => integer.SpecialType != SpecialType.System_UInt64)];
 
     private static readonly ImmutableArray<CSharpIntegerConversionSemantics>
         IntegerConversions = [
-            .. Integers.SelectMany(source =>
-                Integers.Select(target => new CSharpIntegerConversionSemantics(
+            .. LegacyIntegers.SelectMany(source =>
+                LegacyIntegers.Select(target => new CSharpIntegerConversionSemantics(
                     source.SpecialType,
                     target.SpecialType,
                     source.Minimum >= target.Minimum &&
@@ -118,6 +126,8 @@ internal static class CSharpScalarSemantics
     private static readonly ImmutableDictionary<SpecialType, CSharpIntegerSemantics>
         IntegerLookup = Integers.ToImmutableDictionary(
             static value => value.SpecialType);
+    private static readonly ImmutableDictionary<SpecialType, CSharpIntegerSemantics>
+        LegacyIntegerLookup = LegacyIntegers.ToImmutableDictionary(static value => value.SpecialType);
     private static readonly ImmutableDictionary<(SpecialType Source, SpecialType Target), bool>
         IntegerConversionLookup = IntegerConversions.ToImmutableDictionary(
             static value => (value.Source, value.Target),
@@ -134,7 +144,7 @@ internal static class CSharpScalarSemantics
             static value => value.Kind);
 
     internal static ImmutableArray<CSharpIntegerSemantics> SupportedIntegers =>
-        Integers;
+        LegacyIntegers;
 
     internal static ImmutableArray<CSharpBinarySemantics> SupportedBinaryOperators =>
         BinaryOperators;
@@ -162,7 +172,12 @@ internal static class CSharpScalarSemantics
     internal static bool TryGetInteger(
         SpecialType type,
         out CSharpIntegerSemantics semantics) =>
-        IntegerLookup.TryGetValue(type, out semantics);
+        LegacyIntegerLookup.TryGetValue(type, out semantics);
+
+    internal static bool TryGetScalarInteger(SpecialType type, out CSharpIntegerSemantics semantics)
+    {
+        return IntegerLookup.TryGetValue(type, out semantics);
+    }
 
     internal static bool TryGetIrIntegerRange(
         SpecialType type,

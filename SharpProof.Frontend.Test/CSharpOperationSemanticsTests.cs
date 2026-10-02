@@ -41,6 +41,30 @@ public sealed class CSharpOperationSemanticsTests
         Assert.That(CSharpOperationSemantics.Operations.ContainsKey((OperationKind)int.MaxValue), Is.False);
     }
 
+    [TestCase("int Target(int a, int b) => checked(a + b);", int.MaxValue, 1)]
+    [TestCase("int Target(int a, int b) => a / b;", 1, 0)]
+    [TestCase("int Target(int a, int b) => a % b;", int.MinValue, -1)]
+    [TestCase("byte Target(int a, int b) => checked((byte)a);", 256, 0)]
+    public void SharedThrowClassificationCoversExecutedScalarFaults(string members, int a, int b)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        ExpressionSyntax syntax = method.ExpressionBody!.Expression;
+        while (syntax is CheckedExpressionSyntax checkedExpression)
+        {
+            syntax = checkedExpression.Expression;
+        }
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
+        var expression = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
+        var environment = subject.Context.Parameters.ToDictionary(binding => binding.Current,
+            binding => subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b));
+        Assert.That(subject.Invoke([a, b]), Is.InstanceOf<ArithmeticException>());
+        Assert.That(expression.Classification.IsExact, Is.True);
+        Assert.That(new IrInterpreter(subject.Factory).Evaluate(expression.SafeCondition, environment).Value!.Boolean, Is.False);
+        Assert.That(CSharpOperationSemantics.OperationMayThrow(operation), Is.True);
+    }
+
     [TestCase("bool Target(int a, int b) => a / b == a / b;", 1, 0, false, true)]
     [TestCase("bool Target(int a, int b) => false && a / b > 0;", 1, 0, true, false)]
     [TestCase("bool Target(int a, int b) => true || a / b > 0;", 1, 0, true, true)]

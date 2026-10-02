@@ -166,8 +166,7 @@
           "SharpProof.Frontend/TotalIlBody.cs",
           "SharpProof.Frontend/TotalIlStack.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
-          "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs",
-          "SharpProof.Frontend/OperationSupportCatalog.cs"
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs"
         ]
       },
       {
@@ -231,7 +230,7 @@
       {
         "name": "scalarSemanticsCatalog",
         "paths": [
-          "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs",
           "SharpProof.Ir/IrOperatorCatalog.generated.cs"
         ]
       },
@@ -313,12 +312,6 @@
         "name": "effectContractCatalog",
         "paths": [
           "SharpProof.Effects/EffectContractMappings.generated.cs"
-        ]
-      },
-      {
-        "name": "operationSupportCatalog",
-        "paths": [
-          "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
         ]
       },
       {
@@ -625,7 +618,8 @@
         "paths": [
           "eng/CompilerAdditionalTextStability.cs",
           "eng/RoslynCfgFactory.cs",
-          "eng/RoslynCfgThrowFacts.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.ThrowClassification.cs",
+          "SharpProof.Frontend/RoslynCfgReachability.cs",
           "eng/RoslynSymbolFacts.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "SharpProof.CompilerArtifact/CompilerDependencyEvidenceFormatter.cs",

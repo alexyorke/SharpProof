@@ -326,8 +326,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         if (depth >= 256)
         { return FrontendAbstention.ExpressionDepthLimit; }
-        if (!CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var admission))
+        if (!CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision))
         { return FrontendAbstention.UnknownOperationKind; }
+        var admission = decision.Admission;
         if (admission == TotalOperationAdmission.Invalid)
         { return FrontendAbstention.InvalidOperation; }
         if (admission == TotalOperationAdmission.Incomplete)

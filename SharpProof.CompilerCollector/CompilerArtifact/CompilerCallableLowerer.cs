@@ -321,7 +321,7 @@ internal sealed class CompilerCallableLowerer
 
     private static CompilerIntegerInterval? IntegerInterval(SpecialType? type)
     {
-        return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
+        return type.HasValue && CSharpOperationSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
             ? new(semantics.Minimum, semantics.Maximum) : null;
     }
 
@@ -420,7 +420,7 @@ internal sealed class CompilerCallableLowerer
             case IrTypeKind.Boolean when sourceType?.SpecialType == SpecialType.System_Boolean:
                 resultType = _factory.BooleanType;
                 return true;
-            case IrTypeKind.Integer when CSharpScalarSemantics.IsSupportedInteger(
+            case IrTypeKind.Integer when CSharpOperationSemantics.IsSupportedInteger(
                 sourceType?.SpecialType ?? SpecialType.None):
                 resultType = _factory.IntegerType;
                 return true;

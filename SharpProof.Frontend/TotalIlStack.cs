@@ -21,10 +21,8 @@ internal static class TotalIlStack
 
     internal static int Width(SpecialType type)
     {
-        return type is SpecialType.System_Int64 or SpecialType.System_UInt64 ? 64 :
-            type is SpecialType.System_Boolean or SpecialType.System_SByte or SpecialType.System_Byte or
-                SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Char or
-                SpecialType.System_Int32 or SpecialType.System_UInt32 ? 32 : 0;
+        return type == SpecialType.System_Boolean ? 32 :
+            CSharpOperationSemantics.TryGetScalarInteger(type, out var integer) ? Math.Max(32, integer.BitWidth) : 0;
     }
 
     // Validate every reachable merge before allocating frame/stack storage.

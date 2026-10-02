@@ -9,7 +9,7 @@ internal static class CompilerConstantAdmission
         if (!field.IsConst || !field.IsStatic ||
             operation.ConstantValue is not { HasValue: true, Value: not null } ||
             field.Type.SpecialType != field.ContainingType?.SpecialType ||
-            !CSharpScalarSemantics.TryGetInteger(
+            !CSharpOperationSemantics.TryGetInteger(
                 field.Type.SpecialType,
                 out var semantics))
         {
@@ -30,7 +30,7 @@ internal static class CompilerConstantAdmission
         return operation.OperatorKind == UnaryOperatorKind.Minus &&
             operation.Operand is ILiteralOperation &&
             operation.ConstantValue.HasValue &&
-            CSharpScalarSemantics.IsSupportedInteger(
+            CSharpOperationSemantics.IsSupportedInteger(
                 operation.Type?.SpecialType ?? SpecialType.None);
     }
 }

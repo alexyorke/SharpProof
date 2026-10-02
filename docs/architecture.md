@@ -68,18 +68,18 @@ and protocol validation have their own non-overlapping inventories rather than
  its matcher/instantiator source are one audited
  `apiSpecificationCatalog` component. The contract API vocabulary has its own
  `contractApiCatalog` component; its generated output is limited to descriptors
- and ordered tables, while lookup behavior remains handwritten. The C# scalar type, conversion, checked
-arithmetic, IR enum vocabulary, and operator rules likewise live in the
-`CSharpScalarSemantics.generated.cs` and `IrOperatorCatalog.generated.cs`
-tables. The portable IR wire-enum and slot tables and wire projection
+ and ordered tables, while lookup behavior remains handwritten.
+`CSharpOperationSemantics` owns scalar widths, operator mappings, guarded
+local faults, explicit Roslyn decisions and analyzer-stage support flags.
+Source and IL lowering share its metadata. The remaining analyzer range domain
+uses a signed-long projection; CFG traversal contains no language rules.
+`IrOperatorCatalog.generated.cs` owns IR factory operator validation.
+The portable IR wire-enum and slot tables and wire projection
 adapters are declarative, while the codec keeps
  indexing, depth/cycle, canonicality, and malformed-input validation handwritten.
 The effect-contract mapping catalog similarly owns finite capability, region,
 direct-event, and reference-family mappings; effect analysis and fail-closed
 validation remain handwritten.
-The operation-support catalog similarly owns the finite Roslyn operation lists
-for contract-expression lowering and effect discovery; support queries,
-lowering, shape checks, and fail-closed behavior remain handwritten.
 Finite output, result-label, policy, operation-stage, and effect-wiring
 projections live in the per-project `*Projections.generated.cs` tables;
 replay, validation, and analysis algorithms remain handwritten.

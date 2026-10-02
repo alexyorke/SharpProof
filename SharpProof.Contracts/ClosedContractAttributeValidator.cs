@@ -123,7 +123,7 @@ internal static class ClosedContractAttributeValidator
 
     private static bool IsSupportedInteger(ITypeSymbol type, bool includeUnsigned64)
     {
-        return CSharpScalarSemantics.IsSupportedInteger(type.SpecialType) ||
+        return CSharpOperationSemantics.IsSupportedInteger(type.SpecialType) ||
             includeUnsigned64 && type.SpecialType == SpecialType.System_UInt64;
     }
 

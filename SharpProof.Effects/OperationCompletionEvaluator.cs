@@ -1182,8 +1182,7 @@ internal sealed class OperationCompletionEvaluator
             .SkipsLiftedOperator(increment, _abstractFlow);
         return CanCompleteNormally(increment.Target) &&
             (skipsLiftedOperator ||
-             !SharpProof.Roslyn.RoslynCfgThrowFacts
-                 .IsUnsupportedImplicitIncrement(increment) &&
+             !SharpProof.Frontend.CSharpOperationSemantics.IsUnsupportedImplicitIncrement(increment) &&
              (increment.OperatorMethod == null ||
               CanCompleteInvocation(
                   increment.OperatorMethod,

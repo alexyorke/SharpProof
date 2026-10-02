@@ -632,7 +632,7 @@ public sealed class RoslynOperationLowerer
                     _owner._factory.Boolean(false));
             }
 
-            if (CSharpScalarSemantics.IsSupportedInteger(specialType))
+            if (CSharpOperationSemantics.IsSupportedInteger(specialType))
             {
                 return LoweredExpression.Exact(
                     _owner._factory.Integer(0));
@@ -664,7 +664,7 @@ public sealed class RoslynOperationLowerer
                 return OpaqueOperand(operation, operation.Operand, FrontendAbstention.LiftedOperator);
             }
 
-            if (!CSharpScalarSemantics.TryGetUnary(
+            if (!CSharpOperationSemantics.TryGetUnary(
                     operation.OperatorKind,
                     out var semantics))
             {
@@ -687,7 +687,7 @@ public sealed class RoslynOperationLowerer
 
             if (semantics.IsIdentity)
             {
-                if (!CSharpScalarSemantics.IsSupportedInteger(
+                if (!CSharpOperationSemantics.IsSupportedInteger(
                         operation.Type?.SpecialType ?? SpecialType.None))
                 {
                     return OpaqueOperand(
@@ -700,7 +700,7 @@ public sealed class RoslynOperationLowerer
             }
 
             if (semantics.RequiresExactIntegerDomain &&
-                !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
+                !CSharpOperationSemantics.SupportsExactIntegerIrArithmetic(
                     operation.Type?.SpecialType ?? SpecialType.None))
             {
                 return OpaqueOperand(
@@ -779,7 +779,7 @@ public sealed class RoslynOperationLowerer
                         FrontendAbstention.UnsupportedType);
                 }
             }
-            if (!CSharpScalarSemantics.SupportsBuiltInOperands(
+            if (!CSharpOperationSemantics.SupportsBuiltInOperands(
                     operation.OperatorKind,
                     leftOperand.Type,
                     rightOperand.Type))
@@ -813,7 +813,7 @@ public sealed class RoslynOperationLowerer
             {
                 mapped = IrBinaryOperator.StringConcat;
             }
-            else if (!CSharpScalarSemantics.TryGetBinary(
+            else if (!CSharpOperationSemantics.TryGetBinary(
                          operation.OperatorKind,
                          out semantics))
             {
@@ -827,7 +827,7 @@ public sealed class RoslynOperationLowerer
             if (mapped.Value != IrBinaryOperator.StringConcat)
             {
                 if (semantics.IsIntegerArithmetic &&
-                    !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
+                    !CSharpOperationSemantics.SupportsExactIntegerIrArithmetic(
                         operation.Type?.SpecialType ?? SpecialType.None))
                 {
                     return OpaqueBinary(
@@ -970,7 +970,7 @@ public sealed class RoslynOperationLowerer
             }
 
             if (target == operand.Term.Type &&
-                CSharpScalarSemantics.IsValuePreservingIntegerConversion(specializedOperandType?.SpecialType ?? SpecialType.None,
+                CSharpOperationSemantics.IsValuePreservingIntegerConversion(specializedOperandType?.SpecialType ?? SpecialType.None,
                     specializedTargetType?.SpecialType ?? SpecialType.None))
             {
                 return operand;

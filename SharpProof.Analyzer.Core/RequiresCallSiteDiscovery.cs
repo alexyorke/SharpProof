@@ -138,7 +138,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             operationFacts);
         var delegateTargets = GetDirectDelegateTargets(operationRoot!);
         OperationEffectScanner? semanticReachability = null;
-        foreach (var block in RoslynCfgThrowFacts.ReachableBlocks(
+        foreach (var block in SharpProof.Frontend.RoslynCfgReachability.ReachableBlocks(
                      graph,
                      cancellationToken))
         {

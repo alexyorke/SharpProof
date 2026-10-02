@@ -1714,7 +1714,7 @@ internal sealed partial class OperationEffectScanner
     {
         var specialType = (CompilerIdentityBridge.GetNullableUnderlyingType(type) ??
             type)?.SpecialType ?? SpecialType.None;
-        if (CSharpScalarSemantics.TryGetInteger(specialType, out var semantics))
+        if (CSharpOperationSemantics.TryGetInteger(specialType, out var semantics))
         {
             isSigned = semantics.IsSigned;
             hasMinimum = isSigned;

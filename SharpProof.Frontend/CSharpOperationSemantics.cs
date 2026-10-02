@@ -18,32 +18,20 @@ internal readonly struct TotalScalarRule(IrTerm value, ImmutableArray<TotalThrow
     internal FrontendSubsetClassification Classification { get; } = classification;
 }
 
-// Candidate body and clauses use these same scalar values and local C# faults.
+// Body and clauses use these same scalar values and local C# faults.
 // Resolved Roslyn conversions determine promotions before an operator is applied.
 internal static partial class CSharpOperationSemantics
 {
     internal static bool IsScalar(ITypeSymbol? type)
     {
-        return type?.SpecialType is SpecialType.System_Boolean or SpecialType.System_SByte or SpecialType.System_Byte or
-            SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Char or
-            SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
+        return type != null && (type.SpecialType == SpecialType.System_Boolean || TryGetScalarInteger(type.SpecialType, out _));
     }
 
     internal static IrTypeId? MapType(IrFactory factory, SpecialType type)
     {
-        return type switch
-        {
-            SpecialType.System_Boolean => factory.BooleanType,
-            SpecialType.System_SByte => factory.GetOrCreateIntegerType(8, true),
-            SpecialType.System_Byte => factory.GetOrCreateIntegerType(8, false),
-            SpecialType.System_Int16 => factory.GetOrCreateIntegerType(16, true),
-            SpecialType.System_UInt16 or SpecialType.System_Char => factory.GetOrCreateIntegerType(16, false),
-            SpecialType.System_Int32 => factory.GetOrCreateIntegerType(32, true),
-            SpecialType.System_UInt32 => factory.GetOrCreateIntegerType(32, false),
-            SpecialType.System_Int64 => factory.GetOrCreateIntegerType(64, true),
-            SpecialType.System_UInt64 => factory.GetOrCreateIntegerType(64, false),
-            _ => null
-        };
+        return type == SpecialType.System_Boolean ? factory.BooleanType
+            : TryGetScalarInteger(type, out var integer)
+                ? factory.GetOrCreateIntegerType(integer.BitWidth, integer.IsSigned) : null;
     }
 
     internal static IrTerm Literal(IrFactory factory, ITypeSymbol? type, object? value)
@@ -135,25 +123,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool TryBinary(BinaryOperatorKind kind, out IrBinaryOperator result)
     {
-        IrBinaryOperator? mapped = kind switch
-        {
-            BinaryOperatorKind.Add => IrBinaryOperator.Add,
-            BinaryOperatorKind.Subtract => IrBinaryOperator.Subtract,
-            BinaryOperatorKind.Multiply => IrBinaryOperator.Multiply,
-            BinaryOperatorKind.Divide => IrBinaryOperator.Divide,
-            BinaryOperatorKind.Remainder => IrBinaryOperator.Remainder,
-            BinaryOperatorKind.Equals => IrBinaryOperator.Equal,
-            BinaryOperatorKind.NotEquals => IrBinaryOperator.NotEqual,
-            BinaryOperatorKind.LessThan => IrBinaryOperator.LessThan,
-            BinaryOperatorKind.LessThanOrEqual => IrBinaryOperator.LessThanOrEqual,
-            BinaryOperatorKind.GreaterThan => IrBinaryOperator.GreaterThan,
-            BinaryOperatorKind.GreaterThanOrEqual => IrBinaryOperator.GreaterThanOrEqual,
-            BinaryOperatorKind.ConditionalAnd => IrBinaryOperator.AndAlso,
-            BinaryOperatorKind.ConditionalOr => IrBinaryOperator.OrElse,
-            _ => null
-        };
-        result = mapped.GetValueOrDefault();
-        return mapped.HasValue;
+        var supported = TryGetBinary(kind, out var semantics);
+        result = supported ? semantics.IrOperator : default;
+        return supported;
     }
 
     internal static (BigInteger Minimum, BigInteger Maximum) Bounds(IrTypeInfo type)

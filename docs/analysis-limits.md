@@ -17,7 +17,7 @@ compiler-manifest properties, paths, invocation, and host enforcement.
 defaults and validation bounds, and the verifier defaults companion projects
 the same values into MSBuild. The release gate mirrors selected values
 in `eng/acceptance/contract.json` and verifies that they agree.
-`SharpProof.Frontend/CSharpScalarSemantics.generated.cs` lists the admitted
+`SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs` lists the admitted
 integer widths and ranges, value-preserving conversions, checked behavior,
 Roslyn-to-IR and inverse mappings, and comparison relations.
 
