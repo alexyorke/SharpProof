@@ -9,6 +9,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<Assumption> _body;
     private readonly ImmutableArray<IrTerm> _goals;
     private readonly IrTerm _normalCompletion;
+    private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
@@ -20,6 +21,7 @@ internal sealed class PassiveCallableVcPlan
         _body = builder.Facts;
         _goals = builder.Goals;
         _normalCompletion = builder.NormalCompletion;
+        _exceptions = builder.Exceptions;
         _model = builder.Model;
         _labels = builder.Labels;
         _assumes = builder.Assumes;
@@ -68,6 +70,45 @@ internal sealed class PassiveCallableVcPlan
         return CreateReplay(Factory.Boolean(false), Factory.Boolean(true));
     }
 
+    internal VerificationQuery ExceptionQuery(ImmutableHashSet<IrExceptionKind> allowed)
+    {
+        ArgumentNullGuard.NotNull(allowed, nameof(allowed));
+        if (allowed.Any(kind => !Enum.IsDefined(kind)))
+        { throw new ArgumentException("An allowed exception kind is undefined.", nameof(allowed)); }
+        IrTerm goal = Factory.Boolean(true);
+        foreach (var exit in _exceptions)
+        {
+            IrTerm admitted = Factory.Boolean(false);
+            foreach (var kind in allowed.OrderBy(kind => kind))
+            { admitted = Factory.Binary(IrBinaryOperator.OrElse, admitted, Factory.Binary(IrBinaryOperator.Equal, exit.Kind, Factory.Integer((int)kind))); }
+            goal = Factory.Binary(IrBinaryOperator.AndAlso, goal,
+                Factory.Binary(IrBinaryOperator.OrElse, Factory.Unary(IrUnaryOperator.Not, exit.Reach), admitted));
+        }
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory, goal,
+            ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+    }
+
+    internal IrProgramExecutionResult ReplayException(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
+    {
+        var initial = new Dictionary<IrVarId, IrValue>();
+        foreach (var parameter in _candidate.Parameters)
+        {
+            initial[parameter.Entry] = inputs[parameter.Entry];
+            initial[parameter.Current] = inputs[parameter.Entry];
+        }
+        return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
+            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(), cancellationToken);
+    }
+
+    private IrProgramReplayOptions ReplayOptions()
+    {
+        return new(request => Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
+            ? Factory.CreateBooleanValue(false)
+            : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
+                ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
+                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type));
+    }
+
     private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)
     {
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
@@ -81,12 +122,7 @@ internal sealed class PassiveCallableVcPlan
         return new(_candidate.Program, false, bindings.ToImmutable(), old.ToImmutable(),
             _candidate.Result is { } result ? [result] : [], value,
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, PassiveCallableVcBuilder.MaximumSteps, [],
-            postconditionGuard: safe, replayOptions: new IrProgramReplayOptions(request =>
-                Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
-                    ? Factory.CreateBooleanValue(false)
-                    : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
-                        ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
-                        : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)));
+            postconditionGuard: safe, replayOptions: ReplayOptions());
     }
 
     internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)

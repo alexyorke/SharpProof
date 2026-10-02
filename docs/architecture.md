@@ -394,6 +394,13 @@ evidence and is not written to the verification cache during interruption.
 Compiler effect evidence uses separately published entry feasibility; an unconstrained effect-only entry
 needs no SMT query. The public worker creation path now selects native typed
 verification through both the static factory and injected-backend constructor.
+`NativeExceptionEffectVerifier` is the Phase 3 qualification entry point for
+decoded effect-only callable artifacts. It checks entry feasibility and then
+uncaught-exit reachability using the passive SSA session and method budget.
+Exception kinds use predecessor-guarded phi facts. Refutations require original
+IR replay and are compared with compiled C# execution in artifact qualification
+tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.
+The compiler effect assembler remains authoritative during this rollout.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.

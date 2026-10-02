@@ -10,7 +10,7 @@ internal sealed record PassiveCallableFeasibility(PassiveCallableFeasibilityKind
     PassiveCallableCheckResult Evidence, PassiveCallableCheckResult EntryEvidence);
 
 // One session per owned plan; the existing method meter reads the actual solver
-// consumption. This is a standalone candidate API, never a worker authority.
+// consumption. Exception checks remain shadow evidence during effect migration.
 internal sealed class PassiveCallableSolver : IDisposable
 {
     private readonly PassiveCallableVcPlan _plan;
@@ -46,6 +46,31 @@ internal sealed class PassiveCallableSolver : IDisposable
     internal long ConsumedResourceCount => _session?.ConsumedResourceCount ?? _readConsumedResourceCount?.Invoke() ?? 0;
     internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken = default)
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
+
+    internal async Task<PassiveCallableCheckResult> VerifyExceptionsAsync(ImmutableHashSet<IrExceptionKind> allowed,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _plan.ExceptionQuery(allowed);
+        // Postcondition call abstractions do not yet encode all callee effects.
+        if (_plan.HasBodyAbstraction)
+        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
+        var proof = await VerifyAsync(query, null, cancellationToken).ConfigureAwait(false);
+        if (proof.Outcome is ProvenOutcome)
+        { return proof; }
+        var encoding = _plan.LoopSearch ?? _plan;
+        var witness = _plan.LoopSearch == null ? proof
+            : await VerifyAsync(encoding.ExceptionQuery(allowed), null, cancellationToken, encoding).ConfigureAwait(false);
+        if (witness.Outcome is not RefutedOutcome)
+        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        if (!_plan.HasBodyAbstraction)
+        {
+            var replay = _plan.ReplayException(witness.EntryModel, cancellationToken);
+            if (replay.Status == IrProgramExecutionStatus.Exception && !replay.ConsumedApproximation &&
+                replay.Instruction is IrThrowInstruction && replay.Exception is { } exception && !allowed.Contains(exception.Kind))
+            { return witness; }
+        }
+        return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
+    }
     internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken = default)
     {
         if (_plan.HasBodyAbstraction)

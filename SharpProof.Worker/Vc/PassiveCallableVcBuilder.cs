@@ -7,7 +7,7 @@ internal sealed class PassiveCallableVcBuilder
     internal const int MaximumSteps = 4096;
     [SuppressMessage("Design", "CA1032", Justification = "Private construction control flow has no public exception contract.")]
     private sealed class ConstructionLimitException : Exception;
-    private sealed record Edge(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, bool PendingThrow);
+    private sealed record Edge(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? PendingException);
     private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value);
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
@@ -19,6 +19,8 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<IrVarId> _model = [];
     private readonly Dictionary<IrBlockId, List<Edge>> _incoming = [];
     private readonly List<Exit> _returns = [];
+    private readonly List<(IrTerm Reach, IrTerm Kind)> _exceptions = [];
+    private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
     private int _fresh;
@@ -29,6 +31,7 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<Assumption> EntryAssumptions { get; private set; }
     internal ImmutableArray<IrTerm> Goals { get; private set; }
     internal IrTerm NormalCompletion { get; private set; } = null!;
+    internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => [.. _exceptions];
     internal ImmutableArray<Assumption> Facts => [.. _facts];
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
     internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutableDictionary();
@@ -118,7 +121,7 @@ internal sealed class PassiveCallableVcBuilder
             // identity before running the original entry assignments.
             Fact(Equal(_factory.Variable(parameter.Current), _factory.Variable(parameter.Entry)), entry, "input");
         }
-        _incoming.Add(program.Entry, [new(_factory.Boolean(true), initial.ToImmutable(), false)]);
+        _incoming.Add(program.Entry, [new(_factory.Boolean(true), initial.ToImmutable(), null)]);
         foreach (var blockId in order)
         {
             Spend();
@@ -144,7 +147,20 @@ internal sealed class PassiveCallableVcBuilder
                 { Fact(Guard(predecessor.Reach, Equal(phi, predecessor.State[variable])), site, "phi"); }
                 state.Add(variable, phi);
             }
-            var pendingThrow = predecessors.All(edge => edge.PendingThrow);
+            IrTerm? pendingException = null;
+            if (predecessors.All(edge => edge.PendingException != null))
+            {
+                pendingException = predecessors[0].PendingException!;
+                if (predecessors.Any(edge => edge.PendingException!.Id != pendingException.Id))
+                {
+                    pendingException = Fresh(_factory.IntegerType);
+                    foreach (var predecessor in predecessors)
+                    {
+                        Spend();
+                        _exceptionFacts.Add((Guard(predecessor.Reach, Equal(pendingException, predecessor.PendingException!)), site));
+                    }
+                }
+            }
             foreach (var instruction in block.Instructions)
             {
                 Spend();
@@ -205,20 +221,21 @@ internal sealed class PassiveCallableVcBuilder
                     case IrBranchInstruction branch:
                         if (!TryRewrite(branch.Condition, state, out var branchCondition))
                         { return null; }
-                        AddEdge(branch.WhenTrue, And(reach, branchCondition), state, pendingThrow, branch.Operation);
-                        AddEdge(branch.WhenFalse, And(reach, Not(branchCondition)), state, pendingThrow, branch.Operation);
+                        AddEdge(branch.WhenTrue, And(reach, branchCondition), state, pendingException, branch.Operation);
+                        AddEdge(branch.WhenFalse, And(reach, Not(branchCondition)), state, pendingException, branch.Operation);
                         break;
                     case IrGotoInstruction go:
-                        AddEdge(go.Target, reach, state, pendingThrow, go.Operation);
+                        AddEdge(go.Target, reach, state, pendingException, go.Operation);
                         break;
                     case IrThrowInstruction thrown:
-                        AddEdge(thrown.Target, reach, state, true, thrown.Operation);
+                        AddEdge(thrown.Target, reach, state, _factory.Integer((int)thrown.ExceptionKind), thrown.Operation);
                         break;
                     case IrExceptionalExitInstruction:
                         // Never assume validity to delete an executable naked
                         // exit. Every original incoming path must carry a throw.
-                        if (!pendingThrow)
+                        if (pendingException == null)
                         { return null; }
+                        _exceptions.Add((reach, pendingException));
                         break;
                     case IrReturnInstruction returned:
                         IrTerm? returnedValue = null;
@@ -271,18 +288,21 @@ internal sealed class PassiveCallableVcBuilder
         // The fresh total definition adds no restriction on inputs or paths.
         NormalCompletion = Fresh(_factory.BooleanType);
         Fact(Equal(NormalCompletion, normalCompletion), entry, "normal-completion");
+        // Preserve existing body/core labels while adding independent kind facts.
+        foreach (var fact in _exceptionFacts)
+        { Fact(fact.Predicate, fact.Site, "exception-kind"); }
         return new(this, loopSearch, boundedSearch);
     }
 
     private void AddEdge(IrBlockId destination, IrTerm condition, Dictionary<IrVarId, IrTerm> state,
-        bool pendingThrow, OperationId site)
+        IrTerm? pendingException, OperationId site)
     {
         Spend(state.Count);
         var edge = Fresh(_factory.BooleanType);
         Fact(Equal(edge, condition), site, "edge");
         if (!_incoming.TryGetValue(destination, out var predecessors))
         { _incoming.Add(destination, predecessors = []); }
-        predecessors.Add(new(edge, state.ToImmutableDictionary(), pendingThrow));
+        predecessors.Add(new(edge, state.ToImmutableDictionary(), pendingException));
     }
 
     private IrVariableTerm Fresh(IrTypeId type)

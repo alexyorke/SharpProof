@@ -446,6 +446,14 @@ claim results survive a later interruption. Bounded loop search can establish
 a refutation only through original-body replay; a bounded UNSAT result cannot
 prove a cyclic program. Unsupported async and iterator callables abstain.
 Compiler-produced effect evidence remains authoritative for effect claims.
+Native exception-effect qualification uses the same passive SSA body facts.
+Uncaught exits retain guarded exception kinds across joins; allowed kinds are
+checked at the exit rather than inferred from absence of a normal return.
+SAT evidence must replay an explicit uncaught throw in the original body,
+without reading approximation values. Loop cuts can prove unreachability;
+finite search can only supply replayed violations. Call abstractions abstain
+until their throwing behavior is represented. These qualification results do
+not replace compiler effect publication.
 
 Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
 cases carry explicit normal-completion predicates for arithmetic faults and

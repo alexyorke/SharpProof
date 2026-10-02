@@ -134,6 +134,7 @@
           "SharpProof.Worker/Vc/PassiveCallableCandidate.cs",
           "SharpProof.Worker/Vc/PassiveCallableArtifactAdapter.cs",
           "SharpProof.Worker/Vc/TotalCallableVerifier.cs",
+          "SharpProof.Worker/Vc/NativeExceptionEffectVerifier.cs",
           "SharpProof.Worker/Vc/PassiveLoopCutter.cs",
           "SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs",
           "SharpProof.Worker/Vc/PassiveCallableVcPlan.cs",
