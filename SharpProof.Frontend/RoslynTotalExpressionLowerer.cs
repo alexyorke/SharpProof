@@ -109,6 +109,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                     }
                     return right;
                 }
+            case ISimpleAssignmentOperation { IsRef: false, Target: IFieldReferenceOperation field } assignment
+                when CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly):
+                return FieldWrite(assignment, field, block, depth);
             case IIncrementOrDecrementOperation increment when TryStorage(increment.Target, out var target):
                 return Increment(increment, target, block);
             case ICompoundAssignmentOperation compound when TryStorage(compound.Target, out var target):
@@ -139,6 +142,36 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             default:
                 return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind);
         }
+    }
+
+    private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
+        IFieldReferenceOperation field, IrBlockId block, int depth)
+    {
+        IrTerm? receiver = null;
+        var implicitThis = field.Instance is IInstanceReferenceOperation
+        { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        if (!field.Field.IsStatic && !implicitThis)
+        {
+            if (field.Instance == null)
+            { return Approximate(assignment, block, FrontendAbstention.UnsupportedOperationKind); }
+            var instance = LowerBodyValue(field.Instance, block, depth + 1);
+            if (!instance.Classification.IsExact)
+            { return Approximate(assignment, instance.Continuation, instance.Classification.Abstention); }
+            receiver = instance.Value;
+            block = instance.Continuation;
+        }
+        // C# captures the receiver before evaluating the RHS, but faults on a
+        // null receiver only after the RHS has finished evaluating.
+        var right = LowerBodyValue(assignment.Value, block, depth + 1);
+        if (!right.Classification.IsExact)
+        { return right; }
+        var result = ApplyRule(assignment,
+            CSharpOperationSemantics.FieldWrite(_factory, right.Value, receiver), right.Continuation);
+        var region = field.Field.IsStatic ? IrWriteRegion.Static :
+            field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+        _builder!.Write(result.Continuation, _context.Site(assignment), region);
+        return result;
     }
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)

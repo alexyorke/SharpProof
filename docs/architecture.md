@@ -452,7 +452,10 @@ Typed Write events carry Local, Parameter, Field, Static, Element or
 Unknown regions and owned operation sites through artifacts, loop transformation,
 passive SSA and original-program replay. Source local assignments, increments
 and compound assignments emit Local events, including by-value parameter
-rebinding. Nonlocal source mutation lowering remains incomplete. The native
+rebinding. Primitive source field stores emit Parameter, Field or Static events,
+capturing receivers before the RHS and checking null after RHS evaluation.
+Volatile, readonly, external and initialization-sensitive stores abstain; heap
+reads and array stores remain incomplete. The native
 purity shadow forbids reachable nonlocal events; allocation remains compatible
 with purity. The allocation and purity routes share claim admission, entry
 feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.

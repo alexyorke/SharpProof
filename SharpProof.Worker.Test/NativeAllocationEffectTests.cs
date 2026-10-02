@@ -10,6 +10,7 @@ namespace SharpProof.Worker.Test;
 public sealed class NativeAllocationEffectTests
 {
     [TestCase("return x;", true)]
+    [TestCase("State = x; return x;", true)]
     [TestCase("new object(); return x;", false)]
     [TestCase("if (x == 0) new object(); return x;", false)]
     [TestCase("Contract.Requires(x != 0); if (x == 0) new object(); return x;", true)]
@@ -17,7 +18,7 @@ public sealed class NativeAllocationEffectTests
     [TestCase("while (x > 0) { new object(); x--; } return x;", false)]
     public async Task CapturedAllocationSitesQualifyAndMatchCompiledRuntime(string body, bool proven)
     {
-        var source = "using SharpProof.Attributes; public static class C { " +
+        var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             "[ZeroAllocations, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining | System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static int Target(int x) { " + body + " } }";
         var preparation = Prepare(source);

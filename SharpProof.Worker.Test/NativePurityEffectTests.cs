@@ -41,7 +41,7 @@ public sealed class NativePurityEffectTests
     public async Task CanonicalWriteEventsUseGuardedReachabilityAndOriginalReplay(IrWriteRegion region, bool pure)
     {
         // Exercise the portable event protocol independently of source-region
-        // classification; only local source assignments are admitted so far.
+        // classification independently of the admitted source stores.
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("if (x == 0) x = 1; return x;"));
         var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
             .Single(instruction => instruction.Kind == IrInstructionKind.Write);
@@ -94,7 +94,9 @@ public sealed class NativePurityEffectTests
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
     }
 
-    [TestCase("public static int State;", "State = x; return x;")]
+    [TestCase("public static volatile int State;", "State = x; return x;")]
+    [TestCase("public static int State;", "State = x; return State;")]
+    [TestCase("public static int State = 1;", "State = x; return x;")]
     [TestCase("", "System.Console.WriteLine(x); return x;")]
     [TestCase("public static object State = new object();", "return x;")]
     public async Task UnmodeledEffectsAndInitializationRemainUnknown(string members, string body)
@@ -103,6 +105,148 @@ public sealed class NativePurityEffectTests
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets());
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+    [Test]
+    public async Task SourceStaticFieldStoreRefutesPurity()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
+            Source("State = x; return x;", "public static int State;")));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.WriteWitness, Is.Not.Null);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Static));
+    }
+
+    [Test]
+    public async Task FieldLocationCapturedAcrossConditionalRemainsUnknown()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            public sealed class Cell { public int Value; }
+            public static class C {
+                [EnforcePure] public static int Target(Cell cell, Cell other) {
+                    cell.Value = ((cell = other) == null ? 1 : 2);
+                    return 0;
+                }
+            }
+            """));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Null);
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+    [TestCase("cell != null", false)]
+    [TestCase("cell == null", true)]
+    public async Task SourceParameterFieldStoreUsesFaultReachability(string requirement, bool pure)
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            public sealed class Cell { public int Value; }
+            public static class C {
+                [EnforcePure] public static int Target(Cell cell, int x) {
+            """ + "Contract.Requires(" + requirement + "); cell.Value = x; return x; } }"));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Parameter));
+    }
+
+    [Test]
+    public async Task NullReceiverStillEvaluatesRightHandSideStaticStore()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            public sealed class Cell { public int Value; }
+            public static class C {
+                public static int State;
+                [EnforcePure] public static int Target(Cell cell, int x) {
+                    Contract.Requires(cell == null);
+                    cell.Value = (State = x);
+                    return x;
+                }
+            }
+            """));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Single(write => write.Operation == result.WriteWitness).Region,
+            Is.EqualTo(IrWriteRegion.Static));
+    }
+
+    [Test]
+    public async Task SourceInstanceFieldStoreRefutesPurity()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            public sealed class C {
+                public int State;
+                [EnforcePure] public int Target(int x) { State = x; return x; }
+            }
+            """));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void FieldStoreCapturesReceiverBeforeRebinding(bool initiallyNull)
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public sealed class Cell { public bool Value; }
+            public static class C {
+                [EnforcePure] public static int Target(Cell cell, Cell other) {
+                    cell.Value = ((cell = other) == null);
+                    return 0;
+                }
+            }
+            """;
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        var total = preparation.Total!;
+        var factory = total.Program.Factory;
+        var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
+        var writes = new List<IrWriteRegion>();
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [entries[0]] = initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
+                    factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object()),
+                [entries[1]] = initiallyNull ? factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()) :
+                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)
+            }, 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => writes.Add(write.Region) });
+        Assert.That(execution.Status, Is.EqualTo(initiallyNull ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(writes.Contains(IrWriteRegion.Parameter), Is.EqualTo(!initiallyNull));
+        Assert.That(writes.Contains(IrWriteRegion.Local), Is.True);
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("FieldWriteRuntime", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("FieldWriteRuntime", isCollectible: true);
+        try
+        {
+            var assembly = runtime.LoadFromStream(image);
+            var cellType = assembly.GetType("Cell")!;
+            var original = initiallyNull ? null : Activator.CreateInstance(cellType);
+            var replacement = initiallyNull ? Activator.CreateInstance(cellType) : null;
+            var method = assembly.GetType("C")!.GetMethod("Target")!;
+            if (initiallyNull)
+            {
+                var thrown = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() =>
+                    method.Invoke(null, [original, replacement])));
+                Assert.That(thrown!.InnerException, Is.TypeOf<NullReferenceException>());
+                Assert.That(cellType.GetField("Value")!.GetValue(replacement), Is.EqualTo(false));
+            }
+            else
+            {
+                Assert.That(method.Invoke(null, [original, replacement]), Is.EqualTo(0));
+                Assert.That(cellType.GetField("Value")!.GetValue(original), Is.EqualTo(true));
+            }
+        }
+        finally { runtime.Unload(); }
     }
 
     [TestCase(false)]

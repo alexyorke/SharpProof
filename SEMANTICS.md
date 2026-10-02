@@ -481,7 +481,9 @@ separate from authoritative compiler effect results.
 
 Write events classify Local, Parameter, Field, Static, Element and Unknown
 regions. Native purity forbids reachable nonlocal events and permits allocation.
-By-value parameter rebinding is Local. Source heap mutations, unsupported calls
+By-value parameter rebinding is Local. Primitive source field stores carry
+nonlocal events with ordered receiver capture, RHS evaluation and null faults.
+Heap reads, array stores, volatile fields, external fields, unsupported calls
 and incomplete initialization abstain; this shadow does not change compiler
 effect authority. Refutation requires an original-program write-site witness
 without approximation reads. Bounded loop search never establishes a proof.
