@@ -466,7 +466,11 @@ Native allocation qualification captures core `new object()` expressions and
 boxing of supported scalar values to `object`. Value-producing allocations
 create fresh nonnull reference identities. Boxing evaluates its operand before
 the allocation event, including any operand fault. Boxed contents, unboxing and
-runtime type tests remain unsupported. The shadow runtime oracle measures concrete feasible entries in
+runtime type tests remain unsupported.
+Explicit delegate construction for static, nongeneric method references records
+a fresh allocation without executing the target. Compiler-cached method-group
+and lambda conversions, capturing closures and receiver-dependent construction
+remain unsupported until their allocation and fault semantics are represented. The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic
 closures are bounded representatives; unsupported inputs remain explicit gaps.

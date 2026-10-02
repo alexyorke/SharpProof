@@ -138,6 +138,7 @@ public sealed class NativeExceptionShadowTests
     [TestCase("System.Threading.Monitor.Enter(null); return x;", WorkerClaimOutcome.Unknown)]
     [TestCase("object value = x; return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Refuted)]
+    [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Refuted)]
     public async Task AllocationShadowMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome)
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
@@ -262,6 +263,7 @@ public sealed class NativeExceptionShadowTests
     [TestCase("lock ((object)null) { x++; } return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("object value = x; return x;", WorkerClaimOutcome.Proven)]
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Proven)]
     public async Task PurityShadowUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");

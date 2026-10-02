@@ -24,6 +24,40 @@ public sealed class NativePurityEffectTests
     }
 
     [Test]
+    public async Task ExplicitDelegateConstructionDoesNotExecuteItsImpureTarget()
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(
+            "System.Action action = new System.Action(Sink); return x;",
+            "private static void Sink() { System.Console.WriteLine(1); }")));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task DelegateConstructionDoesNotRunTargetTypeInitialization()
+    {
+        var source = Source("System.Action action = new System.Action(Other.Sink); return x;",
+            "public static int State; private static class Other { static Other() { State = 1; } public static void Sink() { State = 2; } }");
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("DelegateInitializationRuntime", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("DelegateInitializationRuntime", isCollectible: true);
+        try
+        {
+            var type = runtime.LoadFromStream(image).GetType("C")!;
+            var run = type.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
+            Assert.That(run(7), Is.EqualTo(7));
+            Assert.That(type.GetField("State")!.GetValue(null), Is.EqualTo(0));
+        }
+        finally { runtime.Unload(); }
+    }
+
+    [Test]
     public async Task SourceHelpersPreserveLocalWritesAndFreshAllocations()
     {
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source("return Helper(x);",

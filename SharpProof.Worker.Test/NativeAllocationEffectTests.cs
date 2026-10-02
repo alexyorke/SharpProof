@@ -12,6 +12,10 @@ public sealed class NativeAllocationEffectTests
     [TestCase("return x;", true)]
     [TestCase("State = x; return x;", true)]
     [TestCase("new object(); return x;", false)]
+    [TestCase("System.Action action = new System.Action(Sink); return x;", false)]
+    [TestCase("if (x == 0) { System.Action action = new System.Action(Sink); } return x;", false)]
+    [TestCase("Contract.Requires(x != 0); if (x == 0) { System.Action action = new System.Action(Sink); } return x;", true)]
+    [TestCase("while (x > 0) { System.Action action = new System.Action(Sink); x--; } return x;", false)]
     [TestCase("object value = x; return x;", false)]
     [TestCase("object value = (object)(x > 0); return x;", false)]
     [TestCase("object value = new object(); return x;", false)]
@@ -24,7 +28,7 @@ public sealed class NativeAllocationEffectTests
     [TestCase("while (x > 0) { new object(); x--; } return x;", false)]
     public async Task CapturedAllocationSitesQualifyAndMatchCompiledRuntime(string body, bool proven)
     {
-        var source = "using SharpProof.Attributes; public static class C { public static int State; " +
+        var source = "using SharpProof.Attributes; public static class C { public static int State; private static void Sink() {} " +
             "[ZeroAllocations, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining | System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static int Target(int x) { " + body + " } }";
         var preparation = Prepare(source);
@@ -54,6 +58,22 @@ public sealed class NativeAllocationEffectTests
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(native.AllocationWitness, Is.Null);
+    }
+
+    [TestCase("System.Action action = Sink;")]
+    [TestCase("System.Action action = () => {};")]
+    [TestCase("System.Action action = () => { State = x; };")]
+    [TestCase("System.Action action = new System.Action(() => {});")]
+    [TestCase("System.Action action = new System.Action(instance.Sink);")]
+    [TestCase("System.Action action = new System.Action(Generic<int>);")]
+    public async Task CachedCapturingAndReceiverDependentDelegatesStayUnmodeled(string body)
+    {
+        var preparation = Prepare("using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
+            "public static int State; private static void Sink() {} private static void Generic<T>() {} " +
+            "[ZeroAllocations] public static int Target(int x, Receiver instance) { " + body + " return x; } }");
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That(result.AllocationWitness, Is.Null);
     }
 
     [Test]
@@ -246,12 +266,13 @@ public sealed class NativeAllocationEffectTests
             foreign.CreateVariable("foreign", foreign.ObjectType))));
     }
 
-    [Test]
-    public async Task SourceHelperAllocationSurvivesExpansionAndMatchesRuntime()
+    [TestCase("new object();")]
+    [TestCase("System.Action action = new System.Action(Sink);")]
+    public async Task SourceHelperAllocationSurvivesExpansionAndMatchesRuntime(string allocation)
     {
         var source = "using SharpProof.Attributes; public static class C { " +
             "[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
-            "private static int Helper(int value) { new object(); value++; return value; } " +
+            "private static int Helper(int value) { " + allocation + " value++; return value; } private static void Sink() {} " +
             "[ZeroAllocations] public static int Target(int x) { return Helper(x); } }";
         var preparation = Prepare(source);
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());

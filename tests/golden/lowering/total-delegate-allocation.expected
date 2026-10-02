@@ -1,0 +1,35 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+variable: v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] source=action
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op1 Allocate t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action -> v5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] source=total-delegate-allocation.cs:184+23
+  i6 op2 Assign v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] = v5 source=total-delegate-allocation.cs:175+32
+  i7 op2 Write Local source=total-delegate-allocation.cs:175+32
+  i8 op4 Assign v6:int[width=32,signed=True] = v1 source=total-delegate-allocation.cs:224+1
+  i9 op5 Assign v7:int[width=32,signed=True] = 1 source=total-delegate-allocation.cs:228+1
+  i10 op6 Assign v8:int[width=32,signed=True] = (v6 + v7) source=total-delegate-allocation.cs:224+5
+  i11 op3 Assign v3:int[width=32,signed=True] = v8 source=total-delegate-allocation.cs:224+5
+  i12 op3 Return v3 source=total-delegate-allocation.cs:224+5
+block: b3 cfg:2
+  i13 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v5
+term: ir2 Variable type=t1:int width=32 signed=True value=v1
+term: ir3 Variable type=t1:int width=32 signed=True value=v6
+term: ir4 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir5 Variable type=t1:int width=32 signed=True value=v7
+term: ir6 Binary type=t1:int width=32 signed=True value=(v6 + v7)
+term: ir7 Variable type=t1:int width=32 signed=True value=v8
+term: ir8 Variable type=t1:int width=32 signed=True value=v3

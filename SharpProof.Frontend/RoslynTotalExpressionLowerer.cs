@@ -86,6 +86,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
+        if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
+            CSharpOperationSemantics.IsExplicitStaticDelegateCreation(delegateCreation))
+        { return AllocateValue(operation, block); }
         if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
         {
             var operand = LowerBodyValue(boxing.Operand, block, depth + 1);

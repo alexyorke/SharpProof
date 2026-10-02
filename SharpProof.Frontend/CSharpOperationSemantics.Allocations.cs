@@ -12,6 +12,19 @@ internal static partial class CSharpOperationSemantics
             creation.Constructor.DeclaringSyntaxReferences.Length == 0;
     }
 
+    internal static bool IsExplicitStaticDelegateCreation(IDelegateCreationOperation creation)
+    {
+        // Explicit construction creates a fresh delegate. Method-group and
+        // lambda conversions can reuse compiler-generated cached instances.
+        return !creation.IsImplicit && creation.Type?.TypeKind == TypeKind.Delegate &&
+            creation.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.ObjectCreationExpressionSyntax &&
+            creation.Target is IMethodReferenceOperation
+            {
+                Instance: null,
+                Method: { IsStatic: true, Arity: 0, ContainingType.Arity: 0 }
+            };
+    }
+
     internal static bool IsScalarBoxing(IConversionOperation conversion)
     {
         return conversion.Type?.SpecialType == SpecialType.System_Object && IsScalar(conversion.Operand.Type) &&
