@@ -98,7 +98,7 @@ internal static class CompilerReachableSourceValidator
                         graph.Factory.GetString(member.Name) == "shadow-call:" + callee.CallIdentity &&
                         member.ParameterTypes.Length == callee.ParameterTypes.Length &&
                         call.Arguments.Length == callee.ParameterTypes.Length &&
-                        (callee.ReturnType == null ? call.Target == null : call.Target != null &&
+                        (callee.ReturnType == null ? call.Target == null && IsVoidType(graph.Factory, member.ReturnType) : call.Target != null &&
                             graph.Factory.GetVariableInfo(call.Target.Value).Type == member.ReturnType &&
                             TypeKey(graph.Factory, member.ReturnType) == callee.ReturnType));
                     for (var index = 0; index < member.ParameterTypes.Length; index++)
@@ -134,6 +134,13 @@ internal static class CompilerReachableSourceValidator
             { pending.Push(callee); }
         }
         Require(reachable.Count == bodies.Count);
+    }
+
+    private static bool IsVoidType(IrFactory factory, IrTypeId type)
+    {
+        var info = factory.GetTypeInfo(type);
+        return info.Kind == IrTypeKind.Reference && info.Width == 0 && !info.Signed && info.ElementType == null &&
+            factory.GetString(info.Name).EndsWith("::System.Void", StringComparison.Ordinal);
     }
 
     private static void Require(bool condition)

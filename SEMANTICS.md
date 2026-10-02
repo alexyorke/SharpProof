@@ -570,7 +570,9 @@ A shadow SCC fixpoint joins local and callee may-effects without recursive
 graph traversal. Cycles may diverge but do not invent allocation or write
 effects. Call exceptions and normal completion remain unresolved, and caught
 callee faults remain conservatively present. External facts are not yet
-enrolled in this consumer; missing IR and entry initialization remain unknown.
+enrolled as modular facts in this consumer; missing IR and entry initialization
+remain unknown. Its lowering reuses the same approved scalar API/specification
+models as eager Total lowering, including owned Array.Empty for omitted params.
 When an allocation operand is unsupported, lowering preserves earlier operand
 effects and returns an unknown value with the allocation expression's type;
 the enclosing body remains incomplete.

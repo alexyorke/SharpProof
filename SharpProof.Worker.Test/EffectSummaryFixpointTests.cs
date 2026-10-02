@@ -43,7 +43,7 @@ public sealed class EffectSummaryFixpointTests
         var graph = Graph("""
             [ZeroAllocations] public static int Root(int x) => First(x);
             static int First(int x) => Second(x);
-            static int Second(int x) => First(System.Math.Abs(x));
+            static int Second(int x) => First(System.Math.Sign(x));
             """);
         Assert.That(EffectSummaryFixpoint.ComputeValidated(graph).Values.All(summary =>
             summary.UnknownEffects == SourceMayEffect.All && summary.UnknownExceptions && summary.MayDiverge), Is.True);

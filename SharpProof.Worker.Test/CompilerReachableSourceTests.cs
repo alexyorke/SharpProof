@@ -8,6 +8,58 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReachableSourceTests
 {
+    [TestCase("int Root(int x) => System.Math.Abs(x);")]
+    [TestCase("int[] Root() => System.Array.Empty<int>();")]
+    [TestCase("string Root(string x) => string.Concat(x, \"x\");")]
+    public void ApprovedScalarApiModelsRemainExactInShadowBodies(string method)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
+            "using SharpProof.Attributes; static class Subject { [ZeroAllocations] public static " + method + " }");
+        var body = artifact.ReachableSource!.Bodies.Single();
+        Assert.That(body.Graph, Is.Not.Null);
+        Assert.That(body.IsCallSkeleton, Is.False);
+        Assert.That(body.SourceCalls, Is.Empty);
+        var decoded = CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _).ReachableSource!;
+        Assert.That(EffectSummaryFixpoint.ComputeValidated(decoded).Values.Single().UnknownEffects,
+            Is.EqualTo(SourceMayEffect.None));
+    }
+
+    [Test]
+    public void EmptyParamsUseTheApprovedArrayEmptyModelBeforeThePreservedCall()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            static class Subject {
+                [ZeroAllocations] public static int Root() => Count();
+                static int Count(params int[] values) => values.Length;
+            }
+            """);
+        var body = artifact.ReachableSource!.Bodies.Single(body => body.IsCallSkeleton);
+        Assert.That(body.SourceCalls, Has.Length.EqualTo(1));
+        var decoded = PortableIrGraphCodec.Decode(body.Graph!);
+        Assert.That(decoded.Instructions.OfType<IrAllocationInstruction>(), Is.Empty);
+        CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+    }
+
+    [Test]
+    public void SourceMethodsNamedLikeFrameworkApisArePreservedRatherThanUsingFrameworkModels()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            static class Subject {
+                [ZeroAllocations] public static int Root(int x) => System.Math.Abs(x);
+            }
+            namespace System { static class Math { public static int Abs(int x) => 7; } }
+            """);
+        var root = artifact.ReachableSource!.Bodies.Single(body => body.IsCallSkeleton);
+        Assert.That(root.SourceCalls, Has.Length.EqualTo(1));
+        Assert.That(PortableIrGraphCodec.Decode(root.Graph!).Instructions.OfType<IrThrowInstruction>(), Is.Empty);
+        CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+    }
+
     private const string SharedSource = """
         using SharpProof.Attributes;
         static class Subject {
@@ -111,6 +163,8 @@ public sealed class CompilerReachableSourceTests
     [TestCase("public static int Root() => P; static int P => 1;")]
     [TestCase("public static object Root() => new Value(); class Value { }")]
     [TestCase("public static int Root(Value x) => (int)x; public struct Value { public static explicit operator int(Value x) => 1; }")]
+    [TestCase("public static int Root(System.IDisposable value) { using var resource = value; return 1; }")]
+    [TestCase("public static int Root(System.IDisposable value) { using (value) { return 1; } }")]
     public void UncollectedImplicitSourceCallsStayIncomplete(string members)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""

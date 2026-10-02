@@ -236,7 +236,9 @@ call-to-body mappings validate every call index, callee identity and signature.
 EffectSummaryFixpoint uses iterative SCC traversal and a monotone worklist to
 join local and callee may-effects. Recursive components may diverge; recursion
 alone does not add allocation or write effects. Call exception/completion facts
-and external effect facts remain unresolved. The three effect-shadow reports
+and modular external effect facts remain unresolved. Shadow lowering shares
+the eager route's approved scalar API/specification model resolver and owned
+Array.Empty model for omitted params. The three effect-shadow reports
 observe summary coverage without changing native outcomes or compiler authority.
 Document bounds come from the selected declarations rather than full-file
 checksums or lengths, preserving artifact stability for unrelated constants.

@@ -6,6 +6,7 @@ internal static class CompilerReachableSourceCollector
 {
     internal static CompilerReachableSourceArtifact Collect(CSharpCompilation compilation,
         IEnumerable<ManifestCallableTarget> targets, CompilerSyntaxTreeSnapshot[] trees,
+        CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
         var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => (tree, ordinal))
@@ -15,6 +16,7 @@ internal static class CompilerReachableSourceCollector
         var methods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
         var roots = new List<CompilerSourceRootArtifact>();
         var complete = true;
+        var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         foreach (var target in targets.OrderBy(target => target.Entry.CallableId, StringComparer.Ordinal))
         {
             var body = Enqueue(target.Method);
@@ -99,8 +101,10 @@ internal static class CompilerReachableSourceCollector
                     var graph = ControlFlowGraph.Create(declaration, model, cancellationToken);
                     if (graph != null)
                     {
+                        var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
                         var lowered = new RoslynProgramLowerer(context.Factory).LowerShadowSourceBody(graph, context,
-                            callee => Enqueue(callee) != null, cancellationToken);
+                            callee => Enqueue(callee) != null, cancellationToken,
+                            method => CompilerTotalCallableLowerer.ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks));
                         if (lowered.Classification.IsExact && body.CallsComplete)
                         {
                             var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], cancellationToken: cancellationToken);
@@ -207,7 +211,7 @@ internal static class CompilerReachableSourceCollector
         };
         return method != null && SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
             operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or IFunctionPointerInvocationOperation or
-                IAwaitOperation or IForEachLoopOperation or IUsingOperation;
+                IAwaitOperation or IForEachLoopOperation or IUsingOperation or IUsingDeclarationOperation;
     }
 
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,

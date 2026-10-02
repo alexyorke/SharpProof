@@ -37,7 +37,6 @@ internal sealed partial class RoslynTotalProgramLowerer
                 parameter.Ordinal < 0 || parameter.Ordinal >= method.Parameters.Length || !ordinals.Add(parameter.Ordinal) ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue or ArgumentKind.ParamArray) ||
                 argument.ArgumentKind == ArgumentKind.ParamArray && !parameter.IsParams ||
-                TotalSourceCallSession.IsEmptyParamsArray(argument) ||
                 argument.ArgumentKind == ArgumentKind.DefaultValue &&
                     (!parameter.HasExplicitDefaultValue || !argument.Value.ConstantValue.HasValue))
             { return null; }
@@ -53,6 +52,13 @@ internal sealed partial class RoslynTotalProgramLowerer
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
+            if (TotalSourceCallSession.IsEmptyParamsArray(argument))
+            {
+                if (_calls?.PrepareEmptyParamsArray(argument) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
+                { return new(value, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+                arguments[argument.Parameter!.Ordinal] = empty.Value;
+                continue;
+            }
             var lowered = _expressions.LowerBodyValue(argument.Value, block, depth + 1);
             block = lowered.Continuation;
             if (!lowered.Classification.IsExact)
@@ -70,10 +76,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        if (_preserveSourceCall != null)
-        { return PreserveSourceCall(invocation, block, depth); }
         if (_calls?.PrepareScalarCall(invocation) is { } model)
         { return _expressions.LowerScalarCall(invocation, model, block, depth); }
+        if (_preserveSourceCall != null)
+        { return PreserveSourceCall(invocation, block, depth); }
         if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body)
         { return InlineMetadataCall(invocation, body, block, depth); }
         if (_calls == null || !_calls.TryPrepare(_context, invocation, out var frame, out var graph))

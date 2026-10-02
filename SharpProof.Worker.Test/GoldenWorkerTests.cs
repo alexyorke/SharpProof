@@ -39,6 +39,7 @@ public sealed class GoldenWorkerTests
             : scenario == "passive-vc" ? await PassiveVc(fixture.Source)
             : scenario == "passive-ownership" ? PassiveOwnership()
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
+            : scenario == "reachable-source" ? ReachableSource(fixture.Source)
             : scenario == "total-claim-results" ? await TotalClaimResults(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
@@ -288,6 +289,33 @@ public sealed class GoldenWorkerTests
                 output.AppendLine("  conditional: " + result.Assumptions.Any(assumption => assumption.Used &&
                     assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification));
             }
+        }
+        return output.ToString();
+    }
+
+    private static string ReachableSource(string source)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
+        var reachable = artifact.ReachableSource!;
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+        var output = new StringBuilder();
+        output.AppendLine(CultureInfo.InvariantCulture, $"collection-complete: {reachable.CollectionComplete}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"bodies: {reachable.Bodies.Length}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"incomplete-calls: {reachable.Bodies.Count(body => !body.CallsComplete)}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body.SourceCalls.Length)}");
+        if (source.Contains("// golden-mutation: void-call-return", StringComparison.Ordinal))
+        {
+            var graph = reachable.Bodies.Single(body => body.IsCallSkeleton).Graph!;
+            // Keep the first void member unchanged so canonical graph closure
+            // cannot mask the second member's invalid return signature.
+            var member = graph.Members.Single(value => value.Name.Contains("Helper", StringComparison.Ordinal));
+            member.ReturnType = Array.FindIndex(graph.Types,
+                type => type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed);
+            Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
+            PortableIrGraphCodec.Decode(graph);
+            Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
+                CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            output.AppendLine("void-call-return-mutation: rejected");
         }
         return output.ToString();
     }

@@ -106,17 +106,7 @@ internal static class CompilerTotalCallableLowerer
             frame.DiscardSpecificationAssumptions();
             return true;
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
-            method => apiSpecs.TryGet(method, out var spec) &&
-                spec.Template.Target.DocumentationCommentId == "M:System.Math.Abs(System.Int32)"
-                ? new TotalScalarCallModel(1, arguments => CSharpOperationSemantics.Int32MathAbs(context.Factory, arguments[0]))
-                : apiSpecs.TryGet(method, out spec) && spec.Template.Target.DocumentationCommentId == "M:System.Array.Empty``1" &&
-                    CSharpOperationSemantics.IsReferenceDomain(method.ReturnType)
-                    ? new TotalScalarCallModel(0, _ => CSharpOperationSemantics.ArrayEmpty(context.Factory,
-                        new RoslynTypeMapper(context.Factory).GetTypeId(method.ReturnType)))
-                    : apiSpecs.TryGet(method, out spec) &&
-                        spec.Template.Target.DocumentationCommentId == "M:System.String.Concat(System.String,System.String)"
-                        ? new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(context.Factory, arguments[0], arguments[1]), stringConcatenation: true)
-                        : specificationPacks.ResolveTotal(method));
+            method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks));
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;
@@ -174,6 +164,26 @@ internal static class CompilerTotalCallableLowerer
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken)
         };
+    }
+
+    internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory,
+        ResolvedApiSpecTable apiSpecs, CompilerSpecificationPackProvider specificationPacks)
+    {
+        if (apiSpecs.TryGet(method, out var spec))
+        {
+            switch (spec.Template.Target.DocumentationCommentId)
+            {
+                case "M:System.Math.Abs(System.Int32)":
+                    return new TotalScalarCallModel(1, arguments => CSharpOperationSemantics.Int32MathAbs(factory, arguments[0]));
+                case "M:System.Array.Empty``1" when CSharpOperationSemantics.IsReferenceDomain(method.ReturnType):
+                    return new TotalScalarCallModel(0, _ => CSharpOperationSemantics.ArrayEmpty(factory,
+                        new RoslynTypeMapper(factory).GetTypeId(method.ReturnType)));
+                case "M:System.String.Concat(System.String,System.String)":
+                    return new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(factory,
+                        arguments[0], arguments[1]), stringConcatenation: true);
+            }
+        }
+        return specificationPacks.ResolveTotal(method);
     }
 
     internal static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
