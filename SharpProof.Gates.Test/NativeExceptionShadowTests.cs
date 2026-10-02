@@ -13,6 +13,24 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class NativeExceptionShadowTests
 {
+    [Test]
+    public async Task RecursiveSourceSummariesAreObservedWithoutPublishingProofs()
+    {
+        var document = Document("""
+            public static class C {
+                public static int Target(int x) => Helper(x);
+                static int Helper(int x) => Target(x);
+            }
+            """);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
+        var report = await NativeExceptionShadow.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        Assert.That(report.ReachableSourceBodyCount, Is.EqualTo(2));
+        Assert.That(report.ReachableSourceMayDivergeCount, Is.EqualTo(2));
+        Assert.That(report.ReachableSourceUnknownEffectCount, Is.EqualTo(2));
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(report.RuntimeContradictions, Is.Zero);
+    }
+
     [TestCase("int x", "return 10 / x;")]
     [TestCase("ulong x", "return (int)(10UL / x);")]
     [TestCase("bool x", "return 10 / (x ? 0 : 1);")]
@@ -139,7 +157,8 @@ public sealed class NativeExceptionShadowTests
     private static OpenSourceCorpusDocument Document(string source)
     {
         var tree = CSharpSyntaxTree.ParseText(source);
-        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Target");
         var span = method.GetLocation().GetLineSpan();
         return new(2, [], [new("test", "sample.cs", "test", source)],
             [new("sample", "test", "sample.cs", span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,

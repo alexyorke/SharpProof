@@ -12,8 +12,66 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return search(kind, site, unwind); }
     }
 
+    // A shadow call records an effect boundary, not executable Total semantics.
+    // In particular, it supplies no exception edge or completion guarantee.
+    private TotalBodyValue? PreserveSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
+    {
+        var method = invocation.TargetMethod;
+        if (invocation.Instance != null || method.MethodKind != MethodKind.Ordinary ||
+            !method.IsStatic || method.IsAsync || method.IsExtern || method.IsVirtual || method.IsAbstract || method.IsOverride ||
+            method.Arity != 0 || method.ContainingType.IsGenericType || method.ReducedFrom != null ||
+            method.ReturnsByRef || method.ReturnsByRefReadonly ||
+            method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
+            !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _context.Target.ContainingAssembly) ||
+            method.DeclaringSyntaxReferences.Length != 1 || invocation.Arguments.Length != method.Parameters.Length ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+                !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
+            !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType))
+        { return null; }
+        var ordinals = new HashSet<int>();
+        foreach (var argument in invocation.Arguments)
+        {
+            SpendRegion();
+            if (argument.Parameter is not { } parameter ||
+                !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method) ||
+                parameter.Ordinal < 0 || parameter.Ordinal >= method.Parameters.Length || !ordinals.Add(parameter.Ordinal) ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue or ArgumentKind.ParamArray) ||
+                argument.ArgumentKind == ArgumentKind.ParamArray && !parameter.IsParams ||
+                TotalSourceCallSession.IsEmptyParamsArray(argument) ||
+                argument.ArgumentKind == ArgumentKind.DefaultValue &&
+                    (!parameter.HasExplicitDefaultValue || !argument.Value.ConstantValue.HasValue))
+            { return null; }
+        }
+        if (!_preserveSourceCall!(method.OriginalDefinition))
+        { return null; }
+        var resultType = _context.Type(method.ReturnType);
+        var target = method.ReturnsVoid ? (IrVarId?)null : _context.Temporary(resultType);
+        IrTerm value = target is { } returned ? _context.Factory.Variable(returned) : _context.Factory.Boolean(false);
+        if (target is { } storage)
+        { _builder.Assign(block, _context.Site(invocation), storage, CSharpOperationSemantics.DefaultValue(_context.Factory, resultType)); }
+        var arguments = new IrTerm[method.Parameters.Length];
+        foreach (var argument in invocation.Arguments)
+        {
+            SpendRegion();
+            var lowered = _expressions.LowerBodyValue(argument.Value, block, depth + 1);
+            block = lowered.Continuation;
+            if (!lowered.Classification.IsExact)
+            { return new(value, block, lowered.Classification); }
+            arguments[argument.Parameter!.Ordinal] = lowered.Value;
+        }
+        var member = _context.Factory.GetOrCreateMember(
+            CompilerIdentityBridge.InternSymbol(_context.Factory, method), _context.Type(method.ContainingType),
+            "shadow-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
+            [.. method.Parameters.Select(parameter => _context.Type(parameter.Type))]);
+        var call = _builder.Call(block, _context.Site(invocation), target, member, null, arguments);
+        _preservedSourceCalls.Add(call, method.OriginalDefinition);
+        return new(value, block, FrontendSubsetClassification.Exact);
+    }
+
     private TotalBodyValue? InlineSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
+        if (_preserveSourceCall != null)
+        { return PreserveSourceCall(invocation, block, depth); }
         if (_calls?.PrepareScalarCall(invocation) is { } model)
         { return _expressions.LowerScalarCall(invocation, model, block, depth); }
         if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body)

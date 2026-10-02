@@ -194,7 +194,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         _abstentions.Add(new(structural, FrontendAbstention.UnsupportedControlFlow));
         return new(closed.Build(), FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedControlFlow),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
-        { ConstructionLimitExceeded = _constructionLimitExceeded || _calls?.ConstructionLimitExceeded == true };
+        {
+            ConstructionLimitExceeded = _constructionLimitExceeded || _calls?.ConstructionLimitExceeded == true,
+            IsShadowCallSkeleton = _preserveSourceCall != null
+        };
     }
 
     private void RegionTerminator(BasicBlock source, IrBlockId block, OperationId structural)

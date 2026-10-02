@@ -9,6 +9,15 @@ internal static class CompilerReachableSourceValidator
     internal static string BodyId(int tree, int start, int length)
     { return string.Format(CultureInfo.InvariantCulture, "source:{0}:{1}:{2}", tree, start, length); }
 
+    internal static string TypeKey(IrFactory factory, IrTypeId type, int depth = 0)
+    {
+        Require(depth <= PortableIrGraphCodec.MaximumGraphDepth);
+        var info = factory.GetTypeInfo(type);
+        return string.Format(CultureInfo.InvariantCulture, "{0}:{1}:{2}:{3}:{4}",
+            info.Kind, info.Width, info.Signed, factory.GetString(info.Name),
+            info.ElementType is { } element ? TypeKey(factory, element, depth + 1) : string.Empty);
+    }
+
     internal static void Validate(CompilerManifestArtifact manifest, CancellationToken cancellationToken)
     {
         var artifact = manifest.ReachableSource;
@@ -25,6 +34,7 @@ internal static class CompilerReachableSourceValidator
             documents.Add(document!.SourceTreeOrdinal, document);
         }
         var bodies = new Dictionary<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
+        var graphs = new Dictionary<string, DecodedPortableIrGraph>(StringComparer.Ordinal);
         foreach (var body in artifact.Bodies!)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -33,12 +43,17 @@ internal static class CompilerReachableSourceValidator
             Require(body!.Start >= 0 && body.Length > 0 &&
                 body.Start <= documents[body.SourceTreeOrdinal].MaximumBodyEnd - body.Length &&
                 body.BodyId == BodyId(body.SourceTreeOrdinal, body.Start, body.Length) &&
-                !bodies.ContainsKey(body.BodyId) && body.Callees != null && body.Callees.Length <= 4096);
+                !bodies.ContainsKey(body.BodyId) && body.Callees != null && body.Callees.Length <= 4096 &&
+                body.SourceCalls != null && body.SourceCalls.Length <= 4096 &&
+                body.ParameterTypes != null && body.ParameterTypes.Length <= 4096 &&
+                body.ParameterTypes.All(type => !string.IsNullOrWhiteSpace(type)));
             bodies.Add(body.BodyId, body);
             if (body.Graph != null)
             {
                 var decoded = PortableIrGraphCodec.Decode(body.Graph, cancellationToken: cancellationToken);
-                Require(decoded.Factory.Semantics == IrExecutionSemantics.Total && decoded.Program != null);
+                Require(decoded.Factory.Semantics == IrExecutionSemantics.Total && decoded.Program != null &&
+                    decoded.Program.Blocks.Length <= 4096 && decoded.Instructions.Count <= 4096);
+                graphs.Add(body.BodyId, decoded);
                 foreach (var operation in body.Graph.Operations)
                 {
                     if (operation.SourceSpan is { } span)
@@ -49,6 +64,8 @@ internal static class CompilerReachableSourceValidator
                     }
                 }
             }
+            else
+            { Require(!body.IsCallSkeleton && body.SourceCalls!.Length == 0); }
         }
         Require(bodies.Values.Select(body => body.SourceTreeOrdinal).Distinct().Count() == documents.Count);
         foreach (var document in documents.Values)
@@ -62,6 +79,37 @@ internal static class CompilerReachableSourceValidator
                 body.Callees.Distinct(StringComparer.Ordinal).Count() == body.Callees.Length);
             if (artifact.CollectionComplete)
             { Require(body.CallsComplete); }
+            if (graphs.TryGetValue(body.BodyId, out var graph))
+            {
+                var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
+                Require(body.IsCallSkeleton == (calls.Length != 0) && body.SourceCalls.Length == calls.Length);
+                var seen = new HashSet<int>();
+                foreach (var row in body.SourceCalls)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Require(row != null && row.InstructionIndex >= 0 && row.InstructionIndex < graph.Instructions.Count &&
+                        seen.Add(row.InstructionIndex) && row.CalleeBodyId != null && bodies.ContainsKey(row.CalleeBodyId));
+                    Require(graph.Instructions[row!.InstructionIndex] is IrCallInstruction);
+                    var call = (IrCallInstruction)graph.Instructions[row.InstructionIndex];
+                    var callee = bodies[row.CalleeBodyId!];
+                    var member = graph.Factory.GetMemberInfo(call.Member);
+                    Require(callee.IsStatic && member.IsStatic && call.Receiver == null &&
+                        !string.IsNullOrWhiteSpace(callee.CallIdentity) &&
+                        graph.Factory.GetString(member.Name) == "shadow-call:" + callee.CallIdentity &&
+                        member.ParameterTypes.Length == callee.ParameterTypes.Length &&
+                        call.Arguments.Length == callee.ParameterTypes.Length &&
+                        (callee.ReturnType == null ? call.Target == null : call.Target != null &&
+                            graph.Factory.GetVariableInfo(call.Target.Value).Type == member.ReturnType &&
+                            TypeKey(graph.Factory, member.ReturnType) == callee.ReturnType));
+                    for (var index = 0; index < member.ParameterTypes.Length; index++)
+                    {
+                        Require(TypeKey(graph.Factory, member.ParameterTypes[index]) == callee.ParameterTypes[index] &&
+                            call.Arguments[index].Type == member.ParameterTypes[index]);
+                    }
+                }
+                Require(new HashSet<string>(body.Callees, StringComparer.Ordinal).SetEquals(
+                    body.SourceCalls.Select(call => call.CalleeBodyId)));
+            }
         }
         var callableIds = new HashSet<string>(manifest.Manifest.Callables.Select(callable => callable.CallableId), StringComparer.Ordinal);
         var rootIds = new HashSet<string>(StringComparer.Ordinal);

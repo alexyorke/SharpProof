@@ -26,6 +26,18 @@ public sealed class RoslynProgramLowerer(
         return new RoslynTotalProgramLowerer(context, cancellationToken).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
     }
 
+    internal FrontendProgramLoweringResult LowerShadowSourceBody(ControlFlowGraph graph, TotalLoweringContext context,
+        Func<IMethodSymbol, bool> preserveSourceCall, CancellationToken cancellationToken)
+    {
+        ArgumentNullGuard.NotNull(graph, nameof(graph));
+        ArgumentNullGuard.NotNull(context, nameof(context));
+        ArgumentNullGuard.NotNull(preserveSourceCall, nameof(preserveSourceCall));
+        if (!ReferenceEquals(_factory, context.Factory))
+        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
+        return new RoslynTotalProgramLowerer(context, cancellationToken,
+            preserveSourceCall: preserveSourceCall).Lower(graph);
+    }
+
     internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
         Func<TotalLoweringContext, bool> prepareCallee, CancellationToken cancellationToken)
     {

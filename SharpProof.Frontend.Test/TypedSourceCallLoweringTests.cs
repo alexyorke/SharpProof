@@ -6,6 +6,71 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedSourceCallLoweringTests
 {
+    [TestCase("int Target(int x) => Helper(x); static int Helper(int x) => x + 1;", 1)]
+    [TestCase("int Target(int x) => Target(x);", 1)]
+    [TestCase("int Target(int x) => Helper(x); static int Helper(int x) => Target(x);", 1)]
+    [TestCase("int Target(int x) => Helper(Helper(x)); static int Helper(int x) => x + 1;", 2)]
+    [TestCase("int Target(int x) { Helper(x); return x; } static void Helper(int x) {}", 1)]
+    [TestCase("object Target(int x) => Helper(x); static object Helper(int x) => new object();", 1)]
+    [TestCase("int Target(int x) => Helper(); static int Helper(int x = 7) => x;", 1)]
+    [TestCase("int Target(int x) => Helper(1, 2); static int Helper(params int[] x) => x.Length;", 1)]
+    [TestCase("int Target(int x) { try { return Helper(x); } finally { x++; } } static int Helper(int x) => x;", 1)]
+    [TestCase("int Target(int x) { try { return Helper(x); } catch (System.DivideByZeroException) { return 7; } } " +
+        "static int Helper(int x) => 10 / x;", 1)]
+    public void ShadowSourceCallsRemainFiniteAndCannotClaimExecutableExactness(string members, int count)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var lowered = subject.LowerShadowSourceCalls();
+        Assert.That(lowered.Classification.IsExact, Is.True);
+        Assert.That(lowered.IsShadowCallSkeleton, Is.True);
+        Assert.That(lowered.IsExact, Is.False);
+        Assert.That(lowered.PreservedSourceCalls, Has.Count.EqualTo(count));
+        Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Count(),
+            Is.EqualTo(count));
+        Assert.That(subject.Execute(lowered, [3]).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+    }
+
+    [TestCase("int Target(int x) => System.Math.Abs(x);")]
+    [TestCase("int Target(int x) => Helper(ref x); static int Helper(ref int x) => x;")]
+    [TestCase("int Target(int x) => Helper(x); static T Helper<T>(T x) => x;")]
+    [TestCase("int Target(int x) => Helper(); static int Helper(params int[] x) => x.Length;")]
+    public void UnsupportedShadowSourceCallsRemainExplicitlyIncomplete(string members)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var lowered = subject.LowerShadowSourceCalls();
+        Assert.That(lowered.Classification.IsExact, Is.False);
+        Assert.That(lowered.IsExact, Is.False);
+        Assert.That(lowered.PreservedSourceCalls, Is.Empty);
+    }
+
+    [TestCase("Pack(first: x, second: x++)", 3, 3)]
+    [TestCase("Pack(second: x++, first: x)", 4, 3)]
+    public void ShadowSourceCallArgumentsCaptureReadsInSourceOrder(string invocation, int first, int second)
+    {
+        using var subject = TypedProgramSubject.Create("int Target(int x) => " + invocation +
+            "; static int Pack(int first, int second) => first * 10 + second;");
+        var lowered = subject.LowerShadowSourceCalls();
+        var execution = subject.Execute(lowered, [3]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        var call = lowered.PreservedSourceCalls.Keys.Single();
+        var interpreter = new IrInterpreter(subject.Factory);
+        Assert.That(interpreter.Evaluate(call.Arguments[0], execution.Values).Value!.IntegerNumericValue,
+            Is.EqualTo(new System.Numerics.BigInteger(first)));
+        Assert.That(interpreter.Evaluate(call.Arguments[1], execution.Values).Value!.IntegerNumericValue,
+            Is.EqualTo(new System.Numerics.BigInteger(second)));
+    }
+
+    [Test]
+    public void ShadowSourceCallArgumentFaultPreventsReachingTheCall()
+    {
+        using var subject = TypedProgramSubject.Create("int Target(int x) => Helper(10 / x); static int Helper(int x) => x;");
+        var lowered = subject.LowerShadowSourceCalls();
+        Assert.That(lowered.PreservedSourceCalls, Has.Count.EqualTo(1));
+        var execution = subject.Execute(lowered, [0]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+    }
+
     [Test]
     public void ConstantCollectionArrayMatchesCompiledResult()
     {

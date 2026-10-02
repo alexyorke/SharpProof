@@ -3,7 +3,8 @@ namespace SharpProof.Frontend;
 // Candidate scalar CFG. The bounded region route is separate from the
 // unchanged ordinary CFG path; unsupported forms remain incomplete.
 internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext context, CancellationToken cancellationToken,
-    TotalSourceCallSession? calls = null, bool externalFilterSearch = false)
+    TotalSourceCallSession? calls = null, bool externalFilterSearch = false,
+    Func<IMethodSymbol, bool>? preserveSourceCall = null)
 {
     private readonly TotalLoweringContext _context = context;
     private IrProgramBuilder _builder = new(context.Factory);
@@ -13,6 +14,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private readonly CancellationToken _cancellationToken = cancellationToken;
     private readonly TotalSourceCallSession? _calls = calls;
     private readonly bool _externalFilterSearch = externalFilterSearch;
+    private readonly Func<IMethodSymbol, bool>? _preserveSourceCall = preserveSourceCall;
+    private readonly Dictionary<IrCallInstruction, IMethodSymbol> _preservedSourceCalls = [];
     private SourceCallFrame? _frame;
     private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
@@ -240,7 +243,11 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
         }
         return new(program, _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
-            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin);
+            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
+        {
+            IsShadowCallSkeleton = _preserveSourceCall != null,
+            PreservedSourceCalls = _preservedSourceCalls.ToImmutableDictionary()
+        };
     }
 
     private bool HasUnsupportedRegion(ControlFlowRegion region)

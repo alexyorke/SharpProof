@@ -191,6 +191,11 @@ internal sealed class TypedProgramSubject : IDisposable
     internal FrontendProgramLoweringResult LowerSourceCalls(CancellationToken cancellationToken = default)
     { return LowerSourceCalls(false, cancellationToken); }
 
+    internal FrontendProgramLoweringResult LowerShadowSourceCalls(CancellationToken cancellationToken = default)
+    {
+        return new RoslynProgramLowerer(Factory).LowerShadowSourceBody(Graph, Context, static _ => true, cancellationToken);
+    }
+
     internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, CancellationToken cancellationToken = default)
     {
         return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context, static _ => true, null, cancellationToken,

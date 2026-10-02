@@ -557,10 +557,20 @@ Source calls and captured implementation IL expand directly into the caller's
 Total program. The compiler no longer produces relational-summary descriptors.
 An additional shadow artifact collects source methods reachable from claim
 roots once, retains recursive call edges, and excludes unrelated methods.
-Only independently admitted leaf bodies carry Total IR initially; unsupported
-bodies and unknown dispatch stay explicit boundaries. Entry initialization is
+Admitted bodies carry Total leaf IR or explicitly marked source-call skeletons;
+unsupported bodies and unknown dispatch stay explicit boundaries. Entry initialization is
 tracked separately. This table does not supply proof or completion facts and
 does not change compiler effect authority.
+An internal frontend route can instead retain supported direct source calls
+without expanding their bodies. Its shadow call skeleton carries an explicit
+marker and is never classified as executable exact Total lowering. It preserves
+argument evaluation, but supplies no callee exception or completion guarantee;
+the collector records validated instruction-to-body mappings for this route.
+A shadow SCC fixpoint joins local and callee may-effects without recursive
+graph traversal. Cycles may diverge but do not invent allocation or write
+effects. Call exceptions and normal completion remain unresolved, and caught
+callee faults remain conservatively present. External facts are not yet
+enrolled in this consumer; missing IR and entry initialization remain unknown.
 When an allocation operand is unsupported, lowering preserves earlier operand
 effects and returns an unknown value with the allocation expression's type;
 the enclosing body remains incomplete.

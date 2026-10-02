@@ -15,7 +15,7 @@ internal static class CompilerReachableSourceCollector
         var methods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
         var roots = new List<CompilerSourceRootArtifact>();
         var complete = true;
-        foreach (var target in targets)
+        foreach (var target in targets.OrderBy(target => target.Entry.CallableId, StringComparer.Ordinal))
         {
             var body = Enqueue(target.Method);
             if (body != null)
@@ -80,8 +80,7 @@ internal static class CompilerReachableSourceCollector
                 }
             }
             body.Callees = [.. calls.OrderBy(id => id, StringComparer.Ordinal)];
-            // Source calls deliberately remain incomplete in this first
-            // consumer. Leaf bodies already use the canonical Total lowering.
+            // Calls stay as shadow boundaries rather than expanding bodies.
             if (syntax is MethodDeclarationSyntax declaration && method.IsStatic && !method.IsGenericMethod &&
                 !method.ContainingType.IsGenericType &&
                 !method.ContainingType.StaticConstructors.Any(constructor => !constructor.IsImplicitlyDeclared) &&
@@ -100,13 +99,40 @@ internal static class CompilerReachableSourceCollector
                     var graph = ControlFlowGraph.Create(declaration, model, cancellationToken);
                     if (graph != null)
                     {
-                        var lowered = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, cancellationToken);
-                        if (lowered.IsExact)
-                        { body.Graph = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], cancellationToken: cancellationToken).Graph; }
+                        var lowered = new RoslynProgramLowerer(context.Factory).LowerShadowSourceBody(graph, context,
+                            callee => Enqueue(callee) != null, cancellationToken);
+                        if (lowered.Classification.IsExact && body.CallsComplete)
+                        {
+                            var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], cancellationToken: cancellationToken);
+                            body.Graph = encoded.Graph;
+                            body.IsCallSkeleton = lowered.PreservedSourceCalls.Count != 0;
+                            body.SourceCalls = [.. lowered.PreservedSourceCalls.Select(call => new CompilerSourceCallArtifact
+                            {
+                                InstructionIndex = encoded.InstructionIndices[call.Key.Id],
+                                CalleeBodyId = Enqueue(call.Value)!.BodyId
+                            }).OrderBy(call => call.InstructionIndex)];
+                            body.Callees = [.. body.SourceCalls.Select(call => call.CalleeBodyId).Distinct(StringComparer.Ordinal)
+                                .OrderBy(id => id, StringComparer.Ordinal)];
+                        }
                     }
                 }
             }
         }
+        // The compiler CFG can omit statically unreachable calls. Retain only
+        // bodies connected by the final IR edges (or an incomplete boundary).
+        var retained = new HashSet<string>(StringComparer.Ordinal);
+        var reachable = new Stack<string>(roots.Select(root => root.BodyId));
+        while (reachable.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var id = reachable.Pop();
+            if (!retained.Add(id))
+            { continue; }
+            foreach (var callee in bodies[id].Callees)
+            { reachable.Push(callee); }
+        }
+        foreach (var id in bodies.Keys.Where(id => !retained.Contains(id)).ToArray())
+        { bodies.Remove(id); }
         return new()
         {
             CollectionComplete = complete,
@@ -146,6 +172,19 @@ internal static class CompilerReachableSourceCollector
                 Start = syntax.SpanStart,
                 Length = syntax.Span.Length
             };
+            body.CallIdentity = CompilerIdentityBridge.CreateSymbolDisplay(method);
+            body.IsStatic = method.IsStatic;
+            if (method.Parameters.Length <= CompilerPreparedBody.MaximumInstructions &&
+                method.Parameters.All(parameter => CSharpOperationSemantics.IsValueDomain(parameter.Type)) &&
+                (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
+            {
+                var signatureFactory = new IrFactory(IrExecutionSemantics.Total);
+                var mapper = new RoslynTypeMapper(signatureFactory);
+                body.ParameterTypes = [.. method.Parameters.Select(parameter =>
+                    CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(parameter.Type)))];
+                body.ReturnType = method.ReturnsVoid ? null :
+                    CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(method.ReturnType));
+            }
             bodies.Add(id, body);
             pending.Enqueue(method);
             return body;

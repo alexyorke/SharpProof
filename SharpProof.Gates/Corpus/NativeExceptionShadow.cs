@@ -31,6 +31,9 @@ internal sealed record NativeExceptionShadowReport(string UniverseSha256, int Un
     ImmutableDictionary<string, int> NativeUnknownReasons, bool ComparisonPassed)
 {
     public string ContractKind { get; init; } = "DoesNotThrow";
+    public int ReachableSourceBodyCount { get; init; }
+    public int ReachableSourceMayDivergeCount { get; init; }
+    public int ReachableSourceUnknownEffectCount { get; init; }
 }
 
 // This report measures the replacement; it never publishes worker authority.
@@ -74,7 +77,10 @@ internal static class NativeExceptionShadow
         var artifact = CompilerManifestArtifactProducer.Create(compilation, root, "net9.0", WorkerFeatureSet.Effects,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, cancellationToken);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken);
+        var validatedArtifact = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken);
+        var sourceSummaries = validatedArtifact.ReachableSource is { } source
+            ? EffectSummaryFixpoint.ComputeValidated(source, cancellationToken)
+            : ImmutableSortedDictionary<string, SourceEffectSummary>.Empty;
         var owned = preparations.ToDictionary(preparation => preparation.Entry.CallableId, StringComparer.Ordinal);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var legacy = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
@@ -121,7 +127,13 @@ internal static class NativeExceptionShadow
             });
         }
         return Summarize(universeSha256, universeMethodCount, rows.ToImmutable(), wall.Elapsed.TotalSeconds) with
-        { ContractKind = purity ? "EnforcePure" : allocations ? "ZeroAllocations" : "DoesNotThrow" };
+        {
+            ContractKind = purity ? "EnforcePure" : allocations ? "ZeroAllocations" : "DoesNotThrow",
+            ReachableSourceBodyCount = sourceSummaries.Count,
+            ReachableSourceMayDivergeCount = sourceSummaries.Values.Count(summary => summary.MayDiverge),
+            ReachableSourceUnknownEffectCount = sourceSummaries.Values.Count(summary =>
+                summary.UnknownEffects != SourceMayEffect.None || summary.UnknownExceptions)
+        };
     }
 
     internal static NativeExceptionShadowReport Summarize(string universeSha256, int universeMethodCount,

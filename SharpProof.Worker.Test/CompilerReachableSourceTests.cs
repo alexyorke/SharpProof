@@ -30,7 +30,8 @@ public sealed class CompilerReachableSourceTests
         Assert.That(shared.Graph, Is.Not.Null);
         Assert.That(PortableIrGraphCodec.Decode(shared.Graph!).Program, Is.Not.Null);
         Assert.That(graph.Bodies.Where(body => body.BodyId != shared.BodyId).All(body =>
-            body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph == null), Is.True);
+            body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph != null && body.IsCallSkeleton &&
+            body.SourceCalls.Single().CalleeBodyId == shared.BodyId), Is.True);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
         Assert.That(roundTrip.ReachableSource!.Bodies.Select(body => body.BodyId),
@@ -50,7 +51,7 @@ public sealed class CompilerReachableSourceTests
         var graph = artifact.ReachableSource!;
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Bodies, Has.Length.EqualTo(2));
-        Assert.That(graph.Bodies.All(body => body.Graph == null && body.Callees.Length == 1 &&
+        Assert.That(graph.Bodies.All(body => body.Graph != null && body.IsCallSkeleton && body.SourceCalls.Length == 1 && body.Callees.Length == 1 &&
             body.Callees[0] != body.BodyId), Is.True);
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
@@ -149,7 +150,7 @@ public sealed class CompilerReachableSourceTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(SharedSource);
         var graph = artifact.ReachableSource!;
-        var leaf = graph.Bodies.Single(body => body.Graph != null);
+        var leaf = graph.Bodies.Single(body => body.Graph != null && !body.IsCallSkeleton);
         switch (mutation)
         {
             case "missing":
@@ -187,5 +188,72 @@ public sealed class CompilerReachableSourceTests
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+    }
+
+    [TestCase("missing")]
+    [TestCase("duplicate")]
+    [TestCase("index")]
+    [TestCase("callee")]
+    [TestCase("signature")]
+    [TestCase("return")]
+    [TestCase("static")]
+    [TestCase("identity")]
+    [TestCase("marker")]
+    public void MalformedSourceCallMappingIsRejected(string mutation)
+    {
+        var source = mutation == "duplicate" ? SharedSource.Replace("=> Shared(x);", "=> Shared(x) + Shared(x);", StringComparison.Ordinal) : SharedSource;
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
+        var graph = artifact.ReachableSource!;
+        var caller = graph.Bodies.First(body => body.IsCallSkeleton);
+        var callee = graph.Bodies.Single(body => body.BodyId == caller.SourceCalls[0].CalleeBodyId);
+        switch (mutation)
+        {
+            case "missing":
+                caller.SourceCalls = [];
+                break;
+            case "duplicate":
+                caller.SourceCalls = [caller.SourceCalls[0], caller.SourceCalls[0]];
+                break;
+            case "index":
+                caller.SourceCalls[0].InstructionIndex = 0;
+                break;
+            case "callee":
+                caller.SourceCalls[0].CalleeBodyId = caller.BodyId;
+                caller.Callees = [caller.BodyId];
+                break;
+            case "signature":
+                callee.ParameterTypes[0] = "wrong";
+                break;
+            case "return":
+                callee.ReturnType = null;
+                break;
+            case "static":
+                callee.IsStatic = false;
+                break;
+            case "identity":
+                callee.CallIdentity = "wrong";
+                break;
+            case "marker":
+                caller.IsCallSkeleton = false;
+                break;
+        }
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+    }
+
+    [Test]
+    public void StaticallyOmittedCallsDoNotLeaveUnreachableBodies()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            static class Subject {
+                [ZeroAllocations] public static int Root() { return 1; return Helper(); }
+                static int Helper() => 2;
+            }
+            """);
+        Assert.That(artifact.ReachableSource!.Bodies, Has.Length.EqualTo(1));
+        Assert.That(artifact.ReachableSource.Bodies[0].SourceCalls, Is.Empty);
+        CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
     }
 }

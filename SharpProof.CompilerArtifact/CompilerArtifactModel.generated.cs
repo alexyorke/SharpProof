@@ -525,6 +525,10 @@ internal sealed class CompilerSourceBodyArtifact
 {
     public string BodyId { get; set; } = string.Empty;
     public string MethodIdentity { get; set; } = string.Empty;
+    public string CallIdentity { get; set; } = string.Empty;
+    public bool IsStatic { get; set; }
+    public string[] ParameterTypes { get; set; } = [];
+    public string? ReturnType { get; set; }
     public int SourceTreeOrdinal { get; set; }
     public int Start { get; set; }
     public int Length { get; set; }
@@ -532,6 +536,14 @@ internal sealed class CompilerSourceBodyArtifact
     public bool EffectsCompleteAtEntry { get; set; }
     public string[] Callees { get; set; } = [];
     public PortableIrGraph? Graph { get; set; }
+    public bool IsCallSkeleton { get; set; }
+    public CompilerSourceCallArtifact[] SourceCalls { get; set; } = [];
+}
+
+internal sealed class CompilerSourceCallArtifact
+{
+    public int InstructionIndex { get; set; }
+    public string CalleeBodyId { get; set; } = string.Empty;
 }
 
 internal readonly struct CompilerEffectConstraintRule(

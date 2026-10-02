@@ -221,13 +221,23 @@ All nested frames share the same construction cap and cancellation boundary.
 The collector also ships a shadow reachable-source table, built lazily from
 claim roots with one body per source declaration and deterministic call edges.
 Shared helpers are deduplicated and recursive edges terminate collection.
-Leaf bodies use the same Total lowering; bodies containing source calls remain
-explicitly incomplete in this table until modular call semantics are integrated.
+Leaf bodies use the same Total lowering. Admitted direct source calls remain
+portable, explicitly marked shadow skeletons without expanding callee bodies.
 Elided invocation arguments and deferred lambda/local-function bodies do not
 add executed call edges. Missing bodies, unknown dispatch and collection limits
 remain boundaries. Entry initialization completeness is separate from body IR.
 The worker validates body identities, source bounds, graph semantics, roots and
 edge closure. This shadow table supplies no published proof authority.
+The frontend has a separate internal call-preserving route for the next shadow
+consumer. It records source-call instruction identities and evaluated arguments
+without expanding callee bodies, including recursive calls. An explicit result
+marker excludes these skeletons from executable exact Total admission. Portable
+call-to-body mappings validate every call index, callee identity and signature.
+EffectSummaryFixpoint uses iterative SCC traversal and a monotone worklist to
+join local and callee may-effects. Recursive components may diverge; recursion
+alone does not add allocation or write effects. Call exception/completion facts
+and external effect facts remain unresolved. The three effect-shadow reports
+observe summary coverage without changing native outcomes or compiler authority.
 Document bounds come from the selected declarations rather than full-file
 checksums or lengths, preserving artifact stability for unrelated constants.
 Unsupported allocation operands retain their evaluation prefix and produce an
