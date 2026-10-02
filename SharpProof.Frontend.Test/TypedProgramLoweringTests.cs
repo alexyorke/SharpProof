@@ -62,6 +62,25 @@ public sealed class TypedProgramLoweringTests
         Assert.That(lowered.IsExact, Is.False);
     }
 
+    [TestCase("new string[] { \"\\uD800\" }")]
+    [TestCase("new string[] { \"\\uDC00\" }")]
+    [TestCase("[\"\\uD800\"]")]
+    [TestCase("[\"\\uDC00\"]")]
+    public void IllFormedArrayStringElementsAbstainWithoutThrowing(string expression)
+    {
+        using var subject = TypedProgramSubject.Create("string[] Target() => " + expression + ";");
+        var lowered = subject.Lower();
+        Assert.That(lowered.IsExact, Is.False);
+    }
+
+    [TestCase("new string[] { \"\\uD83D\\uDE00\" }")]
+    [TestCase("[\"\\uD83D\\uDE00\"]")]
+    public void WellFormedArrayStringElementsRemainExact(string expression)
+    {
+        using var subject = TypedProgramSubject.Create("string[] Target() => " + expression + ";");
+        Assert.That(subject.Lower().IsExact, Is.True);
+    }
+
     [TestCaseSource(nameof(ScalarCases))]
     public void CandidateMatchesCompiledCSharp(string members, object[] arguments)
     {

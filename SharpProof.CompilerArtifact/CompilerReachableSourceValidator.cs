@@ -70,6 +70,7 @@ internal static class CompilerReachableSourceValidator
         {
             Require(root != null && root.CallableId != null && callableIds.Contains(root.CallableId) &&
                 rootIds.Add(root.CallableId) && root.BodyId != null && bodies.ContainsKey(root.BodyId));
+            Require(bodies[root!.BodyId!].MethodIdentity == root.CallableId);
             pending.Push(root!.BodyId!);
         }
         if (artifact.CollectionComplete)

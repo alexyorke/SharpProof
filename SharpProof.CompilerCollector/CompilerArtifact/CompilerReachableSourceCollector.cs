@@ -19,7 +19,10 @@ internal static class CompilerReachableSourceCollector
         {
             var body = Enqueue(target.Method);
             if (body != null)
-            { roots.Add(new() { CallableId = target.Entry.CallableId, BodyId = body.BodyId }); }
+            {
+                body.MethodIdentity = target.Entry.CallableId;
+                roots.Add(new() { CallableId = target.Entry.CallableId, BodyId = body.BodyId });
+            }
             else
             { complete = false; }
         }
@@ -60,10 +63,11 @@ internal static class CompilerReachableSourceCollector
                         if (emission.IsElided(current))
                         { continue; }
                         var callee = invocation.TargetMethod.OriginalDefinition;
+                        if (callee.IsVirtual || callee.IsAbstract || callee.IsOverride ||
+                            callee.MethodKind == MethodKind.DelegateInvoke)
+                        { body.CallsComplete = false; complete = false; }
                         if (SymbolEqualityComparer.Default.Equals(callee.ContainingAssembly, compilation.Assembly))
                         {
-                            if (callee.IsVirtual || callee.IsAbstract || callee.IsOverride)
-                            { body.CallsComplete = false; complete = false; }
                             var destination = Enqueue(callee);
                             if (destination == null)
                             { body.CallsComplete = false; complete = false; }
@@ -163,7 +167,8 @@ internal static class CompilerReachableSourceCollector
             _ => null
         };
         return method != null && SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
-            operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or IAwaitOperation or IForEachLoopOperation or IUsingOperation;
+            operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or IFunctionPointerInvocationOperation or
+                IAwaitOperation or IForEachLoopOperation or IUsingOperation;
     }
 
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,

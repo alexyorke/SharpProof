@@ -122,10 +122,24 @@ public sealed class CompilerReachableSourceTests
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
     }
 
+    [TestCase("public static int Root(System.Func<int> callback) => callback();")]
+    [TestCase("public static int Root(object value) => value.GetHashCode(); " +
+        "class Value { public override int GetHashCode() => Helper(); } static int Helper() => 1;")]
+    public void UnknownDispatchCannotReportCompleteSourceCollection(string members)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
+            using SharpProof.Attributes;
+            static class Subject { [ZeroAllocations] {{members}} }
+            """);
+        Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
+        Assert.That(artifact.ReachableSource.Bodies[0].CallsComplete, Is.False);
+    }
+
     [TestCase("missing")]
     [TestCase("duplicate")]
     [TestCase("identity")]
     [TestCase("root")]
+    [TestCase("root-swap")]
     [TestCase("edge")]
     [TestCase("graph")]
     [TestCase("location")]
@@ -149,6 +163,10 @@ public sealed class CompilerReachableSourceTests
                 break;
             case "root":
                 graph.Roots[0].CallableId = "wrong";
+                break;
+            case "root-swap":
+                (graph.Roots[0].BodyId, graph.Roots[1].BodyId) =
+                    (graph.Roots[1].BodyId, graph.Roots[0].BodyId);
                 break;
             case "edge":
                 leaf.Callees = ["wrong"];

@@ -23,7 +23,8 @@ internal static partial class CSharpOperationSemantics
     {
         return element is not ISpreadOperation && element.ConstantValue.HasValue &&
             (IsScalar(element.Type) || element.ConstantValue.Value == null ||
-                element.Type?.SpecialType == SpecialType.System_String && element.ConstantValue.Value is string);
+                element.Type?.SpecialType == SpecialType.System_String && element.ConstantValue.Value is string text &&
+                Utf16WellFormedness.IsWellFormed(text));
     }
 
     internal static bool IsStringConcatenation(IOperation operation)
