@@ -397,6 +397,11 @@ verification through both the static factory and injected-backend constructor.
 `NativeExceptionEffectVerifier` is the Phase 3 qualification entry point for
 decoded effect-only callable artifacts. It checks entry feasibility and then
 uncaught-exit reachability using the passive SSA session and method budget.
+The compiler captures claim-owned allowed exception kinds using exact bound
+core-library hierarchies. The codec validates claim ownership, canonical kinds
+and the entry/body boundary. The worker never matches short exception names or
+reconstructs Roslyn types. Missing optional constraints remain Unknown; declared
+DoesNotThrow and AllowedExceptions claims share one callable session and meter.
 Exception kinds use predecessor-guarded phi facts. Refutations require original
 IR replay and are compared with compiled C# execution in artifact qualification
 tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.

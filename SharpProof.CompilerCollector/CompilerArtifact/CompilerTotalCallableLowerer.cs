@@ -167,6 +167,37 @@ internal static class CompilerTotalCallableLowerer
                 clause.Value, clause.SafeCondition, clause.SourceOperation,
                 clause.Kind == BoundContractKind.Ensures ? target.Claims[claimOrdinal++].Entry.ClaimId : null,
                 clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id :
-                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction);
+                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction)
+        {
+            ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken)
+        };
+    }
+
+    private static ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints(CSharpCompilation compilation,
+        ManifestCallableTarget target, CancellationToken cancellationToken)
+    {
+        var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
+        var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
+        foreach (var claim in target.EffectClaims)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var evidence = claim.Evidence;
+            if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions) ||
+                evidence.Reason == WorkerClaimReason.UnsupportedContract)
+            { continue; }
+            var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
+            foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
+            {
+                var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
+                if (runtime == null)
+                { return []; }
+                if (evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions &&
+                    CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
+                        evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal)))
+                { allowed.Add(kind); }
+            }
+            constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));
+        }
+        return constraints.ToImmutable();
     }
 }

@@ -13,7 +13,10 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         if (preparation == null)
         { return null; }
-        return EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses, preparation.IsBodyAbstraction);
+        var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result, preparation.Clauses, preparation.IsBodyAbstraction);
+        artifact.ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => new CompilerTotalExceptionConstraintArtifact
+        { ClaimId = constraint.ClaimId, AllowedKinds = [.. constraint.AllowedKinds] })];
+        return artifact;
     }
 
     internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
@@ -52,7 +55,8 @@ internal static class CompilerTotalCallableArtifactCodec
         CancellationToken cancellationToken)
     {
         var decoded = DecodeCore(artifact, entry, claims, entryOnly: false, cancellationToken);
-        return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction);
+        return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
+        { ExceptionConstraints = decoded.ExceptionConstraints };
     }
 
     internal static CompilerTotalEntryPreparation? DecodeEntry(CompilerTotalCallableArtifact? artifact,
@@ -63,7 +67,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private sealed record DecodedTotal(IrFactory Factory, IrProgram? Program, ImmutableArray<CompilerTotalParameter> Parameters,
-        IrVarId? Result, ImmutableArray<CompilerTotalClause> Clauses);
+        IrVarId? Result, ImmutableArray<CompilerTotalClause> Clauses, ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints);
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
@@ -73,7 +77,7 @@ internal static class CompilerTotalCallableArtifactCodec
         { return null; }
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         cancellationToken.ThrowIfCancellationRequested();
-        if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.Result < -1)
+        if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null || artifact.Result < -1)
         { throw new InvalidDataException("The Total callable payload is incomplete."); }
         Require(artifact.Parameters!.Length <= CompilerPreparedBody.MaximumInstructions &&
             artifact.Clauses!.Length <= CompilerPreparedBody.MaximumInstructions, "The Total callable metadata exceeds its bound.");
@@ -176,7 +180,36 @@ internal static class CompilerTotalCallableArtifactCodec
             "The Total clauses do not equal the manifest.");
         if (!entryOnly)
         { ValidateProgram(decoded.Program!, result, clauses, parameters, artifact.IsBodyAbstraction, cancellationToken); }
-        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable());
+        var exceptionConstraints = DecodeExceptionConstraints(artifact.ExceptionConstraints, claims, entryOnly, cancellationToken);
+        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints);
+    }
+
+    private static ImmutableArray<CompilerTotalExceptionConstraint> DecodeExceptionConstraints(
+        CompilerTotalExceptionConstraintArtifact[] rows, ImmutableArray<WorkerClaimManifestEntry> claims,
+        bool entryOnly, CancellationToken cancellationToken)
+    {
+        Require(rows.Length <= CompilerPreparedBody.MaximumInstructions && (!entryOnly || rows.Length == 0),
+            "An exception constraint list has an invalid bound or mode.");
+        var owned = claims.ToDictionary(claim => claim.ClaimId, StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>(rows.Length);
+        foreach (var row in rows)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (row == null || row.ClaimId == null || row.AllowedKinds == null)
+            { throw new InvalidDataException("An exception constraint contains a missing row or field."); }
+            Require(seen.Add(row.ClaimId) && owned.TryGetValue(row.ClaimId, out var claim) &&
+                claim.Kind == WorkerClaimKind.Effect && claim.EffectContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions,
+                "An exception constraint must own a unique exception-effect claim.");
+            var owner = owned[row.ClaimId];
+            Require(row.AllowedKinds.Length <= Enum.GetValues(typeof(IrExceptionKind)).Length &&
+                row.AllowedKinds.All(kind => Enum.IsDefined(typeof(IrExceptionKind), kind)) &&
+                row.AllowedKinds.SequenceEqual(row.AllowedKinds.Distinct().OrderBy(kind => kind)) &&
+                (owner.EffectContractKind != WorkerEffectContractKind.DoesNotThrow || row.AllowedKinds.Length == 0),
+                "Allowed exception kinds must be canonical and agree with the effect contract.");
+            constraints.Add(new(row.ClaimId, [.. row.AllowedKinds]));
+        }
+        return constraints.MoveToImmutable();
     }
 
     private static bool Scalar(IrFactory factory, IrTypeId type)

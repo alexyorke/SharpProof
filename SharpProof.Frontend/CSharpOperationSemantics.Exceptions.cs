@@ -2,6 +2,19 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static string ExceptionMetadataName(IrExceptionKind kind)
+    {
+        return kind switch
+        {
+            IrExceptionKind.DivideByZero => "System.DivideByZeroException",
+            IrExceptionKind.Overflow => "System.OverflowException",
+            IrExceptionKind.NullReference => "System.NullReferenceException",
+            IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
+            IrExceptionKind.InvalidCast => "System.InvalidCastException",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+    }
+
     // Resolve the runtime assembly that owns System.Object. A source-defined
     // same-name exception must never impersonate a local scalar fault.
     internal static bool TryCatchKinds(Compilation compilation, ITypeSymbol? catchType,
@@ -24,15 +37,7 @@ internal static partial class CSharpOperationSemantics
         var matched = ImmutableArray.CreateBuilder<IrExceptionKind>();
         foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
         {
-            var runtime = core.GetTypeByMetadataName(kind switch
-            {
-                IrExceptionKind.DivideByZero => "System.DivideByZeroException",
-                IrExceptionKind.Overflow => "System.OverflowException",
-                IrExceptionKind.NullReference => "System.NullReferenceException",
-                IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
-                IrExceptionKind.InvalidCast => "System.InvalidCastException",
-                _ => throw new InvalidOperationException("Unknown scalar exception kind.")
-            });
+            var runtime = core.GetTypeByMetadataName(ExceptionMetadataName(kind));
             if (runtime == null)
             {
                 kinds = default;

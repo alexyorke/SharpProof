@@ -449,6 +449,13 @@ Compiler-produced effect evidence remains authoritative for effect claims.
 Native exception-effect qualification uses the same passive SSA body facts.
 Uncaught exits retain guarded exception kinds across joins; allowed kinds are
 checked at the exit rather than inferred from absence of a normal return.
+The compiler normalizes each declared DoesNotThrow or AllowedExceptions
+constraint using the bound core-library exception hierarchy and exact type
+identities. A source-defined same-name type cannot allow a core-library fault.
+Owned constraint rows survive artifact round-trip; malformed, duplicate,
+foreign or noncanonical rows are rejected. Missing optional rows abstain,
+including on contradictory entry conditions. Multiple exception claims share
+one method budget while retaining their separate constraints.
 SAT evidence must replay an explicit uncaught throw in the original body,
 without reading approximation values. Loop cuts can prove unreachability;
 finite search can only supply replayed violations. Call abstractions abstain

@@ -107,7 +107,12 @@ internal sealed record CompilerTotalCallablePreparation(
     ImmutableArray<CompilerTotalParameter> Parameters,
     IrVarId? Result,
     ImmutableArray<CompilerTotalClause> Clauses,
-    bool IsBodyAbstraction = false);
+    bool IsBodyAbstraction = false)
+{
+    internal ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints { get; init; } = [];
+}
+
+internal sealed record CompilerTotalExceptionConstraint(string ClaimId, ImmutableArray<IrExceptionKind> AllowedKinds);
 
 internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
 
@@ -122,6 +127,13 @@ internal sealed class CompilerTotalCallableArtifact
     public CompilerTotalParameterArtifact[] Parameters { get; set; } = [];
     public int Result { get; set; } = -1;
     public CompilerTotalClauseArtifact[] Clauses { get; set; } = [];
+    public CompilerTotalExceptionConstraintArtifact[] ExceptionConstraints { get; set; } = [];
+}
+
+internal sealed class CompilerTotalExceptionConstraintArtifact
+{
+    public string ClaimId { get; set; } = string.Empty;
+    public IrExceptionKind[] AllowedKinds { get; set; } = [];
 }
 
 internal sealed class CompilerTotalParameterArtifact
