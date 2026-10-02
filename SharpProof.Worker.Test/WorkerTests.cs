@@ -252,8 +252,7 @@ public sealed class WorkerTests
             TautologySource.Replace(
                 "return value;", "return 00000;",
                 StringComparison.Ordinal));
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -286,7 +285,7 @@ public sealed class WorkerTests
                 Is.True);
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(factoryCalls, Is.EqualTo(1));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(backend.CallCount, Is.EqualTo(3));
             Assert.That(CacheFiles(project), Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
@@ -1721,7 +1720,7 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(() =>
         {
             Interlocked.Increment(ref factoryCalls);
-            return new CountingBackend(BackendCheckResult.Unsatisfiable([]));
+            return new CountingNativeBackend();
         });
 
         var response = await worker.VerifyAsync(request);
@@ -1854,7 +1853,7 @@ public sealed class WorkerTests
             Interlocked.Increment(ref factoryCalls);
             return new CountingBackend(
                 BackendCheckResult.Unsatisfiable([]));
-        }, nativeAuthority: true);
+        });
 
         var response = await second.VerifyAsync(request);
 
@@ -5030,10 +5029,8 @@ public sealed class WorkerTests
             MultipleEnsuresSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.QueryRlimit = 6;
-        request.Budgets.MethodRlimit = 12;
-        var backend = new ResourceCountingBackend(
-            resourceCost: 6,
-            BackendCheckResult.Unsatisfiable([]));
+        request.Budgets.MethodRlimit = 24;
+        using var backend = new ResourceCountingBackend(resourceCost: 6);
         using var worker = new SharpProofWorker(
             backend,
             () => backend.ConsumedResourceCount);
@@ -5045,7 +5042,7 @@ public sealed class WorkerTests
         ];
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(4));
         Assert.That(
             response.ClaimResults.Select(static record => record.Outcome),
             Is.EqualTo(expectedStatuses));
@@ -5087,8 +5084,7 @@ public sealed class WorkerTests
         ThrowingDisposeBackend? backend = null;
         using var worker = new SharpProofWorker(() =>
         {
-            backend = new ThrowingDisposeBackend(
-                BackendCheckResult.Unsatisfiable([]));
+            backend = new ThrowingDisposeBackend();
             return backend;
         });
 
@@ -5099,6 +5095,7 @@ public sealed class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(backend!.DisposeCalls, Is.EqualTo(1));
+            Assert.That(backend.NativeDisposed, Is.True);
         }
     }
 
@@ -5220,13 +5217,13 @@ public sealed class WorkerTests
         using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
-        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.MethodWallTimeMilliseconds = 200;
         request.Budgets.ProjectWallTimeMilliseconds = 1_000;
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) == 1
                 ? new DelayingBackend()
-                : new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+                : new CountingNativeBackend());
 
         var response = await worker.VerifyAsync(request);
 
@@ -5475,13 +5472,13 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
-        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.MethodWallTimeMilliseconds = 200;
         request.Budgets.ProjectWallTimeMilliseconds = 1_000;
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) == 1
                 ? new DelayingBackend()
-                : new ProofThenCounterexampleBackend());
+                : new CountingNativeBackend());
 
         var response = await worker.VerifyAsync(request);
 
@@ -5538,8 +5535,7 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) <= 2
                 ? new DelayingBackend()
-                : new CountingBackend(
-                    BackendCheckResult.Unsatisfiable([])));
+                : new CountingNativeBackend());
 
         var response = await worker.VerifyAsync(request);
 
@@ -5552,7 +5548,7 @@ public sealed class WorkerTests
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
-                    WorkerClaimOutcome.Proven
+                    WorkerClaimOutcome.Refuted
                 ]));
             Assert.That(
                 response.ClaimResults.Take(2)
@@ -5586,7 +5582,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(MultipleEnsuresSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodRlimit = request.Budgets.QueryRlimit;
-        using var backend = new SharpProof.Smt.IrSmtBackend(
+        using var backend = new NativeCallableBackend(
             new SharpProof.Smt.IrSmtBackendOptions(
                 request.Budgets.QueryRlimit));
         using var worker = new SharpProofWorker(
@@ -5597,10 +5593,10 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.ClaimResults[0].Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Proven));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.ClaimResults.Skip(1).Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
@@ -6245,31 +6241,6 @@ public sealed class WorkerTests
         }
     }
 
-    private sealed class ProofThenCounterexampleBackend : ISmtBackend
-    {
-        private int _calls;
-
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Interlocked.Increment(ref _calls) == 1)
-            {
-                return Task.FromResult(
-                    BackendCheckResult.Unsatisfiable([]));
-            }
-
-            var assignments = query.ModelVariables.Select(variable =>
-                KeyValuePair.Create(
-                    variable,
-                    query.Factory.CreateIntegerValue(0)));
-            return Task.FromResult(
-                BackendCheckResult.Satisfiable(
-                    new BackendModel(assignments)));
-        }
-    }
-
     private sealed class CountingNativeBackend : ISmtBackend, IDisposable
     {
         private readonly NativeCallableBackend _backend;
@@ -6381,28 +6352,35 @@ public sealed class WorkerTests
     private sealed class CoordinatedBackend : ISmtBackend, IDisposable
     {
         private readonly ConcurrentLaneState _state;
+        private readonly CountingNativeBackend _backend = new();
         internal CoordinatedBackend(ConcurrentLaneState state)
         {
             _state = state;
             state.CreatedBackend();
         }
-        public Task<BackendCheckResult> CheckAsync(
+        public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query, CancellationToken cancellationToken)
         {
-            return _state.CheckAsync(cancellationToken);
+            await _state.CheckAsync(cancellationToken);
+            return await _backend.CheckAsync(query, cancellationToken);
         }
 
         public void Dispose()
         {
+            _backend.Dispose();
             _state.DisposedBackend();
         }
     }
 
-    private sealed class ThrowingDisposeBackend(BackendCheckResult result) :
+    private sealed class ThrowingDisposeBackend(BackendCheckResult? result = null) :
         ISmtBackend,
         IDisposable
     {
-        private readonly BackendCheckResult _result = result;
+        private readonly BackendCheckResult? _result = result;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213",
+            Justification = "Dispose releases this backend before deliberately throwing the cleanup failure tested by this fixture.")]
+        private readonly CountingNativeBackend? _backend = result == null ? new() : null;
+        internal bool NativeDisposed { get; private set; }
 
         internal int DisposeCalls
         {
@@ -6414,12 +6392,14 @@ public sealed class WorkerTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(_result);
+            return _backend?.CheckAsync(query, cancellationToken) ?? Task.FromResult(_result!);
         }
 
         public void Dispose()
         {
             DisposeCalls++;
+            _backend?.Dispose();
+            NativeDisposed = _backend != null;
             throw new InvalidOperationException("backend disposal failed");
         }
     }
@@ -6489,12 +6469,10 @@ public sealed class WorkerTests
         }
     }
 
-    private sealed class ResourceCountingBackend(
-        long resourceCost,
-        BackendCheckResult result) : ISmtBackend
+    private sealed class ResourceCountingBackend(long resourceCost) : ISmtBackend, IDisposable
     {
         private readonly long _resourceCost = resourceCost;
-        private readonly BackendCheckResult _result = result;
+        private readonly CountingNativeBackend _backend = new();
         private int _callCount;
         private long _consumedResourceCount;
 
@@ -6509,8 +6487,11 @@ public sealed class WorkerTests
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             Interlocked.Add(ref _consumedResourceCount, _resourceCost);
-            return Task.FromResult(_result);
+            return _backend.CheckAsync(query, cancellationToken);
         }
+
+        public void Dispose()
+        { _backend.Dispose(); }
     }
 
     private static void SetDeclaredMaxStack(

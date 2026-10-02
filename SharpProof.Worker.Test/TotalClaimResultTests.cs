@@ -132,7 +132,7 @@ public sealed class TotalClaimResultTests
     [TestCase("bad-reason")]
     public async Task IncompletePublicationCannotPublishAProof(string fault)
     {
-        using var project = new ShadowTestProject(WorkerVcShadowTests.IdentitySource);
+        using var project = new ShadowTestProject(ShadowTestProject.IdentitySource);
         var check = (await Checks(project)).Values.Single();
         var malformed = fault switch
         {
@@ -148,7 +148,7 @@ public sealed class TotalClaimResultTests
     [Test]
     public async Task ForeignClaimCannotBeProjectedIntoAnotherCallable()
     {
-        using var project = new ShadowTestProject(WorkerVcShadowTests.IdentitySource);
+        using var project = new ShadowTestProject(ShadowTestProject.IdentitySource);
         var check = (await Checks(project)).Values.Single();
         Assert.Throws<ArgumentException>(new Action(() => CallableClaimResultAssembler.FromTotal(
             project.Snapshot.Callables.Single(), check with { ClaimId = "foreign" })));

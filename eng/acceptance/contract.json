@@ -135,10 +135,7 @@
           "SharpProof.Worker/ArtifactValidator.cs",
           "SharpProof.Worker/Vc/PassiveCallableCandidate.cs",
           "SharpProof.Worker/Vc/PassiveCallableArtifactAdapter.cs",
-          "SharpProof.Worker/Vc/WorkerVcShadowReport.cs",
-          "SharpProof.Worker/Vc/WorkerVcShadowObserver.cs",
           "SharpProof.Worker/Vc/TotalCallableVerifier.cs",
-          "SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs",
           "SharpProof.Worker/Vc/PassiveLoopCutter.cs",
           "SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs",
           "SharpProof.Worker/Vc/PassiveCallableVcPlan.cs",
@@ -191,10 +188,7 @@
       {
         "name": "execution",
         "paths": [
-          "SharpProof.Worker/CallableEvidenceBuilder.cs",
           "SharpProof.Worker/CallableEntryFeasibility.cs",
-          "SharpProof.Worker/CallableVerifier.cs",
-          "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
           "SharpProof.Worker/SharpProofWorker.cs",
           "SharpProof.Worker/WorkerHost.cs"
@@ -203,7 +197,7 @@
       {
         "name": "obligationGeneration",
         "paths": [
-          "SharpProof.Worker/PostconditionObligationBuilder.cs"
+          "SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs"
         ]
       },
       {

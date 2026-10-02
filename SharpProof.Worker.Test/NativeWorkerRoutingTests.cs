@@ -338,7 +338,7 @@ public sealed class NativeWorkerRoutingTests
     }
 
     [Test]
-    public async Task NativeFactoryDoesNotEmitLegacyShadowComparisons()
+    public async Task NativeFactoryHandlesFullUnsignedDomain()
     {
         using var project = new ShadowTestProject("""
             using SharpProof.Attributes;
@@ -350,13 +350,9 @@ public sealed class NativeWorkerRoutingTests
                 }
             }
             """);
-        using var environment = new ShadowEnvironment("shadow");
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var reports = 0;
-        worker.ShadowReportSink = _ => reports++;
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(reports, Is.Zero);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
 
@@ -527,7 +523,7 @@ public sealed class NativeWorkerRoutingTests
             """, cacheEnabled);
         project.Request.Budgets.MaxParallelism = parallelism;
         Assert.That(project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(".A(", StringComparison.Ordinal)).IsSuccess, Is.False);
-        Assert.That(SharpProofWorker.CountSolverTargets(project.Snapshot.Callables, nativeAuthority: true), Is.EqualTo(2));
+        Assert.That(SharpProofWorker.CountSolverTargets(project.Snapshot.Callables), Is.EqualTo(2));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         for (var run = 0; run < 2; run++)
         {
@@ -548,7 +544,7 @@ public sealed class NativeWorkerRoutingTests
             using SharpProof.Attributes;
             public static class Subject { [DoesNotThrow] public static void Target() { } }
             """);
-        using var worker = new SharpProofWorker(new UnexpectedBackend(), null, nativeAuthority: true);
+        using var worker = new SharpProofWorker(new UnexpectedBackend(), null);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -580,7 +576,7 @@ public sealed class NativeWorkerRoutingTests
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
         project.Request.Budgets.MethodWallTimeMilliseconds = 1500;
         var factory = project.Snapshot.Callables.Single().Total!.Program.Factory;
-        using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory, project.Request.Budgets.QueryRlimit), nativeAuthority: true);
+        using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory, project.Request.Budgets.QueryRlimit));
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
         var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
@@ -616,7 +612,7 @@ public sealed class NativeWorkerRoutingTests
         }
         var factory = project.Snapshot.Callables.OrderBy(callable => callable.Entry.CallableId, StringComparer.Ordinal).First().Total!.Program.Factory;
         using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory,
-            project.Request.Budgets.QueryRlimit, projectTimeout ? null : cancellation.Cancel), nativeAuthority: true);
+            project.Request.Budgets.QueryRlimit, projectTimeout ? null : cancellation.Cancel));
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
         Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
         var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);

@@ -465,6 +465,14 @@ compilation and effective SharpProof options. Compiler error diagnostics fail
 verification as `CompilationFailure`; malformed lowered evidence or an
 expression-depth mismatch fails as `CompilerManifestMismatch`.
 
+Postcondition verification uses the compiler's typed Total IR and native
+bitvector verification conditions. Every worker construction path uses this
+verifier. Entry feasibility uses body-independent predicates, and completed
+claim results survive a later interruption. Bounded loop search can establish
+a refutation only through original-body replay; a bounded UNSAT result cannot
+prove a cyclic program. Unsupported async and iterator callables abstain.
+Compiler-produced effect evidence remains authoritative for effect claims.
+
 This closed artifact removes worker-side compiler reconstruction. For the
 admitted program subset, counterexample replay is independent of symbolic
 execution: the worker executes the compiler-produced whole-body IR with a

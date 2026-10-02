@@ -13,7 +13,7 @@ public sealed class WorkerVcShadowSourceGateTests
 {
     internal static readonly ImmutableArray<ShadowSourceCase> Universe =
     [
-        new("identity", WorkerVcShadowTests.IdentitySource, [WorkerClaimOutcome.Proven]),
+        new("identity", ShadowTestProject.IdentitySource, [WorkerClaimOutcome.Proven]),
         new("array-surrogate", GoldenTest.Load("worker", "vc-shadow-array-surrogate").Source, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("array-filter-return", GoldenTest.Load("worker", "vc-shadow-array-fault").Source, [WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted]),
         new("reference-length", """
