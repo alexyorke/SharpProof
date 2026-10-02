@@ -3,7 +3,7 @@ namespace SharpProof.Worker;
 internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerClaimReason Reason,
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
     ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null,
-    OperationId? AllocationWitness = null);
+    OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false);
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 

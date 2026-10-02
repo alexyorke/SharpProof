@@ -31,7 +31,11 @@ internal static class NativeAllocationEffectVerifier
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
         var result = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
-        return result.Outcome is ProvenOutcome ? result with { EntryModel = entry.EntryModel } : result;
+        return result with
+        {
+            EntryModel = result.Outcome is ProvenOutcome ? entry.EntryModel : result.EntryModel,
+            HasFeasibleEntryWitness = result.Outcome is ProvenOutcome or RefutedOutcome
+        };
     }
 
     private static PassiveCallableCheckResult Unknown(WorkerClaimReason reason)

@@ -439,9 +439,15 @@ decoded as a canonical owned set. Missing admission data abstains even at a
 contradictory entry. Compiled C# tests independently measure thread allocation
 bytes on concrete paths after delegate construction and JIT warmup.
 `SharpProof.Gates allocation-shadow` measures this replacement on the same
-pinned universe with ZeroAllocations annotations. Corpus runtime allocation
-oracles remain explicit gaps; this command does not qualify an authority
-switch or complete the implicit-allocation table.
+pinned universe with ZeroAllocations annotations. Concrete feasible entries
+are replayed before invoking independently compiled source through a direct
+delegate. Arguments and warmup are outside thread-allocation measurements.
+Generic methods use bounded int and string representative closures; unsupported
+inputs and incomplete executions remain explicit gaps. Independent conservative
+IL reachability checks allocation, throw and call sites, including filter handlers.
+A potential IL site remains a gap when preconditions may exclude its edge.
+Runtime observations do not establish a universal proof. This command does not
+qualify an authority switch or complete the implicit-allocation table.
 Native lanes do not instantiate the legacy callable verifier or predicate
 executor. Temporary legacy comparison fixtures explicitly select their internal
 route; legacy implementation retirement remains a separate gate.

@@ -16,7 +16,12 @@ internal sealed record NativeExceptionShadowRow(string MethodId, string Callable
     WorkerClaimOutcome LegacyOutcome, WorkerClaimReason LegacyReason,
     WorkerClaimOutcome CompilerOutcome, WorkerClaimReason CompilerReason,
     WorkerClaimOutcome NativeOutcome, WorkerClaimReason NativeReason,
-    bool HasTotalBody, bool HasBodyAbstraction, string? ExceptionKind, string RuntimeOracle);
+    bool HasTotalBody, bool HasBodyAbstraction, string? ExceptionKind, string RuntimeOracle)
+{
+    public string AllocationIlOracle { get; init; } = "NotRun";
+    public int RuntimeChecks { get; init; }
+    public long? AllocatedBytes { get; init; }
+}
 
 internal sealed record NativeExceptionShadowReport(string UniverseSha256, int UniverseMethodCount,
     int CheckedMethodCount, bool Exhaustive, int LegacyProven, int RetainedProven,
@@ -72,6 +77,7 @@ internal static class NativeExceptionShadow
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var legacy = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
         using var oracle = new NativeExceptionWitnessOracle(compilation);
+        using var allocationOracle = new NativeAllocationWitnessOracle(compilation);
         var rows = ImmutableArray.CreateBuilder<NativeExceptionShadowRow>(methodIds.Length);
         foreach (var id in methodIds.OrderBy(id => id, StringComparer.Ordinal))
         {
@@ -93,13 +99,20 @@ internal static class NativeExceptionShadow
             };
             if (outcome == WorkerClaimOutcome.Refuted && (allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
             { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
-            var runtime = allocations ? "AllocationOracleNotRun" : outcome == WorkerClaimOutcome.Refuted
+            var allocationObservation = allocations && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
+                ? allocationOracle.Check(target.Method, preparation.Total!, evidence, outcome, cancellationToken) : null;
+            var runtime = allocations ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
                 ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
                 : "NotRun";
             rows.Add(new(id, preparation.Entry.CallableId, CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Outcome),
                 CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Reason), claim.Outcome, claim.Reason, outcome, evidence.Reason,
                 preparation.Total != null, preparation.Total?.IsBodyAbstraction == true,
-                evidence.ExceptionWitness?.Kind.ToString(), runtime));
+                evidence.ExceptionWitness?.Kind.ToString(), runtime)
+            {
+                AllocationIlOracle = allocationObservation?.IlOracle ?? "NotRun",
+                RuntimeChecks = allocationObservation?.RuntimeChecks ?? 0,
+                AllocatedBytes = allocationObservation?.AllocatedBytes
+            });
         }
         return Summarize(universeSha256, universeMethodCount, rows.ToImmutable(), wall.Elapsed.TotalSeconds) with
         { ContractKind = allocations ? "ZeroAllocations" : "DoesNotThrow" };

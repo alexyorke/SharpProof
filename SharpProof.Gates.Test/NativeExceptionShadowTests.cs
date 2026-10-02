@@ -1,7 +1,11 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.Gates.Corpus;
+using SharpProof.Host;
+using SharpProof.Verify;
+using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Gates.Test;
@@ -138,8 +142,20 @@ public sealed class NativeExceptionShadowTests
         var report = await NativeExceptionShadow.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(outcome));
-        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("AllocationOracleNotRun"));
-        Assert.That(report.RuntimeWitnesses, Is.Zero);
+        var row = report.Rows.Single();
+        Assert.That(row.RuntimeOracle, Is.EqualTo(outcome == WorkerClaimOutcome.Unknown ? "NotRun" : "Confirmed"));
+        Assert.That(report.RuntimeWitnesses, Is.EqualTo(outcome == WorkerClaimOutcome.Unknown ? 0 : 1));
+        Assert.That(row.RuntimeChecks, Is.EqualTo(outcome == WorkerClaimOutcome.Unknown ? 0 : 1));
+        if (outcome == WorkerClaimOutcome.Proven)
+        {
+            Assert.That(row.AllocatedBytes, Is.Zero);
+            Assert.That(row.AllocationIlOracle, Is.EqualTo("NoReachableAllocationOpcode"));
+        }
+        else if (outcome == WorkerClaimOutcome.Refuted)
+        {
+            Assert.That(row.AllocatedBytes, Is.GreaterThan(0));
+            Assert.That(row.AllocationIlOracle, Is.EqualTo("PotentialAllocationOpcode"));
+        }
     }
 
     [Test]
@@ -154,7 +170,85 @@ public sealed class NativeExceptionShadowTests
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.ComparisonPassed, Is.True);
         Assert.That(report.DisagreementCount, Is.Zero);
+        var retained = report.Rows.Single(row => row.MethodId == "OSS0199");
+        Assert.That(retained.RuntimeOracle, Is.EqualTo("Confirmed"));
+        Assert.That(retained.RuntimeChecks, Is.EqualTo(2));
+        Assert.That(retained.AllocatedBytes, Is.Zero);
+        Assert.That(report.RuntimeContradictions, Is.Zero);
         await TestContext.Progress.WriteLineAsync($"Allocation shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; " +
-            $"{report.RetainedProven} retained; {report.WallSeconds:F1}s; runtime corpus oracle pending.");
+            $"{report.RetainedProven} retained; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
+    }
+
+    [TestCase("public static class C", "", "", "Confirmed", 1)]
+    [TestCase("public static class C<T>", "", "", "Confirmed", 2)]
+    [TestCase("public static class C", "<T>", "", "Confirmed", 2)]
+    [TestCase("public static class C", "", "SharpProof.Attributes.Contract.Requires(false);", "NoFeasibleEntryWitness", 0)]
+    public async Task AllocationOracleDistinguishesEmptyModelsFromVacuousEntries(string owner, string generic, string requires,
+        string expected, int checks)
+    {
+        var document = Document(owner + " { public static int Target" + generic + "() { " + requires + " return 1; } }");
+        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+            CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expected));
+        Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(checks));
+    }
+
+    [TestCase(nameof(NoAllocation), false)]
+    [TestCase(nameof(FilteredHandlerAllocation), true)]
+    public void IlOracleIncludesExceptionFilterHandlers(string name, bool expected)
+    {
+        var method = typeof(NativeExceptionShadowTests).GetMethod(name,
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.EqualTo(expected));
+    }
+
+    private static int NoAllocation(int x)
+    { return x; }
+
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    [TestCase("bool")]
+    public async Task AllocationOracleInvokesExactScalarArgumentTypesWithoutHarnessAllocations(string type)
+    {
+        var document = Document("public static class C { public static " + type + " Target(" + type + " x) { return x; } }");
+        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+            CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
+        Assert.That(report.Rows.Single().AllocatedBytes, Is.Zero);
+    }
+
+    [Test]
+    public async Task IndependentSourceOracleRejectsAnIncorrectAllocationProof()
+    {
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(Document(
+            "public static class C { public static int Target(int x) { new object(); return x; } }"),
+            CancellationToken.None, allocations: true);
+        var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
+        var target = discovery.Targets.Values.Single();
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var preparation = preparations.Single();
+        var evidence = await NativeAllocationEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        using var oracle = new NativeAllocationWitnessOracle(compilation);
+        var observation = oracle.Check(target.Method, preparation.Total!, evidence, WorkerClaimOutcome.Proven, CancellationToken.None);
+        Assert.That(observation.RuntimeOracle, Is.EqualTo("Contradiction"));
+        Assert.That(observation.AllocatedBytes, Is.GreaterThan(0));
+    }
+
+    private static object? FilteredHandlerAllocation(int x)
+    {
+        try
+        { return 1 / x == 0 ? null : null; }
+        catch (DivideByZeroException) when (x == 0) { return new object(); }
     }
 }

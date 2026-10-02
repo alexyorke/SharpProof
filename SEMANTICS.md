@@ -463,7 +463,13 @@ until their throwing behavior is represented. These qualification results do
 not replace compiler effect publication.
 
 Native allocation qualification begins with discarded core `new object()`
-expressions. Allocation events retain an owned type and operation site through
+expressions. The shadow runtime oracle measures concrete feasible entries in
+independently compiled source after argument construction and warmup. An empty
+model for a zero-parameter method is distinct from an infeasible entry. Generic
+closures are bounded representatives; unsupported inputs remain explicit gaps.
+Conservative IL reachability also includes exception-filter handlers. These
+observations do not establish a universal proof. Allocation events retain an
+owned type and operation site through
 artifact capture, loop transformation and passive SSA. A refutation requires
 that the original program execute an allocation site without approximation
 reads. A proof excludes all represented allocation and throw sites, including
