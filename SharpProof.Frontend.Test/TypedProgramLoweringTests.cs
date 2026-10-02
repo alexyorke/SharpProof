@@ -159,8 +159,21 @@ internal sealed class TypedProgramSubject : IDisposable
         return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context);
     }
     internal FrontendProgramLoweringResult LowerSourceCalls(CancellationToken cancellationToken = default)
+    { return LowerSourceCalls(false, cancellationToken); }
+
+    internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, CancellationToken cancellationToken = default)
     {
-        return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context, static _ => true, cancellationToken);
+        return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context, static _ => true, null, cancellationToken,
+            arrayModels ? ResolveArrayEmpty : null);
+
+        TotalScalarCallModel? ResolveArrayEmpty(IMethodSymbol method)
+        {
+            return method.IsStatic && method.ContainingType.SpecialType == SpecialType.System_Array &&
+                method.Name == "Empty" && method.Arity == 1 && method.Parameters.IsEmpty &&
+                CSharpOperationSemantics.IsReferenceDomain(method.ReturnType)
+                ? new(0, _ => CSharpOperationSemantics.ArrayEmpty(Factory,
+                    new RoslynTypeMapper(Factory).GetTypeId(method.ReturnType))) : null;
+        }
     }
     internal IrProgramExecutionResult Execute(FrontendProgramLoweringResult lowering, object[] arguments)
     {

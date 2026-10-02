@@ -9,9 +9,21 @@ internal static partial class CSharpOperationSemantics
             (creation.Initializer == null ||
                 creation.DimensionSizes[0].ConstantValue is { HasValue: true, Value: int length } &&
                 length == creation.Initializer.ElementValues.Length &&
-                creation.Initializer.ElementValues.All(element => element.ConstantValue.HasValue &&
-                    (IsScalar(element.Type) || element.ConstantValue.Value == null ||
-                        element.Type?.SpecialType == SpecialType.System_String && element.ConstantValue.Value is string)));
+                creation.Initializer.ElementValues.All(IsConstantArrayElement));
+    }
+
+    internal static bool IsSupportedConstantArrayCollection(ICollectionExpressionOperation collection)
+    {
+        return collection.Type is IArrayTypeSymbol { IsSZArray: true } && collection.ConstructMethod == null &&
+            !collection.Elements.IsEmpty && IsReferenceDomain(collection.Type) &&
+            collection.Elements.All(IsConstantArrayElement);
+    }
+
+    private static bool IsConstantArrayElement(IOperation element)
+    {
+        return element is not ISpreadOperation && element.ConstantValue.HasValue &&
+            (IsScalar(element.Type) || element.ConstantValue.Value == null ||
+                element.Type?.SpecialType == SpecialType.System_String && element.ConstantValue.Value is string);
     }
 
     internal static bool IsStringConcatenation(IOperation operation)

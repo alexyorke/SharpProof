@@ -439,8 +439,13 @@ concrete replay creates CLR-default elements within its work budget. Symbolic
 array sizes stay unbounded. Constant initializers carry matching literal terms
 and an exact constant size through Allocate, codec validation and replay. SSA
 constrains scalar element values; reference elements remain overapproximated.
-Nonconstant initializers, params expansion and array writes remain incomplete;
-default-array contents are overapproximated.
+Nonempty constant array collection expressions reuse this constructor after
+their collection-specific conversion. Source params frames admit explicit
+arrays/nulls and constant expanded arrays, preserving argument source order.
+Empty expanded arguments require the owned Array.Empty model and retain its
+cached identity; explicit new T[0] remains fresh. Nonconstant initializers,
+dynamic params expansion and array writes remain incomplete. Empty collection
+expressions and spreads abstain; default-array contents are overapproximated.
 The allocation table also recognizes explicit delegate construction for static
 or nonvirtual reference receivers. Receiver evaluation precedes a null guard
 that throws the appended Argument exception kind before allocation when the

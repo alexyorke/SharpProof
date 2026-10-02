@@ -84,6 +84,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (depth < 256 && operation is IConversionOperation
+            { OperatorMethod: null, IsTryCast: false, Operand: ICollectionExpressionOperation converted } collectionConversion &&
+            !collectionConversion.Conversion.IsUserDefined && SymbolEqualityComparer.Default.Equals(collectionConversion.Type, converted.Type) &&
+            CSharpOperationSemantics.IsSupportedConstantArrayCollection(converted))
+        { return LowerBodyValue(converted, block, depth + 1); }
+        if (depth < 256 && operation is ICollectionExpressionOperation collection &&
+            CSharpOperationSemantics.IsSupportedConstantArrayCollection(collection))
+        {
+            var initial = collection.Elements.Select(element =>
+                CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
+            var allocatedType = _context.Type(collection.Type);
+            var allocatedTarget = _context.Temporary(allocatedType);
+            _builder!.Allocate(block, _context.Site(collection), allocatedType, allocatedTarget, _factory.Integer(initial.Length), initial);
+            return new(_factory.Variable(allocatedTarget), block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && operation is IArrayCreationOperation arrayCreation && CSharpOperationSemantics.IsSupportedArrayCreation(arrayCreation))
         {
             var dimension = LowerBodyValue(arrayCreation.DimensionSizes[0], block, depth + 1);

@@ -6,10 +6,25 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedSourceCallLoweringTests
 {
+    [Test]
+    public void ConstantCollectionArrayMatchesCompiledResult()
+    {
+        using var subject = TypedProgramSubject.Create("int Target(int x) { int[] values = [1, -2]; return values[0] + values[1]; }");
+        Assert.That(subject.Invoke([3]), Is.EqualTo(-1));
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        Assert.That(subject.Execute(lowering, [3]).ReturnValue!.Integer, Is.EqualTo(-1));
+    }
+
     [TestCase("int Target(int x) { return Pack(second: x++, first: x++); } static int Pack(int first, int second) { return first * 10 + second; }", 3, 43)]
     [TestCase("int Target(int x) { return Pack(first: x, second: x++); } static int Pack(int first, int second) { return first * 10 + second; }", 3, 33)]
     [TestCase("int Target(int x) { return Pack(first: x, second: (x = 5)); } static int Pack(int first, int second) { return first * 10 + second; }", 3, 35)]
     [TestCase("int Target(int x) { return Multiply(x); } static int Multiply(int value, int factor = 2) { return value * factor; }", 3, 6)]
+    [TestCase("int Target(int x) { return Count(1, 2); } static int Count(params int[] values) => values.Length;", 3, 2)]
+    [TestCase("int Target(int x) { return First(1, 2); } static int First(params int[] values) => values[0];", 3, 1)]
+    [TestCase("int Target(int x) { return Count(new int[0]); } static int Count(params int[] values) => values.Length;", 3, 0)]
+    [TestCase("int Target(int x) { try { return Count((int[])null); } catch (System.NullReferenceException) { return 7; } } static int Count(params int[] values) => values.Length;", 3, 7)]
+    [TestCase("int Target(int x) { return Pack(values: new int[] { 1, 2 }, first: x++); } static int Pack(int first, params int[] values) => first * 10 + values[0] + values[1];", 3, 33)]
     [TestCase("int Target(int x) { return Mutate(x) + x; } static int Mutate(int value) { value += 4; return value; }", 3, 10)]
     [TestCase("int Target(int x) { return Inner(Outer(x)); } static int Outer(int value) { return value + 2; } static int Inner(int value) { return value * 3; }", 3, 15)]
     [TestCase("int Target(int x) { try { return Divide(x); } catch (System.DivideByZeroException) { return 7; } finally { x++; } } static int Divide(int value) { try { return 10 / value; } finally { value = 99; } }", 0, 7)]
@@ -28,6 +43,22 @@ public sealed class TypedSourceCallLoweringTests
         var execution = subject.Execute(lowering, [input]);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
+
+    [TestCase("return Count();", 0)]
+    [TestCase("return Capture() == Capture() ? 1 : 0;", 1)]
+    [TestCase("return Capture() == new int[0] ? 1 : 0;", 0)]
+    public void EmptyParamsPreserveCompiledCacheIdentity(string body, int expected)
+    {
+        using var subject = TypedProgramSubject.Create("int Target(int x) { " + body +
+            " } static int Count(params int[] values) => values.Length; static int[] Capture(params int[] values) => values;");
+        Assert.That(subject.Invoke([3]), Is.EqualTo(expected));
+        Assert.That(subject.LowerSourceCalls().IsExact, Is.False, "Empty params need an owned Array.Empty model.");
+        var lowering = subject.LowerSourceCalls(arrayModels: true);
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        var execution = subject.Execute(lowering, [3]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(expected));
     }
 
     [TestCase(false)]

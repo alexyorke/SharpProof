@@ -40,6 +40,13 @@ internal sealed partial class RoslynTotalProgramLowerer
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
+            if (TotalSourceCallSession.IsEmptyParamsArray(argument))
+            {
+                if (_calls.PrepareEmptyParamsArray(argument) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
+                { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+                arguments[argument.Parameter!.Ordinal] = empty.Value;
+                continue;
+            }
             var value = _expressions.LowerBodyValue(argument.Value, block, depth + 1);
             block = value.Continuation;
             if (!value.Classification.IsExact)

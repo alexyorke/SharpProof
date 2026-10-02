@@ -64,6 +64,9 @@ public sealed class NativeAllocationEffectTests
     [TestCase("int[] values = new int[2]; return values.Length;", false)]
     [TestCase("int[] values = new int[] { }; return values.Length;", false)]
     [TestCase("int[] values = new int[] { 1, -2 }; return values[0] + values[1];", false)]
+    [TestCase("int[] values = [1, -2]; return values[0] + values[1];", false)]
+    [TestCase("short[] values = [1, -2]; return values[0] + values[1];", false)]
+    [TestCase("string[] values = [\"a\", null]; return values.Length;", false)]
     [TestCase("bool[] values = new bool[] { true, false }; return values[0] && !values[1] ? 1 : 0;", false)]
     [TestCase("long[] values = new long[] { 1L, -2L }; return (int)(values[0] + values[1]);", false)]
     [TestCase("string[] values = new string[] { \"a\", null }; return values.Length;", false)]
@@ -631,6 +634,30 @@ public sealed class NativeAllocationEffectTests
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.AllocationWitness, Is.Not.Null);
         Assert.That(AllocatedBytes(source, (int)result.EntryModel.Values.Single().IntegerNumericValue), Is.GreaterThan(0));
+    }
+
+    [TestCase("return Count();", true, 0)]
+    [TestCase("return Count(1, 2);", false, 2)]
+    [TestCase("return First(1, 2);", false, 1)]
+    [TestCase("return Count(new int[0]);", false, 0)]
+    [TestCase("return Capture() == Capture() ? 1 : 0;", true, 1)]
+    [TestCase("return Capture() == new int[0] ? 1 : 0;", false, 0)]
+    public async Task ParamsArraysMatchCompiledAllocationsAndContents(string body, bool proven, int expected)
+    {
+        var ensures = "Contract.Ensures(Contract.Result<int>() == " + expected + "); ";
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "static int Count(params int[] values) => values.Length; static int First(params int[] values) => values[0]; " +
+            "static int[] Capture(params int[] values) => values; [ZeroAllocations] public static int Target(int x) { " +
+            ensures + body + " } }";
+        var preparation = Prepare(source);
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(native.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), native.Reason.ToString());
+        Assert.That(AllocatedBytes(source.Replace(ensures, "", StringComparison.Ordinal),
+            (int)native.EntryModel.Values.Single().IntegerNumericValue), proven ? Is.Zero : Is.GreaterThan(0));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+            Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     private static CompilerCallablePreparation Prepare(string source)

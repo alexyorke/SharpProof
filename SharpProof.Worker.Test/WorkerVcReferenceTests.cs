@@ -226,6 +226,10 @@ public sealed class WorkerVcReferenceTests
     [TestCase("int Target(int[] x, long index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int Target(int[] x, ulong index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int[] Target(int x) { Contract.Ensures(true); return new int[] { x }; }")]
+    [TestCase("int[] Target() { Contract.Ensures(true); return []; }")]
+    [TestCase("int[] Target(int[] x) { Contract.Ensures(true); return [..x]; }")]
+    [TestCase("int[] Target(int x) { Contract.Ensures(true); return [x]; }")]
+    [TestCase("System.Collections.Generic.List<int> Target() { Contract.Ensures(true); return [1, 2]; }")]
     [TestCase("int Target(string x) { Contract.Ensures(true); try { return x.Length; } catch (System.NullReferenceException error) { return error == null ? 1 : 0; } }")]
     public void UnsupportedReferenceOperationsRemainUnenrolled(string member)
     {
@@ -254,6 +258,8 @@ public sealed class WorkerVcReferenceTests
     }
 
     [TestCase("int[] values = new int[] { 1, -2 }; return values[0] + values[1];", -1)]
+    [TestCase("int[] values = [1, -2]; return values[0] + values[1];", -1)]
+    [TestCase("short[] values = [1, -2]; return values[0] + values[1];", -1)]
     [TestCase("bool[] values = new bool[] { true, false }; return values[0] && !values[1] ? 1 : 0;", 1)]
     [TestCase("long[] values = new long[] { 1L, -2L }; return (int)(values[0] + values[1]);", -1)]
     public async Task ConstantArrayInitializersPreserveContents(string body, int expected)

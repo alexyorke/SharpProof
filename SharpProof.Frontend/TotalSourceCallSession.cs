@@ -77,6 +77,34 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal void LeaveIl(IMethodSymbol method)
     { _activeIl.Remove(IlKey(method)); }
 
+    internal static bool IsEmptyParamsArray(IArgumentOperation argument)
+    {
+        return argument.ArgumentKind == ArgumentKind.ParamArray && argument.Parameter?.IsParams == true &&
+            argument.Value is IArrayCreationOperation
+            {
+                IsImplicit: true, Initializer.ElementValues.Length: 0,
+                DimensionSizes.Length: 1, Type: IArrayTypeSymbol { IsSZArray: true }
+            } creation &&
+            creation.DimensionSizes[0].ConstantValue is { HasValue: true, Value: 0 };
+    }
+
+    internal TotalScalarRule? PrepareEmptyParamsArray(IArgumentOperation argument)
+    {
+        if (!IsEmptyParamsArray(argument) || !Spend() || argument.Value.Type is not IArrayTypeSymbol array)
+        { return null; }
+        var emptyMethods = compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Empty")
+            .OfType<IMethodSymbol>().Where(method => method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
+                method.Arity == 1 && method.Parameters.IsEmpty &&
+                method.ReturnType is IArrayTypeSymbol { IsSZArray: true } returned &&
+                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0])).ToArray();
+        if (emptyMethods.Length != 1 || !Spend(emptyMethods.Length))
+        { return null; }
+        var empty = emptyMethods[0].Construct(array.ElementType);
+        var model = resolveScalarModel?.Invoke(empty);
+        return model?.ParameterCount == 0 && SymbolEqualityComparer.Default.Equals(empty.ReturnType, array)
+            ? model.Apply([]) : null;
+    }
+
     private static string IlKey(IMethodSymbol method)
     { return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
@@ -94,7 +122,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.Parameters.Where((parameter, ordinal) =>
                 parameter.Type.SpecialType != method.OriginalDefinition.Parameters[ordinal].Type.SpecialType).Any() ||
             method.ReturnType.SpecialType != method.OriginalDefinition.ReturnType.SpecialType ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsParams ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+                parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
@@ -105,7 +134,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         {
             if (!Spend() || argument.Parameter is not { } parameter ||
                 !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method) ||
-                !ordinals.Add(parameter.Ordinal) || argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue) ||
+                !ordinals.Add(parameter.Ordinal) ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue or ArgumentKind.ParamArray) ||
+                argument.ArgumentKind == ArgumentKind.ParamArray && !parameter.IsParams ||
                 argument.ArgumentKind == ArgumentKind.DefaultValue &&
                     (!parameter.HasExplicitDefaultValue || !argument.Value.ConstantValue.HasValue))
             { return false; }

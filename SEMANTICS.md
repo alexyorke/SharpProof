@@ -473,9 +473,14 @@ length Overflow faults precede allocation. Concrete replay initializes elements
 to their CLR defaults and charges array size to its work budget; this never caps
 symbolic inputs. Constant initializers carry typed literal elements in the same
 allocation instruction, with exact scalar element facts in the VC and contents
-in replay. Reference elements remain overapproximated. Nonconstant initializer
-evaluation, params expansion and array mutation
-are not yet represented. Default-array element contents remain an
+in replay. Reference elements remain overapproximated. Nonempty constant
+collection expressions targeting supported arrays use the same allocation and
+contents model. Source params calls preserve explicit arrays and nulls;
+constant expanded arguments allocate a fresh array. Empty expanded params use
+the compiler's Array.Empty cache only when its owned model is available.
+Nonconstant initializer evaluation, dynamic params expansion and array mutation
+are not yet represented. Empty collection expressions and spreads remain
+incomplete. Default-array element contents remain an
 overapproximation in the VC.
 Explicit delegate construction for static or nonvirtual reference receivers
 records a fresh allocation without executing the target. Instance receiver
