@@ -170,7 +170,7 @@ internal sealed partial class PassiveLoopCutter
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
-                        builder.Allocate(encoded, allocation.Operation, allocation.AllocatedType, allocation.Target, allocation.Length);
+                        builder.Allocate(encoded, allocation.Operation, allocation.AllocatedType, allocation.Target, allocation.Length, allocation.InitialValues);
                         break;
                     case IrLockInstruction synchronization:
                         builder.Lock(encoded, synchronization.Operation, synchronization.Receiver);

@@ -60,8 +60,8 @@ public sealed class IrProgramBuilder(IrFactory factory)
     }
 
     public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
-        IrTerm? length = null)
-    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length)); }
+        IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
+    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length, initialValues)); }
 
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
@@ -266,6 +266,18 @@ public sealed class IrProgramBuilder(IrFactory factory)
                     (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
                         ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
                 { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
+                if (!allocation.InitialValues.IsEmpty)
+                {
+                    if (allocation.Length is not IrIntegerTerm dimension || dimension.Value != allocation.InitialValues.Length)
+                    { throw InvalidArgument("An initialized array requires its exact constant length.", "initialValues"); }
+                    var elementType = _factory.GetTypeInfo(allocation.AllocatedType).ElementType;
+                    foreach (var initial in allocation.InitialValues)
+                    {
+                        if (initial is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm) ||
+                            ValidateTerm(initial, "initialValues") != elementType)
+                        { throw InvalidArgument("Array initializers require matching constant elements.", "initialValues"); }
+                    }
+                }
                 break;
             case IrAssignInstruction value:
                 RequireSameType(

@@ -471,8 +471,12 @@ Single-dimensional zero-initialized arrays with Int32 dimensions produce fresh
 sequence identities and their exact lengths. Dimension evaluation and negative
 length Overflow faults precede allocation. Concrete replay initializes elements
 to their CLR defaults and charges array size to its work budget; this never caps
-symbolic inputs. Array element contents remain an overapproximation in the VC,
-and initializers, params expansion and array mutation are not yet represented.
+symbolic inputs. Constant initializers carry typed literal elements in the same
+allocation instruction, with exact scalar element facts in the VC and contents
+in replay. Reference elements remain overapproximated. Nonconstant initializer
+evaluation, params expansion and array mutation
+are not yet represented. Default-array element contents remain an
+overapproximation in the VC.
 Explicit delegate construction for static or nonvirtual reference receivers
 records a fresh allocation without executing the target. Instance receiver
 evaluation precedes construction. Directly escaping delegates retain the null

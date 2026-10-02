@@ -144,7 +144,8 @@ public sealed class GoldenLoweringTests
             {
                 IrAllocationInstruction value => $"Allocate {value.AllocatedType}:{factory.GetString(factory.GetTypeInfo(value.AllocatedType).Name)}" +
                     (value.Target is { } target ? $" -> {Variable(target)}" : "") +
-                    (value.Length is { } length ? $" length={printer.Print(length)}" : ""),
+                    (value.Length is { } length ? $" length={printer.Print(length)}" : "") +
+                    (!value.InitialValues.IsEmpty ? $" elements=[{string.Join(", ", value.InitialValues.Select(printer.Print))}]" : ""),
                 IrWriteInstruction value => $"Write {value.Region}",
                 IrLockInstruction value => $"Lock {printer.Print(value.Receiver)}",
                 IrAssignInstruction value => $"Assign {Variable(value.Target)} = {printer.Print(value.Value)}",

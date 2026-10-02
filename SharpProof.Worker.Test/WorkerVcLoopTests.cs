@@ -40,7 +40,7 @@ public sealed class WorkerVcLoopTests
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
-                        builder.Allocate(destination, allocation.Operation, allocation.AllocatedType, allocation.Target, allocation.Length);
+                        builder.Allocate(destination, allocation.Operation, allocation.AllocatedType, allocation.Target, allocation.Length, allocation.InitialValues);
                         break;
                     case IrLockInstruction synchronization:
                         builder.Lock(destination, synchronization.Operation, synchronization.Receiver);

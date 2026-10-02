@@ -225,7 +225,7 @@ public sealed class WorkerVcReferenceTests
     [TestCase("string Target(string[] x) { Contract.Ensures(true); return x[0]; }")]
     [TestCase("int Target(int[] x, long index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int Target(int[] x, ulong index) { Contract.Ensures(true); return x[index]; }")]
-    [TestCase("int[] Target() { Contract.Ensures(true); return new int[] { 1 }; }")]
+    [TestCase("int[] Target(int x) { Contract.Ensures(true); return new int[] { x }; }")]
     [TestCase("int Target(string x) { Contract.Ensures(true); try { return x.Length; } catch (System.NullReferenceException error) { return error == null ? 1 : 0; } }")]
     public void UnsupportedReferenceOperationsRemainUnenrolled(string member)
     {
@@ -251,5 +251,22 @@ public sealed class WorkerVcReferenceTests
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var reason), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [TestCase("int[] values = new int[] { 1, -2 }; return values[0] + values[1];", -1)]
+    [TestCase("bool[] values = new bool[] { true, false }; return values[0] && !values[1] ? 1 : 0;", 1)]
+    [TestCase("long[] values = new long[] { 1L, -2L }; return (int)(values[0] + values[1]);", -1)]
+    public async Task ConstantArrayInitializersPreserveContents(string body, int expected)
+    {
+        var subject = PassiveSourceSubject.Create("using SharpProof.Attributes; public static class Subject { " +
+            "[DoesNotThrow, EnforcePure] public static int Target() { Contract.Ensures(Contract.Result<int>() == " + expected + "); " + body + " } }");
+        var candidate = subject.Enroll();
+        Assert.That(candidate, Is.Not.Null);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var replay = new IrProgramInterpreter(candidate!.Factory).Execute(candidate.Program, new Dictionary<IrVarId, IrValue>());
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
     }
 }

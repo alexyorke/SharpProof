@@ -62,9 +62,16 @@ public sealed class NativeAllocationEffectTests
     [TestCase("while (x > 0) { new object(); x--; } return x;", false)]
     [TestCase("int[] values = new int[0]; return values.Length;", false)]
     [TestCase("int[] values = new int[2]; return values.Length;", false)]
+    [TestCase("int[] values = new int[] { }; return values.Length;", false)]
+    [TestCase("int[] values = new int[] { 1, -2 }; return values[0] + values[1];", false)]
+    [TestCase("bool[] values = new bool[] { true, false }; return values[0] && !values[1] ? 1 : 0;", false)]
+    [TestCase("long[] values = new long[] { 1L, -2L }; return (int)(values[0] + values[1]);", false)]
+    [TestCase("string[] values = new string[] { \"a\", null }; return values.Length;", false)]
+    [TestCase("object[] values = new object[] { null }; return values.Length;", false)]
     [TestCase("Contract.Requires(x >= 0); int[] values = new int[x]; return x;", false)]
     [TestCase("Contract.Requires(x != 0); if (x == 0) { int[] values = new int[x]; } return x;", true)]
     [TestCase("while (x > 0) { int[] values = new int[x]; x--; } return x;", false)]
+    [TestCase("while (x > 0) { int[] values = new int[] { 1, -2 }; x--; } return x;", false)]
     [TestCase("return string.Concat(x == 0 ? \"\" : \"a\", \"b\").Length;", false)]
     [TestCase("return string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length;", true)]
     [TestCase("return string.Concat((string)null, x == 0 ? \"a\" : \"b\").Length;", true)]
@@ -235,6 +242,22 @@ public sealed class NativeAllocationEffectTests
                 allocation.C = Array.FindIndex(graph.Terms, term => graph.Types[term.Type].Kind == IrTypeKind.Boolean);
                 break;
         }
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+    }
+
+    [TestCase("count")]
+    [TestCase("type")]
+    [TestCase("expression")]
+    public void ArrayInitializerDecoderRejectsMalformedConstants(string mutation)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ZeroAllocations] public static int Target(int x) { int[] values = new int[] { 1, -2 }; return values[0]; } }");
+        var graph = artifact.Callables.Single().Total!.Graph;
+        var allocation = graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
+        allocation.Items = mutation == "count" ? new[] { allocation.Items[0] }
+            : new[] { Array.FindIndex(graph.Terms, term => mutation == "type"
+                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable), allocation.Items[1] };
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
     }
@@ -596,6 +619,7 @@ public sealed class NativeAllocationEffectTests
     [TestCase("System.Action action = new System.Action(Sink);")]
     [TestCase("string text = string.Concat(value == 0 ? \"a\" : \"b\", \"c\");")]
     [TestCase("int[] values = new int[2];")]
+    [TestCase("int[] values = new int[] { 1, -2 };")]
     public async Task SourceHelperAllocationSurvivesExpansionAndMatchesRuntime(string allocation)
     {
         var source = "using SharpProof.Attributes; public static class C { " +

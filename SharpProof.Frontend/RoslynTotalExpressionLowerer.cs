@@ -84,7 +84,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
-        if (depth < 256 && operation is IArrayCreationOperation arrayCreation && CSharpOperationSemantics.IsDefaultArrayCreation(arrayCreation))
+        if (depth < 256 && operation is IArrayCreationOperation arrayCreation && CSharpOperationSemantics.IsSupportedArrayCreation(arrayCreation))
         {
             var dimension = LowerBodyValue(arrayCreation.DimensionSizes[0], block, depth + 1);
             if (!dimension.Classification.IsExact)
@@ -95,7 +95,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = ApplyRule(operation, rule, dimension.Continuation).Continuation;
             var type = _context.Type(operation.Type);
             var target = _context.Temporary(type);
-            _builder!.Allocate(block, _context.Site(operation), type, target, dimension.Value);
+            var initialValues = arrayCreation.Initializer == null ? ImmutableArray<IrTerm>.Empty
+                : arrayCreation.Initializer.ElementValues.Select(element =>
+                    CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
+            var length = arrayCreation.Initializer == null ? dimension.Value : _factory.Integer(initialValues.Length);
+            _builder!.Allocate(block, _context.Site(operation), type, target, length, initialValues);
             return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
         }
         if (depth < 256 && CSharpOperationSemantics.IsStringConcatenation(operation))

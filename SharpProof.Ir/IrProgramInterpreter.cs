@@ -109,8 +109,9 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             var info = _factory.GetTypeInfo(element);
                             var initial = info.Kind == IrTypeKind.Boolean ? _factory.CreateBooleanValue(false)
                                 : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
-                            values[allocation.Target!.Value] = _factory.CreateSequenceValue(allocation.AllocatedType,
-                                Enumerable.Repeat(initial, count));
+                            var elements = allocation.InitialValues.IsEmpty ? Enumerable.Repeat(initial, count)
+                                : allocation.InitialValues.Select(value => _terms.Evaluate(value, values.Current, values.ObserveRead, cancellationToken).Value!);
+                            values[allocation.Target!.Value] = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
                         }
                         else if (allocation.Target is { } allocatedTarget)
                         { values[allocatedTarget] = _factory.CreateReferenceValue(allocation.AllocatedType, new object()); }

@@ -207,6 +207,15 @@ internal sealed class PassiveCallableVcBuilder
                             Fact(Guard(reach, Not(Equal(allocated, _factory.Null(allocated.Type)))), allocation.Operation, "allocation-nonnull");
                             if (arrayLength != null)
                             { Fact(Guard(reach, Equal(_factory.Length(allocated), arrayLength)), allocation.Operation, "array-length"); }
+                            // The sequence encoder observes only scalar elements.
+                            // Reference contents remain an overapproximation.
+                            for (var index = 0; index < allocation.InitialValues.Length &&
+                                _factory.GetTypeInfo(allocation.InitialValues[index].Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer; index++)
+                            {
+                                Spend();
+                                Fact(Guard(reach, Equal(_factory.SequenceAccess(allocated, _factory.Integer(index)),
+                                    allocation.InitialValues[index])), allocation.Operation, "array-initializer");
+                            }
                             foreach (var existing in state.Values.Where(value => value.Type == allocated.Type).Distinct())
                             {
                                 Spend();
