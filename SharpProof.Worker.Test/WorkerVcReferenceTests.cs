@@ -46,20 +46,18 @@ public sealed class WorkerVcReferenceTests
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(invocation == 0 ? WorkerCacheStatus.Written : WorkerCacheStatus.Hit));
-            var ordinals = project.Snapshot.CompilerManifest.Manifest.Claims.ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-            var rows = report!.Rows.Where(row => row.CallableId == target.Entry.CallableId).OrderBy(row => ordinals[row.ClaimId]).ToArray();
-            Assert.That(rows.Select(row => row.NewOutcome), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
-            Assert.That(rows.All(row => row.Checked && row.TotalPresent), Is.True);
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            Assert.That(response.Errors, Is.Empty);
+            var ordinals = response.Manifest.Claims.Where(claim => claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition)
+                .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
+            Assert.That(posts.Select(result => result.Outcome), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
 

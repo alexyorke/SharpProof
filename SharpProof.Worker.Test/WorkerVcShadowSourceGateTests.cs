@@ -6,8 +6,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 // This is an explicit native source-worker universe. The inherited analyzer
-// corpus has no postconditions and cannot establish candidate shadow coverage.
-// The gate consumes the direct sink; MSBuild stderr capture is capped at 1 MiB.
+// corpus has no postconditions and cannot establish native postcondition coverage.
 [TestFixture]
 [NonParallelizable]
 public sealed class WorkerVcShadowSourceGateTests
@@ -171,7 +170,7 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { public static async void Target(int x) {
                 Contract.Ensures(false); throw null!;
             } }
-            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedBody)
+            """, [WorkerClaimOutcome.Unknown], TotalPresent: false, Checked: false, Reason: WorkerClaimReason.UnsupportedCallable)
     ];
 
     [Test]
@@ -179,33 +178,34 @@ public sealed class WorkerVcShadowSourceGateTests
     {
         Assert.That(Universe.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
         Assert.That(Universe.Length, Is.EqualTo(54));
-        using var environment = new ShadowEnvironment("shadow");
-        var rows = new List<WorkerVcShadowRow>();
+        var results = new List<WorkerClaimResult>();
+        var checks = new List<TotalCallableClaimCheck>();
         var manifestPostconditions = 0;
         foreach (var sourceCase in Universe)
         {
             using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
-            using var worker = project.CreateLegacyWorker();
-            WorkerVcShadowReport? report = null;
-            worker.ShadowReportSink = observed => report = observed;
+            var sourceChecks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+            foreach (var preparation in project.Snapshot.Callables)
+            {
+                await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
+                    check => sourceChecks[check.ClaimId] = check, CancellationToken.None);
+            }
+            using var worker = SharpProofWorker.Create(project.Request.Budgets);
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-            Assert.That(report, Is.Not.Null, sourceCase.Name);
-            AssertReport(report!, response, project, sourceCase);
+            var posts = AssertNativeResults(response, project, sourceCase, sourceChecks);
             manifestPostconditions += response.Manifest.Claims.Count(claim => claim.Kind == WorkerClaimKind.Postcondition);
-            rows.AddRange(report!.Rows);
-            await TestContext.Out.WriteLineAsync($"source-worker {sourceCase.Name}: posts={report.Postconditions} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} oldProven={report.OldProven} newProven={report.NewProven} disagreements={report.SoundnessDisagreements}");
+            results.AddRange(posts);
+            checks.AddRange(sourceChecks.Values);
         }
         Assert.That(manifestPostconditions, Is.EqualTo(87));
-        Assert.That(rows, Has.Count.EqualTo(manifestPostconditions));
-        var aggregate = new WorkerVcShadowReport("source-universe", "source-universe", WorkerCacheStatus.Disabled, [.. rows]);
-        Assert.That(aggregate.Enrolled, Is.EqualTo(86));
-        Assert.That(aggregate.Unenrolled, Is.EqualTo(1));
-        Assert.That(aggregate.Checked, Is.EqualTo(86));
-        Assert.That(aggregate.Unknown, Is.EqualTo(5));
-        Assert.That(aggregate.NewConditional, Is.EqualTo(2));
-        Assert.That(aggregate.SoundnessDisagreements, Is.Zero);
-        Assert.That(aggregate.CoverageComplete, Is.False);
-        await TestContext.Out.WriteLineAsync($"source-worker universe: sources={Universe.Length} posts={aggregate.Postconditions} enrolled={aggregate.Enrolled} checked={aggregate.Checked} unchecked={aggregate.Unchecked} unknown={aggregate.Unknown} disagreements={aggregate.SoundnessDisagreements} full-exit={aggregate.CoverageComplete}");
+        Assert.That(results, Has.Count.EqualTo(manifestPostconditions));
+        Assert.That(checks.Count(check => check.Enrolled), Is.EqualTo(86));
+        Assert.That(results.Count - checks.Count(check => check.Enrolled), Is.EqualTo(1));
+        Assert.That(checks.Count(check => check.Checked), Is.EqualTo(86));
+        Assert.That(results.Count(result => result.Outcome == WorkerClaimOutcome.Unknown), Is.EqualTo(5));
+        Assert.That(results.Count(result => result.Outcome == WorkerClaimOutcome.Proven &&
+            result.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.EqualTo(2));
+        await TestContext.Out.WriteLineAsync($"native source-worker universe: sources={Universe.Length} posts={results.Count} enrolled={checks.Count(check => check.Enrolled)} checked={checks.Count(check => check.Checked)} unknown={results.Count(result => result.Outcome == WorkerClaimOutcome.Unknown)}");
     }
 
     [Test]
@@ -374,48 +374,63 @@ public sealed class WorkerVcShadowSourceGateTests
             using SharpProof.Attributes;
             public static class Subject { [EnforcePure] public static int Target(int x) { return x; } }
             """);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Manifest.Claims, Is.Not.Empty);
-        Assert.That(report, Is.Not.Null);
-        Assert.That(report!.Postconditions, Is.Zero);
-        Assert.That(report.Enrolled, Is.Zero);
-        Assert.That(report.Checked, Is.Zero);
-        Assert.That(report.CoverageComplete, Is.False);
+        Assert.That(response.Manifest.Claims.Any(claim => claim.Kind == WorkerClaimKind.Postcondition), Is.False);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+        var checks = new List<TotalCallableClaimCheck>();
+        foreach (var preparation in project.Snapshot.Callables)
+        {
+            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, checks.Add, CancellationToken.None);
+        }
+        Assert.That(checks, Is.Empty);
     }
 
-    private static void AssertReport(WorkerVcShadowReport report, WorkerVerifyResponse response, ShadowTestProject project, ShadowSourceCase sourceCase)
+    private static WorkerClaimResult[] AssertNativeResults(WorkerVerifyResponse response, ShadowTestProject project, ShadowSourceCase sourceCase,
+        IReadOnlyDictionary<string, TotalCallableClaimCheck> checks)
     {
         var validation = WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest);
         Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
-        Assert.That(report.InputHash, Is.EqualTo(response.InputHash), sourceCase.Name);
-        Assert.That(report.RequestHash, Is.EqualTo(response.RequestHash), sourceCase.Name);
-        Assert.That(report.Rows.Select(row => row.ClaimId), Is.EquivalentTo(response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).Select(claim => claim.ClaimId)));
-        var ordinals = response.Manifest.Claims.ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-        Assert.That(report.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewOutcome), Is.EqualTo(sourceCase.Outcomes), sourceCase.Name);
-        if (sourceCase.Reasons.IsDefault)
-        { Assert.That(report.Rows.Select(row => row.NewReason), Is.All.EqualTo(sourceCase.Reason), sourceCase.Name); }
+        Assert.That(response.Errors, Is.Empty, sourceCase.Name);
+        var ordinals = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+            .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+        if (sourceCase.TotalPresent)
+        { Assert.That(checks.Keys, Is.EquivalentTo(ordinals.Keys), sourceCase.Name); }
         else
-        { Assert.That(report.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewReason), Is.EqualTo(sourceCase.Reasons), sourceCase.Name); }
-        Assert.That(report.Rows.Select(row => row.NewVacuity), Is.All.EqualTo(sourceCase.Vacuity), sourceCase.Name);
-        Assert.That(report.Rows.Select(row => row.TotalPresent), Is.All.EqualTo(sourceCase.TotalPresent), sourceCase.Name);
-        Assert.That(report.Rows.Select(row => row.NewConditional), Is.All.EqualTo(sourceCase.Conditional), sourceCase.Name);
+        { Assert.That(checks, Is.Empty, sourceCase.Name); }
+        var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
+        Assert.That(posts.Select(result => result.ClaimId), Is.EquivalentTo(ordinals.Keys), sourceCase.Name);
+        Assert.That(posts.Select(result => result.Outcome), Is.EqualTo(sourceCase.Outcomes), sourceCase.Name);
+        if (sourceCase.Reasons.IsDefault)
+        { Assert.That(posts.Select(result => result.Reason), Is.All.EqualTo(sourceCase.Reason), sourceCase.Name); }
+        else
+        { Assert.That(posts.Select(result => result.Reason), Is.EqualTo(sourceCase.Reasons), sourceCase.Name); }
+        Assert.That(posts.Select(result => result.Vacuity), Is.All.EqualTo(sourceCase.Vacuity), sourceCase.Name);
+        Assert.That(project.Snapshot.Callables.Select(preparation => preparation.Total != null), Is.All.EqualTo(sourceCase.TotalPresent), sourceCase.Name);
+        Assert.That(posts.Select(result => result.Outcome == WorkerClaimOutcome.Proven &&
+            result.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)),
+            Is.All.EqualTo(sourceCase.Conditional), sourceCase.Name);
         if (sourceCase.Checked is { } checkedValue)
-        { Assert.That(report.Rows.Select(row => row.Checked), Is.All.EqualTo(checkedValue), sourceCase.Name); }
-        foreach (var row in report.Rows)
+        { Assert.That(checks.Values.Select(check => check.Checked), Is.All.EqualTo(checkedValue), sourceCase.Name); }
+        foreach (var post in posts)
         {
-            var old = response.ClaimResults.Single(claim => claim.ClaimId == row.ClaimId);
-            Assert.That(row.OldOutcome, Is.EqualTo(old.Outcome));
-            Assert.That(row.OldVacuity, Is.EqualTo(old.Vacuity));
-            Assert.That(row.OldAssumptions.Select(assumption => (assumption.Id, assumption.Kind, assumption.Used)),
-                Is.EqualTo(old.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).Select(assumption => (assumption.Id, assumption.Kind, assumption.Used))));
+            if (checks.TryGetValue(post.ClaimId, out var check))
+            {
+                var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.ClaimIds.Contains(post.ClaimId));
+                var expected = CallableClaimResultAssembler.FromTotal(preparation, check);
+                Assert.That((post.Outcome, post.Reason, post.Vacuity), Is.EqualTo((expected.Outcome, expected.Reason, expected.Vacuity)), sourceCase.Name);
+            }
+            else
+            {
+                Assert.That(post.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown), sourceCase.Name);
+                Assert.That(post.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable), sourceCase.Name);
+            }
+            if (post.Outcome == WorkerClaimOutcome.Refuted)
+            { Assert.That(post.Model, Is.Not.Empty, sourceCase.Name); }
         }
-        using var json = JsonDocument.Parse(report.Serialize()[WorkerVcShadowReport.Prefix.Length..]);
-        Assert.That(json.RootElement.GetProperty("authority").GetString(), Is.EqualTo("legacy"));
-        Assert.That(report.Serialize(), Does.Not.Contain("entryModel").And.Not.Contain("sourceText").And.Not.Contain("program"));
+        return posts;
     }
 }
 

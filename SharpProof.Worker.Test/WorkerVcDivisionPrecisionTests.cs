@@ -28,7 +28,6 @@ public sealed class WorkerVcDivisionPrecisionTests
         var source = kind == "constant"
             ? WorkerVcShadowSourceGateTests.Universe.Single(item => item.Name == "general-division-budget").Source
             : VariableSource;
-        using var environment = new ShadowEnvironment("shadow");
         var trials = new List<DivisionTrial>();
         string[] structure = [];
         for (var trial = 0; trial < 3; trial++)
@@ -53,23 +52,22 @@ public sealed class WorkerVcDivisionPrecisionTests
             var workerWatch = Stopwatch.StartNew();
             using var workerProject = new ShadowTestProject(source);
             var workerSetupMilliseconds = workerWatch.Elapsed.TotalMilliseconds;
-            using var worker = workerProject.CreateLegacyWorker(workerProject.Request.Budgets);
-            WorkerVcShadowReport? report = null;
-            worker.ShadowReportSink = value => report = value;
+            using var worker = SharpProofWorker.Create(workerProject.Request.Budgets);
             var response = await worker.VerifyAsync(workerProject.Request, workerProject.Snapshot, CancellationToken.None);
             workerWatch.Stop();
             endToEnd.Stop();
             Assert.That(WorkerProtocolJson.Validate(response, workerProject.Bind().InputHash, response.Manifest).IsValid, Is.True);
-            Assert.That(report, Is.Not.Null);
+            Assert.That(response.Errors, Is.Empty);
+            var result = Postconditions(response).Single();
             Assert.That(entry.Outcome, Is.EqualTo(nameof(RefutedOutcome)));
             Assert.That(normal.Outcome, Is.EqualTo(nameof(RefutedOutcome)));
             Assert.That(ensures.Outcome, Is.EqualTo(nameof(ProvenOutcome)));
             Assert.That(ensures.Reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(report!.Rows.Single().NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(report.Rows.Single().NewReason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             trials.Add(new(entry, normal, ensures, solver.ConsumedResourceCount, query.Assumptions.Length, query.ModelVariables.Length,
                 standaloneMilliseconds, workerWatch.Elapsed.TotalMilliseconds - workerSetupMilliseconds, workerWatch.Elapsed.TotalMilliseconds,
-                report.Rows.Single().OldOutcome, report.Rows.Single().NewOutcome, report.Rows.Single().NewReason));
+                result.Outcome, result.Reason));
 
             async Task<DivisionQuery> Query(Func<CancellationToken, Task<PassiveCallableCheckResult>> check)
             {
@@ -85,7 +83,8 @@ public sealed class WorkerVcDivisionPrecisionTests
         {
             var evidence = new
             {
-                schemaVersion = 1,
+                schemaVersion = 2,
+                authority = "native",
                 kind,
                 queryRlimit = WorkerBudgets.DefaultQueryRlimit,
                 methodRlimit = WorkerBudgets.DefaultMethodRlimit,
@@ -111,20 +110,25 @@ public sealed class WorkerVcDivisionPrecisionTests
                 return unchecked(x + x++);
             } }
             """);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        Assert.That(report, Is.Not.Null);
-        Assert.That(report!.Rows, Has.Length.EqualTo(2));
-        Assert.That(report.Rows.Select(row => row.NewOutcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(report.Rows.Select(row => row.NewReason), Is.All.EqualTo(WorkerClaimReason.None));
+        Assert.That(response.Errors, Is.Empty);
+        var posts = Postconditions(response);
+        Assert.That(posts, Has.Length.EqualTo(2));
+        Assert.That(posts.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(posts.Select(result => result.Reason), Is.All.EqualTo(WorkerClaimReason.None));
+    }
+
+    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response)
+    {
+        var ids = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+            .Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToArray();
     }
 
     private sealed record DivisionQuery(string Outcome, WorkerClaimReason Reason, long Resources, double Milliseconds);
     private sealed record DivisionTrial(DivisionQuery Entry, DivisionQuery Normal, DivisionQuery Ensures,
         long MethodResources, int Facts, int ModelVariables, double StandaloneMilliseconds, double WorkerMilliseconds,
-        double EndToEndMilliseconds, WorkerClaimOutcome OldOutcome, WorkerClaimOutcome NewOutcome, WorkerClaimReason NewReason);
+        double EndToEndMilliseconds, WorkerClaimOutcome NativeOutcome, WorkerClaimReason NativeReason);
 }

@@ -100,23 +100,16 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(1)));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            var row = report!.Rows.Single();
-            Assert.That(row.TotalPresent, Is.True);
-            Assert.That(row.Enrolled, Is.True);
-            Assert.That(row.Checked, Is.True);
-            Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(report.CoverageComplete, Is.True);
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            var post = Postconditions(response, target.Entry.CallableId).Single();
+            Assert.That(post.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(post.Model, Is.Not.Empty);
         }
     }
 
@@ -174,23 +167,17 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(capture ? 33 : 1)));
         Assert.That(execution.GetCurrentValue(target.Total.Parameters[0].Current)!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(capture ? 4 : 0)));
         Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>(), Is.Empty);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            var ordinals = response.Manifest.Claims.ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-            Assert.That(report!.Postconditions, Is.EqualTo(2));
-            Assert.That(report.Enrolled, Is.EqualTo(2));
-            Assert.That(report.Checked, Is.EqualTo(2));
-            Assert.That(report.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewOutcome),
+            var posts = Postconditions(response, target.Entry.CallableId);
+            Assert.That(posts.Select(result => result.Outcome),
                 Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
 
@@ -233,20 +220,26 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            Assert.That(report!.Checked, Is.EqualTo(2));
-            Assert.That(report.Unknown, Is.Zero);
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            var posts = Postconditions(response, target.Entry.CallableId);
+            Assert.That(posts.Select(result => result.Outcome),
+                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Assert.That(posts[1].Model, Is.Not.Empty);
         }
+    }
+
+    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response, string callableId)
+    {
+        Assert.That(response.Errors, Is.Empty);
+        var ordinals = response.Manifest.Claims.Where(claim => claim.CallableId == callableId && claim.Kind == WorkerClaimKind.Postcondition)
+            .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
     }
 
     [TestCase(false)]
