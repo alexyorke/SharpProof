@@ -1,10 +1,7 @@
-authority: legacy
+authority: native
 budget: actual native meter
 entry-and-normal: Feasible
 enrolled: True
 checked: False
 reason: ResourceLimit
-old-outcome: Proven
-new-outcome: Unknown
-unchecked: 1
-coverageComplete: False
+outcome: Unknown

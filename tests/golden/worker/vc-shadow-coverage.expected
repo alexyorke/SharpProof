@@ -1,136 +1,92 @@
 run: normal
-authority: legacy
+authority: native
 request-bindings: True
 cache: Written
 postconditions: 4
 enrolled: 4
 checked: 4
-unchecked: 0
-unenrolled: 0
 unknown: 0
-oldProven: 1
-newProven: 3
-oldVacuous: 0
-newVacuous: 0
-oldConditional: 1
-newConditional: 1
-soundnessDisagreements: 0
-precisionGains: 2
-precisionLosses: 0
-coverageComplete: True
+proven: 3
+refuted: 1
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.BAssume(System.Int32)~System.Int32#0
-  oldOutcome: Proven
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: True
-  newConditional: True
+  conditional: True
 row: M:Subject.CLoop(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DCall(System.Int32)~System.Int32#0
-  oldOutcome: Refuted
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 run: cache-hit
-authority: legacy
+authority: native
 request-bindings: True
 cache: Hit
 postconditions: 4
 enrolled: 4
 checked: 4
-unchecked: 0
-unenrolled: 0
 unknown: 0
-oldProven: 1
-newProven: 3
-oldVacuous: 0
-newVacuous: 0
-oldConditional: 1
-newConditional: 1
-soundnessDisagreements: 0
-precisionGains: 2
-precisionLosses: 0
-coverageComplete: True
+proven: 3
+refuted: 1
 row: M:Subject.AUlong(System.UInt64)~System.UInt64#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.BAssume(System.Int32)~System.Int32#0
-  oldOutcome: Proven
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: True
-  newConditional: True
+  conditional: True
 row: M:Subject.CLoop(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DCall(System.Int32)~System.Int32#0
-  oldOutcome: Refuted
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False

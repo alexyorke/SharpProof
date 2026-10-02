@@ -1,64 +1,38 @@
 run: normal
-authority: legacy
+authority: native
 request-bindings: True
 cache: Written
 postconditions: 1
 enrolled: 0
 checked: 0
-unchecked: 1
-unenrolled: 1
 unknown: 1
-oldProven: 0
-newProven: 0
-oldVacuous: 0
-newVacuous: 0
-oldConditional: 0
-newConditional: 0
-soundnessDisagreements: 0
-precisionGains: 0
-precisionLosses: 0
-coverageComplete: False
+proven: 0
+refuted: 0
 row: M:Subject.Target(System.Int32)#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: False
   enrolled: False
   checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
-  newVacuity: None
+  outcome: Unknown
+  reason: UnsupportedCallable
+  vacuity: None
   feasibility: Unknown
-  oldConditional: False
-  newConditional: False
+  conditional: False
 run: cache-hit
-authority: legacy
+authority: native
 request-bindings: True
 cache: Hit
 postconditions: 1
 enrolled: 0
 checked: 0
-unchecked: 1
-unenrolled: 1
 unknown: 1
-oldProven: 0
-newProven: 0
-oldVacuous: 0
-newVacuous: 0
-oldConditional: 0
-newConditional: 0
-soundnessDisagreements: 0
-precisionGains: 0
-precisionLosses: 0
-coverageComplete: False
+proven: 0
+refuted: 0
 row: M:Subject.Target(System.Int32)#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: False
   enrolled: False
   checked: False
-  newOutcome: Unknown
-  newReason: UnsupportedBody
-  newVacuity: None
+  outcome: Unknown
+  reason: UnsupportedCallable
+  vacuity: None
   feasibility: Unknown
-  oldConditional: False
-  newConditional: False
+  conditional: False

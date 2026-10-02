@@ -1,376 +1,272 @@
 run: normal
-authority: legacy
+authority: native
 request-bindings: True
 cache: Written
 postconditions: 14
 enrolled: 14
 checked: 14
-unchecked: 0
-unenrolled: 0
 unknown: 0
-oldProven: 0
-newProven: 9
-oldVacuous: 0
-newVacuous: 1
-oldConditional: 0
-newConditional: 1
-soundnessDisagreements: 0
-precisionGains: 12
-precisionLosses: 0
-coverageComplete: True
+proven: 9
+refuted: 5
 row: M:Subject.ASearchBeforeUnwind(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.ASearchBeforeUnwind(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
-row: M:Subject.BFilterFaultEffects(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.BFilterFaultEffects(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
+row: M:Subject.BFilterFaultEffects(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
 row: M:Subject.CNestedCapturedReturn(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.CNestedCapturedReturn(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DFinallyReplacesSelectedHandler(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DFinallyReplacesSelectedHandler(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.ESiblingFinally(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.FAssumeBeforeFilter(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: True
+  conditional: True
 row: M:Subject.GExplicitFilterThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.HHandlerBeforeOuterFinally(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.IRepeatedFilterClosed(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.JFaultingFilterAllThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: NoModeledNormalReturn
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
   feasibility: NoModeledNormalReturn
-  oldConditional: False
-  newConditional: False
+  conditional: False
 run: cache-hit
-authority: legacy
+authority: native
 request-bindings: True
 cache: Hit
 postconditions: 14
 enrolled: 14
 checked: 14
-unchecked: 0
-unenrolled: 0
 unknown: 0
-oldProven: 0
-newProven: 9
-oldVacuous: 0
-newVacuous: 1
-oldConditional: 0
-newConditional: 1
-soundnessDisagreements: 0
-precisionGains: 12
-precisionLosses: 0
-coverageComplete: True
+proven: 9
+refuted: 5
 row: M:Subject.ASearchBeforeUnwind(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.ASearchBeforeUnwind(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
-row: M:Subject.BFilterFaultEffects(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
-  totalPresent: True
-  enrolled: True
-  checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
-  feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.BFilterFaultEffects(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
+row: M:Subject.BFilterFaultEffects(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
 row: M:Subject.CNestedCapturedReturn(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.CNestedCapturedReturn(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DFinallyReplacesSelectedHandler(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DFinallyReplacesSelectedHandler(System.Int32)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.ESiblingFinally(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.FAssumeBeforeFilter(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: True
+  conditional: True
 row: M:Subject.GExplicitFilterThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.HHandlerBeforeOuterFinally(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.IRepeatedFilterClosed(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.JFaultingFilterAllThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: NoModeledNormalReturn
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
   feasibility: NoModeledNormalReturn
-  oldConditional: False
-  newConditional: False
+  conditional: False

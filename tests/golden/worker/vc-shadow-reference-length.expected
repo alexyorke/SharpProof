@@ -1,88 +1,56 @@
 run: normal
-authority: legacy
+authority: native
 request-bindings: True
 cache: Written
 postconditions: 2
 enrolled: 2
 checked: 2
-unchecked: 0
-unenrolled: 0
 unknown: 0
-oldProven: 0
-newProven: 1
-oldVacuous: 0
-newVacuous: 0
-oldConditional: 0
-newConditional: 0
-soundnessDisagreements: 0
-precisionGains: 2
-precisionLosses: 0
-coverageComplete: True
+proven: 1
+refuted: 1
 row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 run: cache-hit
-authority: legacy
+authority: native
 request-bindings: True
 cache: Hit
 postconditions: 2
 enrolled: 2
 checked: 2
-unchecked: 0
-unenrolled: 0
 unknown: 0
-oldProven: 0
-newProven: 1
-oldVacuous: 0
-newVacuous: 0
-oldConditional: 0
-newConditional: 0
-soundnessDisagreements: 0
-precisionGains: 2
-precisionLosses: 0
-coverageComplete: True
+proven: 1
+refuted: 1
 row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#1
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Refuted
-  newReason: None
-  newVacuity: None
+  outcome: Refuted
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False

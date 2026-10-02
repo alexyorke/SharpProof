@@ -1,8 +1,9 @@
-authority: legacy
-boundary: caller canceled after completed observation
+authority: native
+boundary: caller canceled after completed verification
 completed-run: Complete
-observed-checks: 1
+completed-outcome: Proven
+canceled-run: Canceled
 cache: Disabled
 next-run: Complete
 next-failure: None
-same-backend-checks: 2
+same-backend-outcome: Proven

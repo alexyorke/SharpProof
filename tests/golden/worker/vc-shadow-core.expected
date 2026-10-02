@@ -1,160 +1,110 @@
 run: normal
-authority: legacy
+authority: native
 request-bindings: True
 cache: Written
 postconditions: 5
 enrolled: 5
 checked: 5
-unchecked: 0
-unenrolled: 0
 unknown: 1
-oldProven: 2
-newProven: 4
-oldVacuous: 1
-newVacuous: 2
-oldConditional: 0
-newConditional: 0
-soundnessDisagreements: 0
-precisionGains: 1
-precisionLosses: 0
-coverageComplete: True
+proven: 4
+refuted: 0
 row: M:Subject.AIdentity(System.Int32,System.Int32)~System.Int32#0
-  oldOutcome: Proven
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.BImpossible(System.Int32)~System.Int32#0
-  oldOutcome: Proven
-  oldVacuity: ContradictoryPreconditions
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: ContradictoryPreconditions
+  outcome: Proven
+  reason: None
+  vacuity: ContradictoryPreconditions
   feasibility: ContradictoryEntry
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.CAllThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: NoModeledNormalReturn
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
   feasibility: NoModeledNormalReturn
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DGuarded(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.EUnsafe(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Unknown
-  newReason: PostconditionMayBeUndefined
-  newVacuity: None
+  outcome: Unknown
+  reason: PostconditionMayBeUndefined
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 run: cache-hit
-authority: legacy
+authority: native
 request-bindings: True
 cache: Hit
 postconditions: 5
 enrolled: 5
 checked: 5
-unchecked: 0
-unenrolled: 0
 unknown: 1
-oldProven: 2
-newProven: 4
-oldVacuous: 1
-newVacuous: 2
-oldConditional: 0
-newConditional: 0
-soundnessDisagreements: 0
-precisionGains: 1
-precisionLosses: 0
-coverageComplete: True
+proven: 4
+refuted: 0
 row: M:Subject.AIdentity(System.Int32,System.Int32)~System.Int32#0
-  oldOutcome: Proven
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.BImpossible(System.Int32)~System.Int32#0
-  oldOutcome: Proven
-  oldVacuity: ContradictoryPreconditions
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: ContradictoryPreconditions
+  outcome: Proven
+  reason: None
+  vacuity: ContradictoryPreconditions
   feasibility: ContradictoryEntry
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.CAllThrow(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: NoModeledNormalReturn
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
   feasibility: NoModeledNormalReturn
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.DGuarded(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Proven
-  newReason: None
-  newVacuity: None
+  outcome: Proven
+  reason: None
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False
 row: M:Subject.EUnsafe(System.Int32)~System.Int32#0
-  oldOutcome: Unknown
-  oldVacuity: None
   totalPresent: True
   enrolled: True
   checked: True
-  newOutcome: Unknown
-  newReason: PostconditionMayBeUndefined
-  newVacuity: None
+  outcome: Unknown
+  reason: PostconditionMayBeUndefined
+  vacuity: None
   feasibility: Feasible
-  oldConditional: False
-  newConditional: False
+  conditional: False

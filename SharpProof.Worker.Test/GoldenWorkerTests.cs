@@ -41,15 +41,15 @@ public sealed class GoldenWorkerTests
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
             : scenario == "total-claim-results" ? await TotalClaimResults(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
-            : scenario == "vc-shadow" ? await VcShadow(fixture.Source)
-            : scenario == "vc-shadow-reference" ? await VcShadow(fixture.Source, stableClaimOrder: true)
-            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => VcShadow(artifact))
+            : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
+            : scenario == "vc-shadow-reference" ? await NativeVc(fixture.Source)
+            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => NativeVc(artifact))
             : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => TotalArtifact(artifact))
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
             : scenario == "vc-exception-multi-entry" ? await VcExceptionMultiEntry()
             : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
-            : scenario == "vc-shadow-meter-boundary" ? await VcShadowMeterBoundary(fixture.Source)
-            : scenario == "vc-shadow-completed-boundary" ? await VcShadowCompletedBoundary(fixture.Source)
+            : scenario == "vc-shadow-meter-boundary" ? await NativeMeterBoundary(fixture.Source)
+            : scenario == "vc-shadow-completed-boundary" ? await NativeCompletedBoundary(fixture.Source)
             : scenario == "model-boolean" ? await BooleanModels()
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
@@ -138,49 +138,84 @@ public sealed class GoldenWorkerTests
         return output.ToString();
     }
 
-    private static async Task<string> VcShadowMeterBoundary(string source)
+    private static async Task<string> NativeMeterBoundary(string source)
     {
-        var report = await WorkerVcShadowTests.MeterRefusal(source);
-        var row = report.Rows.Single();
+        using var project = new ShadowTestProject(source);
+        var preparation = project.Snapshot.Callables.Single();
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason), Is.True, reason.ToString());
+        long entryCost;
+        long normalCost;
+        using (var probe = new PassiveCallableSolver(plan!))
+        {
+            Assert.That((await probe.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+            entryCost = probe.ConsumedResourceCount;
+            Assert.That((await probe.VerifyNormalCompletionAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+            normalCost = probe.ConsumedResourceCount - entryCost;
+        }
+        Assert.That(normalCost, Is.GreaterThan(0));
+        project.Request.Budgets.MethodRlimit = checked((uint)(project.Request.Budgets.QueryRlimit + entryCost + normalCost / 2));
+        TotalCallableClaimCheck? check = null;
+        await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, value => check = value, CancellationToken.None);
+        Assert.That(check, Is.Not.Null);
+        Assert.That(check!.Feasibility, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That(check.Enrolled, Is.True);
+        Assert.That(check.Checked, Is.False);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+        var result = response.ClaimResults.Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         var output = new StringBuilder();
-        output.AppendLine("authority: legacy");
+        output.AppendLine("authority: native");
         output.AppendLine("budget: actual native meter");
-        output.AppendLine("entry-and-normal: " + row.Feasibility);
-        output.AppendLine("enrolled: " + row.Enrolled);
-        output.AppendLine("checked: " + row.Checked);
-        output.AppendLine("reason: " + row.NewReason);
-        output.AppendLine("old-outcome: " + row.OldOutcome);
-        output.AppendLine("new-outcome: " + row.NewOutcome);
-        output.AppendLine("unchecked: " + report.Unchecked);
-        output.AppendLine("coverageComplete: " + report.CoverageComplete);
+        output.AppendLine("entry-and-normal: " + check.Feasibility);
+        output.AppendLine("enrolled: " + check.Enrolled);
+        output.AppendLine("checked: " + check.Checked);
+        output.AppendLine("reason: " + result.Reason);
+        output.AppendLine("outcome: " + result.Outcome);
         return output.ToString();
     }
 
-    private static async Task<string> VcShadowCompletedBoundary(string source)
+    private static async Task<string> NativeCompletedBoundary(string source)
     {
-        var result = await WorkerVcShadowTests.CompletedBoundary(source, projectTimeout: false);
+        using var project = new ShadowTestProject(source);
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        using var backend = new NativeCallableBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
+        using var worker = new SharpProofWorker(backend);
+        using var cancellation = new CancellationTokenSource();
+        var completed = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
+        await cancellation.CancelAsync();
+        var canceled = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
+        var next = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        foreach (var response in new[] { completed, canceled, next })
+        { Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True); }
+        Assert.That(completed.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(canceled.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
+        Assert.That(next.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         var output = new StringBuilder();
-        output.AppendLine("authority: legacy");
-        output.AppendLine("boundary: caller canceled after completed observation");
-        output.AppendLine("completed-run: " + result.Completed.RunStatus);
-        output.AppendLine("observed-checks: " + result.Report.Checked);
-        output.AppendLine("cache: " + result.Completed.Summary.CacheStatus);
-        output.AppendLine("next-run: " + result.Next.RunStatus);
-        output.AppendLine("next-failure: " + result.Next.FailureReason);
-        output.AppendLine("same-backend-checks: " + result.Checks);
+        output.AppendLine("authority: native");
+        output.AppendLine("boundary: caller canceled after completed verification");
+        output.AppendLine("completed-run: " + completed.RunStatus);
+        output.AppendLine("completed-outcome: " + completed.ClaimResults.Single().Outcome);
+        output.AppendLine("canceled-run: " + canceled.RunStatus);
+        output.AppendLine("cache: " + completed.Summary.CacheStatus);
+        output.AppendLine("next-run: " + next.RunStatus);
+        output.AppendLine("next-failure: " + next.FailureReason);
+        output.AppendLine("same-backend-outcome: " + next.ClaimResults.Single().Outcome);
         return output.ToString();
     }
 
-    private static async Task<string> VcShadow(string source, bool stableClaimOrder = false)
+    private static async Task<string> NativeVc(string source)
     {
         using var project = new ShadowTestProject(source, cacheEnabled: true);
-        return await VcShadow(project, stableClaimOrder);
+        return await NativeVc(project);
     }
 
-    private static async Task<string> VcShadow(CompilerManifestArtifact artifact)
+    private static async Task<string> NativeVc(CompilerManifestArtifact artifact)
     {
         using var project = new ShadowTestProject(artifact, cacheEnabled: true);
-        return await VcShadow(project, stableClaimOrder: true);
+        return await NativeVc(project);
     }
 
     private static async Task<string> TypedIlGolden(string source, Func<CompilerManifestArtifact, Task<string>> render)
@@ -192,55 +227,68 @@ public sealed class GoldenWorkerTests
         return await render(subject.CreateArtifact());
     }
 
-    private static async Task<string> VcShadow(ShadowTestProject project, bool stableClaimOrder = false)
+    private static async Task<string> NativeVc(ShadowTestProject project)
     {
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        using var errors = new StringWriter(CultureInfo.InvariantCulture);
-        var previous = Console.Error;
-        var output = new StringBuilder();
-        try
+        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        foreach (var preparation in project.Snapshot.Callables)
         {
-            Console.SetError(errors);
-            foreach (var run in new[] { "normal", "cache-hit" })
+            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
+                check => checks[check.ClaimId] = check, CancellationToken.None);
+        }
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var output = new StringBuilder();
+        WorkerClaimResult[]? original = null;
+        foreach (var run in new[] { "normal", "cache-hit" })
+        {
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+            if (original != null)
             {
-                var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-                var line = errors.ToString().TrimEnd('\r', '\n');
-                Assert.That(line, Does.StartWith(WorkerVcShadowReport.Prefix));
-                Assert.That(line.Count(character => character == '\n'), Is.Zero);
-                using var report = JsonDocument.Parse(line[WorkerVcShadowReport.Prefix.Length..]);
-                var json = report.RootElement;
-                Assert.That(json.GetProperty("inputHash").GetString(), Is.EqualTo(response.InputHash));
-                Assert.That(json.GetProperty("requestHash").GetString(), Is.EqualTo(response.RequestHash));
-                Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-                output.AppendLine("run: " + run);
-                output.AppendLine("authority: " + json.GetProperty("authority").GetString());
-                output.AppendLine("request-bindings: True");
-                output.AppendLine("cache: " + response.Summary.CacheStatus);
-                foreach (var property in new[] { "postconditions", "enrolled", "checked", "unchecked", "unenrolled", "unknown", "oldProven", "newProven", "oldVacuous", "newVacuous", "oldConditional", "newConditional", "soundnessDisagreements", "precisionGains", "precisionLosses" })
-                { output.AppendLine(property + ": " + json.GetProperty(property).GetInt32()); }
-                output.AppendLine("coverageComplete: " + json.GetProperty("coverageComplete").GetBoolean());
-                var rows = json.GetProperty("rows").EnumerateArray().ToArray();
-                if (stableClaimOrder)
+                Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+                Assert.That(JsonSerializer.Serialize(response.ClaimResults, WorkerProtocolJson.SharedOptions),
+                    Is.EqualTo(JsonSerializer.Serialize(original, WorkerProtocolJson.SharedOptions)));
+            }
+            original = response.ClaimResults;
+            var claims = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+            var ids = claims.Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
+            var results = response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToDictionary(result => result.ClaimId, StringComparer.Ordinal);
+            Assert.That(results.Keys, Is.EquivalentTo(ids));
+            output.AppendLine("run: " + run);
+            output.AppendLine("authority: native");
+            output.AppendLine("request-bindings: True");
+            output.AppendLine("cache: " + response.Summary.CacheStatus);
+            output.AppendLine("postconditions: " + claims.Length);
+            output.AppendLine("enrolled: " + checks.Values.Count(check => check.Enrolled));
+            output.AppendLine("checked: " + checks.Values.Count(check => check.Checked));
+            output.AppendLine("unknown: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Unknown));
+            output.AppendLine("proven: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Proven));
+            output.AppendLine("refuted: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Refuted));
+            // Artifact claim hashes can include temporary metadata document paths.
+            // Callable identity and source ordinal give every fixture stable ordering.
+            var ordered = claims.OrderBy(claim => claim.CallableId, StringComparer.Ordinal).ThenBy(claim => claim.Ordinal);
+            foreach (var claim in ordered)
+            {
+                var result = results[claim.ClaimId];
+                var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == claim.CallableId);
+                checks.TryGetValue(claim.ClaimId, out var check);
+                if (check != null)
                 {
-                    // Metadata fixtures use captured temporary document paths. Their claim
-                    // hashes vary, so render original callable/ordinal instead of hash order.
-                    var claims = response.Manifest.Claims.ToDictionary(claim => claim.ClaimId, StringComparer.Ordinal);
-                    rows = [.. rows.OrderBy(row => claims[row.GetProperty("claimId").GetString()!].CallableId, StringComparer.Ordinal)
-                        .ThenBy(row => claims[row.GetProperty("claimId").GetString()!].Ordinal)];
+                    var expected = CallableClaimResultAssembler.FromTotal(preparation, check);
+                    Assert.That((result.Outcome, result.Reason, result.Vacuity), Is.EqualTo((expected.Outcome, expected.Reason, expected.Vacuity)));
                 }
-                foreach (var row in rows)
-                {
-                    var claim = response.Manifest.Claims.Single(claim => claim.ClaimId == row.GetProperty("claimId").GetString());
-                    output.AppendLine("row: " + claim.CallableId + "#" + claim.Ordinal);
-                    foreach (var property in new[] { "oldOutcome", "oldVacuity", "totalPresent", "enrolled", "checked", "newOutcome", "newReason", "newVacuity", "feasibility", "oldConditional", "newConditional" })
-                    { output.AppendLine("  " + property + ": " + row.GetProperty(property)); }
-                }
-                errors.GetStringBuilder().Clear();
+                output.AppendLine("row: " + claim.CallableId + "#" + claim.Ordinal);
+                output.AppendLine("  totalPresent: " + (preparation.Total != null));
+                output.AppendLine("  enrolled: " + (check?.Enrolled ?? false));
+                output.AppendLine("  checked: " + (check?.Checked ?? false));
+                output.AppendLine("  outcome: " + result.Outcome);
+                output.AppendLine("  reason: " + result.Reason);
+                output.AppendLine("  vacuity: " + result.Vacuity);
+                output.AppendLine("  feasibility: " + (check?.Feasibility ?? PassiveCallableFeasibilityKind.Unknown));
+                output.AppendLine("  conditional: " + result.Assumptions.Any(assumption => assumption.Used &&
+                    assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification));
             }
         }
-        finally
-        { Console.SetError(previous); }
         return output.ToString();
     }
 
