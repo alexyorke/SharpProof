@@ -11,6 +11,7 @@ internal static partial class CSharpOperationSemantics
             IrExceptionKind.NullReference => "System.NullReferenceException",
             IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
             IrExceptionKind.InvalidCast => "System.InvalidCastException",
+            IrExceptionKind.Argument => "System.ArgumentException",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
@@ -26,7 +27,7 @@ internal static partial class CSharpOperationSemantics
             // Roslyn represents a bare catch with the canonical System.Object.
             "System.Object", "System.Exception", "System.SystemException", "System.ArithmeticException",
             "System.DivideByZeroException", "System.OverflowException", "System.NullReferenceException",
-            "System.IndexOutOfRangeException", "System.InvalidCastException"
+            "System.IndexOutOfRangeException", "System.InvalidCastException", "System.ArgumentException"
         };
         if (catchType != null && !supported.Any(name =>
                 SymbolEqualityComparer.Default.Equals(core.GetTypeByMetadataName(name), catchType)))

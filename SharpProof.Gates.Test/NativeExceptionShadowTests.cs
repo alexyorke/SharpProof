@@ -28,6 +28,20 @@ public sealed class NativeExceptionShadowTests
         Assert.That(report.RuntimeContradictions, Is.Zero);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task DelegateEmissionModesDoNotManufactureExceptionWitnesses(bool escapes)
+    {
+        var source = escapes
+            ? "public static class C { public static System.Func<string> Target(int x) { return new System.Func<string>(((string)null).Trim); } }"
+            : "public static class C { public static int Target(int x) { System.Func<string> action = new System.Func<string>(((string)null).Trim); return x; } }";
+        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), CancellationToken.None),
+            ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(escapes ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown));
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(escapes ? "Confirmed" : "NotRun"));
+        Assert.That(report.RuntimeContradictions, Is.Zero);
+    }
+
     [Test]
     public async Task PinnedUniverseIsExhaustivelyComparedWithoutOracleContradictions()
     {
@@ -139,6 +153,7 @@ public sealed class NativeExceptionShadowTests
     [TestCase("object value = x; return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Refuted)]
+    [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Unknown)]
     public async Task AllocationShadowMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome)
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
@@ -264,6 +279,7 @@ public sealed class NativeExceptionShadowTests
     [TestCase("object value = x; return x;", WorkerClaimOutcome.Proven)]
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Proven)]
     [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Proven)]
     public async Task PurityShadowUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");

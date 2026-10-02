@@ -29,6 +29,7 @@ internal static partial class CSharpOperationSemantics
             IDynamicInvocationOperation or
             IFunctionPointerInvocationOperation or
             IObjectCreationOperation or
+            IDelegateCreationOperation or
             IArrayCreationOperation or
             IArrayElementReferenceOperation or
             IPropertyReferenceOperation or

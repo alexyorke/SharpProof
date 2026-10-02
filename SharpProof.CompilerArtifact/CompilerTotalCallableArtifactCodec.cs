@@ -296,8 +296,7 @@ internal static class CompilerTotalCallableArtifactCodec
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var instruction in block.Instructions)
             {
-                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Lock or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
-                    IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
+                Require(IsSourceInstruction(program, instruction, result, parameters),
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
                 {
@@ -319,6 +318,21 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             pendingThrows[block] = !pendingThrows.TryGetValue(block, out var previous) ? pending : previous && pending;
         }
+    }
+
+    private static bool IsSourceInstruction(IrProgram program, IrInstruction instruction, IrVarId? result,
+        IEnumerable<CompilerTotalParameter> parameters)
+    {
+        if (instruction is IrHavocInstruction havoc)
+        {
+            return havoc.HavocKind == IrHavocKind.Variables && havoc.Origin == IrHavocOrigin.Approximation &&
+                havoc.Variables.Length == 1 && program.Factory.GetVariableInfo(havoc.Variables[0]).Type == program.Factory.BooleanType &&
+                havoc.Variables[0] != result && !parameters.Any(parameter => havoc.Variables[0] == parameter.Entry ||
+                    havoc.Variables[0] == parameter.Current || havoc.Variables[0] == parameter.Old);
+        }
+        return instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Lock or IrInstructionKind.Assign or
+            IrInstructionKind.Branch or IrInstructionKind.Goto or IrInstructionKind.Return or IrInstructionKind.Throw or
+            IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume;
     }
 
     private static void ValidateBodyAbstraction(IrProgram program, IrVarId? result,
@@ -385,8 +399,7 @@ internal static class CompilerTotalCallableArtifactCodec
             foreach (var instruction in block.Instructions)
             {
                 Spend();
-                Require(instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Lock or IrInstructionKind.Assign or IrInstructionKind.Branch or IrInstructionKind.Goto or
-                    IrInstructionKind.Return or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume,
+                Require(IsSourceInstruction(program, instruction, result, parameters),
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
                 { Require(returned.Value?.Type == resultType, "The Total return type disagrees with its canonical result."); }

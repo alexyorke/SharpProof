@@ -8,6 +8,14 @@ namespace SharpProof.Ir.Test;
 public sealed class IrTotalExecutionTests
 {
     [Test]
+    public void ArgumentFaultClassificationDoesNotCollapseOtherArgumentExceptions()
+    {
+        Assert.That(IrExceptionKindFacts.FromException(new ArgumentException()), Is.EqualTo(IrExceptionKind.Argument));
+        Assert.That(IrExceptionKindFacts.FromException(new ArgumentNullException()), Is.Null);
+        Assert.That(IrExceptionKindFacts.FromException(new ArgumentOutOfRangeException()), Is.Null);
+    }
+
+    [Test]
     public void RuntimeEmptyStringConstructionPreservesCanonicalIdentity()
     {
         Assert.That(new string(Array.Empty<char>()), Is.SameAs(string.Empty));

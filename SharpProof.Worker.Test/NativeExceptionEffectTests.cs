@@ -10,6 +10,24 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeExceptionEffectTests
 {
+    [TestCase("System.ArgumentException", true)]
+    [TestCase("System.SystemException", true)]
+    [TestCase("System.ArithmeticException", false)]
+    public async Task InstanceDelegateFaultUsesOwnedDeclaredExceptionConstraints(string allowed, bool proven)
+    {
+        var source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
+            "[AllowedExceptions(typeof(" + allowed + "))] public static System.Action Target(Receiver instance) { " +
+            "return new System.Action(instance.Sink); } }";
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var preparation = preparations.Single();
+        Assert.That(preparation.Total!.ExceptionConstraints.Single().AllowedKinds.Contains(IrExceptionKind.Argument), Is.EqualTo(proven));
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        if (!proven)
+        { Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.Argument)); }
+    }
+
     [TestCase("return x;", true)]
     [TestCase("return 10 / x;", false)]
     [TestCase("try { return checked(x + 1); } catch (System.OverflowException) { return 0; }", true)]

@@ -9,6 +9,40 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeAllocationEffectTests
 {
+    [Test]
+    public void DelegateNullEmissionDistinguishesEscapingAndErasedConstruction()
+    {
+        foreach (var optimization in new[] { Microsoft.CodeAnalysis.OptimizationLevel.Debug, Microsoft.CodeAnalysis.OptimizationLevel.Release })
+        {
+            foreach (var framework in new[] { false, true })
+            {
+                foreach (var escapes in new[] { false, true })
+                {
+                    var source = "public class Receiver { public void Sink() {} } public static class C { public static object Target() { " +
+                        (framework ? "System.Func<string> action = new System.Func<string>(((string)null).Trim); "
+                            : "Receiver receiver = null; System.Action action = new System.Action(receiver.Sink); ") +
+                        (escapes ? "return action;" : "return null;") + " } }";
+                    var compilation = TestCompilation.Create("DelegateNullEmission", source);
+                    using var image = new MemoryStream();
+                    Assert.That(compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization)).Emit(image).Success, Is.True);
+                    image.Position = 0;
+                    var runtime = new System.Runtime.Loader.AssemblyLoadContext("DelegateNullEmission", isCollectible: true);
+                    try
+                    {
+                        var method = runtime.LoadFromStream(image).GetType("C")!.GetMethod("Target")!;
+                        string observed;
+                        try
+                        { observed = method.Invoke(null, null) == null ? "returned-null" : "returned-delegate"; }
+                        catch (System.Reflection.TargetInvocationException exception) { observed = exception.InnerException!.GetType().Name; }
+                        Assert.That(observed, Is.EqualTo(optimization == Microsoft.CodeAnalysis.OptimizationLevel.Release && !escapes
+                            ? "returned-null" : "ArgumentException"), optimization + " framework=" + framework + " escapes=" + escapes);
+                    }
+                    finally { runtime.Unload(); }
+                }
+            }
+        }
+    }
+
     [TestCase("return x;", true)]
     [TestCase("State = x; return x;", true)]
     [TestCase("new object(); return x;", false)]
@@ -64,11 +98,11 @@ public sealed class NativeAllocationEffectTests
     [TestCase("System.Action action = () => {};")]
     [TestCase("System.Action action = () => { State = x; };")]
     [TestCase("System.Action action = new System.Action(() => {});")]
-    [TestCase("System.Action action = new System.Action(instance.Sink);")]
+    [TestCase("System.Action action = new System.Action(instance.VirtualSink);")]
     [TestCase("System.Action action = new System.Action(Generic<int>);")]
     public async Task CachedCapturingAndReceiverDependentDelegatesStayUnmodeled(string body)
     {
-        var preparation = Prepare("using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
+        var preparation = Prepare("using SharpProof.Attributes; public class Receiver { public virtual void VirtualSink() {} } public static class C { " +
             "public static int State; private static void Sink() {} private static void Generic<T>() {} " +
             "[ZeroAllocations] public static int Target(int x, Receiver instance) { " + body + " return x; } }");
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
@@ -84,6 +118,129 @@ public sealed class NativeAllocationEffectTests
         Assert.That(preparation.Total!.ValidEffectClaimIds, Does.Contain(preparation.EffectClaims.Single().ClaimId));
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task InstanceDelegateChecksReceiverAndPreservesNativeEffectGoals(bool requireNonnull)
+    {
+        var source = "using SharpProof.Attributes; public class Receiver { public static int State; public void Sink() { State++; } } " +
+            "public static class C { [ZeroAllocations, DoesNotThrow, EnforcePure] public static int Target(Receiver instance, int x) { " +
+            (requireNonnull ? "Contract.Requires(instance != null); " : "") +
+            "System.Action action = new System.Action(instance.Sink); return x; } }";
+        var preparation = Prepare(source);
+        var exception = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        if (requireNonnull)
+        { Assert.That(exception.Outcome, Is.TypeOf<ProvenOutcome>(), exception.Reason.ToString()); }
+        else
+        {
+            Assert.That(exception.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+            Assert.That(exception.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(exception.ExceptionWitness, Is.Null);
+        }
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        if (requireNonnull)
+        { Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<RefutedOutcome>()); }
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("InstanceDelegateRuntime", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("InstanceDelegateRuntime", isCollectible: true);
+        try
+        {
+            var assembly = runtime.LoadFromStream(image);
+            var receiverType = assembly.GetType("Receiver")!;
+            var method = assembly.GetType("C")!.GetMethod("Target")!;
+            Assert.That(method.Invoke(null, [Activator.CreateInstance(receiverType), 7]), Is.EqualTo(7));
+            Assert.That(receiverType.GetField("State")!.GetValue(null), Is.EqualTo(0));
+            if (!requireNonnull)
+            {
+                var failure = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => method.Invoke(null, [null, 7])));
+                Assert.That(failure!.InnerException, Is.TypeOf<ArgumentException>());
+            }
+        }
+        finally { runtime.Unload(); }
+    }
+
+    [TestCase(0, IrExceptionKind.DivideByZero)]
+    [TestCase(1, IrExceptionKind.Argument)]
+    public void InstanceDelegateEvaluatesReceiverBeforeNullCheckAndAllocation(int x, IrExceptionKind expected)
+    {
+        var source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
+            "private static Receiver Pass(Receiver receiver, int value) { return receiver; } " +
+            "[ZeroAllocations] public static System.Action Target(Receiver instance, int x) { " +
+            "return new System.Action(Pass(instance, 10 / x).Sink); } }";
+        var total = Prepare(source).Total!;
+        var factory = total.Program.Factory;
+        var initial = new Dictionary<IrVarId, IrValue>
+        {
+            [total.Parameters[0].Entry] = factory.CreateNullValue(factory.GetVariableInfo(total.Parameters[0].Entry).Type),
+            [total.Parameters[1].Entry] = factory.CreateIntegerValue(factory.IntegerType, x)
+        };
+        var allocations = 0;
+        var replay = new IrProgramInterpreter(factory).Execute(total.Program, initial, 10000,
+            new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(replay.Exception!.Kind, Is.EqualTo(expected));
+        Assert.That(allocations, Is.Zero);
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("InstanceDelegateFaultRuntime", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("InstanceDelegateFaultRuntime", isCollectible: true);
+        try
+        {
+            var method = runtime.LoadFromStream(image).GetType("C")!.GetMethod("Target")!;
+            var failure = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => method.Invoke(null, [null, x])));
+            Assert.That(failure!.InnerException!.GetType(), Is.EqualTo(expected == IrExceptionKind.Argument ? typeof(ArgumentException) : typeof(DivideByZeroException)));
+        }
+        finally { runtime.Unload(); }
+    }
+
+    [TestCase("input-origin")]
+    [TestCase("spec-origin")]
+    [TestCase("memory")]
+    [TestCase("duplicate")]
+    [TestCase("entry")]
+    [TestCase("current")]
+    [TestCase("old")]
+    [TestCase("result")]
+    public void ConditionalDelegateChoicesCannotReplaceParametersOrResult(string mutation)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public class Receiver { public void Sink() {} } " +
+            "public static class C { [ZeroAllocations] public static bool Target(Receiver receiver, bool flag) { " +
+            "System.Action action = new System.Action(receiver.Sink); return flag; } }");
+        var total = artifact.Callables.Single().Total!;
+        var row = total.Graph.Blocks.SelectMany(block => block.Instructions).Single(instruction => instruction.Kind == IrInstructionKind.Havoc);
+        switch (mutation)
+        {
+            case "input-origin":
+                row.Origin = IrHavocOrigin.Input;
+                break;
+            case "spec-origin":
+                row.Origin = IrHavocOrigin.SpecResult;
+                break;
+            case "memory":
+                row.A = (int)IrHavocKind.VariablesAndMemory;
+                break;
+            case "duplicate":
+                row.Items = [row.Items.Single(), row.Items.Single()];
+                break;
+            case "entry":
+                row.Items = [total.Parameters[1].Entry];
+                break;
+            case "current":
+                row.Items = [total.Parameters[1].Current];
+                break;
+            case "old":
+                row.Items = [total.Parameters[1].Old];
+                break;
+            case "result":
+                row.Items = [total.Result];
+                break;
+        }
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
     }
 
     [TestCase("foreign-claim")]

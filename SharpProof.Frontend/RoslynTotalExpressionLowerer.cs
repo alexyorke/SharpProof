@@ -87,8 +87,27 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
         if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
-            CSharpOperationSemantics.IsExplicitStaticDelegateCreation(delegateCreation))
-        { return AllocateValue(operation, block); }
+            CSharpOperationSemantics.IsExplicitDelegateCreation(delegateCreation))
+        {
+            if (((IMethodReferenceOperation)delegateCreation.Target).Instance is { } instance)
+            {
+                var receiver = LowerBodyValue(instance, block, depth + 1);
+                if (!receiver.Classification.IsExact)
+                { return receiver; }
+                IrTerm? mayCheckNull = null;
+                if (!CSharpOperationSemantics.DelegateValueEscapesDirectly(delegateCreation))
+                {
+                    // Release emission can erase an unused constructor and its
+                    // null check. Preserve both paths; approximation reads may
+                    // support universal proofs but never concrete refutations.
+                    var choice = _context.Temporary(_factory.BooleanType);
+                    _builder!.Havoc(receiver.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, choice);
+                    mayCheckNull = _factory.Variable(choice);
+                }
+                block = ApplyRule(operation, CSharpOperationSemantics.DelegateReceiver(_factory, receiver.Value, mayCheckNull), receiver.Continuation).Continuation;
+            }
+            return AllocateValue(operation, block);
+        }
         if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
         {
             var operand = LowerBodyValue(boxing.Operand, block, depth + 1);

@@ -432,10 +432,18 @@ scalar boxing to `object`. An optional reference target receives a fresh nonnull
 identity, with guarded freshness facts against tracked references of the same
 type. Replay creates a distinct identity on each execution. Boxing lowers its
 operand before allocation; boxed contents and unboxing remain unsupported.
-The allocation table also recognizes explicit delegate construction for static,
-nongeneric method references. It creates a fresh delegate value without calling
-its target. Cached method-group/lambda conversions, capturing closures and
-receiver-dependent delegate construction retain incomplete lowering. The production artifact preserves type and site ownership; passive
+The allocation table also recognizes explicit delegate construction for static
+or nonvirtual reference receivers. Receiver evaluation precedes a null guard
+that throws the appended Argument exception kind before allocation when the
+value directly escapes. Release emission can erase an unused construction and
+its null check. Other uses therefore include a scoped Boolean approximation;
+nonnull receivers avoid reading it, and concrete refutations reject consumed
+approximation values. The decoder permits only one Boolean temporary per such
+Havoc, excluding parameters and result storage, Input/SpecResult origins and
+memory effects. The fresh delegate value never calls its target. Exception capture, portable validation,
+catch dispatch and native allowed-exception constraints preserve the exact
+System.ArgumentException kind. Cached method-group/lambda conversions, generic
+targets, capturing closures and virtual/value-type receivers remain incomplete. The production artifact preserves type and site ownership; passive
 SSA records guarded reachability and original-program replay observes the
 allocation site. Native ZeroAllocations qualification excludes reachable
 throw sites as potential implicit allocations, including caught faults. String concatenation,

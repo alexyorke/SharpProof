@@ -467,10 +467,18 @@ boxing of supported scalar values to `object`. Value-producing allocations
 create fresh nonnull reference identities. Boxing evaluates its operand before
 the allocation event, including any operand fault. Boxed contents, unboxing and
 runtime type tests remain unsupported.
-Explicit delegate construction for static, nongeneric method references records
-a fresh allocation without executing the target. Compiler-cached method-group
-and lambda conversions, capturing closures and receiver-dependent construction
-remain unsupported until their allocation and fault semantics are represented. The shadow runtime oracle measures concrete feasible entries in
+Explicit delegate construction for static or nonvirtual reference receivers
+records a fresh allocation without executing the target. Instance receiver
+evaluation precedes construction. Directly escaping delegates retain the null
+check, which throws the modeled System.ArgumentException before allocation.
+Release emission can erase an unused construction and its null check; other
+uses therefore carry a Boolean approximation of the check. A nonnull receiver
+short-circuits that approximation, while reads on uncertain null paths prevent
+concrete refutations. Universal proofs must hold for both choices. The exact
+argument kind remains distinct from ArgumentNullException and
+ArgumentOutOfRangeException. Generic targets,
+compiler-cached method-group/lambda conversions, capturing closures and virtual
+or value-type receivers remain unsupported until their semantics are represented. The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic
 closures are bounded representatives; unsupported inputs remain explicit gaps.

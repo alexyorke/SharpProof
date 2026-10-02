@@ -227,7 +227,7 @@ internal static class PortableIrWireCatalog
     ];
     internal static readonly ImmutableArray<IrExceptionKind> ExceptionKinds = [
         IrExceptionKind.DivideByZero, IrExceptionKind.Overflow, IrExceptionKind.NullReference,
-        IrExceptionKind.IndexOutOfRange, IrExceptionKind.InvalidCast
+        IrExceptionKind.IndexOutOfRange, IrExceptionKind.InvalidCast, IrExceptionKind.Argument
     ];
 }
 

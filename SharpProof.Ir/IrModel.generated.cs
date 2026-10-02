@@ -88,7 +88,8 @@ public enum IrExceptionKind
     Overflow = 1,
     NullReference = 2,
     IndexOutOfRange = 3,
-    InvalidCast = 4
+    InvalidCast = 4,
+    Argument = 5
 }
 
 public enum IrProgramExecutionStatus
