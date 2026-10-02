@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Text.Json;
 using SharpProof.Ir;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -92,45 +93,49 @@ public sealed class WorkerVcCheckedArithmeticTests
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total!.Parameters.Select(parameter => parameter.Entry)));
         if (kind == "full-ulong")
         { Assert.That(refuted.EntryModel.Single().Value.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(ulong.MaxValue))); }
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(first, project.Bind().InputHash, first.Manifest).IsValid, Is.True);
-        Assert.That(report!.Rows.Select(row => row.Checked), Is.All.True);
         var claimIds = total.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures).Select(clause => clause.ClaimId).ToArray();
-        Assert.That(report.Rows.Single(row => row.ClaimId == claimIds[0]).NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(report.Rows.Single(row => row.ClaimId == claimIds[1]).NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(first.Errors, Is.Empty);
+        Assert.That(first.ClaimResults.Single(result => result.ClaimId == claimIds[0]).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        var witness = first.ClaimResults.Single(result => result.ClaimId == claimIds[1]);
+        Assert.That(witness.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(witness.Model, Is.Not.Empty);
         var hit = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(hit.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-        Assert.That(report.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-        Assert.That(report.Rows.Select(row => row.Checked), Is.All.True);
-        Assert.That(report.Rows.Single(row => row.ClaimId == claimIds[1]).NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-        await TestContext.Out.WriteLineAsync($"checked {kind}: resources={solver.ConsumedResourceCount} checked={report.Checked} proven={report.NewProven} unknown={report.Unknown}");
+        Assert.That(WorkerProtocolJson.Validate(hit, project.Bind().InputHash, hit.Manifest).IsValid, Is.True);
+        Assert.That(hit.Errors, Is.Empty);
+        Assert.That(JsonSerializer.Serialize(hit.ClaimResults, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(first.ClaimResults, WorkerProtocolJson.SharedOptions)));
     }
 
     [Test]
     public async Task UnsafeCheckedClauseAbstainsWhileActualCheckedThrowHasNoNormalReturn()
     {
-        using var environment = new ShadowEnvironment("shadow");
         using var unsafeProject = new ShadowTestProject(UnsafeClauseSource);
-        using var unsafeWorker = unsafeProject.CreateLegacyWorker(unsafeProject.Request.Budgets);
-        WorkerVcShadowReport? report = null;
-        unsafeWorker.ShadowReportSink = value => report = value;
-        await unsafeWorker.VerifyAsync(unsafeProject.Request, unsafeProject.Snapshot, CancellationToken.None);
-        Assert.That(report!.Rows.Single().NewOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(report.Rows.Single().NewReason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
+        using var unsafeWorker = SharpProofWorker.Create(unsafeProject.Request.Budgets);
+        var unsafeResponse = await unsafeWorker.VerifyAsync(unsafeProject.Request, unsafeProject.Snapshot, CancellationToken.None);
+        var unsafeResult = Postcondition(unsafeResponse);
+        Assert.That(unsafeResult.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(unsafeResult.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
         using var throwingProject = new ShadowTestProject("""
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
                 Contract.Requires(x == int.MaxValue); Contract.Ensures(false); return checked(x + 1);
             } }
             """);
-        using var throwingWorker = throwingProject.CreateLegacyWorker(throwingProject.Request.Budgets);
-        throwingWorker.ShadowReportSink = value => report = value;
-        await throwingWorker.VerifyAsync(throwingProject.Request, throwingProject.Snapshot, CancellationToken.None);
-        Assert.That(report!.Rows.Single().NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(report.Rows.Single().NewVacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+        using var throwingWorker = SharpProofWorker.Create(throwingProject.Request.Budgets);
+        var throwingResponse = await throwingWorker.VerifyAsync(throwingProject.Request, throwingProject.Snapshot, CancellationToken.None);
+        var throwingResult = Postcondition(throwingResponse);
+        Assert.That(throwingResult.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(throwingResult.Vacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+    }
+
+    private static WorkerClaimResult Postcondition(WorkerVerifyResponse response)
+    {
+        Assert.That(response.Errors, Is.Empty);
+        var id = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition).ClaimId;
+        return response.ClaimResults.Single(result => result.ClaimId == id);
     }
 }

@@ -100,16 +100,17 @@ public sealed class WorkerVcRegionTests
         using var solver = new PassiveCallableSolver(plan!);
         var check = await solver.VerifyEnsuresAsync(0);
         Assert.That(check.Outcome, Is.TypeOf<ProvenOutcome>(), check.Reason.ToString());
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        Assert.That(report!.Rows.Select(row => row.NewOutcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(report.Rows.Select(row => row.Checked), Is.All.True);
+        Assert.That(response.Errors, Is.Empty);
+        var ids = preparation.Total!.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)
+            .Select(clause => clause.ClaimId).ToHashSet(StringComparer.Ordinal);
+        var posts = response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToArray();
+        Assert.That(posts.Select(result => result.ClaimId), Is.EquivalentTo(ids));
+        Assert.That(posts.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
         if (kind == "assume")
-        { Assert.That(report.Rows.Any(row => row.NewConditional && row.NewAssumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.True); }
+        { Assert.That(posts.Any(result => result.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.True); }
     }
 
     [TestCase("captured-return")]
@@ -154,25 +155,24 @@ public sealed class WorkerVcRegionTests
             var point = total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssumeInstruction>().Single();
             Assert.That(proven.BodyAssumptions, Does.Contain(point.Operation));
         }
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        Assert.That(report!.Rows.Select(row => row.Checked), Is.All.True);
+        Assert.That(response.Errors, Is.Empty);
         var claims = total.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures).ToArray();
-        var first = report.Rows.Single(row => row.ClaimId == claims[0].ClaimId);
-        Assert.That(first.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        var first = response.ClaimResults.Single(result => result.ClaimId == claims[0].ClaimId);
+        Assert.That(first.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         if (kind is "captured-return" or "nested-rethrow")
-        { Assert.That(report.Rows.Single(row => row.ClaimId == claims[1].ClaimId).NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted)); }
+        {
+            var second = response.ClaimResults.Single(result => result.ClaimId == claims[1].ClaimId);
+            Assert.That(second.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(second.Model, Is.Not.Empty);
+        }
         if (kind == "assume-region")
         {
-            Assert.That(first.NewConditional, Is.True);
-            Assert.That(first.NewAssumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.True);
+            Assert.That(first.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.True);
         }
-        Assert.That(first.NewVacuity, Is.EqualTo(kind == "all-throw"
+        Assert.That(first.Vacuity, Is.EqualTo(kind == "all-throw"
             ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None));
-        await TestContext.Out.WriteLineAsync($"region {kind}: enrolled={report.Enrolled} checked={report.Checked} proven={report.NewProven} vacuous={report.NewVacuous} conditional={report.NewConditional}");
     }
 }

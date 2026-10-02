@@ -131,23 +131,21 @@ public sealed class WorkerVcExceptionSearchTests
         var replay = new IrProgramInterpreter(preparation.Total.Program.Factory).Execute(preparation.Total.Program, refuted.EntryModel);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            Assert.That(report!.Checked, Is.EqualTo(2));
-            Assert.That(report.NewProven, Is.EqualTo(1));
-            Assert.That(report.Rows.Select(row => row.NewOutcome), Does.Contain(WorkerClaimOutcome.Refuted));
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
-            Assert.That(report.NewConditional, Is.EqualTo(kind == "assume" ? 1 : 0));
-            if (kind == "assume")
-            { Assert.That(report.Rows.Single(row => row.NewOutcome == WorkerClaimOutcome.Proven).NewAssumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.True); }
+            Assert.That(response.Errors, Is.Empty);
+            var ordinals = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+                .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
+            Assert.That(posts.Select(result => result.Outcome), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Assert.That(posts[1].Model, Is.Not.Empty);
+            Assert.That(posts[0].Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used),
+                Is.EqualTo(kind == "assume"));
         }
     }
 
@@ -191,10 +189,11 @@ public sealed class WorkerVcExceptionSearchTests
     {
         var fixture = GoldenTest.Load("worker", "vc-shadow-regions");
         using var project = new ShadowTestProject(fixture.Source, cacheEnabled: true);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -202,12 +201,12 @@ public sealed class WorkerVcExceptionSearchTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var claim = response.Manifest.Claims.Single(claim => claim.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal));
-            var row = report!.Rows.Single(row => row.ClaimId == claim.ClaimId);
-            Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(row.NewReason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(row.NewVacuity, Is.EqualTo(WorkerVacuityKind.None));
-            Assert.That(row.Feasibility, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-            await TestContext.Out.WriteLineAsync($"historical nested finally: cache={response.Summary.CacheStatus} total={row.TotalPresent} enrolled={report.Enrolled} checked={report.Checked} unknown={report.Unknown} new={row.NewOutcome} newProven={report.NewProven} gains={report.PrecisionGains} coverage={report.CoverageComplete}");
+            Assert.That(response.Errors, Is.Empty);
+            var result = response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId);
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(result.Model, Is.Not.Empty);
         }
     }
 

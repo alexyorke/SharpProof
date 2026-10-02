@@ -152,24 +152,22 @@ public sealed class WorkerVcCrossFrameSearchTests
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(execution.GetCurrentValue(target.Total.Parameters[0].Current)!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(current)));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            var ordinals = response.Manifest.Claims.ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-            Assert.That(report!.Checked, Is.EqualTo(2));
-            Assert.That(report.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewOutcome),
+            Assert.That(response.Errors, Is.Empty);
+            var ordinals = response.Manifest.Claims.Where(claim => claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition)
+                .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
+            Assert.That(posts.Select(result => result.Outcome),
                 Is.EqualTo(new[] { incomplete ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
-            Assert.That(report.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewReason),
+            Assert.That(posts.Select(result => result.Reason),
                 Is.EqualTo(new[] { incomplete ? WorkerClaimReason.SolverIncomplete : WorkerClaimReason.None, WorkerClaimReason.None }));
-            Assert.That(report.CoverageComplete, Is.True);
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
 }

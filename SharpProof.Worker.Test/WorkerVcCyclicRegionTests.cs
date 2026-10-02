@@ -110,14 +110,15 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.BodyAssumptions, Has.Length.EqualTo(1));
         Assert.That(plan!.EntryQuery().Assumptions, Is.Empty);
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
-        await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-        var row = report!.Rows.Single(row => row.ClaimId == project.Snapshot.CompilerManifest.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition && claim.Ordinal == 0).ClaimId);
-        Assert.That(row.Checked && row.NewConditional, Is.True);
-        Assert.That(row.NewAssumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.True);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
+        Assert.That(response.Errors, Is.Empty);
+        var claimId = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition && claim.Ordinal == 0).ClaimId;
+        var claim = response.ClaimResults.Single(result => result.ClaimId == claimId);
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(claim.Vacuity, Is.EqualTo(contradictory ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None));
+        Assert.That(claim.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.True);
     }
 
     [Test]
@@ -194,19 +195,22 @@ public sealed class WorkerVcCyclicRegionTests
         var refuted = await solver.VerifyEnsuresAsync(1);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         var cached = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(first, project.Bind().InputHash, first.Manifest).IsValid, Is.True);
         Assert.That(WorkerProtocolJson.Validate(cached, project.Bind().InputHash, cached.Manifest).IsValid, Is.True);
         Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-        var ordinals = cached.Manifest.Claims.ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-        Assert.That(report!.Rows.OrderBy(row => ordinals[row.ClaimId]).Select(row => row.NewOutcome),
+        Assert.That(first.Errors, Is.Empty);
+        Assert.That(cached.Errors, Is.Empty);
+        var ordinals = cached.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+            .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+        var posts = cached.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
+        Assert.That(posts.Select(result => result.Outcome),
             Is.EqualTo(new[] { repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
-        Assert.That(report.Rows.Select(row => row.Checked), Is.All.True);
+        Assert.That(posts[1].Model, Is.Not.Empty);
+        Assert.That(JsonSerializer.Serialize(cached.ClaimResults, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(first.ClaimResults, WorkerProtocolJson.SharedOptions)));
     }
 
     [Test]
@@ -240,20 +244,18 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(execution.Status, Is.EqualTo(SharpProof.Ir.IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.Not.EqualTo(System.Numerics.BigInteger.One));
-        using var environment = new ShadowEnvironment("shadow");
-        using var worker = project.CreateLegacyWorker();
-        WorkerVcShadowReport? report = null;
-        worker.ShadowReportSink = value => report = value;
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            var row = report!.Rows.Single(row => row.CallableId == preparation.Entry.CallableId);
-            Assert.That(row.TotalPresent && row.Enrolled && row.Checked, Is.True);
-            Assert.That(row.NewOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(report.SoundnessDisagreements, Is.Zero);
+            Assert.That(response.Errors, Is.Empty);
+            var claimId = response.Manifest.Claims.Single(claim => claim.CallableId == preparation.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition).ClaimId;
+            var claim = response.ClaimResults.Single(result => result.ClaimId == claimId);
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(claim.Model, Is.Not.Empty);
         }
     }
 }
