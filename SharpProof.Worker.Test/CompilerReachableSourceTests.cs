@@ -175,6 +175,9 @@ public sealed class CompilerReachableSourceTests
     [TestCase("public static int Root(object value) => value is (1,2) ? 1 : 0;")]
     [TestCase("public static object Root(Value value) => value with { }; public record Value(int A, int B);")]
     [TestCase("public static int Root(Value value) { value++; return 0; } public struct Value { public static implicit operator int(Value value) => 1; public static implicit operator Value(int value) => default; }")]
+    [TestCase("public static int Root(Value value) { value += 1; return 0; } public struct Value { public static implicit operator int(Value value) => 1; public static implicit operator Value(int value) => default; }")]
+    [TestCase("public static int Root(Value value) => value[^1]; public class Value { public int Length => 2; public int this[int index] => index; }")]
+    [TestCase("public static Value Root(Value value) => value[1..^1]; public class Value { public int Length => 3; public Value Slice(int start,int length) => this; }")]
     public void UncollectedImplicitSourceCallsStayIncomplete(string members)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
@@ -206,10 +209,42 @@ public sealed class CompilerReachableSourceTests
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
     }
 
+    [Test]
+    public void CollectionBuilderStaysAnIncompleteCallBoundary()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using System;
+            using System.Collections;
+            using System.Collections.Generic;
+            using System.Runtime.CompilerServices;
+            using SharpProof.Attributes;
+            [CollectionBuilder(typeof(Builder), nameof(Builder.Create))]
+            public sealed class Bag : IEnumerable<int> {
+                public IEnumerator<int> GetEnumerator() => throw new NotSupportedException();
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            public static class Builder {
+                public static Bag Create(ReadOnlySpan<int> values) => new Bag();
+            }
+            public static class Subject {
+                [ZeroAllocations] public static int Root() {
+                    Bag values = [1];
+                    return 0;
+                }
+            }
+            """);
+        Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
+        Assert.That(artifact.ReachableSource.Bodies[0].CallsComplete, Is.False);
+        CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+    }
+
     [TestCase("public static int Root((int,int) value) { var (a,b) = value; return a+b; }")]
     [TestCase("public static int Root((int,(int,int)) value) { var (a,(b,c)) = value; return a+b+c; }")]
     [TestCase("public static int Root((int,int) value) => value is (1,2) ? 1 : 0;")]
     [TestCase("public static int Root(int value) { value++; return value; }")]
+    [TestCase("public static int Root(int[] values) => values[^1];")]
+    [TestCase("public static int[] Root(int[] values) => values[1..^1];")]
     [TestCase("public static string Root(dynamic value) => nameof(value.P);")]
     [TestCase("public static string Root() => nameof(P); static int P => 1;")]
     public void OperationsWithoutHiddenCallsKeepSourceCollectionComplete(string members)

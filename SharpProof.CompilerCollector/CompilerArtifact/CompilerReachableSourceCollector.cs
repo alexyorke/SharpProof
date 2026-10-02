@@ -236,9 +236,16 @@ internal static class CompilerReachableSourceCollector
             IIncrementOrDecrementOperation increment => increment.OperatorMethod,
             IRecursivePatternOperation { DeconstructSymbol: IMethodSymbol deconstruct } => deconstruct,
             IWithOperation withOperation => withOperation.CloneMethod,
+            ICollectionExpressionOperation collection => collection.ConstructMethod,
             _ => null
         };
         return IsUncollectedMethod(method, compilation) ||
+            operation is IImplicitIndexerReferenceOperation indexer &&
+                (IsUncollectedMember(indexer.LengthSymbol, compilation) ||
+                 IsUncollectedMember(indexer.IndexerSymbol, compilation)) ||
+            operation is ICompoundAssignmentOperation assignment &&
+                (IsUncollectedMethod(assignment.InConversion.MethodSymbol, compilation) ||
+                 IsUncollectedMethod(assignment.OutConversion.MethodSymbol, compilation)) ||
             operation is IIncrementOrDecrementOperation implicitIncrement && CSharpOperationSemantics.IsUnsupportedImplicitIncrement(implicitIncrement) ||
             operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or
                 IDynamicMemberReferenceOperation or IDynamicIndexerAccessOperation or IFunctionPointerInvocationOperation or
@@ -251,6 +258,18 @@ internal static class CompilerReachableSourceCollector
         return callable != null &&
             (SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, compilation.Assembly) ||
                 callable.IsVirtual || callable.IsAbstract || callable.IsOverride);
+    }
+
+    private static bool IsUncollectedMember(ISymbol? member, Compilation compilation)
+    {
+        return member switch
+        {
+            null => false,
+            IMethodSymbol method => IsUncollectedMethod(method, compilation),
+            IPropertySymbol property => IsUncollectedMethod(property.GetMethod, compilation) ||
+                IsUncollectedMethod(property.SetMethod, compilation),
+            _ => true
+        };
     }
 
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,

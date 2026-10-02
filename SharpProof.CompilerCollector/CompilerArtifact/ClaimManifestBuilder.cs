@@ -17,6 +17,7 @@ internal sealed partial class ClaimManifestBuilder(
         ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ContractSelectionInventory _attributes =
         ContractSelectionInventory.ForCompilation(compilation);
+    private readonly ContractApiSymbols? _intrinsics = ContractApiSymbols.TryCreate(compilation);
     private readonly EffectiveContractSourceResolver _contractSources =
         EffectiveContractSourceResolver.ForCompilation(compilation);
     private readonly AnalyzerSession _effectSession =
@@ -209,7 +210,7 @@ internal sealed partial class ClaimManifestBuilder(
         var candidates = clauses
             .Select(clause => new ClaimCandidate(
                 SemanticClaimIdentity.CreateInvocationFingerprint(
-                    clause.Invocation, target, source, usesCompanion),
+                    clause.Invocation, target, source, usesCompanion, _intrinsics),
                 clause.Location,
                 usesCompanion
                     ? WorkerClaimEvidence.CompanionClause
@@ -294,7 +295,7 @@ internal sealed partial class ClaimManifestBuilder(
                         ? WorkerAssumptionKind.Precondition
                         : WorkerAssumptionKind.UserAssume,
                     SemanticClaimIdentity.CreateInvocationFingerprint(
-                        clause.Invocation, target, source, usesCompanion)));
+                        clause.Invocation, target, source, usesCompanion, _intrinsics)));
             }
             foreach (var parameter in target.Parameters)
             {
@@ -757,6 +758,30 @@ internal sealed partial class ClaimManifestBuilder(
     private ImmutableDictionary<IMethodSymbol, string> CreateCallableIds(
         ImmutableArray<CallableSeed> callables)
     {
+        // Identity ancestry is required even when the ancestor has no claims.
+        // Keep its membership separate from callable publication.
+        var required = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var pending = new Stack<IMethodSymbol>();
+        foreach (var seed in callables)
+        {
+            if (HasManifestIdentity(seed) || TrustedAttributes(seed.Method).Any())
+            {
+                required.Add(seed.Method);
+                pending.Push(seed.Method);
+            }
+        }
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (pending.Pop().ContainingSymbol is IMethodSymbol containing)
+            {
+                var parent = ContractClauseInventoryBuilder.NormalizeCallable(containing);
+                if (required.Add(parent))
+                {
+                    pending.Push(parent);
+                }
+            }
+        }
         var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
@@ -779,6 +804,29 @@ internal sealed partial class ClaimManifestBuilder(
                          .Select(static (seed, ordinal) => (seed, ordinal)))
             {
                 ordinals.Add(item.seed.Method, item.ordinal);
+            }
+        }
+
+        // Preserve all existing selected-sibling slots. Append the required
+        // plain ancestors and trust-only siblings; unrelated siblings use none.
+        foreach (var group in required
+                     .Where(static method => method.MethodKind is
+                         MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                     .Select(CreateSeed)
+                     .GroupBy(static seed => seed.Method.ContainingSymbol!, SymbolEqualityComparer.Default))
+        {
+            var ordinal = group.Count(seed => ordinals.ContainsKey(seed.Method));
+            foreach (var seed in group.Where(seed => !ordinals.ContainsKey(seed.Method))
+                         .OrderBy(seed => seed.Declaration == null
+                             ? int.MaxValue : _clauses.GetTreeOrdinal(seed.Declaration.SyntaxTree))
+                         .ThenBy(static seed => seed.Declaration?.SpanStart ?? int.MaxValue))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (seed.Declaration == null)
+                {
+                    throw new InvalidOperationException("A required nested callable has no source declaration.");
+                }
+                ordinals.Add(seed.Method, ordinal++);
             }
         }
 
@@ -838,10 +886,8 @@ internal sealed partial class ClaimManifestBuilder(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var nested = unresolved.Pop();
-                // Clause-free nested callables are intentionally excluded from
-                // the stable ordinal sequence. They may still be visited while
-                // resolving a containing callable, so use a deterministic
-                // neutral ordinal rather than failing the entire manifest.
+                // Unneeded clause-free callables do not participate in published
+                // identity. Required ancestors already have distinct ordinals.
                 var ordinal = ordinals.TryGetValue(nested, out var value)
                     ? value
                     : 0;

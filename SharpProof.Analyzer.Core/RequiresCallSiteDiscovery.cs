@@ -30,29 +30,69 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     // Retains the existing potential-call screen without running managed CFG
-    // flow. Successful enumeration is not evidence of complete native admission.
+    // flow. The completeness flag covers the recovered outer operation root
+    // and recognized extraction gaps, not reachability, binding or native admission.
     internal ImmutableArray<PotentialRequiresCallSite>? GetPotentialCalls(
         Func<IMethodSymbol, bool> hasPotentialPreconditions)
     {
+        return GetPotentialCalls(hasPotentialPreconditions, out _);
+    }
+
+    internal ImmutableArray<PotentialRequiresCallSite>? GetPotentialCalls(
+        Func<IMethodSymbol, bool> hasPotentialPreconditions, out bool complete)
+    {
+        complete = false;
         hasPotentialPreconditions = ArgumentNullGuard.NotNull(
             hasPotentialPreconditions, nameof(hasPotentialPreconditions));
 
-        if (!TryGetOperationRoot(out var operationRoot))
+        if (!TryGetOperationRoot(out var operationRoot) ||
+            operationRoot.Syntax.SyntaxTree != semanticModel.SyntaxTree)
         {
             return null;
         }
 
+        var rawOperations = PotentialOperations(operationRoot, null, executable: false);
+        if (!rawOperations.HasValue)
+        {
+            return null;
+        }
         var hasImplicitBase = TryGetImplicitBaseConstructor(out var baseConstructor);
         var implicitInitializer = hasImplicitBase ? (operationRoot as IConstructorBodyOperation)?.Initializer : null;
+        var operations = PotentialOperations(operationRoot, implicitInitializer, executable: true);
+        if (!operations.HasValue)
+        {
+            return null;
+        }
+        complete = true;
         var sites = ImmutableArray.CreateBuilder<PotentialRequiresCallSite>();
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
-        var delegateTargets = GetDirectDelegateTargets(operationRoot);
-        foreach (var operation in
-                 ExecutableDescendantsAndSelf(operationRoot, implicitInitializer))
+        var delegateTargets = GetDirectDelegateTargets(rawOperations.Value, cancellationToken);
+        var remainingWork = 65_536;
+        foreach (var operation in operations.Value)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (--remainingWork < 0)
+            {
+                complete = false;
+                return null;
+            }
+            if (operation is IInvalidOperation or IDynamicInvocationOperation or
+                IDynamicObjectCreationOperation or IDynamicMemberReferenceOperation or
+                IDynamicIndexerAccessOperation or IFunctionPointerInvocationOperation or IAwaitOperation ||
+                operation is ICompoundAssignmentOperation compound &&
+                    (compound.InConversion.MethodSymbol != null || compound.OutConversion.MethodSymbol != null) ||
+                operation is IIncrementOrDecrementOperation increment &&
+                    SharpProof.Frontend.CSharpOperationSemantics.IsUnsupportedImplicitIncrement(increment) ||
+                HasUnenumeratedPotentialCalls(operation, ref remainingWork))
+            {
+                complete = false;
+            }
+            if (remainingWork < 0)
+            {
+                return null;
+            }
             var calls = GetCalls(
                 operation,
                 operationFacts,
@@ -79,6 +119,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         cancellationToken) as IMethodSymbol;
                     if (owner == null)
                     {
+                        complete = false;
                         return null;
                     }
 
@@ -102,6 +143,119 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
 
         return sites.ToImmutable();
+    }
+
+    private bool HasUnenumeratedPotentialCalls(IOperation operation, ref int remainingWork)
+    {
+        if (operation is IUsingOperation { IsAsynchronous: true } or
+            IUsingDeclarationOperation { IsAsynchronous: true })
+        {
+            // Async disposal also invokes the returned awaitable's members.
+            return true;
+        }
+        if (operation is IForEachLoopOperation loop)
+        {
+            if (loop.IsAsynchronous || loop.Syntax is ForEachVariableStatementSyntax)
+            {
+                // Awaiter and deconstruction calls are not operation children.
+                return true;
+            }
+            if (loop.Syntax is not ForEachStatementSyntax foreachSyntax ||
+                semanticModel.GetForEachStatementInfo(foreachSyntax).ElementConversion.MethodSymbol != null)
+            {
+                return true;
+            }
+        }
+        if (operation is ICollectionExpressionOperation collection &&
+                (collection.ConstructMethod != null || collection.Type is not IArrayTypeSymbol) ||
+            operation is ISpreadOperation or IImplicitIndexerReferenceOperation or
+                IWithOperation { CloneMethod: not null } ||
+            operation is IBinaryOperation
+            {
+                OperatorMethod: not null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr
+            } ||
+            operation is IRecursivePatternOperation { DeconstructSymbol: not null } pattern &&
+                pattern.DeconstructSymbol is not IMethodSymbol)
+        {
+            return true;
+        }
+        if (operation is not IDeconstructionAssignmentOperation)
+        {
+            return false;
+        }
+        if (operation.Syntax is not AssignmentExpressionSyntax syntax)
+        {
+            return true;
+        }
+        var pending = new Stack<DeconstructionInfo>();
+        pending.Push(semanticModel.GetDeconstructionInfo(syntax));
+        var hiddenCall = false;
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (--remainingWork < 0)
+            {
+                return true;
+            }
+            var info = pending.Pop();
+            hiddenCall |= info.Method != null || info.Conversion?.MethodSymbol != null;
+            if (info.Nested.IsDefault)
+            {
+                continue;
+            }
+            if (info.Nested.Length > remainingWork - pending.Count)
+            {
+                remainingWork = -1;
+                return true;
+            }
+            foreach (var nested in info.Nested)
+            {
+                pending.Push(nested);
+            }
+        }
+        return hiddenCall;
+    }
+
+    private ImmutableArray<IOperation>? PotentialOperations(
+        IOperation root, IOperation? excluded, bool executable)
+    {
+        const int maximumNodes = 65_536;
+        const int maximumDepth = 128;
+        var pending = new Stack<(IOperation Operation, int Depth)>();
+        pending.Push((root, 0));
+        var result = ImmutableArray.CreateBuilder<IOperation>();
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (operation, depth) = pending.Pop();
+            if (depth > maximumDepth || result.Count == maximumNodes)
+            {
+                return null;
+            }
+            if (ReferenceEquals(operation, excluded) || executable &&
+                (operation is INameOfOperation || operation is IInvocationOperation invocation &&
+                    _invocationEmission.IsElided(invocation)))
+            {
+                continue;
+            }
+            result.Add(operation);
+            var children = new List<IOperation>();
+            foreach (var child in operation.ChildOperations)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (children.Count + pending.Count + result.Count >= maximumNodes)
+                {
+                    return null;
+                }
+                children.Add(child);
+            }
+            for (var index = children.Count - 1; index >= 0; index--)
+            {
+                pending.Push((children[index], depth + 1));
+            }
+        }
+        return result.ToImmutable();
     }
 
     internal ImmutableArray<RequiresCallSiteCandidate>? Get(
@@ -1666,6 +1820,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static Dictionary<ILocalSymbol, DirectDelegateTarget>
         GetDirectDelegateTargets(IOperation operationRoot)
     {
+        return GetDirectDelegateTargets(operationRoot.DescendantsAndSelf());
+    }
+
+    private static Dictionary<ILocalSymbol, DirectDelegateTarget>
+        GetDirectDelegateTargets(IEnumerable<IOperation> inventory,
+            CancellationToken cancellationToken = default)
+    {
         var declarations = new List<(
             ILocalSymbol Symbol,
             IMethodSymbol Method,
@@ -1673,8 +1834,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var invalidations = new Dictionary<ILocalSymbol, List<IOperation>>(
             SymbolEqualityComparer.Default);
         var hasGoto = false;
-        foreach (var operation in operationRoot.DescendantsAndSelf())
+        foreach (var operation in inventory)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (operation is IBranchOperation
                 {
                     BranchKind: BranchKind.GoTo
@@ -1725,6 +1887,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             SymbolEqualityComparer.Default);
         foreach (var declaration in declarations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (ambiguous.Contains(declaration.Symbol))
             {
                 continue;
