@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using System.Text;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -15,6 +17,15 @@ public sealed class GoldenVcRegressionTests
     public async Task TypedVerificationPreservesRetiredRegression(string caseName)
     {
         var fixture = GoldenTest.Load("vc", caseName);
+        if (fixture.Source.StartsWith("// vc-corrupt-spec-identity", StringComparison.Ordinal))
+        {
+            var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(fixture.Source);
+            artifact.Callables.Single().Body!.SpecCalls.Single().WitnessIdentifier = "bcl.enumerable.empty";
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            Assert.Throws<InvalidDataException>(new Action(() => ArtifactValidator.Decode(bytes)));
+            GoldenTest.Compare(fixture, "artifact-rejected: spec-call-identity\n");
+            return;
+        }
         var depthLimited = fixture.Source.StartsWith("// vc-depth-limit: 3", StringComparison.Ordinal);
         var entryDepthLimited = fixture.Source.StartsWith("// vc-depth-limit: 1", StringComparison.Ordinal);
         var maximumDepth = entryDepthLimited ? 1 : depthLimited ? 3 : WorkerBudgets.DefaultMaximumExpressionDepth;

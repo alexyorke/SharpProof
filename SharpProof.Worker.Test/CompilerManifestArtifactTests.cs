@@ -1187,7 +1187,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public async Task SpecCallSetAndCompilerCallIdentityFailClosed()
+    public void SpecCallSetAndCompilerCallIdentityFailClosed()
     {
         const string source = EmptyArraySource;
         var valid = CreateContractArtifact(source);
@@ -1219,16 +1219,22 @@ public sealed class CompilerManifestArtifactTests
 
         var substituted = CloneArtifact(valid);
         substituted.Callables[0].Body!.SpecCalls[0].WitnessIdentifier = "bcl.enumerable.empty";
-        var target = CompilerManifestArtifactJson.DecodeCallables(substituted).Single();
-        var verifier = new CallableVerifier(new UnexpectedBackend(), WorkerBudgets.DefaultMaximumExpressionDepth);
-        var results = (await verifier.VerifyWithEntryFeasibilityAsync(target,
-            new MethodResourceBudget(null, WorkerBudgets.DefaultQueryRlimit, WorkerBudgets.DefaultMethodRlimit),
-            CancellationToken.None)).Postconditions;
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-        }
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(substituted));
+        Assert.Throws<InvalidDataException>(new Action(() => ArtifactValidator.Decode(bytes)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SpecCatalogWitnessAndMemoryEffectFailClosedAtWorkerBoundary(bool corruptMemoryEffect)
+    {
+        var artifact = CreateContractArtifact(EmptyArraySource);
+        var descriptor = artifact.Callables.Single().Body!.SpecCalls.Single();
+        if (corruptMemoryEffect)
+        { descriptor.ConsumesMemoryHavoc = !descriptor.ConsumesMemoryHavoc; }
+        else
+        { descriptor.WitnessIdentifier = "unknown.spec.witness"; }
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+        Assert.Throws<InvalidDataException>(new Action(() => ArtifactValidator.Decode(bytes)));
     }
 
     [Test]
@@ -1529,15 +1535,6 @@ public sealed class CompilerManifestArtifactTests
 
         graph.Blocks = [.. blocks];
         graph.Entry = 0;
-    }
-
-    private sealed class UnexpectedBackend : ISmtBackend
-    {
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query, CancellationToken cancellationToken)
-        {
-            throw new AssertionException("A mismatched spec witness reached the backend.");
-        }
     }
 
     private static CompilerAdditionalFileSnapshot AdditionalFile(

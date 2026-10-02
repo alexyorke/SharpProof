@@ -18,6 +18,22 @@ internal static class ArtifactValidator
         }
         var artifact = CompilerManifestArtifactJson.DeserializePrepared(
             new UTF8Encoding(false, true).GetString(bytes), out var callables, cancellationToken);
+        foreach (var callable in callables)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (callable.Body == null)
+            { continue; }
+            foreach (var call in callable.Body.SpecCalls.Values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!ApiSpecTable.Default.TryGetByWitnessIdentifier(call.WitnessIdentifier, out var template) ||
+                    template.Target.DocumentationCommentId != call.CallIdentity ||
+                    call.ConsumesMemoryHavoc != (template.Facets.Effects.Effects != SpecEffect.None))
+                {
+                    throw new InvalidDataException("A compiler spec-call descriptor does not match its catalog identity.");
+                }
+            }
+        }
         return new ValidatedArtifact(artifact, callables, digest);
     }
 
