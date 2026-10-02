@@ -569,6 +569,57 @@ public sealed class PassiveCallableVcTests
         }
     }
 
+    [TestCase("allocation", true, false)]
+    [TestCase("write", true, false)]
+    [TestCase("allocation", false, false)]
+    [TestCase("write", false, false)]
+    [TestCase("allocation", false, true)]
+    [TestCase("write", false, true)]
+    [TestCase("allocation", null, false)]
+    [TestCase("write", null, false)]
+    public async Task EffectReplayChecksApproximationAtSite(string kind, bool? readBefore, bool throwAfter)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        var local = factory.CreateVariable("approximate", factory.IntegerType);
+        var observed = factory.CreateVariable("observed", factory.IntegerType);
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, local);
+        if (readBefore == true)
+        { subject.Builder.Assign(block, subject.Site, observed, factory.Variable(local)); }
+        var effectSite = factory.CreateOperation("effect-site");
+        if (kind == "allocation")
+        { subject.Builder.Allocate(block, effectSite, factory.ObjectType); }
+        else
+        { subject.Builder.Write(block, effectSite, IrWriteRegion.Static); }
+        if (readBefore == false)
+        { subject.Builder.Assign(block, subject.Site, observed, factory.Variable(local)); }
+        if (throwAfter)
+        {
+            var exit = subject.Builder.CreateBlock();
+            subject.Builder.Throw(block, subject.Site, IrExceptionKind.Overflow, exit);
+            subject.Builder.ExceptionalExit(exit, subject.Site);
+        }
+        else
+        { subject.Builder.Return(block, subject.Site, factory.Integer(0)); }
+        using var solver = new PassiveCallableSolver(Build(subject.Candidate(factory.Boolean(true))));
+        var result = kind == "allocation" ? await solver.VerifyAllocationsAsync() : await solver.VerifyPurityAsync();
+        if (readBefore == true)
+        {
+            Assert.That(result.Outcome, Is.Null);
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(result.AllocationWitness, Is.Null);
+            Assert.That(result.WriteWitness, Is.Null);
+        }
+        else
+        {
+            Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(kind == "allocation" ? result.AllocationWitness : result.WriteWitness,
+                Is.EqualTo(effectSite));
+        }
+    }
+
     [TestCase("read")]
     [TestCase("rewrite")]
     [TestCase("canonical")]

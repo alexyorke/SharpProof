@@ -69,16 +69,26 @@ internal sealed class PassiveCallableSolver : IDisposable
         { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
         OperationId? site = null;
         OperationId? synchronizationSite = null;
-        var replay = _plan.ReplayEffects(witness.EntryModel, cancellationToken,
-            allocationObserver: allocations ? allocation => site ??= allocation.Operation : null,
-            writeObserver: allocations ? null : write =>
+        _plan.ReplayEffects(witness.EntryModel, cancellationToken,
+            allocationPrefixObserver: allocations ? (allocation, approximation) =>
         {
-            if (write.Region != IrWriteRegion.Local)
+            if (!approximation)
+            { site ??= allocation.Operation; }
+        }
+        : null,
+            writePrefixObserver: allocations ? null : (write, approximation) =>
+        {
+            if (!approximation && write.Region != IrWriteRegion.Local)
             { site ??= write.Operation; }
-        }, lockObserver: allocations ? null : synchronization => synchronizationSite ??= synchronization.Operation);
-        if (synchronizationSite != null && !replay.ConsumedApproximation)
+        }, lockPrefixObserver: allocations ? null : (synchronization, approximation) =>
+        {
+            if (!approximation)
+            { synchronizationSite ??= synchronization.Operation; }
+        });
+        cancellationToken.ThrowIfCancellationRequested();
+        if (synchronizationSite != null)
         { return witness with { LockWitness = synchronizationSite }; }
-        if (site != null && !replay.ConsumedApproximation)
+        if (site != null)
         { return allocations ? witness with { AllocationWitness = site } : witness with { WriteWitness = site }; }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }

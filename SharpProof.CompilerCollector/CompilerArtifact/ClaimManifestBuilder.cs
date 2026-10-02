@@ -557,16 +557,15 @@ internal sealed partial class ClaimManifestBuilder(
     private ImmutableArray<IMethodSymbol> DiscoverMethods()
     {
         var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var assemblyTrusted = _compilation.Assembly.GetAttributes().Any(attribute =>
-            ContractSelectionInventory.Is(attribute, _attributes.Trusted));
-        var trustedTrees = TrustedScopeTrees();
+        var assemblySelected = _compilation.Assembly.GetAttributes().Any(RequiresScopeDiscovery);
+        var selectedTrees = SelectedScopeTrees();
         foreach (var tree in _compilation.SyntaxTrees)
         {
             var root = tree.GetRoot(cancellationToken);
             // Semantic-model creation binds every nested local function. Skip
             // trees with no SharpProof syntax so an unrelated deeply nested
             // tree cannot exhaust Roslyn's binder stack during discovery.
-            if (!assemblyTrusted && !trustedTrees.Contains(tree) && !MayContainSharpProofSyntax(root))
+            if (!assemblySelected && !selectedTrees.Contains(tree) && !MayContainSharpProofSyntax(root))
             {
                 continue;
             }
@@ -706,21 +705,26 @@ internal sealed partial class ClaimManifestBuilder(
         }
     }
 
-    private HashSet<SyntaxTree> TrustedScopeTrees()
+    private bool RequiresScopeDiscovery(AttributeData attribute)
+    {
+        return ContractSelectionInventory.Is(attribute, _attributes.Trusted) ||
+            _attributes.IsRejectedControlAttribute(attribute);
+    }
+
+    private HashSet<SyntaxTree> SelectedScopeTrees()
     {
         var trees = new HashSet<SyntaxTree>();
-        var pending = new Stack<(INamespaceOrTypeSymbol Scope, bool Trusted)>();
+        var pending = new Stack<(INamespaceOrTypeSymbol Scope, bool Selected)>();
         pending.Push((_compilation.Assembly.GlobalNamespace, false));
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (scope, inheritedTrust) = pending.Pop();
-            var trusted = inheritedTrust;
+            var (scope, inheritedSelection) = pending.Pop();
+            var selected = inheritedSelection;
             if (scope is INamedTypeSymbol type)
             {
-                trusted |= type.GetAttributes().Any(attribute =>
-                    ContractSelectionInventory.Is(attribute, _attributes.Trusted));
-                if (trusted)
+                selected |= type.GetAttributes().Any(RequiresScopeDiscovery);
+                if (selected)
                 {
                     foreach (var declaration in type.DeclaringSyntaxReferences)
                     { trees.Add(declaration.SyntaxTree); }
@@ -729,10 +733,10 @@ internal sealed partial class ClaimManifestBuilder(
             if (scope is INamespaceSymbol @namespace)
             {
                 foreach (var child in @namespace.GetNamespaceMembers())
-                { pending.Push((child, trusted)); }
+                { pending.Push((child, selected)); }
             }
             foreach (var child in scope.GetTypeMembers())
-            { pending.Push((child, trusted)); }
+            { pending.Push((child, selected)); }
         }
         return trees;
     }

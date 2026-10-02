@@ -165,8 +165,16 @@ public sealed class CompilerReachableSourceTests
     [TestCase("public static int Root(Value x) => (int)x; public struct Value { public static explicit operator int(Value x) => 1; }")]
     [TestCase("public static int Root(System.IDisposable value) { using var resource = value; return 1; }")]
     [TestCase("public static int Root(System.IDisposable value) { using (value) { return 1; } }")]
-    [TestCase("public static int Root(dynamic value) => value.P;")]
-    [TestCase("public static int Root(dynamic value) => value[0];")]
+    [TestCase("public static dynamic Root(dynamic value) => value.P;")]
+    [TestCase("public static dynamic Root(dynamic value) => value[0];")]
+    [TestCase("public static int Root(Value value) { var (a,b) = value; return a+b; } public class Value { public void Deconstruct(out int a, out int b) { a=1; b=2; } }")]
+    [TestCase("public static int Root((Value,int) value) { var ((a,b),c) = value; return a+b+c; } public class Value { public void Deconstruct(out int a, out int b) { a=1; b=2; } }")]
+    [TestCase("public static int Root((Value,int) value) { (int a,int b) = value; return a+b; } public struct Value { public static implicit operator int(Value value) => 1; }")]
+    [TestCase("public static int Root(((Value,int),int) value) { ((int a,int b),int c) = value; return a+b+c; } public struct Value { public static implicit operator int(Value value) => 1; }")]
+    [TestCase("public static int Root(Value value) => value is (1,2) ? 1 : 0; public class Value { public void Deconstruct(out int a, out int b) { a=1; b=2; } }")]
+    [TestCase("public static int Root(object value) => value is (1,2) ? 1 : 0;")]
+    [TestCase("public static object Root(Value value) => value with { }; public record Value(int A, int B);")]
+    [TestCase("public static int Root(Value value) { value++; return 0; } public struct Value { public static implicit operator int(Value value) => 1; public static implicit operator Value(int value) => default; }")]
     public void UncollectedImplicitSourceCallsStayIncomplete(string members)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
@@ -179,9 +187,32 @@ public sealed class CompilerReachableSourceTests
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
     }
 
+    [Test]
+    public void ExtensionDeconstructionStaysAnIncompleteCallBoundary()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            public class Value { }
+            public static class Extensions {
+                public static void Deconstruct(this Value value, out int a, out int b) { a=1; b=2; }
+            }
+            static class Subject {
+                [ZeroAllocations] public static int Root(Value value) { var (a,b) = value; return a+b; }
+            }
+            """);
+        Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
+        Assert.That(artifact.ReachableSource.Bodies[0].CallsComplete, Is.False);
+        CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+    }
+
+    [TestCase("public static int Root((int,int) value) { var (a,b) = value; return a+b; }")]
+    [TestCase("public static int Root((int,(int,int)) value) { var (a,(b,c)) = value; return a+b+c; }")]
+    [TestCase("public static int Root((int,int) value) => value is (1,2) ? 1 : 0;")]
+    [TestCase("public static int Root(int value) { value++; return value; }")]
     [TestCase("public static string Root(dynamic value) => nameof(value.P);")]
     [TestCase("public static string Root() => nameof(P); static int P => 1;")]
-    public void UnevaluatedNameOfDoesNotAddCallBoundaries(string members)
+    public void OperationsWithoutHiddenCallsKeepSourceCollectionComplete(string members)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
             using SharpProof.Attributes;

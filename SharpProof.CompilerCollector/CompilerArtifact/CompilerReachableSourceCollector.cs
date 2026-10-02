@@ -59,7 +59,7 @@ internal static class CompilerReachableSourceCollector
                     if (current is INameOfOperation or IAnonymousFunctionOperation ||
                         current is ILocalFunctionOperation && !ReferenceEquals(current, operation))
                     { continue; }
-                    if (HasUncollectedCall(current, compilation))
+                    if (HasUncollectedCall(current, compilation, model, cancellationToken, ref remaining))
                     { body.CallsComplete = false; complete = false; }
                     if (current is IInvocationOperation invocation)
                     {
@@ -196,8 +196,34 @@ internal static class CompilerReachableSourceCollector
         }
     }
 
-    private static bool HasUncollectedCall(IOperation operation, Compilation compilation)
+    private static bool HasUncollectedCall(IOperation operation, Compilation compilation, SemanticModel model,
+        CancellationToken cancellationToken, ref int remaining)
     {
+        if (operation is IDeconstructionAssignmentOperation deconstruction)
+        {
+            if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax)
+            { return true; }
+            var pending = new Stack<DeconstructionInfo>();
+            pending.Push(model.GetDeconstructionInfo(syntax));
+            while (pending.Count != 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (--remaining < 0)
+                { return true; }
+                var info = pending.Pop();
+                if (IsUncollectedMethod(info.Method, compilation) ||
+                    IsUncollectedMethod(info.Conversion?.MethodSymbol, compilation))
+                { return true; }
+                if (info.Nested.IsDefault)
+                { continue; }
+                if (info.Nested.Length > remaining - pending.Count)
+                { return true; }
+                foreach (var nested in info.Nested)
+                { pending.Push(nested); }
+            }
+        }
+        if (operation is IRecursivePatternOperation { DeconstructSymbol: not null and not IMethodSymbol })
+        { return true; }
         var method = operation switch
         {
             IObjectCreationOperation creation => creation.Constructor,
@@ -208,12 +234,23 @@ internal static class CompilerReachableSourceCollector
             IUnaryOperation unary => unary.OperatorMethod,
             ICompoundAssignmentOperation compound => compound.OperatorMethod,
             IIncrementOrDecrementOperation increment => increment.OperatorMethod,
+            IRecursivePatternOperation { DeconstructSymbol: IMethodSymbol deconstruct } => deconstruct,
+            IWithOperation withOperation => withOperation.CloneMethod,
             _ => null
         };
-        return method != null && SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
+        return IsUncollectedMethod(method, compilation) ||
+            operation is IIncrementOrDecrementOperation implicitIncrement && CSharpOperationSemantics.IsUnsupportedImplicitIncrement(implicitIncrement) ||
             operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation or
                 IDynamicMemberReferenceOperation or IDynamicIndexerAccessOperation or IFunctionPointerInvocationOperation or
                 IAwaitOperation or IForEachLoopOperation or IUsingOperation or IUsingDeclarationOperation;
+    }
+
+    private static bool IsUncollectedMethod(IMethodSymbol? method, Compilation compilation)
+    {
+        var callable = method?.ReducedFrom ?? method;
+        return callable != null &&
+            (SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, compilation.Assembly) ||
+                callable.IsVirtual || callable.IsAbstract || callable.IsOverride);
     }
 
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,

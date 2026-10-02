@@ -88,6 +88,9 @@ public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocV
     public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
     public Action<IrWriteInstruction>? WriteObserver { get; set; }
     public Action<IrLockInstruction>? LockObserver { get; set; }
+    public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; set; }
+    public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; set; }
+    public Action<IrLockInstruction, bool>? LockPrefixObserver { get; set; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =
         ArgumentNullGuard.NotNull(havocValueProvider, nameof(havocValueProvider));

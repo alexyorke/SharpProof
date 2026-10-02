@@ -44,6 +44,27 @@ internal readonly partial record struct RequiresCallSiteCandidate(
     ManagedFlowStatus FlowStatus
 );
 
+internal enum PotentialRequiresCallOrigin
+{
+    Operation,
+    ImplicitBaseConstructor
+}
+
+internal sealed record PotentialRequiresCallSite(
+    IMethodSymbol Owner,
+    IOperation Origin,
+    SyntaxNode Syntax,
+    PotentialRequiresCallOrigin OriginKind,
+    int CallRoleIndex,
+    IMethodSymbol DeclaredTarget,
+    IMethodSymbol Target,
+    IOperation? Instance,
+    ImmutableArray<IArgumentOperation> Arguments,
+    ImmutableDictionary<int, IOperation> ExplicitArguments,
+    ImmutableDictionary<int, long> ImplicitIntegerArguments,
+    bool CanReplay
+);
+
 internal sealed partial class SharpProofAnalyzerEngine
 {
     private readonly partial record struct AdvisoryActivation(

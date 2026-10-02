@@ -116,16 +116,19 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         else if (allocation.Target is { } allocatedTarget)
                         { values[allocatedTarget] = _factory.CreateReferenceValue(allocation.AllocatedType, new object()); }
                         replayOptions?.AllocationObserver?.Invoke(allocation);
+                        replayOptions?.AllocationPrefixObserver?.Invoke(allocation, values.ConsumedApproximation);
                         break;
                     case IrLockInstruction synchronization:
                         var receiver = _terms.Evaluate(synchronization.Receiver, values.Current, values.ObserveRead, cancellationToken);
                         if (receiver.Status != IrEvaluationStatus.Value)
                         { return FromEvaluation(receiver, synchronization, values, steps); }
                         replayOptions?.LockObserver?.Invoke(synchronization);
+                        replayOptions?.LockPrefixObserver?.Invoke(synchronization, values.ConsumedApproximation);
                         return Unsupported(synchronization, values, steps,
                             "Concrete execution stopped at a synchronization attempt.");
                     case IrWriteInstruction write:
                         replayOptions?.WriteObserver?.Invoke(write);
+                        replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
                         break;
                     case IrAssignInstruction assign:
                         var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, cancellationToken);

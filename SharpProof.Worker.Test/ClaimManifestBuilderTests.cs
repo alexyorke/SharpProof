@@ -246,6 +246,38 @@ public sealed class ClaimManifestBuilderTests
             Does.Contain(WorkerAssumptionKind.TrustedBoundary));
     }
 
+    [TestCase("SharpProofTrustedAttribute", "type")]
+    [TestCase("SharpProofSuppressAttribute", "type")]
+    [TestCase("SharpProofTrustedAttribute", "assembly")]
+    [TestCase("SharpProofSuppressAttribute", "assembly")]
+    [TestCase("SharpProofTrustedAttribute", "nested")]
+    [TestCase("SharpProofSuppressAttribute", "nested")]
+    public void RejectedControlScopesSelectTokenFreeDeclarationsWithoutGrantingTrust(string attribute, string scope)
+    {
+        var shadow = $$"""
+            namespace SharpProof.Attributes {
+                public sealed class {{attribute}} : System.Attribute {
+                    public {{attribute}}(string reason) { }
+                }
+            }
+            """;
+        var control = $"SharpProof.Attributes.{attribute}(\"reason\")";
+        var boundary = scope == "assembly" ? $"[assembly: {control}]"
+            : $"[{control}] public static partial class Subject {{ }}";
+        var implementation = scope == "nested"
+            ? "public static partial class Subject { public static class Nested { public static int Target() => 0; } }"
+            : "public static partial class Subject { public static int Target() => 0; }";
+        var compilation = GetCompilation(("Shadow.cs", shadow), ("Boundary.cs", boundary), ("Implementation.cs", implementation));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var target = result.Targets.Values.Single(static target => target.Method.Name == "Target");
+        Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Contracts));
+        Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Effects));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Not.Contain(WorkerAssumptionKind.TrustedBoundary));
+        Assert.That(target.Entry.ClaimIds, Is.Empty);
+    }
+
     [Test]
     public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
     {

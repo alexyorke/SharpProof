@@ -22,6 +22,18 @@ internal sealed partial class RequiresCallSiteDiscovery(
             Func<IMethodSymbol, bool>
                 hasPotentialPreconditions)
     {
+        var calls = GetPotentialCalls(hasPotentialPreconditions);
+        return calls.HasValue
+            ? calls.Value.Select(static call => call.Owner)
+                .ToImmutableHashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+            : null;
+    }
+
+    // Retains the existing potential-call screen without running managed CFG
+    // flow. Successful enumeration is not evidence of complete native admission.
+    internal ImmutableArray<PotentialRequiresCallSite>? GetPotentialCalls(
+        Func<IMethodSymbol, bool> hasPotentialPreconditions)
+    {
         hasPotentialPreconditions = ArgumentNullGuard.NotNull(
             hasPotentialPreconditions, nameof(hasPotentialPreconditions));
 
@@ -30,15 +42,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
             return null;
         }
 
-        var owners = ImmutableHashSet.CreateBuilder<
-            IMethodSymbol>(
-            SymbolEqualityComparer.Default);
+        var hasImplicitBase = TryGetImplicitBaseConstructor(out var baseConstructor);
+        var implicitInitializer = hasImplicitBase ? (operationRoot as IConstructorBodyOperation)?.Initializer : null;
+        var sites = ImmutableArray.CreateBuilder<PotentialRequiresCallSite>();
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
         var delegateTargets = GetDirectDelegateTargets(operationRoot);
         foreach (var operation in
-                 ExecutableDescendantsAndSelf(operationRoot))
+                 ExecutableDescendantsAndSelf(operationRoot, implicitInitializer))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var calls = GetCalls(
@@ -46,14 +58,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts,
                 semanticModel,
                 delegateTargets,
+                flowResult: null,
                 cancellationToken: cancellationToken,
                 disposeInterfaceMethodCache: _disposeInterfaceMethodCache);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
             }
-            foreach (var call in calls)
+            for (var role = 0; role < calls.Length; role++)
             {
+                var call = calls[role];
                 var target = RequiresCallSiteDispatch.ResolveExactTarget(
                     call.TargetMethod,
                     call.Instance,
@@ -68,22 +82,26 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         return null;
                     }
 
-                    owners.Add(
-                        ContractClauseInventoryBuilder
-                            .NormalizeCallable(owner));
+                    sites.Add(new(ContractClauseInventoryBuilder.NormalizeCallable(owner),
+                        operation, operation.Syntax, PotentialRequiresCallOrigin.Operation, role,
+                        call.TargetMethod, target, call.Instance, call.Arguments,
+                        call.ExplicitArguments, call.ImplicitIntegerArguments, call.CanReplay));
                 }
             }
         }
 
-        if (TryGetImplicitBaseConstructor(out var baseConstructor) &&
+        if (hasImplicitBase &&
             hasPotentialPreconditions(baseConstructor))
         {
-            owners.Add(
-                ContractClauseInventoryBuilder
-                    .NormalizeCallable(caller));
+            var body = operationRoot as IConstructorBodyOperation;
+            var origin = (IOperation?)body?.BlockBody ?? body?.ExpressionBody ?? operationRoot!;
+            sites.Add(new(ContractClauseInventoryBuilder.NormalizeCallable(caller), origin, origin.Syntax,
+                PotentialRequiresCallOrigin.ImplicitBaseConstructor, 0, baseConstructor, baseConstructor,
+                null, [], ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty, true));
         }
 
-        return owners.ToImmutable();
+        return sites.ToImmutable();
     }
 
     internal ImmutableArray<RequiresCallSiteCandidate>? Get(
@@ -466,7 +484,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private IEnumerable<IOperation> ExecutableDescendantsAndSelf(
         IOperation operation)
+    { return ExecutableDescendantsAndSelf(operation, null); }
+
+    private IEnumerable<IOperation> ExecutableDescendantsAndSelf(
+        IOperation operation, IOperation? excluded)
     {
+        if (ReferenceEquals(operation, excluded))
+        { yield break; }
         if (operation is IInvocationOperation invocation &&
             _invocationEmission.IsElided(invocation))
         {
@@ -475,7 +499,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         yield return operation;
         foreach (var child in operation.ChildOperations)
         {
-            foreach (var descendant in ExecutableDescendantsAndSelf(child))
+            foreach (var descendant in ExecutableDescendantsAndSelf(child, excluded))
             {
                 yield return descendant;
             }

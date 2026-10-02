@@ -54,6 +54,47 @@ public sealed class IrTotalExecutionTests
         Assert.That(observed, Is.EqualTo(new[] { first }));
     }
 
+    [TestCase("allocation", true)]
+    [TestCase("lock", true)]
+    [TestCase("allocation", false)]
+    [TestCase("lock", false)]
+    public void EffectPrefixObservationsIncludeOperandApproximation(string kind, bool supplied)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var operand = factory.CreateVariable("operand", kind == "allocation" ? factory.IntegerType : factory.ObjectType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        if (supplied)
+        { builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, operand); }
+        var site = factory.CreateOperation("effect");
+        if (kind == "allocation")
+        {
+            var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
+            var target = factory.CreateVariable("array", sequence);
+            builder.Allocate(entry, site, sequence, target, factory.Variable(operand));
+            builder.Return(entry, factory.CreateOperation());
+        }
+        else
+        {
+            builder.Lock(entry, site, factory.Variable(operand));
+            builder.Return(entry, factory.CreateOperation());
+        }
+        var observed = new List<(OperationId Site, bool Approximation)>();
+        var replay = new IrProgramReplayOptions(_ => kind == "allocation"
+            ? factory.CreateIntegerValue(0) : factory.CreateReferenceValue(factory.ObjectType, new object()))
+        {
+            AllocationPrefixObserver = (instruction, approximation) => observed.Add((instruction.Operation, approximation)),
+            LockPrefixObserver = (instruction, approximation) => observed.Add((instruction.Operation, approximation))
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
+        Assert.That(result.Status, Is.EqualTo(kind == "allocation" && supplied
+            ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
+        if (supplied)
+        { Assert.That(observed, Is.EqualTo(new[] { (site, true) })); }
+        else
+        { Assert.That(observed, Is.Empty); }
+    }
+
     [Test]
     public void ArgumentFaultClassificationDoesNotCollapseOtherArgumentExceptions()
     {

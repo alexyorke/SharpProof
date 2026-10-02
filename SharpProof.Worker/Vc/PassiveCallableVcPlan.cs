@@ -160,7 +160,10 @@ internal sealed class PassiveCallableVcPlan
 
     internal IrProgramExecutionResult ReplayEffects(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken,
         Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
-        Action<IrLockInstruction>? lockObserver = null)
+        Action<IrLockInstruction>? lockObserver = null,
+        Action<IrAllocationInstruction, bool>? allocationPrefixObserver = null,
+        Action<IrWriteInstruction, bool>? writePrefixObserver = null,
+        Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
@@ -169,11 +172,15 @@ internal sealed class PassiveCallableVcPlan
             initial[parameter.Current] = inputs[parameter.Entry];
         }
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
-            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver, initial), cancellationToken);
+            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver, initial,
+                allocationPrefixObserver, writePrefixObserver, lockPrefixObserver), cancellationToken);
     }
 
     private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
-        Action<IrLockInstruction>? lockObserver = null, Dictionary<IrVarId, IrValue>? initial = null)
+        Action<IrLockInstruction>? lockObserver = null, Dictionary<IrVarId, IrValue>? initial = null,
+        Action<IrAllocationInstruction, bool>? allocationPrefixObserver = null,
+        Action<IrWriteInstruction, bool>? writePrefixObserver = null,
+        Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
         return new(request => request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
@@ -183,7 +190,14 @@ internal sealed class PassiveCallableVcPlan
             : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type))
-        { AllocationObserver = allocationObserver, WriteObserver = writeObserver, LockObserver = lockObserver };
+        {
+            AllocationObserver = allocationObserver,
+            WriteObserver = writeObserver,
+            LockObserver = lockObserver,
+            AllocationPrefixObserver = allocationPrefixObserver,
+            WritePrefixObserver = writePrefixObserver,
+            LockPrefixObserver = lockPrefixObserver
+        };
     }
 
     private IrTerm BeforeSynchronization(IrTerm goal)
