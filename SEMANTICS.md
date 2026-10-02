@@ -195,53 +195,26 @@ such a local precondition unless an equivalent valid `Requires` contract is
 already declared on an overridden or implemented member. Callers must use the
 base or interface contract that is visible at the dispatch site.
 
-## Relational callee summaries
+## Direct callee verification
 
-Worker postcondition verification may compose a direct callee only when the
-build-time collector constructs a complete quantifier-free relation in the
-shared typed IR. The relation describes normal completion and the result in
-terms of receiver-free scalar input variables. It is an ordinary solver
-formula, not a trusted `Proven` result. The caller remains `Proven` only when
-Z3 establishes the composed obligation and the proof core passes the normal
-hygiene checks.
+Source callees and captured implementation IL expand directly into the
+caller's Total program. Verification uses the composed body and does not
+import callee contract premises. Calls require direct, supported dispatch and
+bounded exact lowering. Recursive expansion, unsupported operations, and
+resource exhaustion abstain or retain a conservative body abstraction.
 
-The current source-summary boundary is one exact current-compilation
-declaration for a static, non-generic method with Boolean or supported-integer
-parameters and result. Its selected CFG must be acyclic and every reachable
-instruction and direct dependency must lower exactly. Recursive dependency
-components, virtual or instance dispatch, references, heap operations,
-unsupported arithmetic, and summary budget failures abstain.
+Implementation IL requires an exact file-backed captured PE whose metadata
+matches the reference Roslyn compiled against. Reference assemblies and
+facades cannot provide implementation authority. Verification applies to that
+captured implementation; deployment must resolve the same binary. The bounded
+IL subset is not a general IL interpreter or metadata effect inference.
 
-An implementation-IL summary is admissible only for an external method with
-the same static scalar shape and an exact file-backed implementation PE. The
-collector requires raw metadata equality with the metadata Roslyn compiled
-against, rejects reference assemblies and facades as body authority, and
-decodes only a bounded scalar opcode set. A missing body, changed image,
-unsupported opcode, cross-module target, loop, recursion, unresolved call, or
-resource limit abstains. This facility is not a general IL interpreter and is
-not used for metadata effect inference. A `Proven` claim whose proof core
-contains `il-summary:` is conditional on the deployed application resolving
-the exact captured implementation binary; the collector records that binary's
-provenance but cannot observe a later runtime or publish-time assembly choice.
-The SARIF claim message makes this runtime-binary assumption visible so a
-consumer can bind the deployment asset to the captured PE or treat the claim
-as requiring review.
-
-An audited specification-pack summary is admissible only when its pack ID was
-explicitly selected by `SharpProofSpecificationPacks`. Packs are embedded,
-strictly schema-validated data with exact method signature, assembly-name, and
-public-key-token constraints. Arbitrary consumer files are not pack authority.
-The current embedded pack catalog schema is 2; `dotnet.scalar@1` contains the audited
-`System.Math.Max(int, int)` relation. An absent, unknown, malformed, or
-identity-mismatched pack never contributes a fact.
-
-Every summary call seals its origin, SHA-256 evidence, pack identity when
-applicable, and the canonical transitive provenance of every composed
-dependency. Compiler artifact schema 18, relational-summary schema version 2,
-and specification-pack schema version 1 validate that closure before backend
-creation.
-Unsupported or incomplete calls remain `Unknown`; neither a convenient method
-name nor a reference-assembly body can become an assumption.
+Audited scalar specification packs require explicit selection through
+`SharpProofSpecificationPacks`. Embedded pack data has exact method signature,
+assembly-name, and public-key-token constraints. Consumer files cannot provide
+pack authority. Embedded catalog schema 2 includes `dotnet.scalar@1`, which
+lowers `System.Math.Max(int, int)` into Total operations. Absent or unsupported
+packs do not supply facts. Legacy relational-summary production is retired.
 
 ## Effects
 
@@ -430,13 +403,14 @@ from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
-metadata. It also carries canonical relational-summary calls and their complete
-source, implementation-IL, or audited-pack dependency provenance, plus the
-admitted unconditional allocation, exact-framework-throw, and synchronization
+metadata for the remaining legacy API-spec payload. Typed Total graphs carry
+composed source and metadata bodies. The artifact also contains admitted
+unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
 their source-tree identities and spans. Worker protocol version 12 and semantic
-cache schema version 14 carry the current wire break. Relational-summary schema
-version 2 and specification-pack schema version 1 govern the new evidence. The
+cache schema version 14 carry the current wire break. The legacy relational-summary schema field remains in the envelope, but
+nonempty relational-summary descriptors are rejected. Specification-pack
+schema version 1 describes scalar-pack selection. The
 artifact further carries compiler error
 diagnostics and mapped locations, handwritten and generated tree hashes, raw
 and effective per-tree preprocessor symbols, and parse evidence, plus a bounded
@@ -472,6 +446,16 @@ claim results survive a later interruption. Bounded loop search can establish
 a refutation only through original-body replay; a bounded UNSAT result cannot
 prove a cyclic program. Unsupported async and iterator callables abstain.
 Compiler-produced effect evidence remains authoritative for effect claims.
+
+Source calls and captured implementation IL expand directly into the caller's
+Total program. The compiler no longer produces relational-summary descriptors.
+Closed generic outer types may share a source helper body when its intrinsic
+parameter and result types do not depend on the outer arguments; top-level
+generic callable admission is unchanged. Metadata boolean `and`, `or`, and
+`xor` are exact only for normalized 0/1 stack values. Other integer bitwise
+operations remain unsupported. Emitted callee contract arguments execute as
+ordinary code, including throwing result placeholders; elided arguments do
+not execute. Callee contract assumptions do not become caller proof premises.
 
 This closed artifact removes worker-side compiler reconstruction. For the
 admitted program subset, counterexample replay is independent of symbolic

@@ -201,82 +201,6 @@ internal sealed class CompilerSpecificationPackProvider
         return result;
     }
 
-    internal bool TryBuild(
-        IMethodSymbol method,
-        IrMemberId member,
-        CancellationToken cancellationToken,
-        out IrRelationalSummary? summary)
-    {
-        summary = null;
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!TryResolve(method, out var definition))
-        {
-            return false;
-        }
-
-        var memberInfo = _factory.GetMemberInfo(member);
-        if (!memberInfo.IsStatic ||
-            memberInfo.ParameterTypes.Length != definition.ParameterTypes.Length ||
-            memberInfo.ReturnType != TypeId(definition.ResultType))
-        {
-            return false;
-        }
-
-        var prefix = CompilerSpecificationPackSelection.GetSummaryPrefix(
-            CompilerSummaryOrigin.SpecificationPack)!;
-        var parameters = memberInfo.ParameterTypes
-            .Select((type, ordinal) => _factory.CreateVariable(
-                prefix + ":parameter:" + ordinal.ToString(
-                    CultureInfo.InvariantCulture),
-                type))
-            .ToImmutableArray();
-        for (var index = 0; index < parameters.Length; index++)
-        {
-            if (_factory.GetVariableInfo(parameters[index]).Type !=
-                TypeId(definition.ParameterTypes[index]))
-            {
-                return false;
-            }
-        }
-
-        IrTerm resultExpression;
-        try
-        {
-            resultExpression = Instantiate(definition.Result, parameters);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        var result = _factory.CreateVariable(prefix + ":result", memberInfo.ReturnType);
-        var builder = new IrProgramBuilder(_factory);
-        var entry = builder.CreateBlock(prefix + ":entry");
-        builder.SetEntry(entry);
-        builder.Return(
-            entry,
-            _factory.CreateOperation(prefix + ":return"),
-            resultExpression);
-        var signature = CompilerSummarySignature.Create(
-            member,
-            parameters,
-            result,
-            new IrSummaryProvenance(
-                IrSummaryOrigin.SpecificationPack,
-                definition.EvidenceSha256,
-                definition.EvidenceIdentity,
-                method.GetDocumentationCommentId() ?? string.Empty));
-        var environment = parameters.ToImmutableDictionary(
-            static parameter => parameter,
-            parameter => (IrTerm)_factory.Variable(parameter));
-        var built = IrRelationalSummaryBuilder.Build(
-            builder.Build(),
-            signature,
-            environment);
-        summary = built.Summary;
-        return built.IsSuccess;
-    }
-
     private bool TryResolve(
         IMethodSymbol method,
         out RelationalSpecPackMethod definition)
@@ -320,53 +244,6 @@ internal sealed class CompilerSpecificationPackProvider
         definition = resolved;
         _resolved[method] = definition;
         return true;
-    }
-
-    private IrTerm Instantiate(
-        SpecTermDeclaration term,
-        ImmutableArray<IrVarId> parameters)
-    {
-        IrTerm result = term switch
-        {
-            SpecVariableDeclaration
-            {
-                Role: SpecVariableRole.Parameter
-            } parameter when parameter.Ordinal >= 0 &&
-                parameter.Ordinal < parameters.Length =>
-                _factory.Variable(parameters[parameter.Ordinal]),
-            SpecBooleanDeclaration value => _factory.Boolean(value.Value),
-            SpecIntegerDeclaration value => _factory.Integer(value.Value),
-            SpecUnaryDeclaration value => _factory.Unary(
-                value.Operator,
-                Instantiate(value.Operand, parameters)),
-            SpecBinaryDeclaration value => _factory.Binary(
-                value.Operator,
-                Instantiate(value.Left, parameters),
-                Instantiate(value.Right, parameters)),
-            SpecConditionalDeclaration value => _factory.Conditional(
-                Instantiate(value.Condition, parameters),
-                Instantiate(value.WhenTrue, parameters),
-                Instantiate(value.WhenFalse, parameters)),
-            _ => throw new ArgumentException("A specification-pack term is invalid.")
-        };
-        if (result.Type != TypeId(term.Type))
-        {
-            throw new ArgumentException(
-                "A specification-pack term has an invalid type.");
-        }
-
-        return result;
-    }
-
-    private IrTypeId TypeId(IrTypeKind kind)
-    {
-        return kind switch
-        {
-            IrTypeKind.Boolean => _factory.BooleanType,
-            IrTypeKind.Integer => _factory.IntegerType,
-            _ => throw new ArgumentException(
-                "A specification-pack scalar type is unsupported.")
-        };
     }
 
     private static bool MatchesType(ITypeSymbol type, IrTypeKind expected)

@@ -338,7 +338,7 @@ public sealed class CompilerManifestArtifactTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(artifact)));
         Assert.That(
-            artifact.Callables.Single(item => item.CallableId.Contains(".B(", StringComparison.Ordinal)).Graph,
+            artifact.Callables.Single(item => item.CallableId.Contains(".B(", StringComparison.Ordinal)).Total?.Graph,
             Is.Not.Null);
     }
 
@@ -1321,7 +1321,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void SummaryFreeVariablesAreFreshFromProgramAndCanonicalVariables()
+    public void TotalCallCanonicalVariablesRemainDistinct()
     {
         const string source =
             """
@@ -1336,41 +1336,37 @@ public sealed class CompilerManifestArtifactTests
             }
             """;
         Action<CompilerCallableArtifact>[] corruptions = [
-            callable => callable.Body!.SummaryCalls[0].Result =
-                callable.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Parameter).Variable,
-            callable => callable.Body!.SummaryCalls[0].Result =
-                callable.Graph!.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .Single(static instruction =>
-                        instruction.Kind == IrInstructionKind.Call).A,
-            callable => callable.Body!.SummaryCalls[0].ExistentialVariables = [
-                callable.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Parameter).Variable
-            ]
+            callable => callable.Total!.Result = callable.Total.Parameters[0].Entry,
+            callable => callable.Total!.Parameters[0].Current = callable.Total.Parameters[0].Entry,
+            callable => callable.Total!.Parameters[0].Old = callable.Total.Parameters[0].Current
         ];
         var valid = CreateContractArtifact(source);
-
+        Assert.That(valid.Callables[0].Total, Is.Not.Null);
         foreach (var corrupt in corruptions)
         {
             var artifact = CloneArtifact(valid);
-            Assert.That(
-                artifact.Callables[0].Body!.SummaryCalls,
-                Has.Length.EqualTo(1));
             corrupt(artifact.Callables[0]);
-
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+            Assert.Throws<InvalidDataException>(new Action(() => CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
     }
 
-
-
-
-
-
-
-
+    [Test]
+    public void RetiredRelationalSummaryDescriptorsAreRejected()
+    {
+        var artifact = CreateContractArtifact("""
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+        artifact.Callables.Single().Body!.SummaryCalls = [new CompilerSummaryCallArtifact()];
+        var exception = Assert.Throws<InvalidDataException>(new Action(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.That(exception!.Message, Does.Contain("Relational-summary descriptors are retired"));
+    }
 
     [Test]
     public void SameShapedMemberSubstitutionFailsClosed()

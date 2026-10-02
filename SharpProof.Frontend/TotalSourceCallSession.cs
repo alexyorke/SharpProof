@@ -88,7 +88,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             !method.IsStatic || method.IsAsync || method.IsExtern || method.IsVirtual ||
             method.Arity != 0 || method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
-            method.ContainingType.IsGenericType || invocation.Instance != null ||
+            invocation.Instance != null ||
+            method.Parameters.Where((parameter, ordinal) =>
+                parameter.Type.SpecialType != method.OriginalDefinition.Parameters[ordinal].Type.SpecialType).Any() ||
+            method.ReturnType.SpecialType != method.OriginalDefinition.ReturnType.SpecialType ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsParams ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
@@ -116,7 +119,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         if (!HasNoTypeInitialization(method.ContainingType) || !Spend(method.Parameters.Length * 3 + 1))
         { return false; }
-        frame = caller.CreateFrame(method);
+        // Source operations bind to declaration symbols. Closed outer types
+        // may share that body only when their intrinsic signature is unchanged.
+        frame = caller.CreateFrame(method.OriginalDefinition);
         if (!prepareCallee(frame))
         { frame = null; return false; }
         cancellationToken.ThrowIfCancellationRequested();

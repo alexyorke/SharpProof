@@ -48,8 +48,6 @@
       '$(MSBuildProjectName)' == 'SharpProof.Ir.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Smt' Or
       '$(MSBuildProjectName)' == 'SharpProof.Specs' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Summaries' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Summaries.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Testing' Or
       '$(MSBuildProjectName)' == 'SharpProof.Testing.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Verify' Or

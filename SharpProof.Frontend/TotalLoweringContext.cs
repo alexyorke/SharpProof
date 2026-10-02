@@ -23,6 +23,7 @@ public sealed class TotalLoweringContext
 {
     private readonly RoslynTypeMapper _types;
     private readonly Func<SyntaxTree, string> _document;
+    private readonly bool _allowGenericContainer;
     private readonly Dictionary<ISymbol, IrVarId> _locals = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
     private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
@@ -39,11 +40,13 @@ public sealed class TotalLoweringContext
     {
     }
 
-    private TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document, int leadingParameters)
+    private TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document, int leadingParameters,
+        bool allowGenericContainer = false)
     {
         Factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         Target = ArgumentNullGuard.NotNull(target, nameof(target));
         _document = ArgumentNullGuard.NotNull(document, nameof(document));
+        _allowGenericContainer = allowGenericContainer;
         if (factory.Semantics != IrExecutionSemantics.Total)
         {
             throw new ArgumentException("Candidate lowering requires Total IR semantics.", nameof(factory));
@@ -65,11 +68,11 @@ public sealed class TotalLoweringContext
     internal object Origin { get; } = new();
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
-        return new(Factory, target, _document);
+        return new(Factory, target, _document, 0, allowGenericContainer: true);
     }
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {
-        return new(Factory, target, _document, omitReceiver ? 1 : 0);
+        return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
     }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
     public IrVarId? Result { get; }
@@ -79,7 +82,7 @@ public sealed class TotalLoweringContext
 
     internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind == MethodKind.Ordinary &&
         !Target.IsVirtual && !Target.IsAbstract && !Target.IsOverride) &&
-        !Target.IsAsync && Target.Arity == 0 && !Target.ContainingType.IsGenericType &&
+        !Target.IsAsync && Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&

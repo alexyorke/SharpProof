@@ -14,69 +14,6 @@ internal static class CompilerLoweredArtifact
         WorkerClaimEvidence.CompanionClause
     ];
 
-    private sealed class SummaryEvidenceIndex
-    {
-        private readonly CompilerCompilationSnapshot _compilation;
-        internal SummaryEvidenceIndex(CompilerCompilationSnapshot compilation)
-        {
-            _compilation = compilation;
-        }
-
-        internal bool IsValid(
-            CompilerSummaryOrigin origin,
-            string? callIdentity,
-            string? sha256,
-            string? identity)
-        {
-            if (!Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) ||
-                !WorkerProtocolJson.IsSha256(sha256) ||
-                !ValidSummaryCallIdentity(callIdentity) ||
-                !ValidSummaryEvidenceIdentity(origin, identity, _compilation))
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        internal bool AreValidDependencies(
-            CompilerPreparedSummaryEvidence[]? evidence)
-        {
-            if (evidence == null)
-            {
-                return false;
-            }
-
-            string? previous = null;
-            foreach (var item in evidence)
-            {
-                if (item == null ||
-                    !IsValid(
-                        item.Origin,
-                        item.CallIdentity,
-                        item.EvidenceSha256,
-                        item.EvidenceIdentity))
-                {
-                    return false;
-                }
-
-                var key = ((int)item.Origin).ToString(
-                        CultureInfo.InvariantCulture) + "|" +
-                    item.CallIdentity + "|" +
-                    item.EvidenceIdentity + "|" + item.EvidenceSha256;
-                if (previous != null &&
-                    StringComparer.Ordinal.Compare(previous, key) >= 0)
-                {
-                    return false;
-                }
-
-                previous = key;
-            }
-
-            return true;
-        }
-    }
-
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
@@ -93,14 +30,9 @@ internal static class CompilerLoweredArtifact
         }
 
         var body = preparation.Body;
-        var orderedSummaryCalls = body?.SummaryCalls.Values
-            .OrderBy(static item => item.Instruction.Value)
-            .ToArray() ?? [];
-        var roots = preparation.Clauses
-            .Select(static clause => clause.Condition)
-            .Concat(orderedSummaryCalls.Select(
-                static call => call.NormalRelation))
-            .ToArray();
+        if (body is { SummaryCalls.Count: > 0 })
+        { throw new InvalidDataException("Relational-summary production is retired."); }
+        var roots = preparation.Clauses.Select(static clause => clause.Condition).ToArray();
         var variables = new List<IrVarId>();
         var seenVariables = new HashSet<IrVarId>();
         void AddVariable(IrVarId variable)
@@ -125,14 +57,6 @@ internal static class CompilerLoweredArtifact
             {
                 AddVariable(binding.Key);
                 AddVariable(binding.Value);
-            }
-        }
-        foreach (var call in orderedSummaryCalls)
-        {
-            AddVariable(call.Result);
-            foreach (var existential in call.ExistentialVariables)
-            {
-                AddVariable(existential);
             }
         }
         var encoded = PortableIrGraphCodec.Encode(preparation.Factory, body?.Program, roots, variables);
@@ -203,9 +127,6 @@ internal static class CompilerLoweredArtifact
             .Select(static call => (
                 call.Instruction,
                 call.CallIdentity))
-            .Concat(body.SummaryCalls.Values.Select(static call => (
-                call.Instruction,
-                call.CallIdentity)))
             .OrderBy(call => encoded.InstructionIndices[call.Instruction])
             .ToArray();
         if (allCalls.Length > 0)
@@ -235,46 +156,7 @@ internal static class CompilerLoweredArtifact
                 Instruction = encoded.InstructionIndices[item.Instruction], WitnessIdentifier = item.WitnessIdentifier,
                 ConsumesMemoryHavoc = item.ConsumesMemoryHavoc
             })];
-        if (orderedSummaryCalls.Length == 0)
-        {
-            artifact.Body.SummaryCalls = [];
-        }
-        else
-        {
-            var programInstructions = body.Program!.Blocks
-                .SelectMany(static block => block.Instructions)
-                .ToDictionary(static instruction => instruction.Id);
-            artifact.Body.SummaryCalls = [.. orderedSummaryCalls.Select((item, index) =>
-                BuildSummaryCallArtifact(item, index, programInstructions))];
-        }
         return artifact;
-
-        CompilerSummaryCallArtifact BuildSummaryCallArtifact(
-            CompilerPreparedSummaryCall item,
-            int index,
-            Dictionary<IrInstructionId, IrInstruction> programInstructions)
-        {
-            if (!programInstructions.TryGetValue(item.Instruction, out var instruction) ||
-                instruction is not IrCallInstruction call)
-            {
-                throw new InvalidDataException(
-                    "A prepared summary call does not reference a call instruction.");
-            }
-
-            return new CompilerSummaryCallArtifact
-            {
-                Instruction = encoded.InstructionIndices[item.Instruction],
-                Identity = item.CallIdentity,
-                Origin = item.Origin,
-                Result = encoded.VariableIndices[item.Result],
-                ExistentialVariables = [.. item.ExistentialVariables.Select(
-                    variable => encoded.VariableIndices[variable])],
-                NormalRelationRoot = preparation.Clauses.Length + index,
-                EvidenceSha256 = item.EvidenceSha256,
-                EvidenceIdentity = item.EvidenceIdentity,
-                DependencyEvidence = [.. item.DependencyEvidence],
-            };
-        }
     }
 
     private static CompilerScalarDomain ScalarDomain(
@@ -340,7 +222,6 @@ internal static class CompilerLoweredArtifact
         }
 
         var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Length);
-        SummaryEvidenceIndex? summaryEvidence = null;
         foreach (var artifact in artifacts.OrderBy(static item => item.CallableId, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -356,7 +237,6 @@ internal static class CompilerLoweredArtifact
                 entry,
                 targetClaims,
                 compilation,
-                ref summaryEvidence,
                 cancellationToken));
         }
         cancellationToken.ThrowIfCancellationRequested();
@@ -367,7 +247,6 @@ internal static class CompilerLoweredArtifact
         WorkerCallableManifestEntry entry,
         ImmutableArray<WorkerClaimManifestEntry> claims,
         CompilerCompilationSnapshot compilation,
-        ref SummaryEvidenceIndex? summaryEvidence,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -378,6 +257,9 @@ internal static class CompilerLoweredArtifact
         {
             throw new InvalidDataException("A lowered callable reason is invalid.");
         }
+
+        if (artifact.Body?.SummaryCalls is { Length: > 0 })
+        { throw new InvalidDataException("Relational-summary descriptors are retired."); }
 
         var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
         var totalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken);
@@ -413,8 +295,7 @@ internal static class CompilerLoweredArtifact
             ExternalVariableIndices(artifact),
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var summaryRootCount = artifact.Body?.SummaryCalls?.Length ?? 0;
-        if (decoded.Roots.Count != artifact.Clauses.Length + summaryRootCount)
+        if (decoded.Roots.Count != artifact.Clauses.Length)
         {
             throw new InvalidDataException(
                 "A lowered callable contains an invalid root closure.");
@@ -514,10 +395,7 @@ internal static class CompilerLoweredArtifact
             artifact.Body,
             artifact.Graph,
             decoded,
-            variables,
-            artifact.Clauses.Length,
-            compilation,
-            ref summaryEvidence);
+            variables);
         cancellationToken.ThrowIfCancellationRequested();
         if (postconditionClaims.Length != 0 && body == null)
         {
@@ -573,18 +451,6 @@ internal static class CompilerLoweredArtifact
             {
                 Add(binding.Source);
                 Add(binding.Target);
-            }
-        }
-        foreach (var summary in artifact.Body?.SummaryCalls ?? [])
-        {
-            if (summary == null)
-            {
-                continue;
-            }
-            Add(summary.Result);
-            foreach (var existential in summary.ExistentialVariables ?? [])
-            {
-                Add(existential);
             }
         }
         return [.. indices.OrderBy(static index => index)];
@@ -709,10 +575,7 @@ internal static class CompilerLoweredArtifact
         CompilerBodyArtifact? row,
         PortableIrGraph portable,
         DecodedPortableIrGraph graph,
-        ImmutableArray<CompilerCanonicalVariable> variables,
-        int clauseRootCount,
-        CompilerCompilationSnapshot compilation,
-        ref SummaryEvidenceIndex? summaryEvidence)
+        ImmutableArray<CompilerCanonicalVariable> variables)
     {
         if (row == null)
         {
@@ -750,9 +613,7 @@ internal static class CompilerLoweredArtifact
 
         var programVariables = ValidateExecutableBody(graph.Program, variables);
         if (row.SummaryCalls.Length != 0)
-        {
-            summaryEvidence ??= new SummaryEvidenceIndex(compilation);
-        }
+        { throw new InvalidDataException("Relational-summary descriptors are retired."); }
 
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
         var parameters = variables
@@ -789,11 +650,9 @@ internal static class CompilerLoweredArtifact
             bindings.Add(source, target);
         }
         var specs = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
-        var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         var callCount = graph.Instructions.Count(static instruction => instruction is IrCallInstruction);
-        var summaryVariables = new HashSet<IrVarId>();
         if (row.Calls.Length != callCount ||
-            row.SpecCalls.Length + row.SummaryCalls.Length != callCount)
+            row.SpecCalls.Length != callCount)
         {
             throw new InvalidDataException(
                 "Lowered call evidence does not equal program calls.");
@@ -860,92 +719,7 @@ internal static class CompilerLoweredArtifact
                 spec.ConsumesMemoryHavoc));
         }
 
-        for (var index = 0; index < row.SummaryCalls.Length; index++)
-        {
-            var summary = row.SummaryCalls[index] ??
-                throw new InvalidDataException(
-                    "A lowered summary-call descriptor is invalid.");
-            var instruction = At(
-                graph.Instructions,
-                summary.Instruction,
-                "instruction");
-            if (instruction is not IrCallInstruction call ||
-                !identities.TryGetValue(call.Id, out var identity) ||
-                summary.Identity != identity ||
-                !summaryEvidence!.IsValid(
-                    summary.Origin,
-                    summary.Identity,
-                    summary.EvidenceSha256,
-                    summary.EvidenceIdentity) ||
-                !summaryEvidence.AreValidDependencies(summary.DependencyEvidence) ||
-                summary.NormalRelationRoot != clauseRootCount + index ||
-                summary.ExistentialVariables == null ||
-                specs.ContainsKey(call.Id) ||
-                summaries.ContainsKey(call.Id))
-            {
-                throw new InvalidDataException(
-                    "A lowered summary-call descriptor is invalid.");
-            }
-
-            var result = At(
-                graph.Variables,
-                summary.Result,
-                "variable");
-            var existentials = summary.ExistentialVariables
-                .Select(index => At(
-                    graph.Variables,
-                    index,
-                    "variable"))
-                .ToImmutableArray();
-            var relation = At(
-                graph.Roots,
-                summary.NormalRelationRoot,
-                "root");
-            var free = existentials.Insert(0, result);
-            var freeIdentifiers = new HashSet<IrVarId>();
-            var hasDuplicateFreeVariable = false;
-            var hasCanonicalFreeVariable = false;
-            var hasProgramFreeVariable = false;
-            var hasSummaryFreeVariable = false;
-            foreach (var variable in free)
-            {
-                hasDuplicateFreeVariable |= !freeIdentifiers.Add(variable);
-                hasCanonicalFreeVariable |= canonical.Contains(variable);
-                hasProgramFreeVariable |= programVariables.Contains(variable);
-                hasSummaryFreeVariable |= summaryVariables.Contains(variable);
-            }
-            if (!call.Target.HasValue ||
-                graph.Factory.GetVariableInfo(call.Target.Value).Type !=
-                    graph.Factory.GetVariableInfo(result).Type ||
-                hasDuplicateFreeVariable ||
-                hasCanonicalFreeVariable ||
-                hasProgramFreeVariable ||
-                hasSummaryFreeVariable ||
-                relation.Type != graph.Factory.BooleanType ||
-                !HasValidSummaryFreeVariableRoles(
-                    call,
-                    result,
-                    existentials,
-                    relation))
-            {
-                throw new InvalidDataException(
-                    "A lowered source-call relation is invalid.");
-            }
-            summaryVariables.UnionWith(free);
-
-            summaries.Add(call.Id, new CompilerPreparedSummaryCall(
-                call.Id,
-                identity,
-                summary.Origin,
-                result,
-                existentials,
-                relation,
-                summary.EvidenceSha256,
-                summary.EvidenceIdentity,
-                [.. summary.DependencyEvidence]));
-        }
-
-        if (specs.Count + summaries.Count != callCount)
+        if (specs.Count != callCount)
         {
             throw new InvalidDataException(
                 "Lowered call evidence is incomplete.");
@@ -955,37 +729,7 @@ internal static class CompilerLoweredArtifact
             graph.Program,
             bindings.ToImmutable(),
             specs.ToImmutable(),
-            summaries.ToImmutable());
-    }
-
-    private static bool HasValidSummaryFreeVariableRoles(
-        IrCallInstruction call,
-        IrVarId result,
-        IReadOnlyList<IrVarId> existentials,
-        IrTerm relation)
-    {
-        var relationVariables = IrTermAnalysis.CollectVariables(relation);
-        var freeVariables = existentials.ToImmutableHashSet().Add(result);
-        if (!freeVariables.IsSubsetOf(relationVariables))
-        {
-            return false;
-        }
-
-        var inputVariables = ImmutableHashSet.CreateBuilder<IrVarId>();
-        if (call.Receiver != null)
-        {
-            inputVariables.UnionWith(
-                IrTermAnalysis.CollectVariables(call.Receiver));
-        }
-
-        foreach (var argument in call.Arguments)
-        {
-            inputVariables.UnionWith(IrTermAnalysis.CollectVariables(argument));
-        }
-
-        return relationVariables
-            .Where(variable => !freeVariables.Contains(variable))
-            .All(inputVariables.Contains);
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);
     }
 
     private static HashSet<IrVarId> ValidateExecutableBody(
@@ -1159,32 +903,6 @@ internal static class CompilerLoweredArtifact
                 AddTermVariables(sequence.Index, variables);
                 break;
         }
-    }
-
-    private static bool ValidSummaryEvidenceIdentity(
-        CompilerSummaryOrigin origin,
-        string? identity,
-        CompilerCompilationSnapshot compilation)
-    {
-        if (identity == null)
-        {
-            return false;
-        }
-
-        if (origin != CompilerSummaryOrigin.SpecificationPack)
-        {
-            return identity.Length == 0;
-        }
-
-        return CompilerSpecificationPackSelection.IsValidPackIdentity(
-            identity,
-            compilation.SpecificationPackIds);
-    }
-
-    private static bool ValidSummaryCallIdentity(string? identity)
-    {
-        return identity is { Length: > 0 and <= 512 } &&
-            identity.All(static character => !char.IsControl(character));
     }
 
     internal static WorkerClaimEvidence ManifestEvidence(

@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -9,7 +8,6 @@ using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
 using SharpProof.Specs;
-using SharpProof.Summaries;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -23,23 +21,6 @@ public sealed class CompilerCallableLowererTests
         CompilerContractKind.Assume,
         CompilerContractKind.Ensures
     ];
-
-    [Test]
-    public void SummaryOriginWireVocabularyMatches()
-    {
-        Assert.That(
-            Enum.GetNames<CompilerSummaryOrigin>(),
-            Is.EqualTo(Enum.GetNames<IrSummaryOrigin>()));
-        Assert.That(
-            Enum.GetValues<CompilerSummaryOrigin>()
-                .Select(static value => Convert.ToInt32(
-                    value,
-                    CultureInfo.InvariantCulture)),
-            Is.EqualTo(Enum.GetValues<IrSummaryOrigin>()
-                .Select(static value => Convert.ToInt32(
-                    value,
-                    CultureInfo.InvariantCulture))));
-    }
 
     [TestCase(ContractBindingFailure.UnsupportedExpression,
         WorkerClaimReason.UnsupportedExpression)]
@@ -266,7 +247,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public void DirectAcyclicSourceCallCarriesAReusableRelationalSummary()
+    public void DirectAcyclicSourceCallUsesTotalPreparation()
     {
         var preparation = Prepare(
             """
@@ -283,28 +264,9 @@ public sealed class CompilerCallableLowererTests
             """,
             "Verify");
 
-        Assert.That(
-            preparation.IsSuccess,
-            Is.True,
-            preparation.FailureReason.ToString());
-        var body = preparation.Body!;
-        var descriptor = body.SummaryCalls.Values.Single();
-        var call = body.Program!.Blocks
-            .SelectMany(static block => block.Instructions)
-            .OfType<IrCallInstruction>()
-            .Single(instruction => instruction.Id == descriptor.Instruction);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(body.SpecCalls, Is.Empty);
-            Assert.That(
-                descriptor.Origin,
-                Is.EqualTo(CompilerSummaryOrigin.Source));
-            Assert.That(descriptor.CallIdentity, Does.Contain(".Read("));
-            Assert.That(descriptor.EvidenceSha256, Has.Length.EqualTo(64));
-            Assert.That(descriptor.EvidenceIdentity, Is.Empty);
-            Assert.That(descriptor.NormalRelation.Type, Is.EqualTo(preparation.Factory.BooleanType));
-            Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
-        }
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Body, Is.Null);
+        Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
 
     [Test]
@@ -360,10 +322,10 @@ public sealed class CompilerCallableLowererTests
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
 
-        var summary = CompilerManifestArtifactJson.DecodeCallables(artifact).Single()
-            .Body!.SummaryCalls.Values.Single();
-        Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
-        Assert.That(summary.CallIdentity, Is.EqualTo("M:Helper.Read(System.Boolean)"));
+        var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Body, Is.Null);
+        Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
 
     [Test]

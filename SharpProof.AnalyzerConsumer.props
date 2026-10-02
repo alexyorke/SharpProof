@@ -50,7 +50,6 @@
                       ReferenceOutputAssembly="false" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.CompilerArtifact.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Summaries.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Worker.Protocol.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.IO.Pipelines.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Encodings.Web.dll" />

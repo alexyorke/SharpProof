@@ -32,8 +32,6 @@
   <Project Path="SharpProof.Smt/SharpProof.Smt.csproj" />
   <Project Path="SharpProof.Specs.Test/SharpProof.Specs.Test.csproj" />
   <Project Path="SharpProof.Specs/SharpProof.Specs.csproj" />
-  <Project Path="SharpProof.Summaries.Test/SharpProof.Summaries.Test.csproj" />
-  <Project Path="SharpProof.Summaries/SharpProof.Summaries.csproj" />
   <Project Path="SharpProof.Testing.Test/SharpProof.Testing.Test.csproj" />
   <Project Path="SharpProof.Testing/SharpProof.Testing.csproj" />
   <Project Path="SharpProof.Verifier/SharpProof.Verifier.csproj" />

@@ -12,14 +12,8 @@ internal sealed class CompilerCallableLowerer
     private readonly CompilerReferenceSnapshot[]? _capturedReferences;
     private readonly ContractBinder _contracts;
     private readonly ResolvedApiSpecTable _apiSpecs;
-    private readonly CompilerRelationalSummaryProvider _summaries;
     private readonly CompilerSpecificationPackConfiguration _specificationPackAuthority;
-
-    internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention =>
-        _summaries.LastImplementationIlAbstention;
-
-    internal ImmutableArray<CompilerSummaryEvidenceAuthority> SummaryEvidenceAuthorities =>
-        _summaries.SummaryEvidenceAuthorities;
+    private readonly CompilerSpecificationPackProvider _specificationPacks;
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
@@ -47,12 +41,7 @@ internal sealed class CompilerCallableLowerer
         _specificationPackAuthority = specificationPackAuthority;
         _contracts = new ContractBinder(compilation, factory);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        _summaries = new CompilerRelationalSummaryProvider(
-            compilation,
-            factory,
-            _apiSpecs,
-            specificationPackAuthority,
-            capturedTrees);
+        _specificationPacks = new CompilerSpecificationPackProvider(factory, specificationPackAuthority);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
@@ -233,7 +222,7 @@ internal sealed class CompilerCallableLowerer
 
         var selected = new RoslynProgramLowerer(
             _factory,
-            _summaries.IsAdmissiblePureCall).LowerSelected(
+            _apiSpecs.IsSideEffectFree).LowerSelected(
             graph, entry!, firstOperation,
             operation => ContainsElidedClause(operation, elidedClauseSites));
         var lowering = selected.Lowering;
@@ -246,7 +235,6 @@ internal sealed class CompilerCallableLowerer
         }
 
         var specCalls = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
-        var summaryCalls = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         foreach (var binding in selected.Calls)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -271,21 +259,9 @@ internal sealed class CompilerCallableLowerer
                 continue;
             }
 
-            if (TryPrepareSummaryCall(
-                    binding.Key,
-                    binding.Value,
-                    callIdentity,
-                    admissibleByValue,
-                    out var preparedSource,
-                    cancellationToken))
-            {
-                summaryCalls.Add(binding.Key.Id, preparedSource!);
-                continue;
-            }
-
             return Unsupported(out failure);
         }
-        if (specCalls.Count + summaryCalls.Count != selected.Calls.Count)
+        if (specCalls.Count != selected.Calls.Count)
         {
             return Unsupported(out failure);
         }
@@ -295,7 +271,7 @@ internal sealed class CompilerCallableLowerer
             lowering.Program,
             parameterBindings,
             specCalls.ToImmutable(),
-            summaryCalls.ToImmutable());
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);
     }
 
     private static CompilerPreparedBody? Unsupported(out WorkerClaimReason failure)
@@ -359,10 +335,9 @@ internal sealed class CompilerCallableLowerer
             return false;
         }
 
-        // An explicitly enabled relational pack owns overlapping calls.  Let
-        // the summary path preserve its relation instead of reducing the call
-        // to the scalar API specification first.
-        if (_summaries.CanResolveSpecificationPack(invocation.TargetMethod))
+        // Enabled scalar packs are lowered by the Total path. Do not replace
+        // their operations with a less precise legacy API-spec descriptor.
+        if (_specificationPacks.CanResolve(invocation.TargetMethod))
         {
             return false;
         }
@@ -395,66 +370,6 @@ internal sealed class CompilerCallableLowerer
             throws.NormalCompletion != null;
     }
 
-    private bool TryPrepareSummaryCall(
-        IrCallInstruction call,
-        IInvocationOperation invocation,
-        string callIdentity,
-        bool admissibleByValue,
-        out CompilerPreparedSummaryCall? prepared,
-        CancellationToken cancellationToken)
-    {
-        prepared = null;
-        if (!admissibleByValue ||
-            !_summaries.TryGet(
-                invocation.TargetMethod,
-                call.Member,
-                cancellationToken,
-                out var summary) ||
-            summary == null)
-        {
-            return false;
-        }
-
-        if (!string.Equals(
-                summary.Signature.Provenance.EvidenceCallIdentity,
-                callIdentity,
-                StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        IrSummaryInstantiation instantiated;
-        try
-        {
-            instantiated = IrRelationalSummaryInstantiator.Instantiate(
-                summary,
-                call.Receiver,
-                call.Arguments,
-                call.Id.Value);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        prepared = new CompilerPreparedSummaryCall(
-            call.Id,
-            callIdentity,
-            ToCompilerOrigin(summary.Signature.Provenance.Origin),
-            instantiated.Result,
-            [.. instantiated.FreshVariables.Skip(1)],
-            instantiated.NormalRelation,
-            summary.Signature.Provenance.EvidenceSha256,
-            summary.Signature.Provenance.EvidenceIdentity,
-            [.. summary.DependencyProvenance.Select(static provenance =>
-                new CompilerPreparedSummaryEvidence(
-                    ToCompilerOrigin(provenance.Origin),
-                    provenance.EvidenceCallIdentity,
-                    provenance.EvidenceSha256,
-                    provenance.EvidenceIdentity))]);
-        return true;
-    }
-
     private static bool TryGetAdmissibleByValueCall(
         IrCallInstruction call,
         IInvocationOperation invocation)
@@ -463,21 +378,6 @@ internal sealed class CompilerCallableLowerer
             RoslynProgramLowerer.IsDirectInvocation(invocation) &&
             !invocation.TargetMethod.Parameters.Any(
                 static parameter => parameter.RefKind != RefKind.None);
-    }
-
-    private static CompilerSummaryOrigin ToCompilerOrigin(
-        IrSummaryOrigin origin)
-    {
-        return origin switch
-        {
-            IrSummaryOrigin.Source => CompilerSummaryOrigin.Source,
-            IrSummaryOrigin.ImplementationIl =>
-                CompilerSummaryOrigin.ImplementationIl,
-            IrSummaryOrigin.SpecificationPack =>
-                CompilerSummaryOrigin.SpecificationPack,
-            _ => throw new InvalidOperationException(
-                "A relational summary has an unsupported origin.")
-        };
     }
 
     private static bool TryGetCallIdentity(IMethodSymbol method, out string identity)

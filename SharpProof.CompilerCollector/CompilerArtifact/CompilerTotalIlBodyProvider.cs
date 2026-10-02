@@ -13,7 +13,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field.FieldType == typeof(OpCode)).Select(field => (OpCode)field.GetValue(null)!)
         .ToDictionary(opcode => opcode.Value);
-    private readonly CompilerImplementationIlSummaryLowerer.MetadataResolutionContext _resolution = new(compilation);
+    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(compilation);
     private readonly Dictionary<string, byte[]> _images = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TotalIlBody?> _bodies = new(StringComparer.Ordinal);
     private CompilerReferenceSnapshot[]? _capturedReferences = references;
@@ -46,9 +46,9 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             !method.IsVararg && !method.HasUnsupportedMetadata && !method.ContainingType.IsGenericType && method.Parameters.Length <= 128 &&
             method.Parameters.All(parameter => parameter.RefKind == RefKind.None && !parameter.IsParams && TotalIlStack.Supported(parameter.Type.SpecialType)) &&
             (method.ReturnsVoid || TotalIlStack.Supported(method.ReturnType.SpecialType)) &&
-            !CompilerImplementationIlSummaryLowerer.IsReferenceAssembly(method.ContainingAssembly) &&
+            !CompilerMetadataResolution.IsReferenceAssembly(method.ContainingAssembly) &&
             !method.GetAttributes().Any(attribute => attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
-                CompilerImplementationIlSummaryLowerer.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices"));
+                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices"));
     }
 
     private static bool NoInitialization(PEReader pe, MetadataReader reader, TypeDefinitionHandle type)
@@ -63,7 +63,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                 var method = reader.GetMethodDefinition(methodHandle);
                 if (reader.GetString(method.Name) != ".cctor")
                 { continue; }
-                if (!CompilerImplementationIlSummaryLowerer.HasManagedIlBody(method) || method.RelativeVirtualAddress == 0 ||
+                if (!CompilerMetadataResolution.HasManagedIlBody(method) || method.RelativeVirtualAddress == 0 ||
                     (method.ImplAttributes & MethodImplAttributes.Synchronized) != 0 || method.GetDeclarativeSecurityAttributes().Count != 0)
                 { return false; }
                 var body = pe.GetMethodBody(method.RelativeVirtualAddress);
@@ -127,8 +127,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         }
         if (!CompilerCompilationCapture.MetadataEquals(backing.GetMetadataReader(), reader) ||
             reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D") != authority.Mvid ||
-            !CompilerImplementationIlSummaryLowerer.TryGetMethodDefinition(reader, method.MetadataToken, out var handle, out var definition) ||
-            !CompilerImplementationIlSummaryLowerer.HasManagedIlBody(definition) ||
+            !CompilerMetadataResolution.TryGetMethodDefinition(reader, method.MetadataToken, out var handle, out var definition) ||
+            !CompilerMetadataResolution.HasManagedIlBody(definition) ||
             (definition.ImplAttributes & MethodImplAttributes.Synchronized) != 0 || definition.RelativeVirtualAddress == 0 ||
             ResolveMethod(reader, assembly, handle, method.ContainingModule.Name) is not { } resolved ||
             !SameSignature(method, resolved) || !NoInitialization(pe, reader, definition.GetDeclaringType()))

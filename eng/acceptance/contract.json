@@ -43,8 +43,7 @@
       "SharpProof.Gates.Test\\SharpProof.Gates.Test.csproj": 2,
       "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
       "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,
-      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2,
-      "SharpProof.Summaries.Test\\SharpProof.Summaries.Test.csproj": 2
+      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2
     }
   },
   "container": {
@@ -96,7 +95,6 @@
       "SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj",
       "SharpProof.Contracts/SharpProof.Contracts.csproj",
       "SharpProof.Dataflow/SharpProof.Dataflow.csproj",
-      "SharpProof.Summaries/SharpProof.Summaries.csproj",
       "SharpProof.Worker/SharpProof.Worker.csproj"
     ],
     "components": [
@@ -173,17 +171,13 @@
         ]
       },
       {
-        "name": "relationalSummaryAuthority",
+        "name": "metadataCallAuthority",
         "paths": [
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerMetadataResolution.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
-          "SharpProof.Ir/IrSemanticTerms.cs",
-          "SharpProof.Summaries/IrRelationalSummary.cs",
-          "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
-          "SharpProof.Summaries/IrRelationalSummaryInstantiator.cs"
+          "SharpProof.Ir/IrSemanticTerms.cs"
         ],
-        "rationale": "These files construct, authenticate, instantiate, and consume the sealed interprocedural relation trusted by the worker."
+        "rationale": "These files authenticate captured metadata bodies and approved scalar specification-pack operations for Total lowering."
       },
       {
         "name": "execution",
@@ -615,7 +609,6 @@
           "SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj",
           "SharpProof.Contracts/SharpProof.Contracts.csproj",
           "SharpProof.Dataflow/SharpProof.Dataflow.csproj",
-          "SharpProof.Summaries/SharpProof.Summaries.csproj",
           "SharpProof.Worker/SharpProof.Worker.csproj"
         ],
         "rationale": "These project files define the evaluated Compile items and compilation options for the trusted proof pipeline."
@@ -638,7 +631,6 @@
           "SharpProof.CompilerArtifact/CompilerDependencyEvidenceFormatter.cs",
           "SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs",
           "SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSummarySignature.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",
           "SharpProof.Contracts/BoundContracts.cs",
           "SharpProof.Contracts/GlobalUsings.cs",
@@ -699,11 +691,10 @@
           "SharpProof.Specs/Polyfills/IsExternalInit.cs",
           "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
           "SharpProof.Specs/Polyfills/NullableAttributes.cs",
-          "SharpProof.Summaries/GlobalUsings.cs",
           "SharpProof.Worker/GlobalUsings.cs",
           "SharpProof.Worker/MethodResourceBudget.cs"
         ],
-        "rationale": "All evaluated Compile sources in the IR, SMT, Effects, Frontend, CompilerArtifact, CompilerCollector, Contracts, Dataflow, Summaries, and Worker projects are trusted pipeline code. The inventory check requires every such source to remain explicitly classified here or in another TCB component."
+        "rationale": "All evaluated Compile sources in the IR, SMT, Effects, Frontend, CompilerArtifact, CompilerCollector, Contracts, Dataflow, and Worker projects are trusted pipeline code. The inventory check requires every such source to remain explicitly classified here or in another TCB component."
       }
     ]
   },

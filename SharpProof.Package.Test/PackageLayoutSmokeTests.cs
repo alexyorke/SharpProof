@@ -82,7 +82,6 @@ public sealed class PackageLayoutSmokeTests
     private static readonly string[] ExpectedCollectorDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
         "SharpProof.CompilerArtifact.dll",
-        "SharpProof.Summaries.dll",
         "SharpProof.Worker.Protocol.dll",
         "System.IO.Pipelines.dll",
         "System.Text.Encodings.Web.dll",
@@ -102,7 +101,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/shared/netstandard2.0/SharpProof.Frontend.dll",
         "tools/shared/netstandard2.0/SharpProof.Ir.dll",
         "tools/shared/netstandard2.0/SharpProof.Specs.dll",
-        "tools/shared/netstandard2.0/SharpProof.Summaries.dll",
         "tools/shared/netstandard2.0/SharpProof.Worker.Protocol.dll",
         "tools/shared/netstandard2.0/System.Buffers.dll",
         "tools/shared/netstandard2.0/System.Collections.Immutable.dll",

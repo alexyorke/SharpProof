@@ -13,7 +13,6 @@ using SharpProof.CompilerArtifact;
 using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
-using SharpProof.Summaries;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -2838,17 +2837,6 @@ public sealed class WorkerTests
             .GetMembers("ReadAgain")
             .OfType<IMethodSymbol>()
             .Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                CompilerImplementationIlSummaryLowerer.IsCandidate(
-                    compilation,
-                    external),
-                Is.True);
-            Assert.That(
-                external.MetadataToken & unchecked((int)0xff000000),
-                Is.EqualTo(0x06000000));
-        }
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
             candidate.Method.MetadataName == "Call");
@@ -2857,9 +2845,8 @@ public sealed class WorkerTests
             new IrFactory());
         var preparation = lowerer.Prepare(target);
         Assert.That(
-            preparation.IsSuccess,
-            Is.True,
-            lowerer.LastImplementationIlAbstention.ToString());
+            preparation.Total,
+            Is.Not.Null);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
@@ -2969,7 +2956,15 @@ public sealed class WorkerTests
     public void ImplementationIlRejectsStackDepthBeyondDeclaredMaximum()
     {
         using var project = TestProject.Create(
-            "public static class Subject { }");
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Verify(int left, int right) {
+                    Contract.Ensures(true);
+                    return ExternalStackDepth.Add(left, right);
+                }
+            }
+            """);
         var implementationPath = project.AddImplementationReference(
             """
             public static class ExternalStackDepth
@@ -2987,64 +2982,17 @@ public sealed class WorkerTests
             "Add",
             declaredMaxStack: 1);
         var compilation = project.CreateCompilation();
-        var method = compilation.GetTypeByMetadataName(
-                "ExternalStackDepth")!
-            .GetMembers("Add")
-            .OfType<IMethodSymbol>()
-            .Single();
-        var factory = new IrFactory();
-        var declaringType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "ExternalStackDepth");
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            declaringType,
-            "Add",
-            factory.IntegerType,
-            isStatic: true,
-            factory.IntegerType,
-            factory.IntegerType);
-
-        var built = CompilerImplementationIlSummaryLowerer.TryBuild(
-            compilation,
-            factory,
-            method,
-            member,
-            static _ => false,
-            NoDependency,
-            CancellationToken.None,
-            out var summary,
-            out var reason);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(built, Is.False);
-            Assert.That(summary, Is.Null);
-            Assert.That(
-                reason,
-                Is.EqualTo(
-                    CompilerImplementationIlAbstentionReason.UnsupportedIl));
-        }
-
-        static bool NoDependency(
-            IMethodSymbol method,
-            IrMemberId member,
-            CancellationToken cancellationToken,
-            out IrRelationalSummary? summary)
-        {
-            _ = method;
-            _ = member;
-            _ = cancellationToken;
-            summary = null;
-            return false;
-        }
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
     }
 
     [Test]
     public void ImplementationIlRejectsOversizedLocalSignatureBeforeMaterialization()
     {
         var localCount =
-            IrRelationalSummaryBuildLimits.Default.MaximumInstructions + 1;
+            129;
         var localDeclarations = string.Join(
             Environment.NewLine,
             Enumerable.Range(0, localCount).Select(static index =>
@@ -3090,8 +3038,7 @@ public sealed class WorkerTests
                 Assert.That(
                     signatureReader.ReadCompressedInteger(),
                     Is.GreaterThan(
-                        IrRelationalSummaryBuildLimits.Default
-                            .MaximumInstructions));
+                        128));
             }
         }
 
@@ -3101,60 +3048,8 @@ public sealed class WorkerTests
             .GetMembers("Read")
             .OfType<IMethodSymbol>()
             .Single();
-        var factory = new IrFactory();
-        var declaringType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "ExternalLocalBudget");
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            declaringType,
-            "Read",
-            factory.IntegerType,
-            isStatic: true,
-            factory.IntegerType);
-
-        var built = CompilerImplementationIlSummaryLowerer.TryBuild(
-            compilation,
-            factory,
-            method,
-            member,
-            static _ => false,
-            NoDependency,
-            CancellationToken.None,
-            out var summary,
-            out var reason);
-        var sentinel = factory.CreateVariable(
-            "sentinel",
-            factory.IntegerType);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(built, Is.False);
-            Assert.That(summary, Is.Null);
-            Assert.That(
-                reason,
-                Is.EqualTo(
-                    CompilerImplementationIlAbstentionReason
-                        .SummaryResourceLimit));
-            Assert.That(
-                sentinel.Value,
-                Is.EqualTo(2),
-                "Oversized metadata locals were materialized before " +
-                "the summary resource limit was applied.");
-        }
-
-        static bool NoDependency(
-            IMethodSymbol method,
-            IrMemberId member,
-            CancellationToken cancellationToken,
-            out IrRelationalSummary? summary)
-        {
-            _ = method;
-            _ = member;
-            _ = cancellationToken;
-            summary = null;
-            return false;
-        }
+        var provider = new CompilerTotalIlBodyProvider(compilation, null);
+        Assert.That(provider.Resolve(method, CancellationToken.None), Is.Null);
     }
 
     [Test]
@@ -3186,55 +3081,21 @@ public sealed class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(request.CompilerManifest.Path));
-        var summary = artifact.Callables.Single()
-            .Body!.SummaryCalls.Single();
-        var manifestJson = await File.ReadAllTextAsync(
-            request.CompilerManifest.Path);
+        var manifestJson = await File.ReadAllTextAsync(request.CompilerManifest.Path);
         var canonicalJson = CompilerManifestArtifactJson.Serialize(artifact);
         var roundTrip = CompilerManifestArtifactJson.Deserialize(canonicalJson);
-        var roundTripSummary = roundTrip.Callables.Single()
-            .Body!.SummaryCalls.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(canonicalJson, Is.EqualTo(manifestJson));
-            Assert.That(
-                roundTripSummary.DependencyEvidence,
-                Is.EqualTo(summary.DependencyEvidence));
-        }
+        Assert.That(canonicalJson, Is.EqualTo(manifestJson));
+        Assert.That(roundTrip.Callables.Single().Total, Is.Not.Null);
+        Assert.That(roundTrip.Callables.Single().Body, Is.Null);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
-        var implementationEvidence = summary.DependencyEvidence
-            .SingleOrDefault(item =>
-                item.Origin == CompilerSummaryOrigin.ImplementationIl);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
-            Assert.That(
-                summary.DependencyEvidence.Select(static item => item.Origin),
-                Does.Contain(CompilerSummaryOrigin.ImplementationIl));
-            Assert.That(
-                implementationEvidence?.EvidenceSha256.Length ?? 0,
-                Is.EqualTo(64));
-            Assert.That(
-                result.ProofCore.Any(static item => item.StartsWith(
-                    "source-summary:",
-                    StringComparison.Ordinal)),
-                Is.False);
-        }
-
-        // Reporting identities remain opaque after compiler lowering.
-        summary.DependencyEvidence = [.. summary.DependencyEvidence.Select(item =>
-            item.Origin == CompilerSummaryOrigin.ImplementationIl
-                ? item with { EvidenceSha256 = new string('b', 64) }
-                : item)];
-        Assert.DoesNotThrow((Action)(() => CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.ProofCore.Any(static item => item.StartsWith("source-summary:", StringComparison.Ordinal)), Is.False);
     }
-
 
     [Test]
     public async Task ImplementationIlBranchesAndInt32WrappingRemainExact()
@@ -3300,8 +3161,43 @@ public sealed class WorkerTests
         }
     }
 
+    [TestCase("&", "&&")]
+    [TestCase("|", "||")]
+    [TestCase("^", "!=")]
+    public async Task ImplementationIlBooleanOperatorsProveAndRefuteTruthTables(string bodyOperator, string contractOperator)
+    {
+        using var project = TestProject.Create($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Correct(bool left, bool right) {
+                    Contract.Ensures(Contract.Result<bool>() == (left {{contractOperator}} right));
+                    return ExternalBoolean.Apply(left, right);
+                }
+                public static bool Incorrect(bool left, bool right) {
+                    Contract.Ensures(Contract.Result<bool>() != (left {{contractOperator}} right));
+                    return ExternalBoolean.Apply(left, right);
+                }
+            }
+            """);
+        project.AddImplementationReference($$"""
+            public static class ExternalBoolean {
+                public static bool Apply(bool left, bool right) => left {{bodyOperator}} right;
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        foreach (var result in response.ClaimResults)
+        {
+            var correct = GetCallableId(response, result).Contains(".Correct(", StringComparison.Ordinal);
+            Assert.That(result.Outcome, Is.EqualTo(correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted), result.Reason.ToString());
+        }
+    }
+
     [Test]
-    public void ImplementationIlScalarOpcodeMatrixBuildsExactSummaries()
+    public void ImplementationIlScalarOpcodeMatrixUsesTotalBodies()
     {
         var signatures = new (string ReturnType, string Name, string Parameters,
             string Arguments)[]
@@ -3434,56 +3330,13 @@ public sealed class WorkerTests
         var compilation = project.CreateCompilation();
         var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
             .ToDictionary(static target => target.Method.Name, StringComparer.Ordinal);
-        var unsupported = new Dictionary<string, CompilerImplementationIlAbstentionReason>(
-            StringComparer.Ordinal)
-        {
-            ["VerifyLongAdd"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
-            ["VerifyNeg64"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
-            ["VerifyInadmissibleCall"] =
-                CompilerImplementationIlAbstentionReason.InadmissibleCallTarget
-        };
-        var successful = 0;
-
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
-            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
-            var preparation = lowerer.Prepare(targets[targetName]);
-            if (unsupported.TryGetValue(targetName, out var expectedReason))
-            {
-                Assert.That(preparation.IsSuccess, Is.False, targetName);
-                Assert.That(
-                    lowerer.LastImplementationIlAbstention,
-                    Is.EqualTo(expectedReason),
-                    targetName);
-                continue;
-            }
-
-            Assert.That(
-                preparation.IsSuccess,
-                Is.True,
-                targetName + ": " +
-                lowerer.LastImplementationIlAbstention);
-            var summary = preparation.Body!.SummaryCalls.Values.Single();
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    summary.Origin,
-                    Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
-                    targetName);
-                Assert.That(
-                    summary.EvidenceSha256,
-                    Does.Match("^[0-9a-f]{64}$"),
-                    targetName);
-                Assert.That(
-                    summary.EvidenceIdentity,
-                    Is.Empty,
-                    targetName);
-            }
-            successful++;
+            var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName]);
+            Assert.That(preparation.Total, Is.Not.Null, targetName);
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(targetName == "VerifyInadmissibleCall"), targetName);
         }
-
-        Assert.That(successful, Is.EqualTo(signatures.Length - unsupported.Count));
     }
 
     [Test]
@@ -3588,15 +3441,8 @@ public sealed class WorkerTests
         {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
             var preparation = lowerer.Prepare(targets[targetName]);
-            Assert.That(
-                preparation.IsSuccess,
-                Is.True,
-                targetName + ": " + preparation.FailureReason + " / " +
-                lowerer.LastImplementationIlAbstention);
-            Assert.That(
-                preparation.Body!.SummaryCalls.Values.Single().Origin,
-                Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
-                targetName);
+            Assert.That(preparation.Total, Is.Not.Null, targetName);
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(targetName == "VerifyManyLocals"), targetName);
         }
 
         var wideLowerer = new CompilerCallableLowerer(
@@ -3605,8 +3451,8 @@ public sealed class WorkerTests
         var widePreparation = wideLowerer.Prepare(
             targets["VerifyManyParameters"]);
         Assert.That(
-            widePreparation.FailureReason,
-            Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            widePreparation.Total!.IsBodyAbstraction,
+            Is.True);
     }
 
     [Test]
@@ -3711,8 +3557,7 @@ public sealed class WorkerTests
             specificationPacks: ["dotnet.scalar"]);
         var withArtifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(withRequest.CompilerManifest.Path));
-        var summaryArtifact = withArtifact.Callables.Single()
-            .Body!.SummaryCalls.Single();
+        var totalArtifact = withArtifact.Callables.Single().Total;
         using var withPackWorker = SharpProofWorker.Create(
             withRequest.Budgets);
         var withPack = await withPackWorker.VerifyAsync(
@@ -3737,21 +3582,14 @@ public sealed class WorkerTests
                     "spec-pack:dotnet.scalar@1:",
                     StringComparison.Ordinal)),
                 Is.False);
-            Assert.That(
-                summaryArtifact.Origin,
-                Is.EqualTo(CompilerSummaryOrigin.SpecificationPack));
-            Assert.That(
-                summaryArtifact.EvidenceIdentity,
-                Is.EqualTo("dotnet.scalar@1"));
-            Assert.That(
-                summaryArtifact.EvidenceSha256,
-                Has.Length.EqualTo(64));
+            Assert.That(totalArtifact, Is.Not.Null);
+            Assert.That(withArtifact.SpecificationPackIds, Has.Length.EqualTo(1));
+            Assert.That(withArtifact.SpecificationPackIds.Single(), Is.EqualTo("dotnet.scalar"));
         }
 
-        summaryArtifact.EvidenceIdentity = string.Empty;
+        withArtifact.Callables.Single().Total!.Graph.Semantics = IrExecutionSemantics.Legacy;
         Assert.That(
-            (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
-                withArtifact)),
+            new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact)),
             Throws.TypeOf<InvalidDataException>());
     }
 

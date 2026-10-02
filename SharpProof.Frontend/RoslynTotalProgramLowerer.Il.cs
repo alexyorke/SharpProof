@@ -264,6 +264,16 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static TotalScalarRule IlArithmetic(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
+        if (code is "And" or "Or" or "Xor")
+        {
+            // Stack validation restricts these opcodes to normalized Bool values.
+            var zero = factory.Integer(left.Type, 0);
+            var leftBoolean = factory.Binary(IrBinaryOperator.NotEqual, left, zero);
+            var rightBoolean = factory.Binary(IrBinaryOperator.NotEqual, right, zero);
+            var booleanOperator = code == "And" ? IrBinaryOperator.AndAlso :
+                code == "Or" ? IrBinaryOperator.OrElse : IrBinaryOperator.NotEqual;
+            return new(factory.Binary(booleanOperator, leftBoolean, rightBoolean), [], FrontendSubsetClassification.Exact);
+        }
         if (code.EndsWith("_un", StringComparison.Ordinal))
         { var type = factory.GetOrCreateIntegerType(factory.GetTypeInfo(left.Type).Width, false); left = factory.Cast(type, left); right = factory.Cast(type, right); }
         var operation = code.StartsWith("Add", StringComparison.Ordinal) ? IrBinaryOperator.Add :
