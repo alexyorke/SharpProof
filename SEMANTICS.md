@@ -555,6 +555,15 @@ contain no scalar or throw classification rules.
 
 Source calls and captured implementation IL expand directly into the caller's
 Total program. The compiler no longer produces relational-summary descriptors.
+An additional shadow artifact collects source methods reachable from claim
+roots once, retains recursive call edges, and excludes unrelated methods.
+Only independently admitted leaf bodies carry Total IR initially; unsupported
+bodies and unknown dispatch stay explicit boundaries. Entry initialization is
+tracked separately. This table does not supply proof or completion facts and
+does not change compiler effect authority.
+When an allocation operand is unsupported, lowering preserves earlier operand
+effects and returns an unknown value with the allocation expression's type;
+the enclosing body remains incomplete.
 Closed generic outer types may share a source helper body when its intrinsic
 parameter and result types do not depend on the outer arguments; top-level
 generic callable admission is unchanged. Metadata boolean `and`, `or`, and

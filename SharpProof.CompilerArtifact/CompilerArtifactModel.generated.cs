@@ -495,6 +495,43 @@ internal sealed class CompilerManifestArtifact
     public int MaximumExpressionDepth { get; set; } = WorkerBudgets.DefaultMaximumExpressionDepth;
     public CompilerDiagnosticArtifact[] CompilerDiagnostics { get; set; } = [];
     public CompilerCallableArtifact[] Callables { get; set; } = [];
+    public CompilerReachableSourceArtifact? ReachableSource { get; set; }
+}
+
+// Shadow input for interprocedural effect analysis. An absent or incomplete
+// body never supplies an effect fact or a normal-completion guarantee.
+internal sealed class CompilerReachableSourceArtifact
+{
+    public bool CollectionComplete { get; set; }
+    public CompilerSourceRootArtifact[] Roots { get; set; } = [];
+    public CompilerSourceBodyArtifact[] Bodies { get; set; } = [];
+    public CompilerSourceDocumentArtifact[] Documents { get; set; } = [];
+}
+
+internal sealed class CompilerSourceDocumentArtifact
+{
+    public int SourceTreeOrdinal { get; set; }
+    public string Path { get; set; } = string.Empty;
+    public int MaximumBodyEnd { get; set; }
+}
+
+internal sealed class CompilerSourceRootArtifact
+{
+    public string CallableId { get; set; } = string.Empty;
+    public string BodyId { get; set; } = string.Empty;
+}
+
+internal sealed class CompilerSourceBodyArtifact
+{
+    public string BodyId { get; set; } = string.Empty;
+    public string MethodIdentity { get; set; } = string.Empty;
+    public int SourceTreeOrdinal { get; set; }
+    public int Start { get; set; }
+    public int Length { get; set; }
+    public bool CallsComplete { get; set; }
+    public bool EffectsCompleteAtEntry { get; set; }
+    public string[] Callees { get; set; } = [];
+    public PortableIrGraph? Graph { get; set; }
 }
 
 internal readonly struct CompilerEffectConstraintRule(

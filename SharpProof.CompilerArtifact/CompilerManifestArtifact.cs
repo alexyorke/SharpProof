@@ -282,6 +282,7 @@ internal static class CompilerManifestArtifactJson
         RequireValid(HasValidCallableStates(
             value.Callables,
             value.CompilerDiagnostics.Length != 0));
+        CompilerReachableSourceValidator.Validate(value, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (validateDecodability &&
             !HasDecodableCallables(value, cancellationToken))

@@ -51,6 +51,17 @@ public sealed class TypedProgramLoweringTests
         }
     }
 
+    [TestCase("int[] Target() => new int[Size()]; static int Size() => 1;")]
+    [TestCase("object Target() => (object)Value(); static int Value() => 1;")]
+    [TestCase("System.Action Target(Receiver receiver) => new System.Action(Pass(receiver).Sink); " +
+        "static Receiver Pass(Receiver receiver) => receiver; public class Receiver { public void Sink() {} }")]
+    public void UnsupportedAllocationOperandsAbstainWithValidResultTypes(string members)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var lowered = subject.Lower();
+        Assert.That(lowered.IsExact, Is.False);
+    }
+
     [TestCaseSource(nameof(ScalarCases))]
     public void CandidateMatchesCompiledCSharp(string members, object[] arguments)
     {

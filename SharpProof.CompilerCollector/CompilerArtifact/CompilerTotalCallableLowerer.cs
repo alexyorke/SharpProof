@@ -176,7 +176,7 @@ internal static class CompilerTotalCallableLowerer
         };
     }
 
-    private static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
+    internal static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
         CancellationToken cancellationToken)
     {
         for (var current = type; current != null; current = current.ContainingType)

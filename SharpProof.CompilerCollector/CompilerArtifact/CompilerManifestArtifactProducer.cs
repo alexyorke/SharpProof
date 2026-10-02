@@ -72,7 +72,10 @@ internal static class CompilerManifestArtifactProducer
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
             CompilerDiagnostics = diagnosticArtifacts,
-            Callables = callables
+            Callables = callables,
+            ReachableSource = diagnosticArtifacts.Length == 0
+                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees, cancellationToken)
+                : null
         };
         return artifact;
     }

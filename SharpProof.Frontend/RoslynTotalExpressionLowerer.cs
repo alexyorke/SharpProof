@@ -103,7 +103,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         {
             var dimension = LowerBodyValue(arrayCreation.DimensionSizes[0], block, depth + 1);
             if (!dimension.Classification.IsExact)
-            { return dimension; }
+            { return Approximate(operation, dimension.Continuation, dimension.Classification.Abstention); }
             var rule = new TotalScalarRule(dimension.Value,
                 [new(IrExceptionKind.Overflow, _factory.Binary(IrBinaryOperator.LessThan, dimension.Value, _factory.Integer(0)))],
                 FrontendSubsetClassification.Exact);
@@ -129,7 +129,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             {
                 var receiver = LowerBodyValue(instance, block, depth + 1);
                 if (!receiver.Classification.IsExact)
-                { return receiver; }
+                { return Approximate(operation, receiver.Continuation, receiver.Classification.Abstention); }
                 IrTerm? mayCheckNull = null;
                 if (!CSharpOperationSemantics.DelegateValueEscapesDirectly(delegateCreation))
                 {
@@ -147,7 +147,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
         {
             var operand = LowerBodyValue(boxing.Operand, block, depth + 1);
-            return operand.Classification.IsExact ? AllocateValue(operation, operand.Continuation) : operand;
+            return operand.Classification.IsExact ? AllocateValue(operation, operand.Continuation)
+                : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
         }
         if (depth < 256 && operation is IInvocationOperation synchronization &&
             CSharpOperationSemantics.IsMonitorAttempt(synchronization))

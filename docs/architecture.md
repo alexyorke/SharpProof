@@ -218,6 +218,21 @@ them to parameter ordinals, and owns a fresh Entry/Current/Old/Result frame.
 Default arguments must be scalar constants. Callee contracts are erased without
 adding their Requires or Ensures as proof premises; callee Assume closes admission.
 All nested frames share the same construction cap and cancellation boundary.
+The collector also ships a shadow reachable-source table, built lazily from
+claim roots with one body per source declaration and deterministic call edges.
+Shared helpers are deduplicated and recursive edges terminate collection.
+Leaf bodies use the same Total lowering; bodies containing source calls remain
+explicitly incomplete in this table until modular call semantics are integrated.
+Elided invocation arguments and deferred lambda/local-function bodies do not
+add executed call edges. Missing bodies, unknown dispatch and collection limits
+remain boundaries. Entry initialization completeness is separate from body IR.
+The worker validates body identities, source bounds, graph semantics, roots and
+edge closure. This shadow table supplies no published proof authority.
+Document bounds come from the selected declarations rather than full-file
+checksums or lengths, preserving artifact stability for unrelated constants.
+Unsupported allocation operands retain their evaluation prefix and produce an
+unknown value of the enclosing expression's type. A failed receiver, dimension
+or boxing operand cannot become a differently typed allocation result.
 Original expanded IR retains callee returns, finally bodies, and escaping throw
 kind/site for replay and caller catch routing. Async, iterator, generic, ref/params,
 unmodeled type-initialization calls remain unsupported. When an
