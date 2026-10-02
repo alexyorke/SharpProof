@@ -55,11 +55,9 @@ internal static class CallableReplayValidator
             }
             if (execution.Status != IrProgramExecutionStatus.Returned)
             {
-                return execution is
-                {
-                    Status: IrProgramExecutionStatus.Unsupported,
-                    Instruction: IrCallInstruction call
-                } && context.RegisteredCalls.Contains(call.Id)
+                return execution.Status == IrProgramExecutionStatus.Unsupported &&
+                    (execution.Instruction is IrLockInstruction ||
+                        execution.Instruction is IrCallInstruction call && context.RegisteredCalls.Contains(call.Id))
                     ? AbstentionReason.CounterexampleNotReplayable
                     : AbstentionReason.CounterexampleReplayFailed;
             }

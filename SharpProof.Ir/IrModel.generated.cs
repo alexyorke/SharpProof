@@ -615,11 +615,12 @@ public abstract partial class IrInstruction
 
 public sealed class IrAllocationInstruction : IrInstruction
 {
-    internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType)
+    internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType, IrVarId? target = null)
         : base(id, IrInstructionKind.Allocate, operation)
-    { AllocatedType = allocatedType; }
+    { AllocatedType = allocatedType; Target = target; }
 
     public IrTypeId AllocatedType { get; }
+    public IrVarId? Target { get; }
 }
 
 // A synchronization attempt is an explicit effect and a concrete replay

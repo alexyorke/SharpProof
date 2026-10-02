@@ -462,8 +462,11 @@ finite search can only supply replayed violations. Call abstractions abstain
 until their throwing behavior is represented. These qualification results do
 not replace compiler effect publication.
 
-Native allocation qualification begins with discarded core `new object()`
-expressions. The shadow runtime oracle measures concrete feasible entries in
+Native allocation qualification captures core `new object()` expressions and
+boxing of supported scalar values to `object`. Value-producing allocations
+create fresh nonnull reference identities. Boxing evaluates its operand before
+the allocation event, including any operand fault. Boxed contents, unboxing and
+runtime type tests remain unsupported. The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic
 closures are bounded representatives; unsupported inputs remain explicit gaps.
@@ -494,6 +497,9 @@ from the owned site without claiming acquisition, release, completion or an
 exception kind. All other body proofs require synchronization sites to be
 unreachable under their preconditions. Allocation witnesses must still observe
 an explicit allocation; a reachable lock alone yields an incomplete result.
+Original postcondition replay stops at synchronization with a semantic
+CounterexampleNotReplayable result, rather than an infrastructure failure.
+Such complete Unknown responses remain eligible for validated caching.
 
 Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
 cases carry explicit normal-completion predicates for arithmetic faults and

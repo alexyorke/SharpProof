@@ -4,16 +4,16 @@ request-bindings: True
 cache: Written
 postconditions: 1
 enrolled: 1
-checked: 1
-unknown: 0
-proven: 1
+checked: 0
+unknown: 1
+proven: 0
 refuted: 0
 row: M:Subject.BContractLock#0
   totalPresent: True
   enrolled: True
-  checked: True
-  outcome: Proven
-  reason: None
+  checked: False
+  outcome: Unknown
+  reason: CounterexampleNotReplayable
   vacuity: None
   feasibility: Unknown
   conditional: False
@@ -23,16 +23,16 @@ request-bindings: True
 cache: Hit
 postconditions: 1
 enrolled: 1
-checked: 1
-unknown: 0
-proven: 1
+checked: 0
+unknown: 1
+proven: 0
 refuted: 0
 row: M:Subject.BContractLock#0
   totalPresent: True
   enrolled: True
-  checked: True
-  outcome: Proven
-  reason: None
+  checked: False
+  outcome: Unknown
+  reason: CounterexampleNotReplayable
   vacuity: None
   feasibility: Unknown
   conditional: False

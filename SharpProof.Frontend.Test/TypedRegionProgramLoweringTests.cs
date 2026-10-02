@@ -150,7 +150,7 @@ public sealed class TypedRegionProgramLoweringTests
     }
 
     [Test]
-    public void SynthesizedLockLocalMustAbstainInsteadOfAbortingCandidateConstruction()
+    public void SynthesizedLockLocalPreservesAllocatedReceiverAndSynchronizationSites()
     {
         using var subject = TypedProgramSubject.Create("void Target() { lock (new object()) { } }");
         var pending = new Stack<Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowRegion>();
@@ -168,6 +168,10 @@ public sealed class TypedRegionProgramLoweringTests
             { pending.Push(child); }
         }
         Assert.That(unnamed, Is.True);
-        Assert.That(subject.Lower().IsExact, Is.False);
+        var lowered = subject.Lower();
+        Assert.That(lowered.IsExact, Is.True);
+        var instructions = lowered.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        Assert.That(instructions.OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
+        Assert.That(instructions.OfType<IrLockInstruction>().Count(), Is.EqualTo(2));
     }
 }

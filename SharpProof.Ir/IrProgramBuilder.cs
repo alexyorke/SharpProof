@@ -59,8 +59,8 @@ public sealed class IrProgramBuilder(IrFactory factory)
             elementType, sequence, index);
     }
 
-    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType)
-    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType)); }
+    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null)
+    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target)); }
 
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
@@ -256,6 +256,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
             case IrAllocationInstruction allocation:
                 if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence))
                 { throw InvalidArgument("An allocation requires a reference or sequence type.", "allocatedType"); }
+                if (allocation.Target is { } allocatedTarget &&
+                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference ||
+                        _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
+                { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
                 break;
             case IrAssignInstruction value:
                 RequireSameType(

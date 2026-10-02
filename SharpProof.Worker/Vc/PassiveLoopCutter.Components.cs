@@ -74,6 +74,8 @@ internal sealed partial class PassiveLoopCutter
                 Spend();
                 if (instruction is IrAssignInstruction assign)
                 { writes.Add(assign.Target); }
+                else if (instruction is IrAllocationInstruction { Target: { } allocatedTarget })
+                { writes.Add(allocatedTarget); }
                 else if (instruction is IrHavocInstruction havoc)
                 {
                     foreach (var variable in havoc.Variables)

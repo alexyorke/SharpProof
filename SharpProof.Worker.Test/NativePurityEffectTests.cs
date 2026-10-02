@@ -12,6 +12,8 @@ public sealed class NativePurityEffectTests
     [TestCase("var y = x; y++; x += y; return x;")]
     [TestCase("while (x > 0) x--; return x;")]
     [TestCase("new object(); return x;")]
+    [TestCase("object value = x; return x;")]
+    [TestCase("object value = new object(); return x;")]
     [TestCase("return x++;")]
     public async Task SourceLocalMutationsAndFreshAllocationsRemainPure(string body)
     {
@@ -98,6 +100,7 @@ public sealed class NativePurityEffectTests
     [TestCase("public static int State;", "State = x; return State;")]
     [TestCase("public static int State = 1;", "State = x; return x;")]
     [TestCase("", "System.Console.WriteLine(x); return x;")]
+    [TestCase("", "return (int)(object)x;")]
     [TestCase("public static object State = new object();", "return x;")]
     public async Task UnmodeledEffectsAndInitializationRemainUnknown(string members, string body)
     {

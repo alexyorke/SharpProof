@@ -427,9 +427,11 @@ invocation shapes remain explicit oracle gaps. Runtime confirmations concern
 counterexamples only; they do not establish universal proofs. The report
 separates comparison success from the 95% old-proof retention gate and does not
 qualify allocation, write, lock, capability, or call-precondition effects.
-The first allocation row emits a typed `Allocate` instruction for discarded
-core `new object()` expressions. Its identity does not enter the scalar value
-domain. The production artifact preserves type and site ownership; passive
+Typed `Allocate` instructions capture core `new object()` expressions and
+scalar boxing to `object`. An optional reference target receives a fresh nonnull
+identity, with guarded freshness facts against tracked references of the same
+type. Replay creates a distinct identity on each execution. Boxing lowers its
+operand before allocation; boxed contents and unboxing remain unsupported. The production artifact preserves type and site ownership; passive
 SSA records guarded reachability and original-program replay observes the
 allocation site. Native ZeroAllocations qualification excludes reachable
 throw sites as potential implicit allocations, including caught faults. String concatenation,
@@ -468,6 +470,10 @@ attempt and stops before synchronization. Native purity excludes reachable
 attempts; postcondition, exception, allocation and normal-completion proofs also
 require them to be unreachable. These guards preserve the boundary around
 blocking, runtime allocation and exceptions; no monitor-state model is implied.
+A deliberate replay stop at a Lock instruction is CounterexampleNotReplayable,
+so it remains a complete semantic Unknown and supports validated cache reuse.
+The fresh receiver in the lock-local worker golden now exposes synchronization;
+its previous postcondition proof is explicitly triaged as Unknown.
 Preconditions can exclude a lock path. Only the compiler's matched lockTaken
 Boolean local is admitted among unnamed generated locals.
 Native lanes do not instantiate the legacy callable verifier or predicate

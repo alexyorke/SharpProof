@@ -93,6 +93,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
+                        if (allocation.Target is { } allocatedTarget)
+                        { values[allocatedTarget] = _factory.CreateReferenceValue(allocation.AllocatedType, new object()); }
                         replayOptions?.AllocationObserver?.Invoke(allocation);
                         break;
                     case IrLockInstruction synchronization:

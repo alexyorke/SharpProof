@@ -490,6 +490,11 @@ public sealed class NativeWorkerRoutingTests
             posts += postIds.Count;
             var actual = response.ClaimResults.Where(result => postIds.Contains(result.ClaimId)).ToDictionary(result => result.ClaimId, StringComparer.Ordinal);
             Assert.That(actual.Keys, Is.EquivalentTo(postIds), sourceCase.Name);
+            if (sourceCase.Name == "golden:vc-shadow-unsupported-lock-local")
+            {
+                Assert.That(actual.Values.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Assert.That(actual.Values.Single().Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            }
             foreach (var result in expected.Values.Where(result => result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
             {
                 known++;
@@ -498,7 +503,9 @@ public sealed class NativeWorkerRoutingTests
             }
         }
         Assert.That(posts, Is.EqualTo(253));
-        Assert.That(known, Is.EqualTo(238));
+        // The newly modeled fresh lock receiver exposes synchronization. Its
+        // former postcondition proof now abstains; all other known results remain.
+        Assert.That(known, Is.EqualTo(237));
         await TestContext.Out.WriteLineAsync($"native-worker universe: fixtures={cases.Length} posts={posts} retained-known={known}");
     }
 

@@ -177,6 +177,19 @@ internal sealed class PassiveCallableVcBuilder
                 {
                     case IrAllocationInstruction allocation:
                         _allocations.Add((reach, allocation.Operation));
+                        if (allocation.Target is { } allocatedTarget)
+                        {
+                            if (_inputBindings.TryGetValue(allocatedTarget, out var allocatedInput) && allocatedInput == allocatedTarget)
+                            { return null; }
+                            var allocated = Fresh(allocation.AllocatedType);
+                            Fact(Guard(reach, Not(Equal(allocated, _factory.Null(allocated.Type)))), allocation.Operation, "allocation-nonnull");
+                            foreach (var existing in state.Values.Where(value => value.Type == allocated.Type).Distinct())
+                            {
+                                Spend();
+                                Fact(Guard(reach, Not(Equal(allocated, existing))), allocation.Operation, "allocation-fresh");
+                            }
+                            state[allocatedTarget] = allocated;
+                        }
                         break;
                     case IrLockInstruction synchronization:
                         if (!TryRewrite(synchronization.Receiver, state, out _))

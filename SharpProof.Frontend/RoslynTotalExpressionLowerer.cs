@@ -83,6 +83,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (depth < 256 && operation is IObjectCreationOperation creation &&
+            CSharpOperationSemantics.IsCoreObjectCreation(creation))
+        { return AllocateValue(operation, block); }
+        if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
+        {
+            var operand = LowerBodyValue(boxing.Operand, block, depth + 1);
+            return operand.Classification.IsExact ? AllocateValue(operation, operand.Continuation) : operand;
+        }
         if (depth < 256 && operation is IInvocationOperation synchronization &&
             CSharpOperationSemantics.IsMonitorAttempt(synchronization))
         {
@@ -150,6 +158,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             default:
                 return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind);
         }
+    }
+
+    private TotalBodyValue AllocateValue(IOperation operation, IrBlockId block)
+    {
+        var type = _context.Type(operation.Type);
+        var target = _context.Temporary(type);
+        _builder!.Allocate(block, _context.Site(operation), type, target);
+        return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
     }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,

@@ -1346,10 +1346,10 @@ public sealed class WorkerTests
                     result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedCallable));
+                response.ClaimResults.Select(result => result.Reason),
+                Is.EqualTo(response.ClaimResults.Select(result =>
+                    GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal)
+                        ? WorkerClaimReason.UnsupportedCallable : WorkerClaimReason.UnsupportedContract)));
             Assert.That(
                 response.ClaimResults.Select(static result =>
                     result.EffectCertainty),
@@ -1365,11 +1365,10 @@ public sealed class WorkerTests
                 Is.All.EqualTo(
                     WorkerCallableCoverage.Incomplete));
             Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerCallableCoverageReason
-                        .UnsupportedCallable));
+                response.CallableResults.Select(result => result.Reason),
+                Is.EqualTo(response.CallableResults.Select(result =>
+                    result.CallableId.Contains(".Async", StringComparison.Ordinal)
+                        ? WorkerCallableCoverageReason.UnsupportedCallable : WorkerCallableCoverageReason.UnsupportedContract)));
             Assert.That(
                 response.RunStatus,
                 Is.EqualTo(WorkerRunStatus.Complete));

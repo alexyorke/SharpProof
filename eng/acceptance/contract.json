@@ -158,6 +158,7 @@
           "SharpProof.Frontend/TotalSourceCallSession.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Arrays.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Allocations.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Fields.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Synchronization.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.References.cs",

@@ -12,6 +12,12 @@ public sealed class NativeAllocationEffectTests
     [TestCase("return x;", true)]
     [TestCase("State = x; return x;", true)]
     [TestCase("new object(); return x;", false)]
+    [TestCase("object value = x; return x;", false)]
+    [TestCase("object value = (object)(x > 0); return x;", false)]
+    [TestCase("object value = new object(); return x;", false)]
+    [TestCase("if (x == 0) { object value = x; } return x;", false)]
+    [TestCase("Contract.Requires(x != 0); if (x == 0) { object value = x; } return x;", true)]
+    [TestCase("while (x > 0) { object value = x; x--; } return x;", false)]
     [TestCase("if (x == 0) new object(); return x;", false)]
     [TestCase("Contract.Requires(x != 0); if (x == 0) new object(); return x;", true)]
     [TestCase("new object(); throw null;", false)]
@@ -84,7 +90,7 @@ public sealed class NativeAllocationEffectTests
                 total.ValidEffectClaimIds = null!;
                 break;
             case "unused-slot":
-                allocation.B = 0;
+                allocation.C = 0;
                 break;
             case "invalid-type":
                 allocation.A = -1;
@@ -93,6 +99,25 @@ public sealed class NativeAllocationEffectTests
                 allocation.A = 0;
                 break;
         }
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
+    [TestCase("invalid-index")]
+    [TestCase("wrong-type")]
+    [TestCase("unused-slot")]
+    public void AllocationValueDecoderRejectsMalformedTargets(string mutation)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ZeroAllocations] public static object Target(int x) { return (object)x; } }");
+        var graph = artifact.Callables.Single().Total!.Graph;
+        var allocation = graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
+        if (mutation == "invalid-index")
+        { allocation.B = int.MaxValue; }
+        else if (mutation == "wrong-type")
+        { allocation.B = 0; }
+        else
+        { allocation.C = 0; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
     }
@@ -158,6 +183,67 @@ public sealed class NativeAllocationEffectTests
             return GC.GetAllocatedBytesForCurrentThread() - before;
         }
         finally { context.Unload(); }
+    }
+
+    [TestCase("x")]
+    [TestCase("new object()")]
+    public async Task AllocationValuesHaveFreshNonnullIdentitiesAndMatchRuntime(string value)
+    {
+        var source = "using SharpProof.Attributes; public static class C { [EnforcePure, ZeroAllocations] " +
+            "public static bool Target(object input, int x) { Contract.Ensures(Contract.Result<bool>()); " +
+            "object first = " + value + "; object second = " + value + "; return first != null && first != input && first != second; } }";
+        var preparation = Prepare(source);
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+            Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>()
+            .All(allocation => allocation.Target != null), Is.True);
+        using var image = new MemoryStream();
+        var runtimeSource = source.Replace("Contract.Ensures(Contract.Result<bool>()); ", "", StringComparison.Ordinal);
+        Assert.That(TestCompilation.Create("AllocationIdentityRuntime", runtimeSource).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("AllocationIdentityRuntime", isCollectible: true);
+        try
+        {
+            var run = runtime.LoadFromStream(image).GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<object, int, bool>>();
+            Assert.That(run(new object(), 1), Is.True);
+            Assert.That(run(null!, 0), Is.True);
+        }
+        finally { runtime.Unload(); }
+    }
+
+    [Test]
+    public void BoxingEvaluatesFaultingOperandBeforeAllocation()
+    {
+        var preparation = Prepare("using SharpProof.Attributes; public static class C { [ZeroAllocations] " +
+            "public static object Target(int x) { return (object)(10 / x); } }");
+        var total = preparation.Total!;
+        var allocations = 0;
+        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(total.Program.Factory.IntegerType, 0L)
+            }, 10000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+        Assert.That(allocations, Is.Zero);
+    }
+
+    [Test]
+    public void AllocationTargetsRequireMatchingOwnedReferenceStorage()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        var site = factory.CreateOperation("allocation");
+        Assert.Throws<ArgumentException>(new Action(() => builder.Allocate(block, site, factory.ObjectType,
+            factory.CreateVariable("wrong", factory.IntegerType))));
+        Assert.Throws<ArgumentException>(new Action(() => builder.Allocate(block, site, factory.ObjectType,
+            foreign.CreateVariable("foreign", foreign.ObjectType))));
     }
 
     [Test]
