@@ -183,7 +183,7 @@ internal static class CompilerTotalCallableLowerer
             cancellationToken.ThrowIfCancellationRequested();
             var evidence = claim.Evidence;
             if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions) ||
-                evidence.Reason == WorkerClaimReason.UnsupportedContract)
+                !claim.HasValidConstraint)
             { continue; }
             var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
             foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))

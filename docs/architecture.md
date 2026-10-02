@@ -402,6 +402,15 @@ core-library hierarchies. The codec validates claim ownership, canonical kinds
 and the entry/body boundary. The worker never matches short exception names or
 reconstructs Roslyn types. Missing optional constraints remain Unknown; declared
 DoesNotThrow and AllowedExceptions claims share one callable session and meter.
+Native admission accepts original generic declarations when every parameter and
+return value has a supported domain and every operation lowers completely.
+Nominal references support identity and null checks; type-parameter values,
+user-defined equality, reference casts and unmodeled member operations abstain.
+Constructed method symbols cannot borrow an original declaration's parameter
+bindings. Constraint validity is captured before legacy language admission can
+downgrade its published claim. Invalid allowances still have no native constraint,
+including at contradictory entry. Model replay requires exact type and factory
+ownership even when nominal display names match.
 Exception kinds use predecessor-guarded phi facts. Refutations require original
 IR replay and are compared with compiled C# execution in artifact qualification
 tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.

@@ -216,7 +216,7 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64 ||
-            type == factory.ObjectType || type == factory.StringType || info.Kind == IrTypeKind.Sequence &&
+            info.Kind == IrTypeKind.Reference || type == factory.StringType || info.Kind == IrTypeKind.Sequence &&
                 info.ElementType is { } element && (factory.GetTypeInfo(element).Kind is IrTypeKind.Boolean or IrTypeKind.Integer ||
                     element == factory.ObjectType || element == factory.StringType);
     }
@@ -224,7 +224,7 @@ internal static class CompilerTotalCallableArtifactCodec
     private static bool SupportedType(PortableIrGraph graph, int index)
     {
         var type = graph.Types[index];
-        return type.Kind == IrTypeKind.Reference && type.Name == "object" || type.Kind == IrTypeKind.String && type.Name == "string" ||
+        return type.Kind == IrTypeKind.Reference || type.Kind == IrTypeKind.String && type.Name == "string" ||
             type.Kind == IrTypeKind.Sequence && graph.Types[type.Element].Kind != IrTypeKind.Sequence && SupportedType(graph, type.Element) ||
             type.Kind == IrTypeKind.Boolean ||
             type.Kind == IrTypeKind.Integer && type.Width is 8 or 16 or 32 or 64;

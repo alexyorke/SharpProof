@@ -625,7 +625,7 @@ public sealed class SharpProofWorker : IDisposable
     }
 
     private static bool CanVerifyTarget(CompilerCallablePreparation target)
-    { return target.IsSuccess || target.Total != null || target.TotalEntry != null; }
+    { return target.IsSuccess || target.Total != null || target.TotalEntry != null && target.FailureReason != WorkerClaimReason.UnsupportedCallable; }
 
     private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectResults(CallableVerificationResult[] results)

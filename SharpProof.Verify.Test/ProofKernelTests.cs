@@ -51,6 +51,40 @@ public sealed class ProofKernelTests
             Is.Zero);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task TotalNominalReferenceWitnessesMustReplayTheRequestedIdentityPredicate(bool isNull)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node<T>");
+        var variable = factory.CreateVariable("node", type);
+        var predicate = factory.Binary(isNull ? IrBinaryOperator.NotEqual : IrBinaryOperator.Equal,
+            factory.Variable(variable), factory.Null(type));
+        var query = new VerificationQuery(factory, [], new Goal(factory, predicate,
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
+        var value = isNull ? factory.CreateNullValue(type) : factory.CreateReferenceValue(type, new object());
+        var outcome = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(
+            new BackendModel([KeyValuePair.Create(variable, value)])))).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MatchingNominalReferenceNamesDoNotAuthorizeForeignTypesOrFactories(bool foreignFactory)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node<T>");
+        var variable = factory.CreateVariable("node", type);
+        var other = foreignFactory ? new IrFactory(IrExecutionSemantics.Total) : factory;
+        var otherType = other.GetOrCreateReferenceType(other.CreateIdentity(), "Node<T>");
+        var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
+        var outcome = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(
+            new BackendModel([KeyValuePair.Create(variable, other.CreateReferenceValue(otherType, new object()))])))).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+    }
+
     [Test]
     public async Task FormulaAndRequestedModelVariablesFormAnExactDeterministicSet()
     {

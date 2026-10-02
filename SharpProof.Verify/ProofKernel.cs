@@ -204,7 +204,7 @@ public sealed class ProofKernel(ISmtBackend backend)
 
         bool IsReferenceDomain(IrTypeId type)
         {
-            if (type == query.Factory.ObjectType || type == query.Factory.StringType)
+            if (query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Reference || type == query.Factory.StringType)
             { return true; }
             var info = query.Factory.GetTypeInfo(type);
             if (info.Kind != IrTypeKind.Sequence || info.ElementType is not { } element)

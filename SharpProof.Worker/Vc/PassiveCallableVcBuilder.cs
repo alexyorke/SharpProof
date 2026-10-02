@@ -382,7 +382,7 @@ internal sealed class PassiveCallableVcBuilder
     {
         var info = _factory.GetTypeInfo(type);
         return type == _factory.BooleanType || info is { Kind: IrTypeKind.Integer, Width: 8 or 16 or 32 or 64 } ||
-            type == _factory.ObjectType || type == _factory.StringType || info.Kind == IrTypeKind.Sequence &&
+            info.Kind == IrTypeKind.Reference || type == _factory.StringType || info.Kind == IrTypeKind.Sequence &&
                 info.ElementType is { } element && (_factory.GetTypeInfo(element).Kind is IrTypeKind.Boolean or IrTypeKind.Integer ||
                     element == _factory.ObjectType || element == _factory.StringType);
     }

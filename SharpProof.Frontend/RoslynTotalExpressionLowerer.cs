@@ -322,10 +322,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return !target.IsDefault;
     }
 
-    private static FrontendAbstention Reject(IOperation operation, int depth)
+    private FrontendAbstention Reject(IOperation operation, int depth)
     {
         if (depth >= 256)
         { return FrontendAbstention.ExpressionDepthLimit; }
+        if (operation is IParameterReferenceOperation parameter && !_context.OwnsParameter(parameter.Parameter))
+        { return FrontendAbstention.UnsupportedOperationKind; }
         if (!CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision))
         { return FrontendAbstention.UnknownOperationKind; }
         var admission = decision.Admission;

@@ -541,7 +541,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task EffectClaimsDoNotRefuteWhenRequiresBodyIsUnsupported()
+    public async Task EffectClaimsRetainCompilerEvidenceWithSupportedNominalRequires()
     {
         using var project = TestProject.Create(
             """
@@ -566,8 +566,7 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
@@ -632,13 +631,13 @@ public sealed class WorkerTests
                         ".ThrowExisting(",
                         StringComparison.Ordinal)).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
-            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
     [Test]
-    public async Task AllowedExceptionsRemainVisibleWhenRequiresBodyIsUnsupported()
+    public async Task AllowedExceptionsRetainCompilerProofWithSupportedNominalRequires()
     {
         using var project = TestProject.Create(
             """
@@ -662,8 +661,7 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
@@ -715,7 +713,7 @@ public sealed class WorkerTests
                         ".RequiredNonNull(",
                         StringComparison.Ordinal)).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
-            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
                 Is.True);
@@ -1385,45 +1383,23 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task UnsupportedSelectedContractCallablesRemainTypedUnknown()
+    public async Task OriginalGenericDefinitionsProveWithoutAdmittingAsyncBodies()
     {
-        var response = await RunAsync(
-            WorkerTestSources.UnsupportedContractCallables,
-            cacheEnabled: false);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedCallable));
-            Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Coverage),
-                Is.All.EqualTo(
-                    WorkerCallableCoverage.Incomplete));
-            Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerCallableCoverageReason
-                        .UnsupportedCallable));
-            Assert.That(
-                response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(
-                WorkerProtocolJson.Validate(response).IsValid,
-                Is.True);
-        }
+        var response = await RunAsync(WorkerTestSources.UnsupportedContractCallables, cacheEnabled: false);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        var generic = response.ClaimResults.Single(result => GetCallableId(response, result).Contains(".Generic", StringComparison.Ordinal));
+        var asynchronous = response.ClaimResults.Single(result => GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal));
+        Assert.That(generic.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(generic.Reason, Is.EqualTo(WorkerClaimReason.None));
+        Assert.That(asynchronous.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(asynchronous.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        Assert.That(response.CallableResults.Single(result => result.CallableId.Contains(".Generic", StringComparison.Ordinal)).Coverage,
+            Is.EqualTo(WorkerCallableCoverage.Complete));
+        Assert.That(response.CallableResults.Single(result => result.CallableId.Contains(".Async", StringComparison.Ordinal)).Coverage,
+            Is.EqualTo(WorkerCallableCoverage.Incomplete));
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+        Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
     [Test]

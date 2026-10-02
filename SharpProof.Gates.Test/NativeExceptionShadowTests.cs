@@ -37,6 +37,7 @@ public sealed class NativeExceptionShadowTests
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.DisagreementCount, Is.Zero);
         Assert.That(report.ComparisonPassed, Is.True);
+        Assert.That(report.Rows.Single(row => row.MethodId == "OSS0199").NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         await TestContext.Progress.WriteLineAsync($"Exception shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; " +
             $"{report.RetainedProven} retained; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
     }

@@ -451,7 +451,7 @@ internal sealed partial class ClaimManifestBuilder(
         };
         var evidence = CreateEffectEvidence(claimId, evaluation, isSupported);
         CompilerEffectClaimArtifactCodec.Seal(evidence);
-        return new ManifestEffectClaim(entry, evidence);
+        return new ManifestEffectClaim(entry, evidence, evaluation.Reason != EffectEvaluationReason.UnsupportedContract);
     }
 
     private CompilerEffectClaimArtifact CreateEffectEvidence(

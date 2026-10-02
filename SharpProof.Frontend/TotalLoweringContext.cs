@@ -82,7 +82,8 @@ public sealed class TotalLoweringContext
 
     internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind == MethodKind.Ordinary &&
         !Target.IsVirtual && !Target.IsAbstract && !Target.IsOverride) &&
-        !Target.IsAsync && Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) &&
+        !Target.IsAsync && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
+            SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&
@@ -101,6 +102,9 @@ public sealed class TotalLoweringContext
     {
         return _types.GetTypeId(type);
     }
+
+    internal bool OwnsParameter(IParameterSymbol parameter)
+    { return Parameters.Any(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)); }
 
     internal IrVarId Variable(ISymbol symbol, TotalParameterState state = TotalParameterState.Current)
     {

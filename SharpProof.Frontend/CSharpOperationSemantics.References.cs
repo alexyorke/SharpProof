@@ -15,6 +15,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsReferenceDomain(ITypeSymbol? type)
     {
         return type?.SpecialType is SpecialType.System_Object or SpecialType.System_String ||
+            type?.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate ||
             type is IArrayTypeSymbol { IsSZArray: true } array &&
             (IsScalar(array.ElementType) || array.ElementType.SpecialType is SpecialType.System_Object or SpecialType.System_String);
     }
@@ -50,17 +51,17 @@ internal static partial class CSharpOperationSemantics
         {
             return operand is IConversionOperation { IsImplicit: true, OperatorMethod: null } conversion &&
                 conversion.Type?.SpecialType == SpecialType.System_Object && conversion.Conversion.IsReference &&
-                (conversion.Operand.Type is IArrayTypeSymbol || conversion.Operand.ConstantValue is { HasValue: true, Value: null })
+                (IsReferenceDomain(conversion.Operand.Type) || conversion.Operand.ConstantValue is { HasValue: true, Value: null })
                 ? conversion.Operand : operand;
         }
         var left = Unwrap(operation.LeftOperand);
         var right = Unwrap(operation.RightOperand);
-        var leftArray = left.Type is IArrayTypeSymbol && IsReferenceDomain(left.Type);
-        var rightArray = right.Type is IArrayTypeSymbol && IsReferenceDomain(right.Type);
-        var sameArrays = leftArray && rightArray && SymbolEqualityComparer.Default.Equals(left.Type, right.Type);
-        var arrayAndNull = leftArray && right.ConstantValue is { HasValue: true, Value: null } ||
-            rightArray && left.ConstantValue is { HasValue: true, Value: null };
-        return sameArrays || arrayAndNull ? (left, right) : (operation.LeftOperand, operation.RightOperand);
+        var leftReference = IsReferenceDomain(left.Type);
+        var rightReference = IsReferenceDomain(right.Type);
+        var sameReferences = leftReference && rightReference && SymbolEqualityComparer.Default.Equals(left.Type, right.Type);
+        var referenceAndNull = leftReference && right.ConstantValue is { HasValue: true, Value: null } ||
+            rightReference && left.ConstantValue is { HasValue: true, Value: null };
+        return sameReferences || referenceAndNull ? (left, right) : (operation.LeftOperand, operation.RightOperand);
     }
 
     private static TotalScalarRule? ReferenceRule(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)

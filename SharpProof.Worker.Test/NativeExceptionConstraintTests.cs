@@ -35,6 +35,80 @@ public sealed class NativeExceptionConstraintTests
         }
     }
 
+    [TestCase("public static class C { [DoesNotThrow] public static bool Target<T>(Node<T> node) => node == null; } public class Node<T> {}", WorkerClaimReason.UnsupportedContract)]
+    [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => x; }", WorkerClaimReason.None)]
+    public async Task GenericDeclarationsWithSupportedValueDomainsRetainNativeExceptionConstraints(string declaration, WorkerClaimReason compilerReason)
+    {
+        var preparation = RoundTrip("using SharpProof.Attributes; " + declaration);
+        Assert.That(preparation.EffectClaims.Single().Reason, Is.EqualTo(compilerReason));
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Total!.ExceptionConstraints.Single().AllowedKinds, Is.Empty);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+    }
+
+    [Test]
+    public void CompiledGenericNullChecksAgreeAcrossValueAndReferenceTypeArguments()
+    {
+        const string source = "public static class C { public static bool Target<T>(Node<T> node) => node == null; } public class Node<T> {}";
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("GenericNullOracle", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new AssemblyLoadContext("GenericNullOracle", isCollectible: true);
+        try
+        {
+            var assembly = context.LoadFromStream(image);
+            foreach (var argument in new[] { typeof(int), typeof(string) })
+            {
+                var target = assembly.GetType("C")!.GetMethod("Target")!.MakeGenericMethod(argument);
+                var node = Activator.CreateInstance(assembly.GetType("Node`1")!.MakeGenericType(argument));
+                Assert.That(target.Invoke(null, [null]), Is.True);
+                Assert.That(target.Invoke(null, [node]), Is.False);
+            }
+        }
+        finally { context.Unload(); }
+    }
+
+    [Test]
+    public async Task UserDefinedGenericEqualityCannotBorrowReferenceIdentitySemantics()
+    {
+        var preparation = RoundTrip("""
+            using SharpProof.Attributes;
+            public static class C { [DoesNotThrow] public static bool Target<T>(Node<T> node) => node == null; }
+            public class Node<T> {
+                public static bool operator ==(Node<T> left, Node<T> right) => throw new System.NotSupportedException();
+                public static bool operator !=(Node<T> left, Node<T> right) => throw new System.NotSupportedException();
+                public override bool Equals(object other) => object.ReferenceEquals(this, other);
+                public override int GetHashCode() => 0;
+            }
+            """);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+    }
+
+    [TestCase("public static class C { [DoesNotThrow] public static object Target(dynamic node) => node; }")]
+    [TestCase("public static class C { [DoesNotThrow] public static T Target<T>(T value) => value; }")]
+    [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => System.Environment.TickCount; }")]
+    public async Task UnsupportedGenericDomainsAndOperationsRemainUnknown(string declaration)
+    {
+        var preparation = RoundTrip("using SharpProof.Attributes; " + declaration);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task InvalidAllowanceRemainsUnknownWhenLegacyAdmissionRejectsAGenericDeclaration(bool contradictory)
+    {
+        var preparation = RoundTrip("using SharpProof.Attributes; public static class C { [AllowedExceptions(typeof(string))] " +
+            "public static int Target<T>(int x) { " + (contradictory ? "Contract.Requires(false); " : "") + "return x; } }");
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+    }
+
     [Test]
     public async Task MultipleExceptionClaimsUseTheirOwnConstraintInOneSession()
     {
