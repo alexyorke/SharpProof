@@ -48,7 +48,7 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
                 typeof(SharpProof.Contracts.BoundContractClause),
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
                 null, [clause.Kind, condition, clause.SourceOperation,
-                    clause.Evidence, clause.DiagnosticText], null)!;
+                    clause.Evidence, clause.DiagnosticText, clause.SourceSyntax], null)!;
             return (SharpProof.Contracts.BoundMethodContracts)Activator.CreateInstance(
                 typeof(SharpProof.Contracts.BoundMethodContracts),
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,

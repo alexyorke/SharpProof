@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using SharpProof.Contracts;
 using SharpProof.CompilerArtifact;
 using SharpProof.Frontend;
 using SharpProof.Host;
@@ -11,6 +12,93 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class TypedMetadataReferenceTests
 {
+    [TestCase("int", "Positive", "0", false)]
+    [TestCase("int", "Positive", "1", true)]
+    [TestCase("ulong", "Positive", "18446744073709551615", true)]
+    [TestCase("byte", "InRange(-1, 300)", "255", true)]
+    [TestCase("byte", "InRange(1, 254)", "255", false)]
+    [TestCase("sbyte", "InRange(-129, 128)", "-128", true)]
+    [TestCase("ulong", "InRange(-1, 9223372036854775807)", "18446744073709551615", false)]
+    [TestCase("ulong", "InRange(-1, 9223372036854775807)", "9223372036854775807", true)]
+    public void MetadataRequiresUseTypedEntryValuesWithoutSourceSyntax(string type, string attribute,
+        string input, bool expected)
+    {
+        using var subject = new MetadataTestSubject(
+            $"using SharpProof.Attributes; public static class Library {{ [return: Positive] public static int Target([{attribute}] {type} value) => 1; }}",
+            "public static class Subject { public static int Target(int value) => value; }");
+        var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, method);
+        var binder = new ContractBinder(subject.Compilation, factory);
+        var binding = binder.BindTotalMetadataRequires(context);
+        Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
+        Assert.That(binding.Clauses, Has.Length.EqualTo(1));
+        var clause = binding.Clauses.Single();
+        Assert.That(clause.ParameterOrdinal, Is.Zero);
+        Assert.That(clause.Attribute, Is.SameAs(method.Parameters[0].GetAttributes().Single()));
+        Assert.That(clause.Attribute.ApplicationSyntaxReference, Is.Null);
+        Assert.That(binder.BindTotalRequires(context).Failure, Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
+        var entry = context.Parameters[0].Entry;
+        var values = new Dictionary<IrVarId, IrValue>
+        {
+            [entry] = type == "ulong"
+                ? factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type,
+                    ulong.Parse(input, System.Globalization.CultureInfo.InvariantCulture))
+                : factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type,
+                    long.Parse(input, System.Globalization.CultureInfo.InvariantCulture))
+        };
+        var interpreter = new IrInterpreter(factory);
+        Assert.That(interpreter.Evaluate(clause.Value, values).Value!.Boolean, Is.EqualTo(expected));
+        Assert.That(interpreter.Evaluate(clause.SafeCondition, values).Value!.Boolean, Is.True);
+    }
+
+    [TestCase("object", false)]
+    [TestCase("object", true)]
+    [TestCase("string", false)]
+    [TestCase("string", true)]
+    public void MetadataRequiresNotNullPreservesReferenceDomain(string type, bool nonnull)
+    {
+        using var subject = new MetadataTestSubject(
+            $"using SharpProof.Attributes; public static class Library {{ public static int Target([NotNull] {type} value) => 1; }}",
+            "public static class Subject { public static int Target(int value) => value; }");
+        var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, method);
+        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context);
+        Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
+        var entry = context.Parameters[0].Entry;
+        var entryType = factory.GetVariableInfo(entry).Type;
+        var value = !nonnull ? factory.CreateNullValue(entryType) : type == "string"
+            ? factory.CreateStringValue("value") : factory.CreateReferenceValue(entryType, new object());
+        var interpreter = new IrInterpreter(factory);
+        var values = new Dictionary<IrVarId, IrValue> { [entry] = value };
+        Assert.That(interpreter.Evaluate(binding.Clauses.Single().Value, values).Value!.Boolean, Is.EqualTo(nonnull));
+    }
+
+    [TestCase("[Positive] int first, [InRange(10, 1)] int second", false, 0)]
+    [TestCase("[Positive, InRange(1, 10)] int value", true, 2)]
+    [TestCase("[System.Runtime.InteropServices.In] int value", true, 0)]
+    public void MetadataRequiresBindingIsTransactional(string parameters, bool success, int count)
+    {
+        using var subject = new MetadataTestSubject(
+            $"using SharpProof.Attributes; public static class Library {{ public static int Target({parameters}) => 1; }}",
+            "public static class Subject { public static int Target(int value) => value; }");
+        var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, method);
+        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context);
+        Assert.That(binding.IsSuccess, Is.EqualTo(success));
+        Assert.That(binding.Clauses, Has.Length.EqualTo(count));
+        Assert.That(binding.Failure, Is.EqualTo(success ? ContractBindingFailure.None : ContractBindingFailure.InvalidClosedAttribute));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellation.Token)));
+        var foreignContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+        Assert.Throws<ArgumentException>(new Action(() =>
+            new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(foreignContext)));
+    }
+
     [Test]
     public void ConcatenationAllocationIdentityRemainsOutsideNativeObservationProofs()
     {

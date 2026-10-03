@@ -22,6 +22,7 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
     internal ConcurrentDictionary<string, int> OutcomeCounts =>
         _outcomeCounts;
     internal int CreateCount => Volatile.Read(ref _createCount);
+    internal IRequiresCallSiteObserver? RequiresObserver { get; init; }
     internal AnalyzerSemanticOutcome GetNamedOutcome(string name)
     {
         return _methodOutcomes.Single(pair =>
@@ -67,7 +68,7 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
                     outcome,
                     (_, current) =>
                         AnalyzerSemanticOutcomes.Combine(current, outcome));
-            });
+            }, RequiresObserver);
         return Session;
     }
 

@@ -8,6 +8,13 @@ internal interface IAnalyzerSessionFactory
         CancellationToken cancellationToken);
 }
 
+internal interface IRequiresCallSiteObserver
+{
+    void ObserveClause(in RequiresClauseObservation observation);
+    void ObserveGap(in RequiresCallObservationGap gap);
+    void ObserveOwnerGap(in RequiresOwnerObservationGap gap);
+}
+
 internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 {
     internal static DefaultAnalyzerSessionFactory Instance { get; } = new();
@@ -38,6 +45,7 @@ internal sealed class AnalyzerSession
         _callPreconditions;
     private readonly CancellationToken _cancellationToken;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
+    private readonly IRequiresCallSiteObserver? _requiresObserver;
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _validatedAttributes = new();
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
@@ -67,13 +75,15 @@ internal sealed class AnalyzerSession
         Compilation compilation,
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken,
-        Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null)
+        Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null,
+        IRequiresCallSiteObserver? requiresObserver = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         Configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
         _cancellationToken = cancellationToken;
         _outcomeObserver = outcomeObserver;
+        _requiresObserver = requiresObserver;
         _attributes = CreateLazy(
             () => ContractSelectionInventory.ForCompilation(compilation));
         _contractClauses = CreateLazy(
@@ -129,6 +139,7 @@ internal sealed class AnalyzerSession
         ReferenceEquals(_effects.Value.ApiSpecs, _apiSpecs.Value);
     internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
     internal bool HasCreatedEffectAnalysis => _effects.IsValueCreated;
+    internal IRequiresCallSiteObserver? RequiresObserver => _requiresObserver;
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {

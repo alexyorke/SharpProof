@@ -11,6 +11,58 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void NativeContractCoverageUsesCompanionTreeIdentity(bool collidingPaths)
+    {
+        var options = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp12);
+        var implementation = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("""
+            public static class Helper { public static int Target(int value) => value; }
+            public static class Caller { public static int Root(int value) => Helper.Target(value); }
+            """, options, "Implementation.cs");
+        var companion = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("""
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Helper))]
+            public static class HelperContracts {
+                public static int Target(int value) { Contract.Requires(value > 0); return value; }
+            }
+            """, options, collidingPaths ? "Implementation.cs" : "Companion.cs");
+        var occupiedSuffix = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            "internal class Unused {}", options, "Implementation.cs#1");
+        var compilation = AnalyzerGateHost.CreateCompilation("", "CompanionCoverage")
+            .RemoveAllSyntaxTrees().AddSyntaxTrees(implementation, companion, occupiedSuffix);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+            SharpProof.Worker.Protocol.WorkerFeatureSet.All,
+            SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
+        var body = batch.Callers.Single().Body;
+        var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId,
+            SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!, CancellationToken.None);
+        var match = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+        Assert.That(match.Expected, Is.EqualTo(1));
+        Assert.That(match.Matched, Is.EqualTo(1));
+        Assert.That(match.Failures, Is.Empty);
+        var missing = CorpusGate.MatchNativeContractCalls(compilation,
+            [detached.Body with { CallPreconditions = [] }]);
+        Assert.That(missing.Expected, Is.EqualTo(1));
+        Assert.That(missing.Matched, Is.Zero);
+        Assert.That(missing.Failures, Has.Some.StartsWith("MissingNativeObligation:"));
+        var row = detached.Body.CallPreconditions.Single();
+        var factory = detached.Body.Program.Factory;
+        var span = factory.GetOperationInfo(row.ClauseSite).SourceSpan!;
+        var wrongSite = factory.CreateOperation("coverage-negative",
+            new SharpProof.Ir.IrSourceSpan(span.Document, span.Start + 1, span.Length));
+        var substituted = CorpusGate.MatchNativeContractCalls(compilation,
+            [detached.Body with { CallPreconditions = [row with { ClauseSite = wrongSite }] }]);
+        Assert.That(substituted.Expected, Is.EqualTo(1));
+        Assert.That(substituted.Matched, Is.Zero);
+        Assert.That(substituted.Failures, Has.Some.StartsWith("UnexpectedNativeObligation:"));
+        Assert.That(substituted.Failures, Has.Some.StartsWith("MissingNativeObligation:"));
+    }
+
     [Test]
     public async Task NativeShadowCallersQualifyEveryContractCorpusVariantWithOriginalReplay()
     {
@@ -29,6 +81,7 @@ public sealed class CorpusGateTests
             Assert.That(seed.Select(static item => item.Variant), Is.EquivalentTo(Enum.GetValues<CorpusVariant>()), seed.Key);
         }
         var rows = new List<(string Seed, string Outcome, string Reason)>();
+        var managedRows = new List<(string Seed, string Outcome)>();
         foreach (var item in cases)
         {
             var compilation = AnalyzerGateHost.CreateCompilation(item.Source, "ShadowCorpus_" + item.SeedId);
@@ -68,6 +121,20 @@ public sealed class CorpusGateTests
             Assert.That(coverage.Expected, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Failures, Is.Empty, item.Id);
+            var managed = await CorpusGate.ObserveManagedContractClausesAsync(compilation, CancellationToken.None);
+            Assert.That(managed.Gaps, Is.Empty, item.Id);
+            Assert.That(managed.Clauses, Has.Length.EqualTo(1), item.Id);
+            var managedClause = managed.Clauses.Single();
+            var nativeClause = detached.Body.CallPreconditions.Single();
+            var marker = detached.Body.Program.Blocks.SelectMany(static block => block.Instructions)
+                .Single(instruction => instruction.Id == nativeClause.Instruction);
+            var callSpan = detached.Body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan!;
+            var clauseSpan = detached.Body.Program.Factory.GetOperationInfo(nativeClause.ClauseSite).SourceSpan!;
+            var nativeKey = new ContractCoverageKey(body.CallableId, nativeClause.CalleeIdentity, nativeClause.ClauseOrdinal,
+                new(callSpan.Document, callSpan.Start, callSpan.Length),
+                new(clauseSpan.Document, clauseSpan.Start, clauseSpan.Length));
+            Assert.That(managedClause.Key, Is.EqualTo(nativeKey), item.Id);
+            managedRows.Add((item.SeedId, managedClause.Outcome));
             var candidate = SharpProof.Worker.PassiveCallableArtifactAdapter.EnrollShadow(detached);
             Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
             using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
@@ -82,6 +149,7 @@ public sealed class CorpusGateTests
             rows.Add((item.SeedId, outcome, result.Reason.ToString()));
             var expected = item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted";
             Assert.That(outcome, Is.EqualTo(expected), item.Id + ":" + result.Reason);
+            Assert.That(managedClause.Outcome, Is.EqualTo(item.SeedId == "C06" ? "Unknown" : expected), item.Id);
             if (outcome == "Refuted")
             {
                 var replay = plan!.ReplayCallPrecondition(0, result.EntryModel, CancellationToken.None);
@@ -93,6 +161,9 @@ public sealed class CorpusGateTests
         }
         Assert.That(rows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
         Assert.That(rows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(70));
+        Assert.That(managedRows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
+        Assert.That(managedRows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(60));
+        Assert.That(managedRows.Count(static row => row.Outcome == "Unknown"), Is.EqualTo(10));
         var snapshotAfter = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
         Assert.That(snapshotAfter, Is.EqualTo(snapshotBefore));
     }

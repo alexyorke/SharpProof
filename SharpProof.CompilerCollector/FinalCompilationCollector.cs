@@ -39,7 +39,9 @@ internal static class FinalCompilationCollector
                 throw new InvalidOperationException(
                     "analyzer configuration is invalid");
             }
-            AtomicFile.WriteUtf8(path, Create(context, options, configuration));
+            var serialized = Create(context, options, configuration);
+            context.CancellationToken.ThrowIfCancellationRequested();
+            AtomicFile.WriteUtf8(path, serialized);
         }
         catch (OperationCanceledException)
         {
@@ -89,7 +91,7 @@ internal static class FinalCompilationCollector
             context.CancellationToken,
             context.Options.AdditionalFiles,
             ParseSpecificationPacks(Get(options, SpecificationPacksOption)));
-        return CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        return CompilerManifestArtifactJson.SerializeProducerValidated(artifact, context.CancellationToken);
     }
 
     private static ImmutableArray<string> ParseSpecificationPacks(

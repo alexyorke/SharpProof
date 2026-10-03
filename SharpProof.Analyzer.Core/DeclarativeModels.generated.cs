@@ -44,6 +44,26 @@ internal readonly partial record struct RequiresCallSiteCandidate(
     ManagedFlowStatus FlowStatus
 );
 
+// Advisory observations retain compiler-owned clause and call identities.
+// Their outcomes do not authorize native claims or proof-cache evidence.
+internal readonly record struct RequiresClauseObservation(
+    IMethodSymbol Caller,
+    RequiresCallSiteCandidate Candidate,
+    IMethodSymbol ContractTarget,
+    BoundContractClause Clause,
+    int ClauseOrdinal,
+    AnalyzerSemanticOutcome Outcome);
+
+internal readonly record struct RequiresCallObservationGap(
+    IMethodSymbol Caller,
+    RequiresCallSiteCandidate Candidate,
+    string Reason);
+
+internal readonly record struct RequiresOwnerObservationGap(
+    IMethodSymbol Caller,
+    SyntaxNode Declaration,
+    string Reason);
+
 internal enum PotentialRequiresCallOrigin
 {
     Operation,

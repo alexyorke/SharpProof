@@ -74,6 +74,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 {
                     if (argument == null)
                     {
+                        session.RequiresObserver?.ObserveOwnerGap(new(constructor, declaration, "PrimaryConstructorArgumentsUnavailable"));
                         return AnalyzerSemanticOutcome.Unknown;
                     }
                     argumentsBuilder.Add(argument);
@@ -86,6 +87,7 @@ internal static partial class RequiresCallSiteAnalyzer
         }
         if (target == null || initializer != null && origin == null)
         {
+            session.RequiresObserver?.ObserveOwnerGap(new(constructor, declaration, "PrimaryConstructorTargetUnavailable"));
             return AnalyzerSemanticOutcome.Unknown;
         }
         var baseCall = new RequiresCallSiteCandidate(
@@ -262,6 +264,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 requireCallerOwnership);
             if (callSites == null)
             {
+                session.RequiresObserver?.ObserveOwnerGap(new(caller, declaration, "CallDiscoveryIncomplete"));
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
@@ -280,11 +283,27 @@ internal static partial class RequiresCallSiteAnalyzer
             RequiresCallSiteCandidate candidate,
             bool requireCallerOwnership = true)
         {
+            var observer = session.RequiresObserver;
+            if (observer == null)
+            { return AnalyzeCallSiteCore(candidate, requireCallerOwnership, null); }
+            var capture = new RequiresObservationCapture();
+            var outcome = AnalyzeCallSiteCore(candidate, requireCallerOwnership, capture);
+            cancellationToken.ThrowIfCancellationRequested();
+            capture.Publish(observer, caller, candidate);
+            return outcome;
+        }
+
+        private AnalyzerSemanticOutcome AnalyzeCallSiteCore(
+            RequiresCallSiteCandidate candidate,
+            bool requireCallerOwnership,
+            RequiresObservationCapture? capture)
+        {
             if (requireCallerOwnership && !SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetEnclosingSymbol(
                         candidate.Syntax.SpanStart, cancellationToken),
                     caller))
             {
+                capture?.Gap("CallerOwnershipMismatch");
                 return AnalyzerSemanticOutcome.NotApplicable;
             }
 
@@ -299,11 +318,13 @@ internal static partial class RequiresCallSiteAnalyzer
                 contractTarget.ContainingType.StaticConstructors is
                 { Length: > 0 })
             {
+                capture?.Gap("StaticInitialization");
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
             if (session.HasRejectedMetadataPrecondition(contractTarget))
             {
+                capture?.Gap("RejectedMetadataPrecondition");
                 SharpProofControlAttributePolicy.ReportRejectedContractApi(
                     contractTarget.Name,
                     candidate.Syntax.GetLocation(),
@@ -315,6 +336,7 @@ internal static partial class RequiresCallSiteAnalyzer
             var binding = session.BindRequires(contractTarget);
             if (binding is not { IsSuccess: true, Contracts: not null })
             {
+                capture?.Gap("RequiresBindingFailed");
                 return externalSourceTarget
                     ? AnalyzerSemanticOutcome.NotApplicable
                     : AnalyzerSemanticOutcome.Unknown;
@@ -326,13 +348,27 @@ internal static partial class RequiresCallSiteAnalyzer
                     (!externalSourceTarget ||
                      clause.Evidence == BoundContractEvidence.ClosedAttribute))
                 .ToImmutableArray();
+            capture?.Bind(contractTarget, requires);
             if (requires.IsDefaultOrEmpty)
             {
-                return externalSourceTarget
-                    ? AnalyzerSemanticOutcome.NotApplicable
-                    : session.HasPotentialCallPreconditions(contractTarget)
-                    ? AnalyzerSemanticOutcome.Unknown
-                    : AnalyzerSemanticOutcome.NotApplicable;
+                if (externalSourceTarget)
+                {
+                    if (capture is not null && binding.Contracts.Clauses.Any(
+                        clause => clause.Kind == BoundContractKind.Requires))
+                    {
+                        capture.Gap("ExternalSourceRequiresExcluded");
+                    }
+
+                    return AnalyzerSemanticOutcome.NotApplicable;
+                }
+
+                if (session.HasPotentialCallPreconditions(contractTarget))
+                {
+                    capture?.Gap("UnboundPotentialRequires");
+                    return AnalyzerSemanticOutcome.Unknown;
+                }
+
+                return AnalyzerSemanticOutcome.NotApplicable;
             }
 
             if (!candidate.CanReplay)
@@ -344,7 +380,8 @@ internal static partial class RequiresCallSiteAnalyzer
                 candidate,
                 binding.Contracts,
                 requires,
-                out var inputVariables);
+                out var inputVariables,
+                capture);
             if (candidate.FlowStatus != ManagedFlowStatus.Complete)
             {
                 return concrete == AnalyzerSemanticOutcome.Refuted
@@ -356,7 +393,8 @@ internal static partial class RequiresCallSiteAnalyzer
                 candidate,
                 binding.Contracts,
                 requires,
-                inputVariables);
+                inputVariables,
+                capture);
         }
 
         private bool IsExternalSourceTarget(IMethodSymbol target)
@@ -371,7 +409,8 @@ internal static partial class RequiresCallSiteAnalyzer
             RequiresCallSiteCandidate candidate,
             BoundMethodContracts contracts,
             ImmutableArray<BoundContractClause> requires,
-            ImmutableArray<BoundContractVariable> inputVariables)
+            ImmutableArray<BoundContractVariable> inputVariables,
+            RequiresObservationCapture? capture)
         {
             if (candidate.Flow == null || candidate.Operation == null)
             {
@@ -459,7 +498,7 @@ internal static partial class RequiresCallSiteAnalyzer
                     return new ClauseEvaluation(
                         value.TryGetBoolean(out var proven) ? proven : null,
                         clause.DiagnosticText);
-                }));
+                }), capture);
         }
 
         private static bool TryEvaluateArgumentSnapshot(
@@ -505,7 +544,8 @@ internal static partial class RequiresCallSiteAnalyzer
             RequiresCallSiteCandidate callSite,
             BoundMethodContracts contracts,
             ImmutableArray<BoundContractClause> requires,
-            out ImmutableArray<BoundContractVariable> inputVariables)
+            out ImmutableArray<BoundContractVariable> inputVariables,
+            RequiresObservationCapture? capture)
         {
             inputVariables = default;
             if (contracts.Target.Parameters.Any(
@@ -610,16 +650,20 @@ internal static partial class RequiresCallSiteAnalyzer
                     value.Value.Boolean,
                     clause.DiagnosticText));
             }
-            return CompleteEvaluation(callSite, evaluations);
+            return CompleteEvaluation(callSite, evaluations, capture);
         }
 
         private AnalyzerSemanticOutcome CompleteEvaluation(
             RequiresCallSiteCandidate callSite,
-            IEnumerable<ClauseEvaluation> evaluations)
+            IEnumerable<ClauseEvaluation> evaluations,
+            RequiresObservationCapture? capture)
         {
             var outcome = AnalyzerSemanticOutcome.Proven;
+            var ordinal = 0;
             foreach (var evaluation in evaluations)
             {
+                capture?.Evaluation(ordinal, evaluation.Value);
+                ordinal++;
                 if (!evaluation.Value.HasValue)
                 {
                     outcome = AnalyzerSemanticOutcomes.Combine(
@@ -636,6 +680,47 @@ internal static partial class RequiresCallSiteAnalyzer
                 }
             }
             return outcome;
+        }
+
+        private sealed class RequiresObservationCapture
+        {
+            private IMethodSymbol? _target;
+            private ImmutableArray<BoundContractClause> _clauses = [];
+            private bool?[]? _values;
+            private string _gap = "NoBoundRequires";
+
+            internal void Gap(string reason)
+            { _gap = reason; }
+
+            internal void Bind(IMethodSymbol target, ImmutableArray<BoundContractClause> clauses)
+            {
+                _target = target;
+                _clauses = clauses;
+            }
+
+            internal void Evaluation(int ordinal, bool? value)
+            {
+                _values ??= new bool?[_clauses.Length];
+                _values[ordinal] = value;
+            }
+
+            internal void Publish(IRequiresCallSiteObserver observer, IMethodSymbol owner,
+                RequiresCallSiteCandidate candidate)
+            {
+                if (_clauses.IsDefaultOrEmpty)
+                {
+                    observer.ObserveGap(new(owner, candidate, _gap));
+                    return;
+                }
+                for (var ordinal = 0; ordinal < _clauses.Length; ordinal++)
+                {
+                    var value = _values?[ordinal];
+                    var outcome = value == false ? AnalyzerSemanticOutcome.Refuted :
+                        value == true && candidate.FlowStatus == ManagedFlowStatus.Complete
+                            ? AnalyzerSemanticOutcome.Proven : AnalyzerSemanticOutcome.Unknown;
+                    observer.ObserveClause(new(owner, candidate, _target!, _clauses[ordinal], ordinal, outcome));
+                }
+            }
         }
     }
 
