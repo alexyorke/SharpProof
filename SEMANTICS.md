@@ -464,8 +464,9 @@ throws, allocates, writes or synchronizes only when the specification says so,
 and uses only the capabilities it declares. A call without a specification may
 do all of these. Native AllowedCapabilities forbids reachable locks and calls
 whose capabilities fall outside the allowed set; only a reached lock refutes.
-Compiler evidence still decides AllowedCapabilities until `SharpProof.Gates
-capability-shadow` retains its proofs.
+Z3 decides AllowedCapabilities as well, after `SharpProof.Gates
+capability-shadow` retained every legacy proof; EffectContract still uses
+compiler evidence.
 Claim lowering admits array element stores, increments and compound
 assignments. The array and indexes evaluate first; a store then evaluates its
 value, and the null and bounds checks follow (an increment or compound

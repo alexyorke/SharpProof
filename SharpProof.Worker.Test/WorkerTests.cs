@@ -1027,7 +1027,7 @@ public sealed class WorkerTests
                 Is.EqualTo("explicit-throw"));
             Assert.That(
                 ClaimFor(conditional, "ConditionalLock").Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 ClaimFor(laterAllocation, "AllocationAfterFirstStatement").Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted));

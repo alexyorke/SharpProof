@@ -1,17 +1,17 @@
 namespace SharpProof.Worker;
 
-// Z3 decides exception, allocation and purity claims over the Total program.
+// Z3 decides exception, allocation, purity and capability claims over the Total program.
 // A proof is a complete may-effect summary; a refutation names the first
 // replayed violating site. Compiler effect evidence never supplies a proof;
 // where Z3 stays Unknown, only a compiler violation that replays is kept.
 internal static class NativeEffectClaims
 {
-    // AllowedCapabilities stays with compiler evidence until `SharpProof.Gates
-    // capability-shadow` retains its proofs.
+    // EffectContract still uses compiler evidence.
     internal static bool IsNative(WorkerEffectContractKind kind)
     {
         return kind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
-            WorkerEffectContractKind.ZeroAllocations or WorkerEffectContractKind.EnforcePure;
+            WorkerEffectContractKind.ZeroAllocations or WorkerEffectContractKind.EnforcePure or
+            WorkerEffectContractKind.AllowedCapabilities;
     }
 
     internal static async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,

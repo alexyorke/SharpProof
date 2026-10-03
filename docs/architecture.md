@@ -451,7 +451,7 @@ Exception kinds use predecessor-guarded phi facts. Refutations require original
 IR replay and are compared with compiled C# execution in artifact qualification
 tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.
 NativeEffectClaims publishes these results: Z3 proofs and replayed native
-refutations decide exception, allocation and purity claims, a replayed compiler
+refutations decide exception, allocation, purity and capability claims, a replayed compiler
 violation is kept only where Z3 stays Unknown, and other effect contracts still
 use the compiler effect assembler. Explicit throws carry per-site exception
 codes so AllowedExceptions goals compare each site's static type. The collector
