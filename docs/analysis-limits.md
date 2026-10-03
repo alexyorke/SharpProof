@@ -17,7 +17,7 @@ compiler-manifest properties, paths, invocation, and host enforcement.
 defaults and validation bounds, and the verifier defaults companion projects
 the same values into MSBuild. The release gate mirrors selected values
 in `eng/acceptance/contract.json` and verifies that they agree.
-`SharpProof.Frontend/CSharpScalarSemantics.generated.cs` lists the admitted
+`SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs` lists the admitted
 integer widths and ranges, value-preserving conversions, checked behavior,
 Roslyn-to-IR and inverse mappings, and comparison relations.
 
@@ -120,7 +120,7 @@ SharpProof does not inspect or duplicate cgroup enforcement.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-19 compiler artifact. The launcher supplies the same property as the
+schema-21 compiler artifact. The launcher supplies the same property as the
 worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
@@ -240,7 +240,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 13, cache schema version 15,
-claim-manifest schema version 5, compiler artifact schema version 19,
+claim-manifest schema version 5, compiler artifact schema version 28,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,

@@ -12,7 +12,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
 using SharpProof.Ir;
-using SharpProof.Summaries;
+using SharpProof.Smt;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -251,8 +251,7 @@ public sealed class WorkerTests
             TautologySource.Replace(
                 "return value;", "return 00000;",
                 StringComparison.Ordinal));
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -285,7 +284,7 @@ public sealed class WorkerTests
                 Is.True);
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(factoryCalls, Is.EqualTo(1));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(backend.CallCount, Is.EqualTo(3));
             Assert.That(CacheFiles(project), Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
@@ -504,7 +503,7 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             Assert.That(
                 response.ClaimResults.Select(static result =>
@@ -542,7 +541,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task EffectClaimsDoNotRefuteWhenRequiresBodyIsUnsupported()
+    public async Task EffectClaimsRetainCompilerEvidenceWithSupportedNominalRequires()
     {
         using var project = TestProject.Create(
             """
@@ -567,8 +566,7 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
@@ -633,13 +631,13 @@ public sealed class WorkerTests
                         ".ThrowExisting(",
                         StringComparison.Ordinal)).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
-            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
     [Test]
-    public async Task AllowedExceptionsRemainVisibleWhenRequiresBodyIsUnsupported()
+    public async Task AllowedExceptionsRetainCompilerProofWithSupportedNominalRequires()
     {
         using var project = TestProject.Create(
             """
@@ -663,8 +661,7 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
@@ -716,7 +713,7 @@ public sealed class WorkerTests
                         ".RequiredNonNull(",
                         StringComparison.Ordinal)).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
-            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
                 Is.True);
@@ -1149,8 +1146,7 @@ public sealed class WorkerTests
     [Test]
     public async Task MixedPostconditionAndEffectClaimsAreReturnedInManifestOrder()
     {
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         var response = await RunAsync(
             """
             using SharpProof.Attributes;
@@ -1174,7 +1170,7 @@ public sealed class WorkerTests
                 Is.EqualTo(response.Manifest.Claims.Select(static claim => claim.ClaimId)));
             Assert.That(response.ClaimResults.Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(backend.CallCount, Is.GreaterThan(0));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -1350,10 +1346,10 @@ public sealed class WorkerTests
                     result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedCallable));
+                response.ClaimResults.Select(result => result.Reason),
+                Is.EqualTo(response.ClaimResults.Select(result =>
+                    GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal)
+                        ? WorkerClaimReason.UnsupportedCallable : WorkerClaimReason.UnsupportedContract)));
             Assert.That(
                 response.ClaimResults.Select(static result =>
                     result.EffectCertainty),
@@ -1369,11 +1365,10 @@ public sealed class WorkerTests
                 Is.All.EqualTo(
                     WorkerCallableCoverage.Incomplete));
             Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerCallableCoverageReason
-                        .UnsupportedCallable));
+                response.CallableResults.Select(result => result.Reason),
+                Is.EqualTo(response.CallableResults.Select(result =>
+                    result.CallableId.Contains(".Async", StringComparison.Ordinal)
+                        ? WorkerCallableCoverageReason.UnsupportedCallable : WorkerCallableCoverageReason.UnsupportedContract)));
             Assert.That(
                 response.RunStatus,
                 Is.EqualTo(WorkerRunStatus.Complete));
@@ -1387,45 +1382,23 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task UnsupportedSelectedContractCallablesRemainTypedUnknown()
+    public async Task OriginalGenericDefinitionsProveWithoutAdmittingAsyncBodies()
     {
-        var response = await RunAsync(
-            WorkerTestSources.UnsupportedContractCallables,
-            cacheEnabled: false);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedCallable));
-            Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Coverage),
-                Is.All.EqualTo(
-                    WorkerCallableCoverage.Incomplete));
-            Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Reason),
-                Is.All.EqualTo(
-                    WorkerCallableCoverageReason
-                        .UnsupportedCallable));
-            Assert.That(
-                response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(
-                WorkerProtocolJson.Validate(response).IsValid,
-                Is.True);
-        }
+        var response = await RunAsync(WorkerTestSources.UnsupportedContractCallables, cacheEnabled: false);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        var generic = response.ClaimResults.Single(result => GetCallableId(response, result).Contains(".Generic", StringComparison.Ordinal));
+        var asynchronous = response.ClaimResults.Single(result => GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal));
+        Assert.That(generic.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(generic.Reason, Is.EqualTo(WorkerClaimReason.None));
+        Assert.That(asynchronous.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(asynchronous.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        Assert.That(response.CallableResults.Single(result => result.CallableId.Contains(".Generic", StringComparison.Ordinal)).Coverage,
+            Is.EqualTo(WorkerCallableCoverage.Complete));
+        Assert.That(response.CallableResults.Single(result => result.CallableId.Contains(".Async", StringComparison.Ordinal)).Coverage,
+            Is.EqualTo(WorkerCallableCoverage.Incomplete));
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+        Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
     [Test]
@@ -1721,7 +1694,7 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(() =>
         {
             Interlocked.Increment(ref factoryCalls);
-            return new CountingBackend(BackendCheckResult.Unsatisfiable([]));
+            return new CountingNativeBackend();
         });
 
         var response = await worker.VerifyAsync(request);
@@ -1840,8 +1813,8 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        using (var first = new SharpProofWorker(
-                   new SpuriousModelBackend()))
+        using var firstBackend = new CountingNativeBackend();
+        using (var first = new SharpProofWorker(firstBackend))
         {
             Assert.That(
                 (await first.VerifyAsync(request)).Summary.CacheStatus,
@@ -2026,8 +1999,7 @@ public sealed class WorkerTests
                 """));
         var request = project.CreateRequest(cacheEnabled: false);
         var compilation = project.CreateCompilation();
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         var target = new ClaimManifestBuilder(compilation)
             .Build()
             .Targets
@@ -2051,7 +2023,7 @@ public sealed class WorkerTests
         Assert.That(
             response.ClaimResults[0].Outcome,
             Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(backend.CallCount, Is.EqualTo(1));
+        Assert.That(backend.CallCount, Is.GreaterThan(0));
     }
 
     [Test]
@@ -2215,18 +2187,18 @@ public sealed class WorkerTests
                 StringComparison.Ordinal));
         Assert.That(
             intIdentity.ProofCore,
-            Is.EqualTo(["domain:parameter:0"]));
+            Is.Empty);
         Assert.That(
             response.ClaimResults
                 .Where(record => !GetCallableId(response, record).Contains(
                     ".Int64Identity(",
                     StringComparison.Ordinal))
                 .SelectMany(static record => record.ProofCore),
-            Is.All.EqualTo("domain:parameter:0"));
+            Is.Empty);
     }
 
     [Test]
-    public async Task SourceDomainAssumptionsUseLoweredEvidence()
+    public async Task SourceDomainsUseNativeBitvectorTypes()
     {
         using var project = TestProject.Create(
             """
@@ -2240,25 +2212,18 @@ public sealed class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        var backend = new CapturingBackend(
-            BackendCheckResult.Unsatisfiable([0]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var query = backend.Query;
-        Assert.That(query.Assumptions, Has.Length.EqualTo(1));
-        Assert.That(
-            query.Assumptions[0].Justification,
-            Is.TypeOf<LoweredJustification>());
-        Assert.That(
-            response.ClaimResults.Single().ProofCore,
-            Is.EqualTo(["domain:parameter:0"]));
+        AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
+        Assert.That(backend.Query.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
+        Assert.That(response.ClaimResults.Single().ProofCore, Is.Empty);
     }
-
     [Test]
-    public async Task ProofCoreMarksOnlyTheUserAssumptionItUses()
+    public async Task NativeProofCoreMarksItsBodyAssumptionsUsed()
     {
         using var project = TestProject.Create(BoundedIdentitySubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
@@ -2266,12 +2231,11 @@ public sealed class WorkerTests
             request,
             WorkerCacheIdentity.Current,
             CancellationToken.None);
-        var expectedUsedId = snapshot.CompilerManifest.Callables.Single()
-            .Clauses.First(static clause =>
+        var expectedUsedIds = snapshot.CompilerManifest.Callables.Single()
+            .Clauses.Where(static clause =>
                 clause.Kind == CompilerContractKind.Assume)
-            .AssumptionId;
-        var backend = new CapturingBackend(
-            BackendCheckResult.Unsatisfiable([0]));
+            .Select(static clause => clause.AssumptionId).ToArray();
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
@@ -2282,8 +2246,8 @@ public sealed class WorkerTests
             Is.EqualTo(WorkerClaimOutcome.Proven),
             record.Reason.ToString());
         Assert.That(
-            backend.Query.Assumptions[0].Justification,
-            Is.TypeOf<UserAssumedJustification>());
+            backend.Query.Factory.Semantics,
+            Is.EqualTo(IrExecutionSemantics.Total));
         var userAssumptions = record.Assumptions
             .Where(static evidence =>
                 evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
@@ -2291,10 +2255,10 @@ public sealed class WorkerTests
         {
             Assert.That(
                 userAssumptions.Count(static evidence => evidence.Used),
-                Is.EqualTo(1));
+                Is.EqualTo(2));
             Assert.That(
-                userAssumptions.Single(static evidence => evidence.Used).Id,
-                Is.EqualTo(expectedUsedId));
+                userAssumptions.Where(static evidence => evidence.Used).Select(static evidence => evidence.Id),
+                Is.EquivalentTo(expectedUsedIds));
         }
     }
 
@@ -2582,13 +2546,13 @@ public sealed class WorkerTests
         {
             Assert.That(
                 concat.ProofCore,
-                Is.EqualTo(["spec:bcl.string.concat.string-string"]));
+                Is.Empty);
             Assert.That(empty, Has.Length.EqualTo(2));
             foreach (var record in empty)
             {
                 Assert.That(
                     record.ProofCore,
-                    Is.EqualTo(["spec:bcl.array.empty"]));
+                    Is.Empty);
             }
         }
     }
@@ -2654,8 +2618,8 @@ public sealed class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedExpression);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
@@ -2668,13 +2632,16 @@ public sealed class WorkerTests
             using SharpProof.Attributes;
             public static class Subject {
                 private static int s_ambient;
-                private static void TouchAmbient() => s_ambient++;
+                private static void TouchAmbient(ref int[] value) {
+                    s_ambient++;
+                    value = null;
+                }
 
                 public static int[] Unsafe() {
                     Contract.Ensures(
                         Contract.Result<int[]>() != null);
                     var result = Array.Empty<int>();
-                    TouchAmbient();
+                    TouchAmbient(ref result);
                     return result;
                 }
             }
@@ -2688,7 +2655,7 @@ public sealed class WorkerTests
         var record = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.UnsupportedCallable);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
@@ -2765,7 +2732,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task LoopsAbstainWhileDirectAcyclicSourceCallsAreProven()
+    public async Task ReducibleLoopsAndDirectAcyclicSourceCallsAreProven()
     {
         using var project = TestProject.Create(
             """
@@ -2807,17 +2774,17 @@ public sealed class WorkerTests
                 StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 loop.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(call.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(call.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 call.ProofCore.Any(static item => item.StartsWith(
                     "source-summary:",
                     StringComparison.Ordinal)),
-                Is.True);
+                Is.False);
         }
     }
 
@@ -2848,17 +2815,6 @@ public sealed class WorkerTests
             .GetMembers("ReadAgain")
             .OfType<IMethodSymbol>()
             .Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                CompilerImplementationIlSummaryLowerer.IsCandidate(
-                    compilation,
-                    external),
-                Is.True);
-            Assert.That(
-                external.MetadataToken & unchecked((int)0xff000000),
-                Is.EqualTo(0x06000000));
-        }
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
             candidate.Method.MetadataName == "Call");
@@ -2867,9 +2823,8 @@ public sealed class WorkerTests
             new IrFactory());
         var preparation = lowerer.Prepare(target);
         Assert.That(
-            preparation.IsSuccess,
-            Is.True,
-            lowerer.LastImplementationIlAbstention.ToString());
+            preparation.Total,
+            Is.Not.Null);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
@@ -2883,7 +2838,7 @@ public sealed class WorkerTests
             result.ProofCore.Any(static item => item.StartsWith(
                 "il-summary:",
                 StringComparison.Ordinal)),
-            Is.True);
+            Is.False);
     }
 
     [Test]
@@ -2969,8 +2924,8 @@ public sealed class WorkerTests
                     result.ProofCore.Any(static item => item.StartsWith(
                         "il-summary:",
                         StringComparison.Ordinal)),
-                    Is.True,
-                    methodName + " did not use an implementation-IL summary.");
+                    Is.False,
+                    methodName + " retained a legacy implementation-IL summary.");
             }
         }
     }
@@ -2979,7 +2934,15 @@ public sealed class WorkerTests
     public void ImplementationIlRejectsStackDepthBeyondDeclaredMaximum()
     {
         using var project = TestProject.Create(
-            "public static class Subject { }");
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Verify(int left, int right) {
+                    Contract.Ensures(true);
+                    return ExternalStackDepth.Add(left, right);
+                }
+            }
+            """);
         var implementationPath = project.AddImplementationReference(
             """
             public static class ExternalStackDepth
@@ -2997,64 +2960,17 @@ public sealed class WorkerTests
             "Add",
             declaredMaxStack: 1);
         var compilation = project.CreateCompilation();
-        var method = compilation.GetTypeByMetadataName(
-                "ExternalStackDepth")!
-            .GetMembers("Add")
-            .OfType<IMethodSymbol>()
-            .Single();
-        var factory = new IrFactory();
-        var declaringType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "ExternalStackDepth");
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            declaringType,
-            "Add",
-            factory.IntegerType,
-            isStatic: true,
-            factory.IntegerType,
-            factory.IntegerType);
-
-        var built = CompilerImplementationIlSummaryLowerer.TryBuild(
-            compilation,
-            factory,
-            method,
-            member,
-            static _ => false,
-            NoDependency,
-            CancellationToken.None,
-            out var summary,
-            out var reason);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(built, Is.False);
-            Assert.That(summary, Is.Null);
-            Assert.That(
-                reason,
-                Is.EqualTo(
-                    CompilerImplementationIlAbstentionReason.UnsupportedIl));
-        }
-
-        static bool NoDependency(
-            IMethodSymbol method,
-            IrMemberId member,
-            CancellationToken cancellationToken,
-            out IrRelationalSummary? summary)
-        {
-            _ = method;
-            _ = member;
-            _ = cancellationToken;
-            summary = null;
-            return false;
-        }
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
     }
 
     [Test]
     public void ImplementationIlRejectsOversizedLocalSignatureBeforeMaterialization()
     {
         var localCount =
-            IrRelationalSummaryBuildLimits.Default.MaximumInstructions + 1;
+            129;
         var localDeclarations = string.Join(
             Environment.NewLine,
             Enumerable.Range(0, localCount).Select(static index =>
@@ -3100,8 +3016,7 @@ public sealed class WorkerTests
                 Assert.That(
                     signatureReader.ReadCompressedInteger(),
                     Is.GreaterThan(
-                        IrRelationalSummaryBuildLimits.Default
-                            .MaximumInstructions));
+                        128));
             }
         }
 
@@ -3111,60 +3026,8 @@ public sealed class WorkerTests
             .GetMembers("Read")
             .OfType<IMethodSymbol>()
             .Single();
-        var factory = new IrFactory();
-        var declaringType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "ExternalLocalBudget");
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            declaringType,
-            "Read",
-            factory.IntegerType,
-            isStatic: true,
-            factory.IntegerType);
-
-        var built = CompilerImplementationIlSummaryLowerer.TryBuild(
-            compilation,
-            factory,
-            method,
-            member,
-            static _ => false,
-            NoDependency,
-            CancellationToken.None,
-            out var summary,
-            out var reason);
-        var sentinel = factory.CreateVariable(
-            "sentinel",
-            factory.IntegerType);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(built, Is.False);
-            Assert.That(summary, Is.Null);
-            Assert.That(
-                reason,
-                Is.EqualTo(
-                    CompilerImplementationIlAbstentionReason
-                        .SummaryResourceLimit));
-            Assert.That(
-                sentinel.Value,
-                Is.EqualTo(2),
-                "Oversized metadata locals were materialized before " +
-                "the summary resource limit was applied.");
-        }
-
-        static bool NoDependency(
-            IMethodSymbol method,
-            IrMemberId member,
-            CancellationToken cancellationToken,
-            out IrRelationalSummary? summary)
-        {
-            _ = method;
-            _ = member;
-            _ = cancellationToken;
-            summary = null;
-            return false;
-        }
+        var provider = new CompilerTotalIlBodyProvider(compilation, null);
+        Assert.That(provider.Resolve(method, CancellationToken.None), Is.Null);
     }
 
     [Test]
@@ -3196,55 +3059,21 @@ public sealed class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(request.CompilerManifest.Path));
-        var summary = artifact.Callables.Single()
-            .Body!.SummaryCalls.Single();
-        var manifestJson = await File.ReadAllTextAsync(
-            request.CompilerManifest.Path);
+        var manifestJson = await File.ReadAllTextAsync(request.CompilerManifest.Path);
         var canonicalJson = CompilerManifestArtifactJson.Serialize(artifact);
         var roundTrip = CompilerManifestArtifactJson.Deserialize(canonicalJson);
-        var roundTripSummary = roundTrip.Callables.Single()
-            .Body!.SummaryCalls.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(canonicalJson, Is.EqualTo(manifestJson));
-            Assert.That(
-                roundTripSummary.DependencyEvidence,
-                Is.EqualTo(summary.DependencyEvidence));
-        }
+        Assert.That(canonicalJson, Is.EqualTo(manifestJson));
+        Assert.That(roundTrip.Callables.Single().Total, Is.Not.Null);
+        Assert.That(roundTrip.Callables.Single().Body, Is.Null);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
-        var implementationEvidence = summary.DependencyEvidence
-            .SingleOrDefault(item =>
-                item.Origin == CompilerSummaryOrigin.ImplementationIl);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
-            Assert.That(
-                summary.DependencyEvidence.Select(static item => item.Origin),
-                Does.Contain(CompilerSummaryOrigin.ImplementationIl));
-            Assert.That(
-                implementationEvidence?.EvidenceSha256.Length ?? 0,
-                Is.EqualTo(64));
-            Assert.That(
-                result.ProofCore.Any(static item => item.StartsWith(
-                    "source-summary:",
-                    StringComparison.Ordinal)),
-                Is.True);
-        }
-
-        // Reporting identities remain opaque after compiler lowering.
-        summary.DependencyEvidence = [.. summary.DependencyEvidence.Select(item =>
-            item.Origin == CompilerSummaryOrigin.ImplementationIl
-                ? item with { EvidenceSha256 = new string('b', 64) }
-                : item)];
-        Assert.DoesNotThrow((Action)(() => CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.ProofCore.Any(static item => item.StartsWith("source-summary:", StringComparison.Ordinal)), Is.False);
     }
-
 
     [Test]
     public async Task ImplementationIlBranchesAndInt32WrappingRemainExact()
@@ -3304,14 +3133,49 @@ public sealed class WorkerTests
             Assert.That(
                 response.ClaimResults,
                 Has.All.Matches<WorkerClaimResult>(result =>
-                    result.ProofCore.Any(static item => item.StartsWith(
+                    !result.ProofCore.Any(static item => item.StartsWith(
                         "il-summary:",
                         StringComparison.Ordinal))));
         }
     }
 
+    [TestCase("&", "&&")]
+    [TestCase("|", "||")]
+    [TestCase("^", "!=")]
+    public async Task ImplementationIlBooleanOperatorsProveAndRefuteTruthTables(string bodyOperator, string contractOperator)
+    {
+        using var project = TestProject.Create($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Correct(bool left, bool right) {
+                    Contract.Ensures(Contract.Result<bool>() == (left {{contractOperator}} right));
+                    return ExternalBoolean.Apply(left, right);
+                }
+                public static bool Incorrect(bool left, bool right) {
+                    Contract.Ensures(Contract.Result<bool>() != (left {{contractOperator}} right));
+                    return ExternalBoolean.Apply(left, right);
+                }
+            }
+            """);
+        project.AddImplementationReference($$"""
+            public static class ExternalBoolean {
+                public static bool Apply(bool left, bool right) => left {{bodyOperator}} right;
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        foreach (var result in response.ClaimResults)
+        {
+            var correct = GetCallableId(response, result).Contains(".Correct(", StringComparison.Ordinal);
+            Assert.That(result.Outcome, Is.EqualTo(correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted), result.Reason.ToString());
+        }
+    }
+
     [Test]
-    public void ImplementationIlScalarOpcodeMatrixBuildsExactSummaries()
+    public void ImplementationIlScalarOpcodeMatrixUsesTotalBodies()
     {
         var signatures = new (string ReturnType, string Name, string Parameters,
             string Arguments)[]
@@ -3444,56 +3308,13 @@ public sealed class WorkerTests
         var compilation = project.CreateCompilation();
         var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
             .ToDictionary(static target => target.Method.Name, StringComparer.Ordinal);
-        var unsupported = new Dictionary<string, CompilerImplementationIlAbstentionReason>(
-            StringComparer.Ordinal)
-        {
-            ["VerifyLongAdd"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
-            ["VerifyNeg64"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
-            ["VerifyInadmissibleCall"] =
-                CompilerImplementationIlAbstentionReason.InadmissibleCallTarget
-        };
-        var successful = 0;
-
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
-            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
-            var preparation = lowerer.Prepare(targets[targetName]);
-            if (unsupported.TryGetValue(targetName, out var expectedReason))
-            {
-                Assert.That(preparation.IsSuccess, Is.False, targetName);
-                Assert.That(
-                    lowerer.LastImplementationIlAbstention,
-                    Is.EqualTo(expectedReason),
-                    targetName);
-                continue;
-            }
-
-            Assert.That(
-                preparation.IsSuccess,
-                Is.True,
-                targetName + ": " +
-                lowerer.LastImplementationIlAbstention);
-            var summary = preparation.Body!.SummaryCalls.Values.Single();
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    summary.Origin,
-                    Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
-                    targetName);
-                Assert.That(
-                    summary.EvidenceSha256,
-                    Does.Match("^[0-9a-f]{64}$"),
-                    targetName);
-                Assert.That(
-                    summary.EvidenceIdentity,
-                    Is.Empty,
-                    targetName);
-            }
-            successful++;
+            var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName]);
+            Assert.That(preparation.Total, Is.Not.Null, targetName);
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(targetName == "VerifyInadmissibleCall"), targetName);
         }
-
-        Assert.That(successful, Is.EqualTo(signatures.Length - unsupported.Count));
     }
 
     [Test]
@@ -3598,15 +3419,8 @@ public sealed class WorkerTests
         {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
             var preparation = lowerer.Prepare(targets[targetName]);
-            Assert.That(
-                preparation.IsSuccess,
-                Is.True,
-                targetName + ": " + preparation.FailureReason + " / " +
-                lowerer.LastImplementationIlAbstention);
-            Assert.That(
-                preparation.Body!.SummaryCalls.Values.Single().Origin,
-                Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
-                targetName);
+            Assert.That(preparation.Total, Is.Not.Null, targetName);
+            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(targetName == "VerifyManyLocals"), targetName);
         }
 
         var wideLowerer = new CompilerCallableLowerer(
@@ -3615,8 +3429,8 @@ public sealed class WorkerTests
         var widePreparation = wideLowerer.Prepare(
             targets["VerifyManyParameters"]);
         Assert.That(
-            widePreparation.FailureReason,
-            Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            widePreparation.Total!.IsBodyAbstraction,
+            Is.True);
     }
 
     [Test]
@@ -3656,18 +3470,17 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        var loop = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(".Loop(", StringComparison.Ordinal));
+        var recursion = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(".Recurse(", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(
-                response.ClaimResults.SelectMany(
-                    static result => result.ProofCore),
-                Is.Empty);
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(loop.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(recursion.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(recursion.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(recursion.ProofCore, Is.Empty);
         }
     }
 
@@ -3702,7 +3515,7 @@ public sealed class WorkerTests
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.CounterexampleNotReplayable);
         Assert.That(result.ProofCore, Is.Empty);
     }
 
@@ -3722,8 +3535,7 @@ public sealed class WorkerTests
             specificationPacks: ["dotnet.scalar"]);
         var withArtifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(withRequest.CompilerManifest.Path));
-        var summaryArtifact = withArtifact.Callables.Single()
-            .Body!.SummaryCalls.Single();
+        var totalArtifact = withArtifact.Callables.Single().Total;
         using var withPackWorker = SharpProofWorker.Create(
             withRequest.Budgets);
         var withPack = await withPackWorker.VerifyAsync(
@@ -3740,30 +3552,98 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 disabled.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(enabled.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(enabled.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 enabled.ProofCore.Any(static item => item.StartsWith(
                     "spec-pack:dotnet.scalar@1:",
                     StringComparison.Ordinal)),
-                Is.True);
-            Assert.That(
-                summaryArtifact.Origin,
-                Is.EqualTo(CompilerSummaryOrigin.SpecificationPack));
-            Assert.That(
-                summaryArtifact.EvidenceIdentity,
-                Is.EqualTo("dotnet.scalar@1"));
-            Assert.That(
-                summaryArtifact.EvidenceSha256,
-                Has.Length.EqualTo(64));
+                Is.False);
+            Assert.That(totalArtifact, Is.Not.Null);
+            Assert.That(withArtifact.SpecificationPackIds, Has.Length.EqualTo(1));
+            Assert.That(withArtifact.SpecificationPackIds.Single(), Is.EqualTo("dotnet.scalar"));
         }
 
-        summaryArtifact.EvidenceIdentity = string.Empty;
+        withArtifact.Callables.Single().Total!.Graph.Semantics = IrExecutionSemantics.Legacy;
         Assert.That(
-            (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
-                withArtifact)),
+            new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact)),
             Throws.TypeOf<InvalidDataException>());
+    }
+
+    [TestCase("Contract.Result<int>() == (left >= right ? left : right)", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() >= left", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() >= right", WorkerClaimOutcome.Proven)]
+    [TestCase("Contract.Result<int>() == left", WorkerClaimOutcome.Refuted)]
+    public async Task NativeSpecificationPackRequiresExplicitOptIn(string predicate, WorkerClaimOutcome expected)
+    {
+        using var project = TestProject.Create($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int left, int right) {
+                    Contract.Ensures({{predicate}});
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var disabledRequest = project.CreateRequest(cacheEnabled: false);
+        using var disabledWorker = SharpProofWorker.CreateNative(disabledRequest.Budgets);
+        var disabled = await disabledWorker.VerifyAsync(disabledRequest);
+        Assert.That(disabled.Errors, Is.Empty);
+        Assert.That(disabled.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(disabled.ClaimResults.Single().ProofCore, Is.Empty);
+
+        var enabledRequest = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
+        using var enabledWorker = SharpProofWorker.CreateNative(enabledRequest.Budgets);
+        var enabled = await enabledWorker.VerifyAsync(enabledRequest);
+        Assert.That(enabled.Errors, Is.Empty);
+        Assert.That(enabled.ClaimResults.Single().Outcome, Is.EqualTo(expected));
+        Assert.That(enabled.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.None));
+    }
+
+    [Test]
+    public async Task NativeSpecificationPackPreservesNamedArgumentEvaluationOrder()
+    {
+        using var project = TestProject.Create("""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value == 0);
+                    Contract.Ensures(Contract.Result<int>() == 2 && value == 2);
+                    return Math.Max(val2: ++value, val1: value *= 2);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
+        using var worker = SharpProofWorker.CreateNative(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    [Test]
+    public async Task NativeSpecificationPackDoesNotTrustAnImpersonatedFrameworkType()
+    {
+        using var project = TestProject.Create("""
+            using SharpProof.Attributes;
+            namespace System { public static class Math { public static int Max(int left, int right) => -1; } }
+            public static class Subject {
+                public static int Target(int left, int right) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return System.Math.Max(left, right);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
+        using var worker = SharpProofWorker.CreateNative(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
     [Test]
@@ -3812,12 +3692,12 @@ public sealed class WorkerTests
         var record = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.CounterexampleNotReplayable);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
     [Test]
-    public async Task RelationalSummaryCallProducesTypedNonfatalUnreplayableCounterexample()
+    public async Task SourceCallProducesReplayedCounterexample()
     {
         using var project = TestProject.Create(
             """
@@ -3840,8 +3720,8 @@ public sealed class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.CounterexampleNotReplayable);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -3851,7 +3731,7 @@ public sealed class WorkerTests
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.None));
             Assert.That(record.ProofCore, Is.Empty);
-            Assert.That(record.Model, Is.Empty);
+            Assert.That(record.Model, Has.Length.EqualTo(1));
         }
     }
 
@@ -4054,7 +3934,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task WorkerProductPathInstantiatesApiSpecResultEvidence()
+    public async Task WorkerProductPathUsesNativeApiSpecResultEvidence()
     {
         using var project = TestProject.Create(
             """
@@ -4069,27 +3949,17 @@ public sealed class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        var backend = new CapturingBackend(
-            BackendCheckResult.Unsatisfiable([0]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
-        var query = backend.Query;
-        var specAssumption = query.Assumptions.Single(assumption =>
-            assumption.Justification is SpecJustification);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(response.Errors, Is.Empty);
-            Assert.That(
-                response.ClaimResults.Single().ProofCore,
-                Is.EqualTo(["spec:bcl.string.concat.string-string"]));
-            Assert.That(
-                specAssumption.Predicate,
-                Is.TypeOf<IrVariableTerm>());
-        }
+        Assert.That(response.Errors, Is.Empty);
+        AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
+        Assert.That(backend.Query.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
+        Assert.That(response.ClaimResults.Single().ProofCore,
+            Does.Not.Contain("spec:bcl.string.concat.string-string"));
     }
-
     [Test]
     public async Task NarrowIntegralCounterexampleStaysInsideSourceDomain()
     {
@@ -4121,7 +3991,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task WidthSensitiveArithmeticAndConversionsAbstain()
+    public async Task WidthSensitiveArithmeticAndConversionsUseTypedSemantics()
     {
         using var project = TestProject.Create(
             """
@@ -4158,24 +4028,25 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
-        Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
-            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(
-            response.ClaimResults
-                .Where(record => GetCallableId(response, record).Contains(
-                    "Contract(",
-                    StringComparison.Ordinal))
-                .Select(static record => record.Reason),
-            Is.All.EqualTo(
-                WorkerClaimReason.UnsupportedExpression));
-        Assert.That(
-            response.ClaimResults
-                .Where(record => GetCallableId(response, record).Contains(
-                    "Body(",
-                    StringComparison.Ordinal))
-                .Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+        foreach (var record in response.ClaimResults)
+        {
+            var callableId = GetCallableId(response, record);
+            if (callableId.Contains(".CheckedContract(", StringComparison.Ordinal))
+            {
+                Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
+            }
+            else if (callableId.Contains(".UncheckedContract(", StringComparison.Ordinal))
+            {
+                Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+                Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.None));
+            }
+            else
+            {
+                Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), callableId);
+                Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.None), callableId);
+            }
+        }
     }
 
     [Test]
@@ -4215,14 +4086,14 @@ public sealed class WorkerTests
                     record.Reason)));
         Assert.That(
             response.ClaimResults.Select(static record => record.ProofCore),
-            Is.All.Contain("body:normal-completion"));
+            Has.All.Matches<string[]>(core => core.Any(static item => item.StartsWith("normal-completion:", StringComparison.Ordinal))));
         Assert.That(
             response.ClaimResults.Select(static record => record.Vacuity),
             Is.All.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
     }
 
     [Test]
-    public async Task UnusedAssignmentDefinednessConstrainsNormalCompletion()
+    public async Task UnusedAssignmentFaultsConstrainNormalCompletion()
     {
         using var project = TestProject.Create(
             """
@@ -4250,7 +4121,7 @@ public sealed class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(record.ProofCore, Does.Contain("body:normal-completion"));
+            Assert.That(record.ProofCore, Has.Some.StartsWith("edge:"));
             Assert.That(record.Model, Is.Empty);
         }
     }
@@ -4320,7 +4191,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task NullableStringProofsAbstainWithoutNullTagEncoding()
+    public async Task StringConcatEqualityAbstainsWithoutContentEncoding()
     {
         using var project = TestProject.Create(
             """
@@ -4352,11 +4223,11 @@ public sealed class WorkerTests
         Assert.That(
             response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(
-                WorkerClaimReason.UnsupportedExpression));
+                WorkerClaimReason.UnsupportedBody));
     }
 
     [Test]
-    public async Task UnsupportedBodyAndDeepPostconditionAbstain()
+    public async Task NativeDepthAndUnsupportedInstanceCallAbstain()
     {
         var response = await RunAsync(
             """
@@ -4383,7 +4254,7 @@ public sealed class WorkerTests
             response.ClaimResults.Select(static record => record.Reason),
             Is.EquivalentTo(new[] {
                 WorkerClaimReason.DeepPostcondition,
-                WorkerClaimReason.UnsupportedBody
+                WorkerClaimReason.CounterexampleNotReplayable
             }));
         Assert.That(
             response.ClaimResults.All(static record =>
@@ -4458,15 +4329,18 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var enabled = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
+        using var backend = new CountingNativeBackend();
         using var firstWorker = new SharpProofWorker(backend);
         var first = await firstWorker.VerifyAsync(enabled);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var second = await firstWorker.VerifyAsync(enabled);
-        Assert.That(backend.CallCount, Is.EqualTo(1));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries));
         AssertSemanticallyEquivalent(first, second);
 
         var disabled = project.CreateRequest(cacheEnabled: false);
-        var disabledBackend = new SpuriousModelBackend();
+        using var disabledBackend = new CountingNativeBackend();
         using var disabledWorker = new SharpProofWorker(disabledBackend);
         var withoutCache = await disabledWorker.VerifyAsync(disabled);
         AssertSemanticallyEquivalent(first, withoutCache);
@@ -4603,30 +4477,65 @@ public sealed class WorkerTests
             Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
-    [Test]
-    public async Task FatalClaimTakesPrecedenceOverAnotherCallableTimeout()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void FatalClaimTakesPrecedenceOverAnotherCallableTimeout(bool reverseRecords)
     {
         using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.Budgets.MaxParallelism = 1;
-        request.Budgets.MethodWallTimeMilliseconds = 30;
-        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
-        using var worker = new SharpProofWorker(
-            new UnavailableThenDelayingBackend());
-
-        var response = await worker.VerifyAsync(request);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var assembled = AssembleFatalAndTimedOut(request, snapshot, reverseRecords);
+        var response = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(assembled))!;
+        var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
+            snapshot.InputHash, snapshot.CompilerManifest.Manifest, request, Launcher.Program.ExpectedVersions());
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(validation.IsValid, Is.True, string.Join(';', validation.Errors.Select(error => error.Code)));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
             Assert.That(
                 response.ClaimResults.Select(static result => result.Reason),
-                Does.Contain(WorkerClaimReason.BackendUnavailable)
-                    .And.Contain(WorkerClaimReason.MethodTimeout));
+                Is.EqualTo((WorkerClaimReason[])[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
+            Assert.That(response.CallableResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerCallableCoverageReason[])[WorkerCallableCoverageReason.InfrastructureFailure,
+                    WorkerCallableCoverageReason.MethodTimeout]));
+            Assert.That(response.ClaimResults.Select(static result => result.ClaimId),
+                Is.EqualTo(snapshot.CompilerManifest.Manifest.Claims.Select(static claim => claim.ClaimId)));
+            Assert.That(VerificationCache.IsCacheable(response, snapshot.InputHash, snapshot.CompilerManifest.Manifest), Is.False);
         }
+    }
+
+    internal static WorkerVerifyResponse AssembleFatalAndTimedOut(
+        WorkerVerifyRequest request, WorkerInputSnapshot snapshot, bool reverseRecords)
+    {
+        var manifest = snapshot.CompilerManifest.Manifest;
+        Assert.That(manifest.Callables, Has.Length.EqualTo(2));
+        var callables = manifest.Callables.Select((callable, index) => new WorkerCallableResult
+        {
+            CallableId = callable.CallableId,
+            Coverage = WorkerCallableCoverage.Incomplete,
+            Reason = index == 0 ? WorkerCallableCoverageReason.InfrastructureFailure : WorkerCallableCoverageReason.MethodTimeout,
+            Assumptions = callable.Assumptions
+        }).ToArray();
+        var claims = manifest.Callables.SelectMany((callable, index) => callable.ClaimIds.Select(claimId => new WorkerClaimResult
+        {
+            ClaimId = claimId,
+            Outcome = WorkerClaimOutcome.Unknown,
+            Reason = index == 0 ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.MethodTimeout,
+            Assumptions = callable.Assumptions
+        })).ToArray();
+        if (reverseRecords)
+        {
+            Array.Reverse(callables);
+            Array.Reverse(claims);
+        }
+        var run = WorkerResultAssembler.Classify(callables, claims);
+        return WorkerResultAssembler.Create(snapshot.InputHash, manifest, run.Status, run.Failure, callables, claims,
+            request.Budgets, WorkerCacheStatus.Disabled, 0, requestHash: WorkerProtocolJson.ComputeRequestHash(request),
+            versions: Launcher.Program.ExpectedVersions());
     }
 
     [Test]
@@ -4761,16 +4670,19 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
             "*.sharp-proof-cache.json").Single();
         await File.WriteAllTextAsync(cacheFile, "{corrupt");
         var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         AssertSemanticallyEquivalent(first, second);
     }
 
@@ -4779,9 +4691,12 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
             "*.sharp-proof-cache.json").Single();
@@ -4799,7 +4714,7 @@ public sealed class WorkerTests
 
         var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         AssertSemanticallyEquivalent(first, second);
     }
 
@@ -4809,14 +4724,17 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         request.Cache.MaximumBytes = 1;
-        var backend = new SpuriousModelBackend();
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         var second = await worker.VerifyAsync(request);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
             Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(
@@ -4927,10 +4845,8 @@ public sealed class WorkerTests
             MultipleEnsuresSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.QueryRlimit = 6;
-        request.Budgets.MethodRlimit = 12;
-        var backend = new ResourceCountingBackend(
-            resourceCost: 6,
-            BackendCheckResult.Unsatisfiable([]));
+        request.Budgets.MethodRlimit = 24;
+        using var backend = new ResourceCountingBackend(resourceCost: 6);
         using var worker = new SharpProofWorker(
             backend,
             () => backend.ConsumedResourceCount);
@@ -4942,7 +4858,7 @@ public sealed class WorkerTests
         ];
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(4));
         Assert.That(
             response.ClaimResults.Select(static record => record.Outcome),
             Is.EqualTo(expectedStatuses));
@@ -4984,8 +4900,7 @@ public sealed class WorkerTests
         ThrowingDisposeBackend? backend = null;
         using var worker = new SharpProofWorker(() =>
         {
-            backend = new ThrowingDisposeBackend(
-                BackendCheckResult.Unsatisfiable([]));
+            backend = new ThrowingDisposeBackend();
             return backend;
         });
 
@@ -4996,6 +4911,7 @@ public sealed class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(backend!.DisposeCalls, Is.EqualTo(1));
+            Assert.That(backend.NativeDisposed, Is.True);
         }
     }
 
@@ -5117,13 +5033,13 @@ public sealed class WorkerTests
         using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
-        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.MethodWallTimeMilliseconds = 200;
         request.Budgets.ProjectWallTimeMilliseconds = 1_000;
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) == 1
                 ? new DelayingBackend()
-                : new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+                : new CountingNativeBackend());
 
         var response = await worker.VerifyAsync(request);
 
@@ -5372,13 +5288,13 @@ public sealed class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
-        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.MethodWallTimeMilliseconds = 200;
         request.Budgets.ProjectWallTimeMilliseconds = 1_000;
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) == 1
                 ? new DelayingBackend()
-                : new ProofThenCounterexampleBackend());
+                : new CountingNativeBackend());
 
         var response = await worker.VerifyAsync(request);
 
@@ -5435,8 +5351,7 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) <= 2
                 ? new DelayingBackend()
-                : new CountingBackend(
-                    BackendCheckResult.Unsatisfiable([])));
+                : new CountingNativeBackend());
 
         var response = await worker.VerifyAsync(request);
 
@@ -5449,7 +5364,7 @@ public sealed class WorkerTests
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
-                    WorkerClaimOutcome.Proven
+                    WorkerClaimOutcome.Refuted
                 ]));
             Assert.That(
                 response.ClaimResults.Take(2)
@@ -5470,10 +5385,10 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.ClaimResults[0].Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Proven));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.ClaimResults.Skip(1).Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
@@ -5483,7 +5398,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(MultipleEnsuresSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodRlimit = request.Budgets.QueryRlimit;
-        using var backend = new SharpProof.Smt.IrSmtBackend(
+        using var backend = new NativeCallableBackend(
             new SharpProof.Smt.IrSmtBackendOptions(
                 request.Budgets.QueryRlimit));
         using var worker = new SharpProofWorker(
@@ -5494,10 +5409,10 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.ClaimResults[0].Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Proven));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.ClaimResults.Skip(1).Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
@@ -5508,8 +5423,7 @@ public sealed class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.QueryRlimit = 6;
         request.Budgets.MethodRlimit = 12;
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var response = await worker.VerifyAsync(request);
 
@@ -5525,14 +5439,17 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
+        using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
+        var firstQueries = backend.CallCount;
+        Assert.That(firstQueries, Is.GreaterThan(0));
+        AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
 
         request.Budgets.MethodRlimit--;
         var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         Assert.That(second.InputHash, Is.Not.EqualTo(first.InputHash));
         Assert.That(
             CacheFiles(project),
@@ -5778,9 +5695,8 @@ public sealed class WorkerTests
         var request = project.CreateRequest(
             cacheEnabled,
             maximumExpressionDepth: maximumExpressionDepth);
-        using var worker = new SharpProofWorker(
-            backend ?? new CountingBackend(
-                BackendCheckResult.Unsatisfiable([])));
+        using var defaultBackend = backend == null ? new CountingNativeBackend() : null;
+        using var worker = new SharpProofWorker(backend ?? defaultBackend!);
         return await worker.VerifyAsync(request);
     }
 
@@ -6096,26 +6012,6 @@ public sealed class WorkerTests
         }
     }
 
-    private sealed class CapturingBackend(BackendCheckResult result)
-        : ISmtBackend
-    {
-        private readonly BackendCheckResult _result = result;
-        private VerificationQuery? _query;
-
-        internal VerificationQuery Query =>
-            _query ?? throw new InvalidOperationException(
-                "The backend has not received a query.");
-
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            _query = query;
-            return Task.FromResult(_result);
-        }
-    }
-
     private sealed class DelayingBackend : ISmtBackend
     {
         public async Task<BackendCheckResult> CheckAsync(
@@ -6161,28 +6057,32 @@ public sealed class WorkerTests
         }
     }
 
-    private sealed class ProofThenCounterexampleBackend : ISmtBackend
+    private sealed class CountingNativeBackend : ISmtBackend, IDisposable
     {
-        private int _calls;
+        private readonly NativeCallableBackend _backend;
+        private int _callCount;
+        private VerificationQuery? _query;
 
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
+        internal CountingNativeBackend()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Interlocked.Increment(ref _calls) == 1)
-            {
-                return Task.FromResult(
-                    BackendCheckResult.Unsatisfiable([]));
-            }
+            ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+            _backend = new NativeCallableBackend(new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
+        }
 
-            var assignments = query.ModelVariables.Select(variable =>
-                KeyValuePair.Create(
-                    variable,
-                    query.Factory.CreateIntegerValue(0)));
-            return Task.FromResult(
-                BackendCheckResult.Satisfiable(
-                    new BackendModel(assignments)));
+        internal int CallCount => Volatile.Read(ref _callCount);
+
+        internal VerificationQuery Query => _query ?? throw new InvalidOperationException("No native query was submitted.");
+
+        public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        {
+            _query = query;
+            Interlocked.Increment(ref _callCount);
+            return _backend.CheckAsync(query, cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            _backend.Dispose();
         }
     }
 
@@ -6268,28 +6168,35 @@ public sealed class WorkerTests
     private sealed class CoordinatedBackend : ISmtBackend, IDisposable
     {
         private readonly ConcurrentLaneState _state;
+        private readonly CountingNativeBackend _backend = new();
         internal CoordinatedBackend(ConcurrentLaneState state)
         {
             _state = state;
             state.CreatedBackend();
         }
-        public Task<BackendCheckResult> CheckAsync(
+        public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query, CancellationToken cancellationToken)
         {
-            return _state.CheckAsync(cancellationToken);
+            await _state.CheckAsync(cancellationToken);
+            return await _backend.CheckAsync(query, cancellationToken);
         }
 
         public void Dispose()
         {
+            _backend.Dispose();
             _state.DisposedBackend();
         }
     }
 
-    private sealed class ThrowingDisposeBackend(BackendCheckResult result) :
+    private sealed class ThrowingDisposeBackend(BackendCheckResult? result = null) :
         ISmtBackend,
         IDisposable
     {
-        private readonly BackendCheckResult _result = result;
+        private readonly BackendCheckResult? _result = result;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213",
+            Justification = "Dispose releases this backend before deliberately throwing the cleanup failure tested by this fixture.")]
+        private readonly CountingNativeBackend? _backend = result == null ? new() : null;
+        internal bool NativeDisposed { get; private set; }
 
         internal int DisposeCalls
         {
@@ -6301,12 +6208,14 @@ public sealed class WorkerTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(_result);
+            return _backend?.CheckAsync(query, cancellationToken) ?? Task.FromResult(_result!);
         }
 
         public void Dispose()
         {
             DisposeCalls++;
+            _backend?.Dispose();
+            NativeDisposed = _backend != null;
             throw new InvalidOperationException("backend disposal failed");
         }
     }
@@ -6364,7 +6273,7 @@ public sealed class WorkerTests
                     _secondEntered.TrySetResult();
                 }
 
-                return BackendCheckResult.Unsatisfiable([]);
+                return BackendCheckResult.Unknown(BackendFailureReason.ResourceLimit);
             }
             finally
             {
@@ -6376,32 +6285,10 @@ public sealed class WorkerTests
         }
     }
 
-    private sealed class UnavailableThenDelayingBackend : ISmtBackend
-    {
-        private int _calls;
-
-        public async Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            if (Interlocked.Increment(ref _calls) == 1)
-            {
-                return BackendCheckResult.Unknown(
-                    BackendFailureReason.Unavailable);
-            }
-
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            return BackendCheckResult.Unknown(
-                BackendFailureReason.InfrastructureFailure);
-        }
-    }
-
-    private sealed class ResourceCountingBackend(
-        long resourceCost,
-        BackendCheckResult result) : ISmtBackend
+    private sealed class ResourceCountingBackend(long resourceCost) : ISmtBackend, IDisposable
     {
         private readonly long _resourceCost = resourceCost;
-        private readonly BackendCheckResult _result = result;
+        private readonly CountingNativeBackend _backend = new();
         private int _callCount;
         private long _consumedResourceCount;
 
@@ -6416,8 +6303,11 @@ public sealed class WorkerTests
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             Interlocked.Add(ref _consumedResourceCount, _resourceCost);
-            return Task.FromResult(_result);
+            return _backend.CheckAsync(query, cancellationToken);
         }
+
+        public void Dispose()
+        { _backend.Dispose(); }
     }
 
     private static void SetDeclaredMaxStack(

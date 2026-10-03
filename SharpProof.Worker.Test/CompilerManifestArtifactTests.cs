@@ -338,7 +338,7 @@ public sealed class CompilerManifestArtifactTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(artifact)));
         Assert.That(
-            artifact.Callables.Single(item => item.CallableId.Contains(".B(", StringComparison.Ordinal)).Graph,
+            artifact.Callables.Single(item => item.CallableId.Contains(".B(", StringComparison.Ordinal)).Total?.Graph,
             Is.Not.Null);
     }
 
@@ -1187,7 +1187,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public async Task SpecCallSetAndCompilerCallIdentityFailClosed()
+    public void SpecCallSetAndCompilerCallIdentityFailClosed()
     {
         const string source = EmptyArraySource;
         var valid = CreateContractArtifact(source);
@@ -1219,16 +1219,22 @@ public sealed class CompilerManifestArtifactTests
 
         var substituted = CloneArtifact(valid);
         substituted.Callables[0].Body!.SpecCalls[0].WitnessIdentifier = "bcl.enumerable.empty";
-        var target = CompilerManifestArtifactJson.DecodeCallables(substituted).Single();
-        var verifier = new CallableVerifier(new UnexpectedBackend(), WorkerBudgets.DefaultMaximumExpressionDepth);
-        var results = (await verifier.VerifyWithEntryFeasibilityAsync(target,
-            new MethodResourceBudget(null, WorkerBudgets.DefaultQueryRlimit, WorkerBudgets.DefaultMethodRlimit),
-            CancellationToken.None)).Postconditions;
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-        }
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(substituted));
+        Assert.Throws<InvalidDataException>(new Action(() => ArtifactValidator.Decode(bytes)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SpecCatalogWitnessAndMemoryEffectFailClosedAtWorkerBoundary(bool corruptMemoryEffect)
+    {
+        var artifact = CreateContractArtifact(EmptyArraySource);
+        var descriptor = artifact.Callables.Single().Body!.SpecCalls.Single();
+        if (corruptMemoryEffect)
+        { descriptor.ConsumesMemoryHavoc = !descriptor.ConsumesMemoryHavoc; }
+        else
+        { descriptor.WitnessIdentifier = "unknown.spec.witness"; }
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+        Assert.Throws<InvalidDataException>(new Action(() => ArtifactValidator.Decode(bytes)));
     }
 
     [Test]
@@ -1315,7 +1321,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void SummaryFreeVariablesAreFreshFromProgramAndCanonicalVariables()
+    public void TotalCallCanonicalVariablesRemainDistinct()
     {
         const string source =
             """
@@ -1330,41 +1336,37 @@ public sealed class CompilerManifestArtifactTests
             }
             """;
         Action<CompilerCallableArtifact>[] corruptions = [
-            callable => callable.Body!.SummaryCalls[0].Result =
-                callable.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Parameter).Variable,
-            callable => callable.Body!.SummaryCalls[0].Result =
-                callable.Graph!.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .Single(static instruction =>
-                        instruction.Kind == IrInstructionKind.Call).A,
-            callable => callable.Body!.SummaryCalls[0].ExistentialVariables = [
-                callable.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Parameter).Variable
-            ]
+            callable => callable.Total!.Result = callable.Total.Parameters[0].Entry,
+            callable => callable.Total!.Parameters[0].Current = callable.Total.Parameters[0].Entry,
+            callable => callable.Total!.Parameters[0].Old = callable.Total.Parameters[0].Current
         ];
         var valid = CreateContractArtifact(source);
-
+        Assert.That(valid.Callables[0].Total, Is.Not.Null);
         foreach (var corrupt in corruptions)
         {
             var artifact = CloneArtifact(valid);
-            Assert.That(
-                artifact.Callables[0].Body!.SummaryCalls,
-                Has.Length.EqualTo(1));
             corrupt(artifact.Callables[0]);
-
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+            Assert.Throws<InvalidDataException>(new Action(() => CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
     }
 
-
-
-
-
-
-
-
+    [Test]
+    public void RetiredRelationalSummaryDescriptorsAreRejected()
+    {
+        var artifact = CreateContractArtifact("""
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+        artifact.Callables.Single().Body!.SummaryCalls = [new CompilerSummaryCallArtifact()];
+        var exception = Assert.Throws<InvalidDataException>(new Action(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.That(exception!.Message, Does.Contain("Relational-summary descriptors are retired"));
+    }
 
     [Test]
     public void SameShapedMemberSubstitutionFailsClosed()
@@ -1529,15 +1531,6 @@ public sealed class CompilerManifestArtifactTests
 
         graph.Blocks = [.. blocks];
         graph.Entry = 0;
-    }
-
-    private sealed class UnexpectedBackend : ISmtBackend
-    {
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query, CancellationToken cancellationToken)
-        {
-            throw new AssertionException("A mismatched spec witness reached the backend.");
-        }
     }
 
     private static CompilerAdditionalFileSnapshot AdditionalFile(

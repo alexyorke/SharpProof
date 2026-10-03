@@ -44,6 +44,48 @@ internal readonly partial record struct RequiresCallSiteCandidate(
     ManagedFlowStatus FlowStatus
 );
 
+// Advisory observations retain compiler-owned clause and call identities.
+// Their outcomes do not authorize native claims or proof-cache evidence.
+internal readonly record struct RequiresClauseObservation(
+    IMethodSymbol Caller,
+    RequiresCallSiteCandidate Candidate,
+    IMethodSymbol ContractTarget,
+    BoundContractClause Clause,
+    int ClauseOrdinal,
+    AnalyzerSemanticOutcome Outcome);
+
+internal readonly record struct RequiresCallObservationGap(
+    IMethodSymbol Caller,
+    RequiresCallSiteCandidate Candidate,
+    string Reason);
+
+internal readonly record struct RequiresOwnerObservationGap(
+    IMethodSymbol Caller,
+    SyntaxNode Declaration,
+    string Reason);
+
+internal enum PotentialRequiresCallOrigin
+{
+    Operation,
+    ImplicitBaseConstructor,
+    ExplicitPrimaryBaseConstructor
+}
+
+internal sealed record PotentialRequiresCallSite(
+    IMethodSymbol Owner,
+    IOperation Origin,
+    SyntaxNode Syntax,
+    PotentialRequiresCallOrigin OriginKind,
+    int CallRoleIndex,
+    IMethodSymbol DeclaredTarget,
+    IMethodSymbol Target,
+    IOperation? Instance,
+    ImmutableArray<IArgumentOperation> Arguments,
+    ImmutableDictionary<int, IOperation> ExplicitArguments,
+    ImmutableDictionary<int, long> ImplicitIntegerArguments,
+    bool CanReplay
+);
+
 internal sealed partial class SharpProofAnalyzerEngine
 {
     private readonly partial record struct AdvisoryActivation(
@@ -72,7 +114,10 @@ internal sealed partial class RequiresCallSiteDiscovery
         ImmutableDictionary<int, IOperation> ExplicitArguments,
         ImmutableDictionary<int, long> ImplicitIntegerArguments,
         bool CanReplay
-    );
+    )
+    {
+        internal int CanonicalRole { get; init; } = -1;
+    }
 }
 
 internal static partial class RequiresCallSiteTreeAnalyzer

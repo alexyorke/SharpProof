@@ -1,0 +1,236 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 12
+enrolled: 12
+checked: 12
+unknown: 1
+proven: 7
+refuted: 4
+row: M:Subject.ALoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ALoop(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BDo(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BDo(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CNested(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CNested(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DWrap(System.UInt64)~System.UInt64#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DWrap(System.UInt64)~System.UInt64#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.EBeyond(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.EBeyond(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.FInfinite(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
+  feasibility: NoModeledNormalReturn
+  conditional: False
+row: M:Subject.GAssume(System.Int32,System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: True
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 12
+enrolled: 12
+checked: 12
+unknown: 1
+proven: 7
+refuted: 4
+row: M:Subject.ALoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ALoop(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BDo(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BDo(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CNested(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CNested(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DWrap(System.UInt64)~System.UInt64#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DWrap(System.UInt64)~System.UInt64#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.EBeyond(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.EBeyond(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.FInfinite(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
+  feasibility: NoModeledNormalReturn
+  conditional: False
+row: M:Subject.GAssume(System.Int32,System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: True

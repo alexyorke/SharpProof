@@ -40,7 +40,7 @@ internal static class TryCompletionFacts
             if (operation is IUsingOperation or IUsingDeclarationOperation or
                     IForEachLoopOperation or
                     ISwitchExpressionOperation { IsExhaustive: false } ||
-                SharpProof.Roslyn.RoslynCfgThrowFacts.OperationMayThrow(
+                SharpProof.Frontend.CSharpOperationSemantics.OperationMayThrow(
                     operation))
             {
                 return true;

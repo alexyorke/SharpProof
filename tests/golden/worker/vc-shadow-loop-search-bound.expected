@@ -1,0 +1,56 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 2
+enrolled: 2
+checked: 2
+unknown: 1
+proven: 1
+refuted: 0
+row: M:Subject.Target(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.Target(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 2
+enrolled: 2
+checked: 2
+unknown: 1
+proven: 1
+refuted: 0
+row: M:Subject.Target(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.Target(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Unknown
+  conditional: False

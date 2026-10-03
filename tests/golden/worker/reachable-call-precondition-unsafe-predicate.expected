@@ -1,0 +1,5 @@
+collection-complete: True
+bodies: 2
+incomplete-calls: 0
+preserved-calls: 1
+call-precondition: 0 outcome=Refuted reason=None witness=True

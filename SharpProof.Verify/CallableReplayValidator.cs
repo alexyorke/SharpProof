@@ -21,6 +21,7 @@ internal static class CallableReplayValidator
         ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken)
     {
         var final = model.ToBuilder();
+        var approximationVariables = new HashSet<IrVarId>();
         if (!context.IsTrivial)
         {
             if (context.Program is not { } program || !ReferenceEquals(program.Factory, factory) ||
@@ -38,15 +39,25 @@ internal static class CallableReplayValidator
                 }
                 initial[binding.Key] = value;
             }
+            var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
+                request.Origin switch
+                {
+                    IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
+                    IrHavocOrigin.SpecResult => null,
+                    IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
+                    _ => null
+                });
             var execution = new IrProgramInterpreter(factory).Execute(
-                program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, cancellationToken);
+                program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
+            if (execution.ConsumedApproximation)
+            {
+                return AbstentionReason.CounterexampleNotReplayable;
+            }
             if (execution.Status != IrProgramExecutionStatus.Returned)
             {
-                return execution is
-                {
-                    Status: IrProgramExecutionStatus.Unsupported,
-                    Instruction: IrCallInstruction call
-                } && context.RegisteredCalls.Contains(call.Id)
+                return execution.Status == IrProgramExecutionStatus.Unsupported &&
+                    (execution.Instruction is IrLockInstruction ||
+                        execution.Instruction is IrCallInstruction call && context.RegisteredCalls.Contains(call.Id))
                     ? AbstentionReason.CounterexampleNotReplayable
                     : AbstentionReason.CounterexampleReplayFailed;
             }
@@ -58,6 +69,11 @@ internal static class CallableReplayValidator
                     return AbstentionReason.CounterexampleReplayFailed;
                 }
                 final[binding.Value] = value;
+                approximationVariables.Remove(binding.Value);
+                if (execution.ApproximationVariables.Contains(binding.Key))
+                {
+                    approximationVariables.Add(binding.Value);
+                }
             }
             if (context.ResultVariables.Length > 1 ||
                 context.ResultVariables.Length == 0 && execution.ReturnValue != null ||
@@ -70,6 +86,7 @@ internal static class CallableReplayValidator
             if (context.ResultVariables.Length == 1)
             {
                 final[context.ResultVariables[0]] = execution.ReturnValue!;
+                approximationVariables.Remove(context.ResultVariables[0]);
             }
         }
         else if (context.Program != null || !context.ParameterBindings.IsEmpty ||
@@ -86,18 +103,52 @@ internal static class CallableReplayValidator
                 return AbstentionReason.CounterexampleReplayFailed;
             }
             final[binding.Key] = value;
+            approximationVariables.Remove(binding.Key);
         }
         foreach (var domain in context.IntegerDomains)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (final.TryGetValue(domain.Key, out var value) &&
-                (value.Kind != IrValueKind.Integer || value.Integer < domain.Value.Minimum ||
-                    value.Integer > domain.Value.Maximum))
+                (value.Kind != IrValueKind.Integer || value.IntegerNumericValue < domain.Value.Minimum ||
+                    value.IntegerNumericValue > domain.Value.Maximum))
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
         }
-        var evaluated = new IrInterpreter(factory).Evaluate(context.Postcondition, final, cancellationToken);
+        var consumedApproximation = false;
+        void ObserveRead(IrVarId variable)
+        {
+            if (approximationVariables.Contains(variable))
+            {
+                consumedApproximation = true;
+            }
+        }
+        var interpreter = new IrInterpreter(factory);
+        if (factory.Semantics == IrExecutionSemantics.Total)
+        {
+            if (context.PostconditionGuard is not { } guard || guard.Type != factory.BooleanType)
+            {
+                return AbstentionReason.CounterexampleNotReplayable;
+            }
+            var defined = interpreter.Evaluate(guard, final, ObserveRead, cancellationToken);
+            if (consumedApproximation)
+            {
+                return AbstentionReason.CounterexampleNotReplayable;
+            }
+            if (defined.Status != IrEvaluationStatus.Value || defined.Value is not { Kind: IrValueKind.Boolean })
+            {
+                return AbstentionReason.CounterexampleReplayFailed;
+            }
+            if (!defined.Value.Boolean)
+            {
+                return AbstentionReason.PostconditionMayBeUndefined;
+            }
+        }
+        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, cancellationToken);
+        if (consumedApproximation)
+        {
+            return AbstentionReason.CounterexampleNotReplayable;
+        }
         if (evaluated.Status == IrEvaluationStatus.Exception)
         {
             return AbstentionReason.PostconditionMayBeUndefined;
@@ -107,4 +158,5 @@ internal static class CallableReplayValidator
                 ? null
                 : AbstentionReason.CounterexampleReplayFailed;
     }
+
 }

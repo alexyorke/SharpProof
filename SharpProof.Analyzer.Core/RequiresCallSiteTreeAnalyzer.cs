@@ -14,6 +14,31 @@ internal static partial class RequiresCallSiteTreeAnalyzer
     {
         caller = ContractClauseInventoryBuilder
             .NormalizeCallable(caller);
+        var initializerOutcome = AnalyzerSemanticOutcome.NotApplicable;
+        if (declaration is TypeDeclarationSyntax type &&
+            (PrimaryConstructorCallableInventory.TryGet(type, semanticModel, cancellationToken, out var constructor) ||
+             PrimaryConstructorCallableInventory.TryGetSynthesizedDefault(type, semanticModel, cancellationToken, out constructor)) &&
+            SymbolEqualityComparer.Default.Equals(caller, constructor))
+        {
+            // Both Roslyn callbacks own this same constructor. Whichever runs
+            // first must use the initializer route before claiming its key.
+            // Continue tree discovery for independent nested callable owners.
+            initializerOutcome = AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
+                constructor, type, semanticModel, session, reportDiagnostic, cancellationToken)
+                ?? AnalyzerSemanticOutcome.NotApplicable;
+        }
+        return AnalyzerSemanticOutcomes.Combine(initializerOutcome,
+            AnalyzeTree(caller, declaration, semanticModel, session, reportDiagnostic, cancellationToken));
+    }
+
+    private static AnalyzerSemanticOutcome AnalyzeTree(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
         var discovery = new RequiresCallSiteDiscovery(
             caller,
             declaration,
@@ -42,6 +67,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         if (potentialOwners.IsEmpty)
         {
             return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
+        if (potentialOwners.Contains(caller))
+        {
+            session.ObserveAdvisoryCalls(caller, declaration, cancellationToken);
         }
 
         if (!discovery.TryCreateGraph(
@@ -859,7 +889,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     {
                         if (exceptionalStateSurvivesKill)
                         {
-                            foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
+                            foreach (var successor in SharpProof.Frontend.RoslynCfgReachability.ExceptionalSuccessors(
                                          graph,
                                          block))
                             {
@@ -874,7 +904,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     }
                     if (BlockMayThrow(block, after))
                     {
-                        foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
+                        foreach (var successor in SharpProof.Frontend.RoslynCfgReachability.ExceptionalSuccessors(
                                      graph,
                                      block))
                         {
@@ -1215,7 +1245,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 .SelectMany(static operation =>
                     operation.DescendantsAndSelf())
                 .Any(static operation =>
-                    RoslynCfgThrowFacts.OperationMayThrow(operation));
+                    SharpProof.Frontend.CSharpOperationSemantics.OperationMayThrow(operation));
         }
 
         private static ISimpleAssignmentOperation? GetEnclosingSimpleAssignment(
@@ -1291,7 +1321,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     candidate.Syntax.SpanStart < commitEnd)
                 .SelectMany(static candidate => candidate.DescendantsAndSelf())
                 .Any(static candidate =>
-                    RoslynCfgThrowFacts.OperationMayThrow(candidate));
+                    SharpProof.Frontend.CSharpOperationSemantics.OperationMayThrow(candidate));
             cache.Add(key, result);
             return result;
         }

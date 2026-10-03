@@ -20,7 +20,6 @@
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Specs" />
     <InternalsVisibleTo Include="SharpProof.Specs.Test" />
-    <InternalsVisibleTo Include="SharpProof.Summaries" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />

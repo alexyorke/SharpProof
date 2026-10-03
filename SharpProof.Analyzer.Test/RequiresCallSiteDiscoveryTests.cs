@@ -17,6 +17,384 @@ public sealed class RequiresCallSiteDiscoveryTests
     private static readonly CSharpCompilation AccessorCompilation =
         CreateAccessorCompilation();
 
+    [TestCase("value++")]
+    [TestCase("++value")]
+    [TestCase("value--")]
+    [TestCase("--value")]
+    public void HiddenIncrementConversionsKeepKnownCallsButPreventCompleteInventory(string expression)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public struct Wrapper {
+                public int Value;
+                public static implicit operator int(Wrapper value) => value.Value;
+                public static implicit operator Wrapper(int value) => new Wrapper { Value = value };
+            }
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call(Wrapper value) {
+                    Positive(1); {{expression}}; Positive(2);
+                }
+            }
+            """, []);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value, Has.Length.EqualTo(2));
+        Assert.That(sites.Value.All(static row => row.Owner.Name == "Call" && row.CallRoleIndex == 0), Is.True);
+        Assert.That(complete, Is.False);
+    }
+
+    [Test]
+    public void HiddenCompoundConversionsPreventCompleteInventory()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation("""
+            public struct InputOperand { }
+            public struct OperatorResult { }
+            public struct Wrapper {
+                public static implicit operator InputOperand(Wrapper value) => default;
+                public static implicit operator Wrapper(OperatorResult value) => default;
+                public static OperatorResult operator +(InputOperand left, Wrapper right) => default;
+            }
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call(Wrapper left, Wrapper right) {
+                    Positive(1); left += right; Positive(2);
+                }
+            }
+            """, []);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name is "Positive" or "op_Addition", out var complete);
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value, Has.Length.EqualTo(3));
+        Assert.That(complete, Is.False);
+    }
+
+    [TestCase(8, true)]
+    [TestCase(256, false)]
+    public void PotentialInventoryHasABoundedOperationWalk(int depth, bool expectedComplete)
+    {
+        var expression = new string('!', depth) + "value";
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static bool Call(bool value) { Positive(1); return {{expression}}; }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(complete, Is.EqualTo(expectedComplete));
+        Assert.That(sites.HasValue, Is.EqualTo(expectedComplete));
+        if (sites.HasValue)
+        {
+            Assert.That(sites.Value, Has.Length.EqualTo(1));
+        }
+    }
+
+    [TestCase(2, true)]
+    [TestCase(200, false)]
+    public void PotentialInventoryBoundsDelegateStabilityWork(int count, bool expectedComplete)
+    {
+        var calls = string.Concat(Enumerable.Repeat("action();", count));
+        var assignments = string.Concat(Enumerable.Repeat("action = Positive;", count));
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public static class Subject {
+                static void Positive() { }
+                public static void Call() {
+                    System.Action action = Positive;
+                    {{calls}}
+                    {{assignments}}
+                }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(complete, Is.EqualTo(expectedComplete));
+        Assert.That(sites.HasValue, Is.EqualTo(expectedComplete));
+        if (sites.HasValue)
+        {
+            Assert.That(sites.Value, Has.Length.EqualTo(count));
+        }
+    }
+    [Test]
+    public void PotentialInventoryRejectsASuppliedDescendantOperation()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "public static class Subject { public static void Call() { Target(); } static void Target() { } }", []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+        var invocation = model.GetOperation(declaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single());
+        var discovery = new RequiresCallSiteDiscovery((IMethodSymbol)model.GetDeclaredSymbol(declaration)!,
+            declaration, model, CancellationToken.None, suppliedOperationRoot: invocation);
+        Assert.That(discovery.GetPotentialCalls(static _ => true, out var complete), Is.Null);
+        Assert.That(complete, Is.False);
+    }
+    [Test]
+    public void PotentialInventoryRejectsAForeignSuppliedOperationRoot()
+    {
+        const string source = "public static class Subject { public static void Call() { } }";
+        var compilation = AnalyzerTestHost.CreateCompilation(source, []);
+        var foreign = AnalyzerTestHost.CreateCompilation(source, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single();
+        var foreignDeclaration = foreign.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+        var foreignRoot = foreign.GetSemanticModel(foreignDeclaration.SyntaxTree).GetOperation(foreignDeclaration);
+        var discovery = new RequiresCallSiteDiscovery((IMethodSymbol)model.GetDeclaredSymbol(declaration)!,
+            declaration, model, CancellationToken.None, suppliedOperationRoot: foreignRoot);
+        Assert.That(discovery.GetPotentialCalls(static _ => false, out var complete), Is.Null);
+        Assert.That(complete, Is.False);
+    }
+
+    [TestCase("var (a,b) = new Value();", false)]
+    [TestCase("var ((a,b),c) = (new Value(),0);", false)]
+    [TestCase("var pair = (new Convertible(),0); (int a,int b) = pair;", false)]
+    [TestCase("(int a,int b) = (new Convertible(),0);", true)]
+    [TestCase("var clone = new Item(1) with { };", false)]
+    [TestCase("int[] values = [..new int[0]];", false)]
+    [TestCase("var (a,b) = (1,2);", true)]
+    [TestCase("int[] values = [1,2];", true)]
+    public void HiddenPotentialCallsHaveExplicitCompleteness(string body, bool expectedComplete)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public class Value {
+                public void Deconstruct(out int a, out int b) { a=1; b=2; }
+            }
+            public struct Convertible {
+                public static implicit operator int(Convertible value) => 1;
+            }
+            public record Item(int Value);
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call() { Positive(1); {{body}} Positive(2); }
+            }
+            """, []);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value, Has.Length.EqualTo(2));
+        Assert.That(complete, Is.EqualTo(expectedComplete));
+    }
+
+    [TestCase("_ = new Buffer()[^1];", false)]
+    [TestCase("_ = new Buffer()[1..^1];", false)]
+    [TestCase("Gate left=default, right=default; _ = left && right;", false)]
+    [TestCase("Gate left=default, right=default; _ = left || right;", false)]
+    [TestCase("bool left=false, right=true; _ = left && right;", true)]
+    [TestCase("int[] values = new int[2]; _ = values[^1];", true)]
+    public void HiddenIndexingAndTruthOperatorsPreventCompleteInventory(string body, bool expectedComplete)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public class Buffer {
+                public int Length => 3;
+                public int this[int index] => index;
+                public Buffer Slice(int start,int length) => this;
+            }
+            public struct Gate {
+                public static bool operator false(Gate value) => false;
+                public static bool operator true(Gate value) => false;
+                public static Gate operator &(Gate left, Gate right) => left;
+                public static Gate operator |(Gate left, Gate right) => left;
+            }
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call() { Positive(1); {{body}} Positive(2); }
+            }
+            """, []);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value, Has.Length.EqualTo(2));
+        Assert.That(complete, Is.EqualTo(expectedComplete));
+    }
+
+    [TestCase("foreach (int item in values) { }", false)]
+    [TestCase("foreach (var (a,b) in pairs) { }", false)]
+    [TestCase("foreach (var item in values) { }", true)]
+    [TestCase("await using (resource) { }", false)]
+    [TestCase("await using var owned = resource;", false)]
+    [TestCase("await foreach (var item in sequence) { }", false)]
+    public void HiddenIterationAndAwaitCallsPreventCompleteInventory(string body, bool expectedComplete)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+            public struct Convertible {
+                public static implicit operator int(Convertible value) => 1;
+            }
+            public class Pair {
+                public void Deconstruct(out int a,out int b) { a=1; b=2; }
+            }
+            public struct Awaiter<T> : INotifyCompletion {
+                public bool IsCompleted => true;
+                public void OnCompleted(Action continuation) { }
+                public T GetResult() => default;
+            }
+            public struct Awaitable<T> {
+                public Awaiter<T> GetAwaiter() => default;
+            }
+            public class Resource {
+                public Awaitable<int> DisposeAsync() => default;
+            }
+            public class Sequence {
+                public Enumerator GetAsyncEnumerator() => new Enumerator();
+            }
+            public class Enumerator {
+                public int Current => 0;
+                public Awaitable<bool> MoveNextAsync() => default;
+                public Awaitable<int> DisposeAsync() => default;
+            }
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static async Task Call(Convertible[] values,Pair[] pairs,
+                    Resource resource,Sequence sequence) {
+                    Positive(1); {{body}} Positive(2);
+                }
+            }
+            """, []);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value, Has.Length.EqualTo(2));
+        Assert.That(complete, Is.EqualTo(expectedComplete));
+    }
+
+    [Test]
+    public void PotentialInventoryRetainsRepeatedCallsAndOwnerProjection()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation("""
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call() { Positive(1); Positive(2); }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var discovery = CreateDiscovery(compilation, declaration);
+        var sites = discovery.GetPotentialCalls(static target => target.Name == "Positive");
+        Assert.That(sites, Is.Not.Null);
+        var rows = sites!.Value;
+        Assert.That(rows, Has.Length.EqualTo(2));
+        Assert.That(rows[0].Origin, Is.Not.SameAs(rows[1].Origin));
+        Assert.That(rows.All(static row => row.Owner.Name == "Call"), Is.True);
+        Assert.That(discovery.GetPotentialCallOwners(static target => target.Name == "Positive")!
+            .SetEquals(rows.Select(static row => row.Owner)), Is.True);
+    }
+
+    [Test]
+    public void PotentialInventoryKeepsUnfilteredDelegateRoleIndices()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation("""
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call() { System.Func<int,int> callback = Positive; callback(1); }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var discovery = CreateDiscovery(compilation, declaration);
+        var sites = discovery.GetPotentialCalls(static _ => true);
+        Assert.That(sites, Is.Not.Null);
+        var rows = sites!.Value;
+        Assert.That(rows, Has.Length.EqualTo(2));
+        Assert.That(rows[0].DeclaredTarget.MethodKind, Is.EqualTo(MethodKind.DelegateInvoke));
+        Assert.That(rows[0].CallRoleIndex, Is.Zero);
+        Assert.That(rows[1].Target.Name, Is.EqualTo("Positive"));
+        Assert.That(rows[1].CallRoleIndex, Is.EqualTo(1));
+        var filtered = discovery.GetPotentialCalls(static target => target.Name == "Positive");
+        Assert.That(filtered!.Value.Single().CallRoleIndex, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void PotentialInventoryRetainsPropertyGetterAndSetterAtOneOrigin()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation("""
+            public class Subject {
+                public int Value { get; set; }
+                public void Call() { Value += 1; }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single();
+        var sites = CreateDiscovery(compilation, declaration).GetPotentialCalls(static _ => true);
+        Assert.That(sites, Is.Not.Null);
+        var rows = sites!.Value;
+        Assert.That(rows, Has.Length.EqualTo(2));
+        Assert.That(rows[0].Origin, Is.SameAs(rows[1].Origin));
+        Assert.That(rows.Single(static row => row.Target.MethodKind == MethodKind.PropertyGet).CallRoleIndex, Is.Zero);
+        var setter = rows.Single(static row => row.Target.MethodKind == MethodKind.PropertySet);
+        Assert.That(setter.CallRoleIndex, Is.EqualTo(1));
+        Assert.That(setter.CanReplay, Is.False);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PotentialInventoryDistinguishesImplicitBaseConstruction(bool explicitInitializer)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public class Base { protected Base() { } }
+            public sealed class Derived : Base {
+                public Derived() {{(explicitInitializer ? ": base()" : "")}} { }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<ConstructorDeclarationSyntax>().Single(static constructor => constructor.Identifier.ValueText == "Derived");
+        var sites = CreateDiscovery(compilation, declaration).GetPotentialCalls(static target => target.ContainingType.Name == "Base");
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value, Has.Length.EqualTo(1));
+        Assert.That(sites.Value[0].Owner.Name, Is.EqualTo(".ctor"));
+        Assert.That(sites.Value[0].Owner.ContainingType.Name, Is.EqualTo("Derived"));
+        Assert.That(sites.Value[0].Target.ContainingType.Name, Is.EqualTo("Base"));
+        Assert.That(sites.Value[0].OriginKind, Is.EqualTo(explicitInitializer
+            ? PotentialRequiresCallOrigin.Operation : PotentialRequiresCallOrigin.ImplicitBaseConstructor));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PotentialInventoryAssignsCallsToNestedOwners(bool lambda)
+    {
+        var body = lambda ? "System.Func<int> callback = () => Positive(1);"
+            : "int Local() => Positive(1); Local();";
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public static class Subject {
+                static int Positive(int value) => value;
+                public static void Call() { {{body}} }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration).GetPotentialCalls(static target => target.Name == "Positive");
+        Assert.That(sites, Is.Not.Null);
+        Assert.That(sites!.Value.Single().Owner.MethodKind,
+            Is.EqualTo(lambda ? MethodKind.AnonymousFunction : MethodKind.LocalFunction));
+    }
+
     [Test]
     public void ImplicitBaseConstructorProducesOneReplayCandidate()
     {
@@ -1708,6 +2086,7 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(
             discovery.GetPotentialCallOwners(static _ => false),
             Is.Null);
+        Assert.That(discovery.GetPotentialCalls(static _ => false), Is.Null);
     }
 
     private static ImmutableArray<RequiresCallSiteCandidate>? Discover<TSyntax>(

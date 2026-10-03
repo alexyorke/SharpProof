@@ -751,7 +751,7 @@ public sealed class FrontendLoweringTests
                 Assert.That(
                     classification.IsExact,
                     Is.EqualTo(
-                        OperationSupportCatalog.IsSupported(stage, kind)),
+                        CSharpOperationSemantics.IsSupported(stage, kind)),
                     $"{stage}:{kind}");
             }
 

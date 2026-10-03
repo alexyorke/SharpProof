@@ -59,6 +59,16 @@ public sealed class IrProgramBuilder(IrFactory factory)
             elementType, sequence, index);
     }
 
+    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
+        IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
+    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length, initialValues)); }
+
+    public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
+    { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
+
+    public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
+    { return Append(block, new IrLockInstruction(NextInstructionId(), operation, receiver)); }
+
     public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
     {
         return Append(
@@ -122,6 +132,13 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrHavocKind havocKind,
         params IrVarId[] variables)
     {
+        return Havoc(block, operation, havocKind, IrHavocOrigin.Approximation, variables);
+    }
+
+    public IrHavocInstruction Havoc(
+        IrBlockId block, OperationId operation, IrHavocKind havocKind,
+        IrHavocOrigin origin, params IrVarId[] variables)
+    {
         ArgumentNullGuard.NotNull(variables, nameof(variables));
 
         var distinct = variables
@@ -131,7 +148,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         return Append(
             block,
             new IrHavocInstruction(
-                NextInstructionId(), operation, havocKind, distinct));
+                NextInstructionId(), operation, havocKind, distinct, origin));
     }
 
     public IrBranchInstruction Branch(
@@ -160,6 +177,17 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 NextInstructionId(), operation, value));
     }
 
+    public IrThrowInstruction Throw(IrBlockId block, OperationId operation,
+        IrExceptionKind exceptionKind, IrBlockId target)
+    {
+        return Append(block, new IrThrowInstruction(NextInstructionId(), operation, exceptionKind, target));
+    }
+
+    public IrExceptionalExitInstruction ExceptionalExit(IrBlockId block, OperationId operation)
+    {
+        return Append(block, new IrExceptionalExitInstruction(NextInstructionId(), operation));
+    }
+
     public IrProgram Build()
     {
         EnsureMutable();
@@ -176,7 +204,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 !block.Instructions[block.Instructions.Count - 1].IsTerminal)
             {
                 throw new InvalidOperationException(
-                    "Every program block must end in branch, goto, or return.");
+                    "Every program block must end in a control-flow terminator.");
             }
 
             blocks.Add(block.Freeze());
@@ -217,6 +245,40 @@ public sealed class IrProgramBuilder(IrFactory factory)
         _factory.GetOperationInfo(instruction.Operation);
         switch (instruction)
         {
+            case IrLockInstruction synchronization:
+                if (_factory.GetTypeInfo(ValidateTerm(synchronization.Receiver, "receiver")).Kind is not
+                    (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
+                { throw InvalidArgument("Synchronization requires a reference receiver.", "receiver"); }
+                break;
+            case IrWriteInstruction write:
+                if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
+                { throw InvalidArgument("A write region is undefined.", "region"); }
+                break;
+            case IrAllocationInstruction allocation:
+                if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
+                { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
+                if (allocation.Target is { } allocatedTarget &&
+                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference &&
+                        !(_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence && allocation.Length != null) ||
+                        _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
+                { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
+                if (allocation.Length is { } length &&
+                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
+                        ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
+                { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
+                if (!allocation.InitialValues.IsEmpty)
+                {
+                    if (allocation.Length is not IrIntegerTerm dimension || dimension.Value != allocation.InitialValues.Length)
+                    { throw InvalidArgument("An initialized array requires its exact constant length.", "initialValues"); }
+                    var elementType = _factory.GetTypeInfo(allocation.AllocatedType).ElementType;
+                    foreach (var initial in allocation.InitialValues)
+                    {
+                        if (initial is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm) ||
+                            ValidateTerm(initial, "initialValues") != elementType)
+                        { throw InvalidArgument("Array initializers require matching constant elements.", "initialValues"); }
+                    }
+                }
+                break;
             case IrAssignInstruction value:
                 RequireSameType(
                     _factory.GetVariableInfo(value.Target).Type, ValidateTerm(value.Value, "value"),
@@ -250,6 +312,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                     : ((IrAssertInstruction)instruction).Condition, "condition");
                 break;
             case IrHavocInstruction value:
+                _ = ArgumentNullGuard.RequireDefined(value.Origin, "origin");
                 _ = ArgumentNullGuard.RequireDefined(
                     value.HavocKind,
                     "havocKind");
@@ -275,6 +338,12 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 break;
             case IrGotoInstruction value:
                 GetBlock(value.Target);
+                break;
+            case IrThrowInstruction value:
+                _ = ArgumentNullGuard.RequireDefined(value.ExceptionKind, "exceptionKind");
+                GetBlock(value.Target);
+                break;
+            case IrExceptionalExitInstruction:
                 break;
             case IrReturnInstruction value:
                 if (value.Value != null)

@@ -86,11 +86,13 @@ public sealed class FuzzRunnerTests
         var first = await FuzzRunner.RunAsync(options);
         var second = await FuzzRunner.RunAsync(options);
 
+        Assert.That(first.Passed, Is.True, string.Join(Environment.NewLine, first.Failures));
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(4));
+        Assert.That(first.SchemaVersion, Is.EqualTo(7));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
+        Assert.That(first.TotalProgramCoverage.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.FrontendAgreements, Is.EqualTo(options.Cases));
         Assert.That(first.SmtAgreements, Is.EqualTo(options.Cases));
         Assert.That(
@@ -167,6 +169,8 @@ public sealed class FuzzRunnerTests
             parallel.PartialSmtAgreements,
             Is.EqualTo(serial.PartialSmtAgreements));
         Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
+        Assert.That(parallel.TotalProgramCoverage, Is.EqualTo(serial.TotalProgramCoverage));
+        Assert.That(parallel.MetadataProgramCoverage, Is.EqualTo(serial.MetadataProgramCoverage));
     }
 
     [Test]
@@ -175,7 +179,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -185,6 +189,8 @@ public sealed class FuzzRunnerTests
             SmtAgreements: 1,
             PartialSmtAgreements: 1,
             FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -201,7 +207,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             Cases: cases,
             Seed: 7,
             MaximumParallelism: maximumParallelism,
@@ -211,6 +217,8 @@ public sealed class FuzzRunnerTests
             SmtAgreements: cases,
             PartialSmtAgreements: cases,
             FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -231,7 +239,7 @@ public sealed class FuzzRunnerTests
             OverflowExceptions = 1
         };
         var valid = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             Cases: FuzzOptions.DefaultCases,
             Seed: 7,
             MaximumParallelism: 1,
@@ -241,12 +249,27 @@ public sealed class FuzzRunnerTests
             SmtAgreements: FuzzOptions.DefaultCases,
             PartialSmtAgreements: FuzzOptions.DefaultCases,
             FrontendCoverage: complete,
+            TotalProgramCoverage: new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40),
+            MetadataProgramCoverage: new(1000, 1000, 1000, 1000, 1023, 127),
             CoverageSatisfied: true,
             Failures: []);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(valid.Passed, Is.True);
+            Assert.That((valid with { MetadataProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeRefutations = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { TypeMask = 1022 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { RecipeMask = 63 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ReferenceBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { TypeMask = 1023 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ArrayReadBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ArrayReadBodies = 101 } }).Passed, Is.False);
             Assert.That(
                 (valid with { SchemaVersion = 999 }).Passed,
                 Is.False);
@@ -397,7 +420,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var enabled = factory.CreateVariable("enabled", factory.BooleanType);
         var satisfiable = factory.Binary(
@@ -469,7 +492,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         IrTerm any = factory.Boolean(false);
         for (var index = 0; index < 32; index++)
         {
@@ -522,7 +545,7 @@ public sealed class FuzzRunnerTests
         int expectedFalse,
         int expectedUndefined)
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
 
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
@@ -542,9 +565,20 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public async Task GuardedPartialTermCampaignMatchesCSharpAcrossEveryControlBit([Range(0, 31)] int seed)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
+        Assert.That(result.ScenarioCount, Is.EqualTo(2));
+        Assert.That(result.DefinedTrueCount + result.DefinedFalseCount + result.UndefinedCount, Is.EqualTo(2));
+    }
+
+    [Test]
     public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var first = PartialTermSmtCaseGenerator.Create(factory, 0);
         var second = PartialTermSmtCaseGenerator.Create(factory, 8);
         var printer = new IrPrinter(factory);
@@ -555,7 +589,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = new Goal(
             factory,
@@ -624,7 +658,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task IrShrinkerIsDeterministicAndPreservesMismatch()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var variableTerm = factory.Variable(variable);
         var formula = factory.Binary(

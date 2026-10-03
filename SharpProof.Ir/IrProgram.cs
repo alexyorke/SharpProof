@@ -3,7 +3,8 @@ namespace SharpProof.Ir;
 public abstract partial class IrInstruction
 {
     public bool IsTerminal => Kind is IrInstructionKind.Branch
-        or IrInstructionKind.Goto or IrInstructionKind.Return;
+        or IrInstructionKind.Goto or IrInstructionKind.Return
+        or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit;
 }
 
 public sealed partial class IrBasicBlock

@@ -1,0 +1,80 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op3 Assign v11:int[width=32,signed=True] = 0 source=total-call-precondition-named-capture.cs:214+29
+  i6 op4 Assign v12:int[width=32,signed=True] = v1 source=total-call-precondition-named-capture.cs:229+3
+  i7 op5 Assign v13:int[width=32,signed=True] = (v12 + 1) source=total-call-precondition-named-capture.cs:229+3
+  i8 op6 Assign v1:int[width=32,signed=True] = v13 source=total-call-precondition-named-capture.cs:229+3
+  i9 op6 Write Local source=total-call-precondition-named-capture.cs:229+3
+  i10 op7 Assign v14:int[width=32,signed=True] = v1 source=total-call-precondition-named-capture.cs:241+1
+  i11 op3 Assign v15:bool[width=0,signed=False] = (v14 == v12) source=total-call-precondition-named-capture.cs:214+29
+  i12 op3 Assign v4:int[width=32,signed=True] = v14 source=total-call-precondition-named-capture.cs:214+29
+  i13 op3 Assign v7:int[width=32,signed=True] = v12 source=total-call-precondition-named-capture.cs:214+29
+  i14 op3 Goto b6 source=total-call-precondition-named-capture.cs:214+29
+block: b3 cfg:2
+  i34 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 call:continued
+  i32 op1 Assign v3:int[width=32,signed=True] = v11 source=total-call-precondition-named-capture.cs:214+29
+  i33 op1 Return v3 source=total-call-precondition-named-capture.cs:214+29
+block: b6 call:body
+  i15 op8 Assign v5:int[width=32,signed=True] = v4 source=none
+  i16 op8 Assign v6:int[width=32,signed=True] = v4 source=none
+  i17 op8 Assign v8:int[width=32,signed=True] = v7 source=none
+  i18 op8 Assign v9:int[width=32,signed=True] = v7 source=none
+  i19 op8 Goto b7 source=none
+block: b7 call:body
+  i20 op8 Goto b8 source=none
+block: b8 call:body
+  i21 op9 Allocate t3:object source=total-call-precondition-named-capture.cs:349+12
+  i22 op11 Assign v16:int[width=32,signed=True] = v5 source=total-call-precondition-named-capture.cs:378+5
+  i23 op12 Assign v17:int[width=32,signed=True] = 10 source=total-call-precondition-named-capture.cs:386+2
+  i24 op13 Assign v18:int[width=32,signed=True] = (v16 * v17) source=total-call-precondition-named-capture.cs:378+10
+  i25 op14 Assign v19:int[width=32,signed=True] = v8 source=total-call-precondition-named-capture.cs:391+6
+  i26 op15 Assign v20:int[width=32,signed=True] = (v18 + v19) source=total-call-precondition-named-capture.cs:378+19
+  i27 op10 Assign v10:int[width=32,signed=True] = v20 source=total-call-precondition-named-capture.cs:378+19
+  i28 op10 Assign v11:int[width=32,signed=True] = v10 source=total-call-precondition-named-capture.cs:378+19
+  i29 op10 Goto b5 source=total-call-precondition-named-capture.cs:378+19
+block: b9 call:body
+  i30 op8 Goto b5 source=none
+block: b10 call:body
+  i31 op8 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v4
+term: ir3 Variable type=t1:int width=32 signed=True value=v7
+term: ir5 Variable type=t1:int width=32 signed=True value=v11
+term: ir6 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir7 Variable type=t1:int width=32 signed=True value=v1
+term: ir8 Variable type=t1:int width=32 signed=True value=v12
+term: ir9 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir10 Binary type=t1:int width=32 signed=True value=(v12 + 1)
+term: ir11 Variable type=t1:int width=32 signed=True value=v13
+term: ir12 Variable type=t1:int width=32 signed=True value=v14
+term: ir13 Binary type=t0:bool width=0 signed=False value=(v14 == v12)
+term: ir14 Variable type=t1:int width=32 signed=True value=v5
+term: ir15 Variable type=t1:int width=32 signed=True value=v16
+term: ir16 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir17 Variable type=t1:int width=32 signed=True value=v17
+term: ir18 Binary type=t1:int width=32 signed=True value=(v16 * v17)
+term: ir19 Variable type=t1:int width=32 signed=True value=v18
+term: ir20 Variable type=t1:int width=32 signed=True value=v8
+term: ir21 Variable type=t1:int width=32 signed=True value=v19
+term: ir22 Binary type=t1:int width=32 signed=True value=(v18 + v19)
+term: ir23 Variable type=t1:int width=32 signed=True value=v20
+term: ir24 Variable type=t1:int width=32 signed=True value=v10
+term: ir25 Variable type=t1:int width=32 signed=True value=v3
+call-execution: Returned allocations=1
+call-precondition: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32,System.Int32)~System.Int32 clause=0 reached=True value=False
+call-observation: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32,System.Int32)~System.Int32 clause=0 value=False approximation=False

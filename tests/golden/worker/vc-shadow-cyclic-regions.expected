@@ -1,0 +1,218 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 11
+enrolled: 11
+checked: 11
+unknown: 2
+proven: 4
+refuted: 5
+row: M:Subject.ARepeatedFilter(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ARepeatedFilter(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtLoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtLoop(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CConditionalLoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: True
+row: M:Subject.CConditionalLoop(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DBeyondSearch(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.DBeyondSearch(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.ECapturedLoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.FGuardedRethrow(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.GConditionalFinallyCompletion(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 11
+enrolled: 11
+checked: 11
+unknown: 2
+proven: 4
+refuted: 5
+row: M:Subject.ARepeatedFilter(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ARepeatedFilter(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtLoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtLoop(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CConditionalLoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: True
+row: M:Subject.CConditionalLoop(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DBeyondSearch(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.DBeyondSearch(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+row: M:Subject.ECapturedLoop(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.FGuardedRethrow(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.GConditionalFinallyCompletion(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

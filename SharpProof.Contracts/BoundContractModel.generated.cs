@@ -54,7 +54,8 @@ public sealed class BoundContractClause
         IrTerm condition,
         OperationId sourceOperation,
         BoundContractEvidence evidence,
-        string diagnosticText
+        string diagnosticText,
+        SyntaxReference? sourceSyntax = null
     )
     {
         Kind = kind;
@@ -62,12 +63,14 @@ public sealed class BoundContractClause
         SourceOperation = sourceOperation;
         Evidence = evidence;
         DiagnosticText = diagnosticText;
+        SourceSyntax = sourceSyntax;
     }
     public BoundContractKind Kind { get; }
     public IrTerm Condition { get; }
     public OperationId SourceOperation { get; }
     public BoundContractEvidence Evidence { get; }
     public string DiagnosticText { get; }
+    public SyntaxReference? SourceSyntax { get; }
 }
 
 public sealed class BoundContractVariable

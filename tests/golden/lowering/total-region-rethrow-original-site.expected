@@ -1,0 +1,139 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v6:int[width=32,signed=True] = v1 source=total-region-rethrow-original-site.cs:112+1
+  i6 op3 Assign v7:int[width=32,signed=True] = 0 source=total-region-rethrow-original-site.cs:117+1
+  i7 op4 Assign v8:bool[width=0,signed=False] = (v6 == v7) source=total-region-rethrow-original-site.cs:112+6
+  i8 op1 Branch v8 ? b3 : b4 source=total-region-rethrow-original-site.cs:112+6
+block: b3 cfg:2
+  i9 op6 Assign v9:int[width=32,signed=True] = 10 source=total-region-rethrow-original-site.cs:127+2
+  i10 op7 Assign v10:int[width=32,signed=True] = v1 source=total-region-rethrow-original-site.cs:132+1
+  i11 op8 Branch (v10 == 0) ? b10 : b11 source=total-region-rethrow-original-site.cs:127+6
+block: b4 cfg:3
+  i20 op12 Assign v12:int[width=32,signed=True] = 20 source=total-region-rethrow-original-site.cs:142+2
+  i21 op13 Assign v13:int[width=32,signed=True] = v1 source=total-region-rethrow-original-site.cs:148+1
+  i22 op14 Assign v14:int[width=32,signed=True] = 1 source=total-region-rethrow-original-site.cs:152+1
+  i23 op15 Assign v15:int[width=32,signed=True] = (v13 - v14) source=total-region-rethrow-original-site.cs:148+5
+  i24 op16 Branch (v15 == 0) ? b15 : b16 source=total-region-rethrow-original-site.cs:142+12
+block: b5 cfg:4
+  i33 op19 Assign v17:int[width=32,signed=True] = v1 source=total-region-rethrow-original-site.cs:260+1
+  i34 op20 Assign v18:int[width=32,signed=True] = 256 source=total-region-rethrow-original-site.cs:264+3
+  i35 op21 Assign v19:int[width=32,signed=True] = (v17 + v18) source=total-region-rethrow-original-site.cs:260+7
+  i36 op22 Branch (v19 < 0) ? b20 : b21 source=total-region-rethrow-original-site.cs:243+26
+block: b6 cfg:5
+  i49 op0 Goto b7 source=none
+block: b7 cfg:6
+  i52 op0 Branch (v4 == 0) ? b26 : b27 source=none
+block: b8 cfg:7
+  i50 op0 Return void source=none
+block: b9 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b10 throw
+  i14 op8 Throw DivideByZero -> b12 source=total-region-rethrow-original-site.cs:127+6
+block: b11 normal
+  i15 op9 Branch ((v9 == -2147483648) && (v10 == -1)) ? b13 : b14 source=total-region-rethrow-original-site.cs:127+6
+block: b12 catch:entry
+  i12 op8 Assign v4:int[width=32,signed=True] = 0 source=total-region-rethrow-original-site.cs:127+6
+  i13 op8 Goto b5 source=total-region-rethrow-original-site.cs:127+6
+block: b13 throw
+  i16 op9 Throw Overflow -> b9 source=total-region-rethrow-original-site.cs:127+6
+block: b14 normal
+  i17 op10 Assign v11:int[width=32,signed=True] = (v9 / v10) source=total-region-rethrow-original-site.cs:127+6
+  i18 op5 Assign v3:int[width=32,signed=True] = v11 source=total-region-rethrow-original-site.cs:127+6
+  i19 op5 Return v3 source=total-region-rethrow-original-site.cs:127+6
+block: b15 throw
+  i27 op16 Throw DivideByZero -> b17 source=total-region-rethrow-original-site.cs:142+12
+block: b16 normal
+  i28 op17 Branch ((v12 == -2147483648) && (v15 == -1)) ? b18 : b19 source=total-region-rethrow-original-site.cs:142+12
+block: b17 catch:entry
+  i25 op16 Assign v4:int[width=32,signed=True] = 2 source=total-region-rethrow-original-site.cs:142+12
+  i26 op16 Goto b5 source=total-region-rethrow-original-site.cs:142+12
+block: b18 throw
+  i29 op17 Throw Overflow -> b9 source=total-region-rethrow-original-site.cs:142+12
+block: b19 normal
+  i30 op18 Assign v16:int[width=32,signed=True] = (v12 / v15) source=total-region-rethrow-original-site.cs:142+12
+  i31 op11 Assign v3:int[width=32,signed=True] = v16 source=total-region-rethrow-original-site.cs:142+12
+  i32 op11 Return v3 source=total-region-rethrow-original-site.cs:142+12
+block: b20 throw
+  i39 op22 Throw Overflow -> b22 source=total-region-rethrow-original-site.cs:243+26
+block: b21 normal
+  i40 op23 Branch (v19 > 255) ? b23 : b24 source=total-region-rethrow-original-site.cs:243+26
+block: b22 catch:entry
+  i37 op22 Assign v5:int[width=32,signed=True] = 4 source=total-region-rethrow-original-site.cs:243+26
+  i38 op22 Goto b6 source=total-region-rethrow-original-site.cs:243+26
+block: b23 throw
+  i43 op23 Throw Overflow -> b25 source=total-region-rethrow-original-site.cs:243+26
+block: b24 normal
+  i44 op24 Assign v20:byte[width=8,signed=False] = (("byte"#t4)v19) source=total-region-rethrow-original-site.cs:243+26
+  i45 op25 Assign v21:int[width=32,signed=True] = (("int"#t1)v20) source=total-region-rethrow-original-site.cs:243+26
+  i46 op26 Assign v1:int[width=32,signed=True] = v21 source=total-region-rethrow-original-site.cs:231+39
+  i47 op26 Write Local source=total-region-rethrow-original-site.cs:231+39
+  i48 op0 Goto b7 source=none
+block: b25 catch:entry
+  i41 op23 Assign v5:int[width=32,signed=True] = 5 source=total-region-rethrow-original-site.cs:243+26
+  i42 op23 Goto b6 source=total-region-rethrow-original-site.cs:243+26
+block: b26 rethrow:original
+  i51 op8 Throw DivideByZero -> b9 source=total-region-rethrow-original-site.cs:127+6
+block: b27 rethrow:dispatch
+  i54 op0 Goto b28 source=none
+block: b28 rethrow:original
+  i53 op16 Throw DivideByZero -> b9 source=total-region-rethrow-original-site.cs:142+12
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v1
+term: ir2 Variable type=t1:int width=32 signed=True value=v6
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir4 Variable type=t1:int width=32 signed=True value=v7
+term: ir5 Binary type=t0:bool width=0 signed=False value=(v6 == v7)
+term: ir6 Variable type=t0:bool width=0 signed=False value=v8
+term: ir7 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir8 Variable type=t1:int width=32 signed=True value=v9
+term: ir9 Variable type=t1:int width=32 signed=True value=v10
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v10 == 0)
+term: ir11 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir12 Binary type=t0:bool width=0 signed=False value=(v9 == -2147483648)
+term: ir13 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir14 Binary type=t0:bool width=0 signed=False value=(v10 == -1)
+term: ir15 Binary type=t0:bool width=0 signed=False value=((v9 == -2147483648) && (v10 == -1))
+term: ir16 Binary type=t1:int width=32 signed=True value=(v9 / v10)
+term: ir17 Variable type=t1:int width=32 signed=True value=v11
+term: ir18 Variable type=t1:int width=32 signed=True value=v3
+term: ir19 Integer type=t1:int width=32 signed=True bits=20 value=20
+term: ir20 Variable type=t1:int width=32 signed=True value=v12
+term: ir21 Variable type=t1:int width=32 signed=True value=v13
+term: ir22 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir23 Variable type=t1:int width=32 signed=True value=v14
+term: ir24 Binary type=t1:int width=32 signed=True value=(v13 - v14)
+term: ir25 Variable type=t1:int width=32 signed=True value=v15
+term: ir26 Binary type=t0:bool width=0 signed=False value=(v15 == 0)
+term: ir27 Binary type=t0:bool width=0 signed=False value=(v12 == -2147483648)
+term: ir28 Binary type=t0:bool width=0 signed=False value=(v15 == -1)
+term: ir29 Binary type=t0:bool width=0 signed=False value=((v12 == -2147483648) && (v15 == -1))
+term: ir30 Binary type=t1:int width=32 signed=True value=(v12 / v15)
+term: ir31 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir32 Variable type=t1:int width=32 signed=True value=v16
+term: ir33 Variable type=t1:int width=32 signed=True value=v17
+term: ir34 Integer type=t1:int width=32 signed=True bits=256 value=256
+term: ir35 Variable type=t1:int width=32 signed=True value=v18
+term: ir36 Binary type=t1:int width=32 signed=True value=(v17 + v18)
+term: ir37 Variable type=t1:int width=32 signed=True value=v19
+term: ir38 Binary type=t0:bool width=0 signed=False value=(v19 < 0)
+term: ir39 Integer type=t1:int width=32 signed=True bits=255 value=255
+term: ir40 Binary type=t0:bool width=0 signed=False value=(v19 > 255)
+term: ir41 Cast type=t4:byte width=8 signed=False value=(("byte"#t4)v19)
+term: ir42 Integer type=t1:int width=32 signed=True bits=4 value=4
+term: ir43 Integer type=t1:int width=32 signed=True bits=5 value=5
+term: ir44 Variable type=t4:byte width=8 signed=False value=v20
+term: ir45 Cast type=t1:int width=32 signed=True value=(("int"#t1)v20)
+term: ir46 Variable type=t1:int width=32 signed=True value=v21
+term: ir47 Variable type=t1:int width=32 signed=True value=v4
+term: ir48 Binary type=t0:bool width=0 signed=False value=(v4 == 0)

@@ -47,7 +47,6 @@
     <Analyzer Include="
         $(_SharpProofSharedDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
         $(_SharpProofSharedDirectory)/SharpProof.CompilerArtifact.dll;
-        $(_SharpProofSharedDirectory)/SharpProof.Summaries.dll;
         $(_SharpProofSharedDirectory)/SharpProof.Worker.Protocol.dll;
         $(_SharpProofSharedDirectory)/System.IO.Pipelines.dll;
         $(_SharpProofSharedDirectory)/System.Text.Encodings.Web.dll;

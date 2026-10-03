@@ -1,0 +1,39 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+contract: Ensures safety=(((!(v1 == 0)) && (!((v3 == -2147483648) && (v1 == -1)))) && ((!(v1 == 0)) && (!((v3 == -2147483648) && (v1 == -1))))) value=((v3 / v1) == (v3 / v1))
+variable: v1:int[width=32,signed=True] source=d
+block: b0 entry
+  i0 op1 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op1 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op1 Goto b1 source=none
+block: b1 cfg:0
+  i4 op1 Goto b2 source=none
+block: b2 cfg:1
+  i5 op3 Assign v4:int[width=32,signed=True] = 0 source=total-guarded-ensures.cs:250+1
+  i6 op2 Assign v3:int[width=32,signed=True] = v4 source=total-guarded-ensures.cs:250+1
+  i7 op2 Return v3 source=total-guarded-ensures.cs:250+1
+block: b3 cfg:2
+  i8 op1 Return void source=none
+block: b4 exceptional:exit
+  i2 op1 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v3
+term: ir2 Variable type=t1:int width=32 signed=True value=v1
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir4 Binary type=t0:bool width=0 signed=False value=(v1 == 0)
+term: ir5 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v3 == -2147483648)
+term: ir7 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v1 == -1)
+term: ir9 Binary type=t0:bool width=0 signed=False value=((v3 == -2147483648) && (v1 == -1))
+term: ir10 Binary type=t1:int width=32 signed=True value=(v3 / v1)
+term: ir11 Unary type=t0:bool width=0 signed=False value=(!(v1 == 0))
+term: ir12 Unary type=t0:bool width=0 signed=False value=(!((v3 == -2147483648) && (v1 == -1)))
+term: ir13 Binary type=t0:bool width=0 signed=False value=((!(v1 == 0)) && (!((v3 == -2147483648) && (v1 == -1))))
+term: ir14 Binary type=t0:bool width=0 signed=False value=((v3 / v1) == (v3 / v1))
+term: ir15 Binary type=t0:bool width=0 signed=False value=(((!(v1 == 0)) && (!((v3 == -2147483648) && (v1 == -1)))) && ((!(v1 == 0)) && (!((v3 == -2147483648) && (v1 == -1)))))
+term: ir16 Variable type=t1:int width=32 signed=True value=v0
+term: ir17 Variable type=t1:int width=32 signed=True value=v4

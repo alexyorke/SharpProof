@@ -8,6 +8,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -16,11 +17,648 @@ namespace SharpProof.Worker.Test;
 public sealed class ClaimManifestBuilderTests
 {
     private static readonly int[] DenseOrdinals = [0, 1];
+    private static readonly int[] FailingShadowInputs = [0, 10];
+    private static readonly string[] PotentialOwnerGapReasons =
+        ["UnsupportedOwner", "UnsupportedSignature", "IncompleteCalls"];
     private static readonly WorkerClaimEvidence[] CompanionEvidence = [
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
     ];
 
+    [Test]
+    public void ShadowCallerPreparationRetainsDirectAndTransitiveRequiresWithoutPublishingCallers()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); Contract.Requires(value < 10); return value + 1; }
+                public static int Wrapper(int value) => Positive(value);
+                public static int Root(int value) => Wrapper(value);
+            }
+            """));
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Gaps, Is.Empty);
+        Assert.That(batch.Callers, Has.Length.EqualTo(2));
+        foreach (var caller in batch.Callers)
+        {
+            Assert.That(caller.OwnerId, Is.EqualTo(caller.Body.CallableId));
+            Assert.That(caller.Body.CallPreconditions, Has.Length.EqualTo(2));
+            Assert.That(caller.Body.CallPreconditions.Select(static call => call.ClauseOrdinal), Is.EqualTo(DenseOrdinals));
+            var factory = caller.Body.Program.Factory;
+            var entry = caller.Body.Parameters.Single().Entry;
+            foreach (var input in FailingShadowInputs)
+            {
+                var execution = new IrProgramInterpreter(factory).Execute(caller.Body.Program,
+                    new Dictionary<IrVarId, IrValue>
+                    { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)input) });
+                Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+                Assert.That(execution.ConsumedApproximation, Is.False);
+                Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));
+                var failed = caller.Body.CallPreconditions[input == 0 ? 0 : 1];
+                var marker = caller.Body.Program.Blocks.SelectMany(static block => block.Instructions)
+                    .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == failed.Instruction);
+                Assert.That(execution.GetCurrentValue(marker.Target)!.Boolean, Is.False);
+            }
+            Assert.That(caller.Body.Clauses, Is.Empty);
+            Assert.That(caller.Body.ValidEffectClaimIds, Is.Empty);
+            Assert.That(caller.Body.ExceptionConstraints, Is.Empty);
+            Assert.That(caller.Body.IsBodyAbstraction, Is.False);
+            Assert.That(baseline.Manifest.Callables.Any(entry => entry.CallableId == caller.OwnerId), Is.False);
+        }
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(new ClaimManifestBuilder(compilation).Build().Manifest),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
+    }
+
+    [TestCase("static Subject() { throw new System.InvalidOperationException(); }", "", "UnsupportedEntryInitialization")]
+    [TestCase("", "static Helper() { throw new System.InvalidOperationException(); }", "UnsupportedBody")]
+    [TestCase("", "static int State = 1;", "UnsupportedBody")]
+    [TestCase("", "", "UnsupportedEntryInitialization", true)]
+    public void ShadowCallerPreparationRejectsUnmodeledInitialization(string ownerInitialization,
+        string calleeInitialization, string expectedReason, bool moduleInitializer = false)
+    {
+        var module = moduleInitializer ? """
+            static class Bootstrap {
+                [System.Runtime.CompilerServices.ModuleInitializer]
+                public static void Initialize() => throw new System.InvalidOperationException();
+            }
+            """ : "";
+        var compilation = GetCompilation(("Subject.cs", $$"""
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Helper {
+                {{calleeInitialization}}
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+            }
+            public static class Subject {
+                {{ownerInitialization}}
+                public static int Root(int value) => Helper.Positive(value);
+            }
+            {{module}}
+            """));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo(expectedReason));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationGuardsSelectedDeepCalleeBeforeBinding()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "using SharpProof.Attributes; public static class Subject { public static bool Positive(bool value) { " +
+            "Contract.Requires(" + new string('!', 256) + "value); return value; } public static bool Root(bool value) => Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Deep.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsMismatchedSourceAndPropagatesCancellation()
+    {
+        var first = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var second = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 2; }"));
+        var trees = CompilerCompilationCapture.CaptureTrees(first, CancellationToken.None);
+        var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(second, WorkerFeatureSet.All,
+            trees, null, authority, CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            CompilerTotalCallableLowerer.PrepareShadowCallers(first, WorkerFeatureSet.All,
+                trees, null, authority, cancellation.Token)));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRetainsUnreachableMarkersWithoutExecutingThem()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                public static int Root() { if (false) return Positive(-1); return 0; }
+            }
+            """));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Gaps, Is.Empty);
+        var body = batch.Callers.Single().Body;
+        Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+        var execution = new IrProgramInterpreter(body.Program.Factory).Execute(body.Program);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        var marker = body.Program.Blocks.SelectMany(static block => block.Instructions)
+            .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == body.CallPreconditions.Single().Instruction);
+        Assert.That(execution.GetCurrentValue(marker.Target), Is.Null);
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsDeepAttributesBeforeSemanticInventoryConstruction()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "[System.Obsolete(" + new string('(', 256) + "\"message\"" + new string(')', 256) +
+            ")] public static class Subject { public static int Root() => 1; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "DeepAttribute.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsOwnContractsWhenFeaturesExcludePublicMembership()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                public static int Root([Positive] int value) => Positive(value);
+            }
+            """));
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.Effects,
+            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo("UnsupportedOwnContracts"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationBoundsSourceCommentsBeforeHashing()
+    {
+        var tree = CSharpSyntaxTree.ParseText("/*" + new string('x', 4_194_304) +
+            "*/ public static class Subject { public static int Root() => 1; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "WideComment.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        // Do not capture/hash this source before invoking the production guard.
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            [new CompilerSyntaxTreeSnapshot()], null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotBudget"));
+    }
+
+    private static CompilerShadowPreparationBatch PrepareShadowBatch(CSharpCompilation compilation)
+    {
+        return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+    }
+
+    [Test]
+    public void PotentialCallShadowFindsPlainSeparateFileCallersWithoutChangingManifest()
+    {
+        var compilation = GetCompilation(
+            ("Helper.cs", """
+                using SharpProof.Attributes;
+                public static class Helper {
+                    public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                }
+                """),
+            ("Caller.cs", "public static class Caller { public static int Root(int value) => Helper.Positive(value); }"));
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true);
+        Assert.That(baseline.PotentialCalls, Is.Null);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(shadow.Manifest),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
+        var caller = shadow.PotentialCalls!.Owners.Single(static owner => owner.Method.Name == "Root");
+        Assert.That(caller.DiscoveryComplete, Is.True);
+        Assert.That(caller.Calls, Has.Length.EqualTo(1));
+        Assert.That(caller.Calls.Single().Target.Name, Is.EqualTo("Positive"));
+        Assert.That(caller.CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(caller.Method)));
+        Assert.That(shadow.Manifest.Callables.Any(entry => entry.CallableId == caller.CallableId), Is.False);
+        Assert.That(shadow.PotentialCalls.Gaps, Is.Empty);
+    }
+
+    [Test]
+    public void PotentialCallShadowRetainsIncompleteAndUnsupportedOwnerGaps()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            public static class Subject {
+                public static void Root() { System.Action callback = () => { }; }
+                public static void Dynamic(dynamic value) { value.Invoke(); }
+                public static int Incomplete() => new Buffer()[^1];
+                public class Buffer { public int Length => 2; public int this[int index] => index; }
+            }
+            """));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Gaps.Select(static gap => gap.Reason),
+            Is.EquivalentTo(PotentialOwnerGapReasons));
+        Assert.That(shadow.Owners.Single().Method.Name, Is.EqualTo("Incomplete"));
+        Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.False);
+    }
+
+    [Test]
+    public void PotentialCallShadowRejectsDeepPlainSyntaxBeforeSemanticBinding()
+    {
+        var expression = new string('!', 256) + "value";
+        var tree = CSharpSyntaxTree.ParseText(
+            "public static class Subject { public static bool Root(bool value) => " + expression + "; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Plain.cs");
+        // Avoid TestCompilation.Create/GetDiagnostics: those bind before the guard.
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps, Has.Length.EqualTo(1));
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void PotentialCallShadowGuardsCrossTreeCalleesBeforeContractScreening()
+    {
+        var expression = new string('!', 256) + "value";
+        var caller = CSharpSyntaxTree.ParseText(
+            "public static class Caller { public static bool Root(bool value) => Deep.Callee(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var callee = CSharpSyntaxTree.ParseText(
+            "public static class Deep { public static bool Callee(bool value) => " + expression + "; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Deep.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [caller, callee], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps.Single().TreeOrdinal, Is.EqualTo(1));
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+    [TestCase(8, true)]
+    [TestCase(256, false)]
+    public void PotentialCallShadowGuardsReferencedSourceBeforeContractScreening(int depth, bool expectedComplete)
+    {
+        var expression = new string('!', depth) + "value";
+        var calleeTree = CSharpSyntaxTree.ParseText(
+            "using SharpProof.Attributes; public static class Helper { public static bool Positive(bool value) " +
+            "{ Contract.Requires(value); return " + expression + "; } }",
+            new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Helper.cs");
+        var dependency = CSharpCompilation.Create("HelperLibrary", [calleeTree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var callerTree = CSharpSyntaxTree.ParseText(
+            "public static class Caller { public static bool Root(bool value) => Helper.Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [callerTree],
+            TestMetadataReferences.WithSharpProof.Add(dependency.ToMetadataReference()),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        if (expectedComplete)
+        {
+            Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.True);
+            Assert.That(shadow.Owners.Single().Calls, Has.Length.EqualTo(1));
+            Assert.That(shadow.Gaps, Is.Empty);
+        }
+        else
+        {
+            Assert.That(shadow.Owners, Is.Empty);
+            Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("ReferenceSyntaxBudget"));
+            Assert.That(shadow.Gaps.Single().ReferenceAssemblyName, Is.EqualTo("HelperLibrary"));
+        }
+    }
+    [Test]
+    public void PotentialCallShadowRejectsAmbiguousReferencedTreeOwnership()
+    {
+        var shared = CSharpSyntaxTree.ParseText("""
+            using SharpProof.Attributes;
+            public static class Helper {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+            }
+            """, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Helper.cs");
+        var first = CSharpCompilation.Create("FirstLibrary", [shared], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var second = CSharpCompilation.Create("SecondLibrary", [shared], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var caller = CSharpSyntaxTree.ParseText(
+            "extern alias first; public static class Caller { public static int Root(int value) => first::Helper.Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [caller], TestMetadataReferences.WithSharpProof
+            .Add(first.ToMetadataReference(aliases: ["first"]))
+            .Add(second.ToMetadataReference(aliases: ["second"])),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("ReferenceOwnership"));
+    }
+    [Test]
+    public void SelectedDescendantsOfPlainSiblingLambdasHaveDistinctIdentities()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Outer() {
+                    Func<Func<int,int>> first = () => value => {
+                        Contract.Ensures(Contract.Result<int>() == value);
+                        return value;
+                    };
+                    Func<Func<int,int>> second = () => value => {
+                        Contract.Ensures(Contract.Result<int>() == value);
+                        return value;
+                    };
+                    _ = first()(second()(1));
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(result.Manifest.Claims.Select(static entry => entry.ClaimId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void InheritedTrustKeepsPlainSiblingCallableIdentitiesDistinct()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using System;
+            using SharpProof.Attributes;
+            [SharpProofTrusted("Reviewed boundary")]
+            public static class Subject {
+                public static int Outer(int value) {
+                    Func<int,int> first = item => item;
+                    Func<int,int> second = item => item;
+                    return first(second(value));
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(3));
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(3));
+        Assert.That(result.Manifest.Claims, Is.Empty);
+        Assert.That(result.Manifest.Callables.All(static entry => entry.Assumptions.Length == 1 &&
+            entry.Assumptions[0].Kind == WorkerAssumptionKind.TrustedBoundary), Is.True);
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void FileLocalMethodNamesDistinguishCallableIdentities()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using SharpProof.Attributes;
+            file static class Subject {
+                public static int First(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+                public static int Second(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void FunctionPointerMethodNamesDistinguishCallableIdentities()
+    {
+        var compilation = TestCompilation.Create("ManifestTests", [("Subject.cs", """
+            using SharpProof.Attributes;
+            public static unsafe class Subject {
+                public static int First(delegate*<int,int> pointer) {
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    return 1;
+                }
+                public static int Second(delegate*<int,int> pointer) {
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    return 1;
+                }
+            }
+            """)], allowUnsafe: true);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var prepared = AssertIdentityArtifactRoundTrip(compilation, result);
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
+        Assert.That(prepared.All(static entry => entry.Total == null &&
+            entry.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void ChangingPredicateCallTargetChangesClaimIdentity()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Subject {
+                static int First(int value) => value;
+                static int Second(int value) => value + 1;
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == CALLEE(value));
+                    return value;
+                }
+            }
+            """;
+        var first = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "First", StringComparison.Ordinal)));
+        var second = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Second", StringComparison.Ordinal)));
+        Assert.That(first.Manifest.Callables.Single().CallableId,
+            Is.EqualTo(second.Manifest.Callables.Single().CallableId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+    }
+
+    [Test]
+    public void LocalPredicateTargetsHaveDistinctRenameStableIdentities()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    bool Positive(int input) => input > 0;
+                    bool Negative(int input) => input < 0;
+                    Contract.Ensures(CALLEE(value));
+                    return value;
+                }
+            }
+            """;
+        var first = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Positive", StringComparison.Ordinal)));
+        var second = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Negative", StringComparison.Ordinal)));
+        var renamed = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Positive", StringComparison.Ordinal)
+            .Replace("Positive", "Renamed", StringComparison.Ordinal)));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.EqualTo(renamed.Manifest.Claims.Single().ClaimId));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LocalPredicateHelperInsideNestedCallableKeepsRenameStableIdentity(bool useLambda)
+    {
+        var parent = useLambda ? "System.Func<int,int> Parent = value =>" : "int Parent(int value)";
+        var suffix = useLambda ? ";" : "";
+        var source = $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Outer() {
+                    {{parent}} {
+                        Contract.Ensures(Contract.Result<int>() == Helper(value));
+                        int Helper(int item) => item;
+                        return value;
+                    }{{suffix}}
+                    _ = Parent(1);
+                }
+            }
+            """;
+        var first = BuildIdentityArtifact(("Subject.cs", source));
+        var renamed = BuildIdentityArtifact(("Subject.cs", source.Replace("Helper", "Renamed", StringComparison.Ordinal)));
+        Assert.That(first.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.EqualTo(renamed.Manifest.Claims.Single().ClaimId));
+        Assert.That(WorkerProtocolJson.ValidateManifest(first.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void GenericLocalAncestorRenamesPreserveNestedIdentities()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Outer() {
+                    bool Parent<T>(T value) {
+                        bool Child(T item) {
+                            Contract.Ensures(Helper(item));
+                            return true;
+                        }
+                        bool Helper(T item) => true;
+                        return Child(value);
+                    }
+                    _ = Parent<int>(1);
+                }
+            }
+            """;
+        var before = BuildIdentityArtifact(("Subject.cs", source));
+        var after = BuildIdentityArtifact(("Subject.cs", source.Replace("Parent", "Renamed", StringComparison.Ordinal)));
+        var beforeTarget = before.Targets.Values.Single(static target => target.Method.Name == "Child");
+        var afterTarget = after.Targets.Values.Single(static target => target.Method.Name == "Child");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(afterTarget.Entry.CallableId, Is.EqualTo(beforeTarget.Entry.CallableId));
+            Assert.That(afterTarget.Claims.Single().Entry.ClaimId, Is.EqualTo(beforeTarget.Claims.Single().Entry.ClaimId));
+        }
+    }
+    [Test]
+    public void CheckedResultAndOldPreserveEstablishedClaimIdentities()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() == Contract.Old(value));
+                    return value;
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables.Single().CallableId,
+            Is.EqualTo("M:Subject.Target(System.Int32)~System.Int32"));
+        Assert.That(result.Manifest.Claims.Single().ClaimId,
+            Is.EqualTo("spc1:f48e52a492d1b8b11171c02d137abd51cd41c19f4eaced15e92e145067335f3e"));
+        Assert.That(result.Manifest.Callables.Single().Assumptions.Single().Id,
+            Is.EqualTo("spa1:3ddb2cbf9ccbb834015a267d7d8cdb7f937809a4deecbd7c032dcb1d38003373"));
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public void AliasedAssemblyCallTargetsHaveDistinctClaimIdentities(bool useCompilationReference)
+    {
+        MetadataReference Library(string assemblyName, string alias, string body)
+        {
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                [CSharpSyntaxTree.ParseText("namespace Shared { public static class Api { public static int Helper(int value) => " + body + "; } }")],
+                TestMetadataReferences.Platform,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            if (useCompilationReference)
+            {
+                return compilation.ToMetadataReference(aliases: [alias]);
+            }
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.That(emitted.Success, Is.True,
+                string.Join(Environment.NewLine, emitted.Diagnostics));
+            return MetadataReference.CreateFromImage(stream.ToArray().ToImmutableArray(),
+                new MetadataReferenceProperties(aliases: [alias]));
+        }
+        var references = TestMetadataReferences.WithSharpProof
+            .Add(Library("FirstLibrary", "first", "value"))
+            .Add(Library("SecondLibrary", "second", "value + 1"));
+        const string source = """
+            extern alias first;
+            extern alias second;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == CALLEE::Shared.Api.Helper(value));
+                    return value;
+                }
+            }
+            """;
+        ClaimManifestBuildResult Compile(string alias)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source.Replace("CALLEE", alias, StringComparison.Ordinal),
+                new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Subject.cs");
+            var compilation = CSharpCompilation.Create("ManifestTests", [tree], references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Single(static invocation => invocation.Expression.ToString().Contains("::", StringComparison.Ordinal));
+            var callee = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(syntax).Symbol!;
+            Assert.That(callee.ContainingAssembly.Identity.Name,
+                Is.EqualTo(alias == "first" ? "FirstLibrary" : "SecondLibrary"));
+            return new ClaimManifestBuilder(compilation).Build();
+        }
+        var first = Compile("first");
+        var second = Compile("second");
+        Assert.That(first.Manifest.Callables.Single().CallableId, Is.EqualTo(second.Manifest.Callables.Single().CallableId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PropertyAndFieldCallTargetsHaveDistinctClaimIdentities(bool useField)
+    {
+        var declarations = useField
+            ? "static int First = 0; static int Second = 1;"
+            : "static int First => 0; static int Second => 1;";
+        var source = $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                {{declarations}}
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == MEMBER);
+                    return value;
+                }
+            }
+            """;
+        ClaimManifestBuildResult Compile(string name)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source.Replace("MEMBER", name, StringComparison.Ordinal),
+                new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Subject.cs");
+            var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var syntax = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
+                .Single(identifier => identifier.Identifier.ValueText == name);
+            var member = compilation.GetSemanticModel(tree).GetSymbolInfo(syntax).Symbol;
+            Assert.That(member, Is.Not.Null);
+            Assert.That(member!.MetadataName, Is.EqualTo(name));
+            Assert.That(member.Kind, Is.EqualTo(useField ? SymbolKind.Field : SymbolKind.Property));
+            if (member is IFieldSymbol field)
+            {
+                Assert.That(field.IsConst, Is.False);
+            }
+            return new ClaimManifestBuilder(compilation).Build();
+        }
+        var first = Compile("First");
+        var second = Compile("Second");
+        Assert.That(first.Manifest.Callables.Single().CallableId, Is.EqualTo(second.Manifest.Callables.Single().CallableId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+    }
     [Test]
     public void EffectWireMappingsAreNamedAndExhaustive()
     {
@@ -199,6 +837,85 @@ public sealed class ClaimManifestBuilderTests
         }
     }
 
+    [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "Z")]
+    [TestCase("global using Z = SharpProof.Attributes;", "Z.ZeroAllocations")]
+    [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "\\u005A")]
+    public void GlobalAttributeAliasSelectsASeparateTokenFreeTree(string alias, string attribute)
+    {
+        var result = Build(
+            ("Aliases.cs", alias),
+            ("Subject.cs", $"public static class Subject {{ [{attribute}] public static int Target() => 0; }}"));
+        Assert.That(result.Targets.Values.Single().Method.Name, Is.EqualTo("Target"));
+        Assert.That(result.Manifest.Claims.Single().EffectContractKind,
+            Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
+    }
+
+    [Test]
+    public void TrustedPartialScopeSelectsASeparateTokenFreeTree()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [SharpProofTrusted(\"Reviewed boundary\")] public static partial class Subject { }"),
+            ("Implementation.cs", "public static partial class Subject { public static int Target() => 0; }"));
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.Name, Is.EqualTo("Target"));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [Test]
+    public void TrustedAssemblySelectsASeparateTokenFreeTree()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [assembly: SharpProofTrusted(\"Reviewed boundary\")]"),
+            ("Implementation.cs", "public static class Subject { public static int Target() => 0; }"));
+        Assert.That(result.Targets.Values.Single().Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [Test]
+    public void TrustedOuterScopeSelectsNestedPartialDeclarations()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [SharpProofTrusted(\"Reviewed boundary\")] public static partial class Subject { public static partial class Nested { } }"),
+            ("Implementation.cs", "public static partial class Subject { public static partial class Nested { public static int Target() => 0; } }"));
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.ContainingType.Name, Is.EqualTo("Nested"));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [TestCase("SharpProofTrustedAttribute", "type")]
+    [TestCase("SharpProofSuppressAttribute", "type")]
+    [TestCase("SharpProofTrustedAttribute", "assembly")]
+    [TestCase("SharpProofSuppressAttribute", "assembly")]
+    [TestCase("SharpProofTrustedAttribute", "nested")]
+    [TestCase("SharpProofSuppressAttribute", "nested")]
+    public void RejectedControlScopesSelectTokenFreeDeclarationsWithoutGrantingTrust(string attribute, string scope)
+    {
+        var shadow = $$"""
+            namespace SharpProof.Attributes {
+                public sealed class {{attribute}} : System.Attribute {
+                    public {{attribute}}(string reason) { }
+                }
+            }
+            """;
+        var control = $"SharpProof.Attributes.{attribute}(\"reason\")";
+        var boundary = scope == "assembly" ? $"[assembly: {control}]"
+            : $"[{control}] public static partial class Subject {{ }}";
+        var implementation = scope == "nested"
+            ? "public static partial class Subject { public static class Nested { public static int Target() => 0; } }"
+            : "public static partial class Subject { public static int Target() => 0; }";
+        var compilation = GetCompilation(("Shadow.cs", shadow), ("Boundary.cs", boundary), ("Implementation.cs", implementation));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var target = result.Targets.Values.Single(static target => target.Method.Name == "Target");
+        Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Contracts));
+        Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Effects));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Not.Contain(WorkerAssumptionKind.TrustedBoundary));
+        Assert.That(target.Entry.ClaimIds, Is.Empty);
+    }
+
     [Test]
     public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
     {
@@ -243,6 +960,31 @@ public sealed class ClaimManifestBuilderTests
                 .Intersect(first.Manifest.Claims.Select(static claim =>
                     claim.ClaimId)),
             Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void SurrogateCharacterConstantsHaveDistinctStableClaimIdentities()
+    {
+        string Source(int codeUnit)
+        {
+            return $$"""
+                using SharpProof.Attributes;
+                public static class Subject {
+                    public static char Target(char value) {
+                        Contract.Ensures(Contract.Result<char>() == '\u{{codeUnit.ToString("X4", System.Globalization.CultureInfo.InvariantCulture)}}');
+                        return value;
+                    }
+                }
+                """;
+        }
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var codeUnit in new[] { 0xD800, 0xD801, 0xDC00, 0xDFFF })
+        {
+            var first = Build(("First.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
+            var repeated = Build(("Renamed.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
+            Assert.That(first, Is.EqualTo(repeated));
+            Assert.That(identities.Add(first), Is.True);
+        }
     }
 
     [Test]
@@ -2525,6 +3267,13 @@ public sealed class ClaimManifestBuilderTests
             // its unrelated local functions.
             Assert.That(ids, Is.Empty);
         }
+        var mixed = Build(
+            ("Deep.cs", source.ToString()),
+            ("Aliases.cs", "global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;"),
+            ("Selected.cs", "public static class Selected { [Z] public static int Target() => 0; }"));
+        Assert.That(mixed.Targets.Values.Single().Method.Name, Is.EqualTo("Target"));
+        Assert.That(mixed.Manifest.Claims.Single().EffectContractKind,
+            Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
         await File.WriteAllTextAsync(
             Environment.GetEnvironmentVariable(markerVariable)!,
             "complete");
@@ -2534,6 +3283,40 @@ public sealed class ClaimManifestBuilderTests
         params (string FileName, string Source)[] sources)
     {
         return new ClaimManifestBuilder(GetCompilation(sources)).Build();
+    }
+
+    private static ClaimManifestBuildResult BuildIdentityArtifact(
+        params (string FileName, string Source)[] sources)
+    {
+        var compilation = GetCompilation(sources);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        AssertIdentityArtifactRoundTrip(compilation, result);
+        return result;
+    }
+
+    private static ImmutableArray<CompilerCallablePreparation> AssertIdentityArtifactRoundTrip(
+        CSharpCompilation compilation, ClaimManifestBuildResult discovery)
+    {
+        TestCompilation.AssertNoErrors(compilation);
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        var decoded = CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        Assert.That(decoded.Manifest.Callables.Select(static entry => entry.CallableId),
+            Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry.CallableId)));
+        Assert.That(decoded.Manifest.Claims.Select(static entry => entry.ClaimId),
+            Is.EqualTo(discovery.Manifest.Claims.Select(static entry => entry.ClaimId)));
+        Assert.That(prepared.Select(static entry => entry.Entry.CallableId),
+            Is.EqualTo(decoded.Manifest.Callables.Select(static entry => entry.CallableId)));
+        foreach (var entry in decoded.Manifest.Callables)
+        {
+            Assert.That(entry.ClaimIds, Is.EqualTo(decoded.Manifest.Claims
+                .Where(claim => claim.CallableId == entry.CallableId).Select(static claim => claim.ClaimId)));
+            Assert.That(entry.Assumptions.Select(static assumption => assumption.Id),
+                Is.EqualTo(discovery.Manifest.Callables.Single(original => original.CallableId == entry.CallableId)
+                    .Assumptions.Select(static assumption => assumption.Id)));
+        }
+        return prepared;
     }
 
     private static CSharpCompilation GetCompilation(

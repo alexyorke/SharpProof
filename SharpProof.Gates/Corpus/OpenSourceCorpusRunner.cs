@@ -17,122 +17,9 @@ internal static class OpenSourceCorpusRunner
         OpenSourceCorpusDocument document,
         CancellationToken cancellationToken)
     {
-        var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(document);
-        var declarationIndexes = OpenSourceCorpusCatalog.GetDeclarationIndexes(document);
-        var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
-            document.Files.Length + 1);
-        trees.Add(CSharpSyntaxTree.ParseText(
-            """
-            global using System;
-            global using System.Collections.Generic;
-            global using System.IO;
-            global using System.Linq;
-            global using System.Threading;
-            global using System.Threading.Tasks;
-            """,
-            AnalyzerGateHost.ParseOptions,
-            "__SharpProofOssCorpusGlobalUsings.cs",
-            Encoding.UTF8,
-            cancellationToken));
-
-        var methodsByFile = document.Methods
-            .GroupBy(
-                static method => OpenSourceCorpusCatalog.GetSourceFileKey(
-                    method.SourceId,
-                    method.Path),
-                StringComparer.Ordinal)
-            .ToImmutableDictionary(
-                static group => group.Key,
-                static group => group.ToImmutableArray(),
-                StringComparer.Ordinal);
-        var methodsById = document.Methods.ToImmutableDictionary(
-            static method => method.Id,
-            StringComparer.Ordinal);
-        var targets = ImmutableDictionary.CreateBuilder<
-            TargetKey,
-            TargetInfo>();
-        foreach (var file in document.Files)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var key = OpenSourceCorpusCatalog.GetSourceFileKey(
-                file.SourceId,
-                file.Path);
-            var root = parsedFiles is not null &&
-                parsedFiles.TryGetValue(key, out var parsedRoot)
-                ? parsedRoot
-                : CSharpSyntaxTree.ParseText(
-                        OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
-                        AnalyzerGateHost.ParseOptions,
-                        file.Path,
-                        Encoding.UTF8,
-                        cancellationToken)
-                    .GetCompilationUnitRoot(cancellationToken);
-            if (methodsByFile.TryGetValue(key, out var methods))
-            {
-                var declarationIndex = declarationIndexes is not null &&
-                    declarationIndexes.TryGetValue(key, out var cachedIndex)
-                    ? cachedIndex
-                    : OpenSourceCorpusCatalog.BuildDeclarationIndex(root);
-                var selected = methods.ToImmutableDictionary(
-                    method => OpenSourceCorpusCatalog.FindDeclaration(
-                        declarationIndex,
-                        method),
-                    static method => method);
-                root = root.ReplaceNodes(
-                    selected.Keys,
-                    (original, rewritten) => Instrument(
-                        rewritten,
-                        selected[original].Id));
-            }
-            var tree = CSharpSyntaxTree.Create(
-                root,
-                AnalyzerGateHost.ParseOptions,
-                file.Path,
-                Encoding.UTF8);
-            trees.Add(tree);
-            foreach (var declaration in tree.GetCompilationUnitRoot(
-                         cancellationToken)
-                     .GetAnnotatedNodes(AnnotationKind)
-                     .OfType<MethodDeclarationSyntax>())
-            {
-                var annotation = declaration.GetAnnotations(AnnotationKind)
-                    .Single();
-                var id = annotation.Data ??
-                    throw new InvalidDataException(
-                        $"Instrumented method in {file.Path} has no corpus ID.");
-                if (!methodsById.TryGetValue(id, out var method))
-                {
-                    throw new InvalidDataException(
-                        $"Instrumented method in {file.Path} refers to " +
-                        $"unknown corpus ID {id}.");
-                }
-                targets.Add(
-                    new TargetKey(tree, declaration.SpanStart),
-                    new TargetInfo(method, tree, declaration.FullSpan));
-            }
-        }
-        if (targets.Count != document.Methods.Length)
-        {
-            throw new InvalidDataException(
-                $"Instrumented {targets.Count} OSS methods, expected " +
-                $"{document.Methods.Length}.");
-        }
-
-        var template = AnalyzerGateHost.CreateCompilation(
-            string.Empty,
-            "SharpProofOssCorpus");
-        var compilation = template
-            .RemoveSyntaxTrees(template.SyntaxTrees)
-            .AddSyntaxTrees(trees);
-        AnalyzerGateHost.ThrowIfCompilationHasErrors(
-            compilation,
-            25,
-            static errors => new InvalidDataException(
-                "The pinned OSS corpus did not compile:" +
-                Environment.NewLine + errors),
-            cancellationToken);
-
-        var targetMap = targets.ToImmutable();
+        var prepared = Prepare(document, "global::SharpProof.Attributes.EnforcePure", cancellationToken);
+        var compilation = prepared.Compilation;
+        var targetMap = prepared.Targets;
         var diagnosticsByMethod = targetMap.Values
             .Select(static target => target.Method.Id)
             .ToDictionary(
@@ -246,9 +133,144 @@ internal static class OpenSourceCorpusRunner
                     item.Diagnostic.Location)));
     }
 
+    internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
+        bool allocations = false, bool purity = false)
+    {
+        return Prepare(document, purity ? "global::SharpProof.Attributes.EnforcePure" : allocations
+            ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken,
+            includeExternalEffectsFixture: purity).Compilation;
+    }
+
+    internal static string? CorpusMethodId(SyntaxNode? declaration)
+    { return declaration?.GetAnnotations(AnnotationKind).SingleOrDefault()?.Data; }
+
+    private sealed record PreparedCorpus(CSharpCompilation Compilation, ImmutableDictionary<TargetKey, TargetInfo> Targets);
+
+    private static PreparedCorpus Prepare(OpenSourceCorpusDocument document, string effectAttribute, CancellationToken cancellationToken,
+        bool includeExternalEffectsFixture = true)
+    {
+        var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(document);
+        var declarationIndexes = OpenSourceCorpusCatalog.GetDeclarationIndexes(document);
+        var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
+            document.Files.Length + 1);
+        trees.Add(CSharpSyntaxTree.ParseText(
+            """
+            global using System;
+            global using System.Collections.Generic;
+            global using System.IO;
+            global using System.Linq;
+            global using System.Threading;
+            global using System.Threading.Tasks;
+            """,
+            AnalyzerGateHost.ParseOptions,
+            "__SharpProofOssCorpusGlobalUsings.cs",
+            Encoding.UTF8,
+            cancellationToken));
+
+        var methodsByFile = document.Methods
+            .GroupBy(
+                static method => OpenSourceCorpusCatalog.GetSourceFileKey(
+                    method.SourceId,
+                    method.Path),
+                StringComparer.Ordinal)
+            .ToImmutableDictionary(
+                static group => group.Key,
+                static group => group.ToImmutableArray(),
+                StringComparer.Ordinal);
+        var methodsById = document.Methods.ToImmutableDictionary(
+            static method => method.Id,
+            StringComparer.Ordinal);
+        var targets = ImmutableDictionary.CreateBuilder<
+            TargetKey,
+            TargetInfo>();
+        foreach (var file in document.Files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var key = OpenSourceCorpusCatalog.GetSourceFileKey(
+                file.SourceId,
+                file.Path);
+            var root = parsedFiles is not null &&
+                parsedFiles.TryGetValue(key, out var parsedRoot)
+                ? parsedRoot
+                : CSharpSyntaxTree.ParseText(
+                        OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
+                        AnalyzerGateHost.ParseOptions,
+                        file.Path,
+                        Encoding.UTF8,
+                        cancellationToken)
+                    .GetCompilationUnitRoot(cancellationToken);
+            if (methodsByFile.TryGetValue(key, out var methods))
+            {
+                var declarationIndex = declarationIndexes is not null &&
+                    declarationIndexes.TryGetValue(key, out var cachedIndex)
+                    ? cachedIndex
+                    : OpenSourceCorpusCatalog.BuildDeclarationIndex(root);
+                var selected = methods.ToImmutableDictionary(
+                    method => OpenSourceCorpusCatalog.FindDeclaration(
+                        declarationIndex,
+                        method),
+                    static method => method);
+                root = root.ReplaceNodes(
+                    selected.Keys,
+                    (original, rewritten) => Instrument(
+                        rewritten,
+                        selected[original].Id, effectAttribute));
+            }
+            var tree = CSharpSyntaxTree.Create(
+                root,
+                AnalyzerGateHost.ParseOptions,
+                file.Path,
+                Encoding.UTF8);
+            trees.Add(tree);
+            foreach (var declaration in tree.GetCompilationUnitRoot(
+                         cancellationToken)
+                     .GetAnnotatedNodes(AnnotationKind)
+                     .OfType<MethodDeclarationSyntax>())
+            {
+                var annotation = declaration.GetAnnotations(AnnotationKind)
+                    .Single();
+                var id = annotation.Data ??
+                    throw new InvalidDataException(
+                        $"Instrumented method in {file.Path} has no corpus ID.");
+                if (!methodsById.TryGetValue(id, out var method))
+                {
+                    throw new InvalidDataException(
+                        $"Instrumented method in {file.Path} refers to " +
+                        $"unknown corpus ID {id}.");
+                }
+                targets.Add(
+                    new TargetKey(tree, declaration.SpanStart),
+                    new TargetInfo(method, tree, declaration.FullSpan));
+            }
+        }
+        if (targets.Count != document.Methods.Length)
+        {
+            throw new InvalidDataException(
+                $"Instrumented {targets.Count} OSS methods, expected " +
+                $"{document.Methods.Length}.");
+        }
+
+        var template = AnalyzerGateHost.CreateCompilation(
+            string.Empty,
+            "SharpProofOssCorpus",
+            includeExternalEffectsFixture: includeExternalEffectsFixture && effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
+        var compilation = template
+            .RemoveSyntaxTrees(template.SyntaxTrees)
+            .AddSyntaxTrees(trees);
+        AnalyzerGateHost.ThrowIfCompilationHasErrors(
+            compilation,
+            25,
+            static errors => new InvalidDataException(
+                "The pinned OSS corpus did not compile:" +
+                Environment.NewLine + errors),
+            cancellationToken);
+
+        return new(compilation, targets.ToImmutable());
+    }
+
     private static MethodDeclarationSyntax Instrument(
         MethodDeclarationSyntax declaration,
-        string id)
+        string id, string effectAttribute)
     {
         return declaration
             .WithAttributeLists(
@@ -258,7 +280,7 @@ internal static class OpenSourceCorpusRunner
                         SyntaxFactory.SingletonSeparatedList(
                             SyntaxFactory.Attribute(
                                 SyntaxFactory.ParseName(
-                                    "global::SharpProof.Attributes.EnforcePure"))))))
+                                    effectAttribute))))))
             .WithAdditionalAnnotations(
                 new SyntaxAnnotation(AnnotationKind, id));
     }

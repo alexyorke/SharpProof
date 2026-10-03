@@ -1,0 +1,58 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v8:int[width=32,signed=True] = 0 source=total-source-effect-sites.cs:133+9
+  i6 op3 Assign v9:int[width=32,signed=True] = v1 source=total-source-effect-sites.cs:140+1
+  i7 op2 Assign v4:int[width=32,signed=True] = v9 source=total-source-effect-sites.cs:133+9
+  i8 op2 Goto b6 source=total-source-effect-sites.cs:133+9
+block: b3 cfg:2
+  i26 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 call:continued
+  i24 op1 Assign v3:int[width=32,signed=True] = v8 source=total-source-effect-sites.cs:133+9
+  i25 op1 Return v3 source=total-source-effect-sites.cs:133+9
+block: b6 call:body
+  i9 op4 Assign v5:int[width=32,signed=True] = v4 source=none
+  i10 op4 Assign v6:int[width=32,signed=True] = v4 source=none
+  i11 op4 Goto b7 source=none
+block: b7 call:body
+  i12 op4 Goto b8 source=none
+block: b8 call:body
+  i13 op5 Allocate t3:object source=total-source-effect-sites.cs:206+12
+  i14 op6 Assign v10:int[width=32,signed=True] = v5 source=total-source-effect-sites.cs:228+7
+  i15 op7 Assign v11:int[width=32,signed=True] = (v10 + 1) source=total-source-effect-sites.cs:228+7
+  i16 op8 Assign v5:int[width=32,signed=True] = v11 source=total-source-effect-sites.cs:228+7
+  i17 op8 Write Local source=total-source-effect-sites.cs:228+7
+  i18 op10 Assign v12:int[width=32,signed=True] = v5 source=total-source-effect-sites.cs:252+5
+  i19 op9 Assign v7:int[width=32,signed=True] = v12 source=total-source-effect-sites.cs:252+5
+  i20 op9 Assign v8:int[width=32,signed=True] = v7 source=total-source-effect-sites.cs:252+5
+  i21 op9 Goto b5 source=total-source-effect-sites.cs:252+5
+block: b9 call:body
+  i22 op4 Goto b5 source=none
+block: b10 call:body
+  i23 op4 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v8
+term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir3 Variable type=t1:int width=32 signed=True value=v1
+term: ir4 Variable type=t1:int width=32 signed=True value=v9
+term: ir5 Variable type=t1:int width=32 signed=True value=v4
+term: ir6 Variable type=t1:int width=32 signed=True value=v5
+term: ir7 Variable type=t1:int width=32 signed=True value=v10
+term: ir8 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir9 Binary type=t1:int width=32 signed=True value=(v10 + 1)
+term: ir10 Variable type=t1:int width=32 signed=True value=v11
+term: ir11 Variable type=t1:int width=32 signed=True value=v12
+term: ir12 Variable type=t1:int width=32 signed=True value=v7
+term: ir13 Variable type=t1:int width=32 signed=True value=v3

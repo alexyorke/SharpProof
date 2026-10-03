@@ -1,4 +1,5 @@
 using Microsoft.Build.Framework;
+using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
@@ -21,8 +22,10 @@ public sealed class ResetPublishedVerification : CancelableBuildTask
     {
         try
         {
-            foreach (var path in Present(RequestPath, ResultPath, ManifestPath, SarifPath)
-                         .Select(path => ResolveProjectRelativePath(ProjectDirectory, path)))
+            var paths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+                .Select(path => ResolveProjectRelativePath(ProjectDirectory, path)).ToArray();
+            using var lease = PublicationLease.Acquire(paths, cancellationToken);
+            foreach (var path in paths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (File.Exists(path))

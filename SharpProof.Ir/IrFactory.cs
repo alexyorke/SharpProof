@@ -7,7 +7,7 @@ public sealed class IrFactory
     private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = [];
     private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
     private readonly List<string> _strings = [];
-    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType), IrTypeId> _typeIds = [];
+    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
     private readonly List<IrTypeInfo> _types = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = [];
@@ -15,17 +15,25 @@ public sealed class IrFactory
     private readonly List<IrOperationInfo> _operations = [];
     private readonly Dictionary<StructuralKey, IrTerm> _termIds = [];
     private readonly List<IrTerm> _terms = [];
+    private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
     private readonly long _scope;
     private int _identityCount;
 
-    public IrFactory()
+    public IrFactory() : this(IrExecutionSemantics.Legacy) { }
+
+    public IrFactory(IrExecutionSemantics semantics)
     {
+        Semantics = ArgumentNullGuard.RequireDefined(semantics, nameof(semantics));
         _scope = Interlocked.Increment(ref s_nextScope);
         BooleanType = CreateBuiltInType("bool", IrTypeKind.Boolean);
-        IntegerType = CreateBuiltInType("int", IrTypeKind.Integer);
+        IntegerType = semantics == IrExecutionSemantics.Total
+            ? GetOrCreateIntegerType(32, signed: true)
+            : CreateBuiltInType("int", IrTypeKind.Integer);
         StringType = CreateBuiltInType("string", IrTypeKind.String);
         ObjectType = CreateBuiltInType("object", IrTypeKind.Reference);
     }
+
+    public IrExecutionSemantics Semantics { get; }
 
     public IrTypeId BooleanType
     {
@@ -42,6 +50,34 @@ public sealed class IrFactory
     public IrTypeId ObjectType
     {
         get;
+    }
+
+    public IrTypeId GetOrCreateIntegerType(int width, bool signed)
+    {
+        if (width is not (8 or 16 or 32 or 64))
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "Integer widths are 8, 16, 32, or 64 bits.");
+        }
+        lock (_gate)
+        {
+            var key = (IrTypeKind.Integer, -1, -1, width, signed);
+            if (_typeIds.TryGetValue(key, out var existing))
+            {
+                return existing;
+            }
+            var name = (width, signed) switch
+            {
+                (8, true) => "sbyte",
+                (8, false) => "byte",
+                (16, true) => "short",
+                (16, false) => "ushort",
+                (32, true) => "int",
+                (32, false) => "uint",
+                (64, true) => "long",
+                _ => "ulong"
+            };
+            return CreateTypeCore(key, name, IrTypeKind.Integer, null);
+        }
     }
 
     public IrIdentityId CreateIdentity()
@@ -155,7 +191,7 @@ public sealed class IrFactory
         lock (_gate)
         {
             var element = GetTypeInfoCore(elementType, nameof(elementType));
-            var key = (IrTypeKind.Sequence, -1, elementType.Value);
+            var key = (IrTypeKind.Sequence, -1, elementType.Value, 0, false);
             if (_typeIds.TryGetValue(key, out var existing))
             {
                 return existing;
@@ -251,13 +287,13 @@ public sealed class IrFactory
         }
     }
 
-    public OperationId CreateOperation(string? description = null)
+    public OperationId CreateOperation(string? description = null, IrSourceSpan? sourceSpan = null)
     {
         lock (_gate)
         {
             var id = new OperationId(_scope, _operations.Count);
             var descriptionId = string.IsNullOrWhiteSpace(description) ? (IrStringId?)null : InternStringCore(description!);
-            _operations.Add(new IrOperationInfo(id, descriptionId));
+            _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
             return id;
         }
     }
@@ -285,7 +321,22 @@ public sealed class IrFactory
 
     public IrValue CreateIntegerValue(long value)
     {
-        return new(IntegerType, IrValueKind.Integer, value);
+        return CreateIntegerValue(IntegerType, value);
+    }
+
+    public IrValue CreateIntegerValue(IrTypeId type, long value)
+    {
+        return new(type, IrValueKind.Integer, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrValue CreateIntegerValue(IrTypeId type, ulong value)
+    {
+        return new(type, IrValueKind.Integer, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrValue CreateIntegerValueFromBits(IrTypeId type, ulong bits)
+    {
+        return new(type, IrValueKind.Integer, IrInteger.FromBits(GetTypeInfo(type), bits));
     }
 
     public IrValue CreateStringValue(string value)
@@ -374,12 +425,32 @@ public sealed class IrFactory
 
     public IrIntegerTerm Integer(long value)
     {
+        return Integer(IntegerType, value);
+    }
+
+    public IrIntegerTerm Integer(IrTypeId type, long value)
+    {
+        return IntegerCore(type, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrIntegerTerm Integer(IrTypeId type, ulong value)
+    {
+        return IntegerCore(type, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrIntegerTerm IntegerBits(IrTypeId type, ulong bits)
+    {
+        return IntegerCore(type, IrInteger.FromBits(GetTypeInfo(type), bits));
+    }
+
+    private IrIntegerTerm IntegerCore(IrTypeId type, IrInteger value)
+    {
         lock (_gate)
         {
             return Intern(
-                new StructuralKey(IrTermKind.Integer, IntegerType.Value, number: value),
-                (IntegerType, value),
-                static (id, state) => new IrIntegerTerm(id, state.IntegerType, state.value));
+                new StructuralKey(IrTermKind.Integer, type.Value, number: unchecked((long)value.Bits)),
+                (type, value),
+                static (id, state) => new IrIntegerTerm(id, state.type, state.value));
         }
     }
 
@@ -409,6 +480,28 @@ public sealed class IrFactory
         {
             RequireNullableTypeCore(type, nameof(type));
             return NullCore(type);
+        }
+    }
+
+    public IrEmptyArrayTerm EmptyArray(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || GetTypeInfo(type).Kind != IrTypeKind.Sequence)
+            { throw new ArgumentException("An empty array requires a Total sequence type.", nameof(type)); }
+            return Intern(new StructuralKey(IrTermKind.EmptyArray, type.Value), type,
+                static (id, valueType) => new IrEmptyArrayTerm(id, valueType));
+        }
+    }
+
+    public IrValue CreateEmptyArrayValue(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            EmptyArray(type);
+            if (!_emptyArrays.TryGetValue(type, out var value))
+            { _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
+            return value;
         }
     }
 
@@ -444,10 +537,8 @@ public sealed class IrFactory
         {
             EnsureTermCore(operand, nameof(operand));
             var semantics = IrOperatorCatalog.Get(@operator);
-            var expectedType = IrOperatorCatalog.GetBuiltInType(
-                this,
-                semantics.Operand);
-            if (operand.Type != expectedType)
+            var expectedType = operand.Type;
+            if (GetTypeInfoCore(operand.Type, nameof(operand)).Kind != semantics.Operand)
             {
                 throw new ArgumentException("The operand type is not valid for the unary operator.", nameof(operand));
             }
@@ -562,6 +653,18 @@ public sealed class IrFactory
             }
 
             var source = GetTypeInfoCore(operand.Type, nameof(operand));
+            if (source.Kind == IrTypeKind.Integer && target.Kind == IrTypeKind.Integer &&
+                source.Width != 0 && target.Width != 0)
+            {
+                if (operand is IrIntegerTerm integer)
+                {
+                    return IntegerBits(targetType, integer.Integer.ConvertBits(target.Width));
+                }
+                return Intern(
+                    new StructuralKey(IrTermKind.Cast, targetType.Value, first: operand.Id.Value),
+                    (targetType, operand),
+                    static (id, state) => new IrCastTerm(id, state.targetType, state.operand));
+            }
             var isUnboxing =
                 source.Kind == IrTypeKind.Reference &&
                 target.Kind is IrTypeKind.Boolean or IrTypeKind.Integer;
@@ -786,7 +889,8 @@ public sealed class IrFactory
 
     private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeKind kind, IrTypeId? elementType)
     {
-        var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1);
+        var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
+            0, kind == IrTypeKind.Integer);
         if (_typeIds.TryGetValue(key, out var existing))
         {
             return existing;
@@ -796,7 +900,7 @@ public sealed class IrFactory
     }
 
     private IrTypeId CreateTypeCore(
-        (IrTypeKind Kind, int Identity, int ElementType) key,
+        (IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed) key,
         string name,
         IrTypeKind kind,
         IrTypeId? elementType)
@@ -804,7 +908,7 @@ public sealed class IrFactory
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
-        _types.Add(new IrTypeInfo(id, nameId, kind, elementType));
+        _types.Add(new IrTypeInfo(id, nameId, kind, elementType, key.Width, key.Signed));
         return id;
     }
 

@@ -287,14 +287,24 @@ public sealed class IrCSharpDifferentialOracle
         builder.Append(term.Id.Value.ToString(CultureInfo.InvariantCulture));
         builder.Append(" = new System.Lazy<");
         builder.Append(type);
-        builder.Append(">(() => checked(");
+        var info = _factory.GetTypeInfo(term.Type);
+        var typedInteger = info.Kind == IrTypeKind.Integer && info.Width != 0;
+        builder.Append(typedInteger ? ">(() => unchecked((" + type + ")(" : ">(() => checked(");
         switch (term)
         {
             case IrBooleanTerm boolean:
                 builder.Append(boolean.Value ? "true" : "false");
                 break;
             case IrIntegerTerm integer:
-                AppendInteger(builder, integer.Value);
+                if (typedInteger)
+                {
+                    builder.Append(integer.Bits.ToString(CultureInfo.InvariantCulture));
+                    builder.Append("UL");
+                }
+                else
+                {
+                    AppendInteger(builder, integer.Value);
+                }
                 break;
             case IrStringTerm text:
                 builder.Append(SymbolDisplay.FormatLiteral(
@@ -312,7 +322,14 @@ public sealed class IrCSharpDifferentialOracle
                 break;
             case IrUnaryTerm unary:
                 builder.Append('(');
-                builder.Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
+                if (unary.Operator == IrUnaryOperator.Negate && info.Width == 64 && !info.Signed)
+                {
+                    builder.Append("0UL - ");
+                }
+                else
+                {
+                    builder.Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
+                }
                 AppendLazyValue(builder, unary.Operand);
                 builder.Append(')');
                 break;
@@ -360,7 +377,7 @@ public sealed class IrCSharpDifferentialOracle
                 reason = "The term kind is outside the executable oracle subset.";
                 return false;
         }
-        builder.AppendLine("));");
+        builder.AppendLine(typedInteger ? ")));" : "));");
         reason = "";
         return true;
     }
@@ -395,7 +412,7 @@ public sealed class IrCSharpDifferentialOracle
         name = info.Kind switch
         {
             IrTypeKind.Boolean => "bool",
-            IrTypeKind.Integer => "long",
+            IrTypeKind.Integer => info.Width == 0 ? "long" : _factory.GetString(info.Name),
             IrTypeKind.String => "string",
             IrTypeKind.Reference when type == _factory.ObjectType =>
                 "object",
@@ -453,7 +470,7 @@ public sealed class IrCSharpDifferentialOracle
         var runtimeValue = value.Kind switch
         {
             IrValueKind.Boolean => value.Boolean,
-            IrValueKind.Integer => value.Integer,
+            IrValueKind.Integer => IntegerRuntimeValue(value),
             IrValueKind.String => value.String,
             IrValueKind.Null => null,
             IrValueKind.Reference => value.Reference,
@@ -463,6 +480,41 @@ public sealed class IrCSharpDifferentialOracle
         };
         converted[value] = runtimeValue;
         return runtimeValue;
+    }
+
+    private static object IntegerRuntimeValue(IrValue value)
+    {
+        var bits = value.IntegerBits;
+        return (value.IntegerWidth, value.IntegerSigned) switch
+        {
+            (0, _) => value.Integer,
+            (8, true) => (object)unchecked((sbyte)bits),
+            (8, false) => (object)(byte)bits,
+            (16, true) => (object)unchecked((short)bits),
+            (16, false) => (object)(ushort)bits,
+            (32, true) => (object)unchecked((int)bits),
+            (32, false) => (object)(uint)bits,
+            (64, true) => (object)unchecked((long)bits),
+            (64, false) => bits,
+            _ => throw new InvalidOperationException("Unsupported integer width.")
+        };
+    }
+
+    private static Type IntegerRuntimeType(IrTypeInfo info)
+    {
+        return (info.Width, info.Signed) switch
+        {
+            (0, _) => typeof(long),
+            (8, true) => typeof(sbyte),
+            (8, false) => typeof(byte),
+            (16, true) => typeof(short),
+            (16, false) => typeof(ushort),
+            (32, true) => typeof(int),
+            (32, false) => typeof(uint),
+            (64, true) => typeof(long),
+            (64, false) => typeof(ulong),
+            _ => throw new InvalidOperationException("Unsupported integer width.")
+        };
     }
 
     private Array ToRuntimeArray(
@@ -503,7 +555,7 @@ public sealed class IrCSharpDifferentialOracle
         Type? supported = info.Kind switch
         {
             IrTypeKind.Boolean => typeof(bool),
-            IrTypeKind.Integer => typeof(long),
+            IrTypeKind.Integer => IntegerRuntimeType(info),
             IrTypeKind.String => typeof(string),
             IrTypeKind.Reference when type == _factory.ObjectType =>
                 typeof(object),
@@ -548,8 +600,7 @@ public sealed class IrCSharpDifferentialOracle
         {
             IrValueKind.Boolean =>
                 actual is bool value && value == interpreted.Boolean,
-            IrValueKind.Integer =>
-                actual is long value && value == interpreted.Integer,
+            IrValueKind.Integer => Equals(actual, IntegerRuntimeValue(interpreted)),
             IrValueKind.String => actual is string value &&
                                   string.Equals(
                                       value,

@@ -1,0 +1,77 @@
+mode: Total
+classification: Exact/None
+entry: b0
+result: v0:int[width=32,signed=True]
+variable: v1:<no-assembly>::System.Int32[][width=0,signed=False] source=values
+block: b0 entry
+  i1 op0 Goto b1 source=none
+block: b1 cfg:0
+  i2 op0 Goto b2 source=none
+block: b2 cfg:1
+  i3 op1 Assign v2:int[width=32,signed=True] = 2 source=total-constant-array-initializer.cs:136+19
+  i4 op2 Branch (v2 < 0) ? b5 : b6 source=total-constant-array-initializer.cs:136+19
+block: b3 cfg:2
+  i27 op0 Return void source=none
+block: b4 exceptional:exit
+  i0 op0 ExceptionalExit source=none
+block: b5 throw
+  i5 op2 Throw Overflow -> b4 source=total-constant-array-initializer.cs:136+19
+block: b6 normal
+  i6 op3 Assign v3:int[width=32,signed=True] = v2 source=total-constant-array-initializer.cs:136+19
+  i7 op4 Allocate t4:<no-assembly>::System.Int32[] -> v4:<no-assembly>::System.Int32[][width=0,signed=False] length=2 elements=[1, -2] source=total-constant-array-initializer.cs:136+19
+  i8 op5 Assign v1:<no-assembly>::System.Int32[][width=0,signed=False] = v4 source=total-constant-array-initializer.cs:127+28
+  i9 op5 Write Local source=total-constant-array-initializer.cs:127+28
+  i10 op7 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-constant-array-initializer.cs:172+6
+  i11 op8 Assign v6:int[width=32,signed=True] = 0 source=total-constant-array-initializer.cs:179+1
+  i12 op9 Branch (v5 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b7 : b8 source=total-constant-array-initializer.cs:172+9
+block: b7 throw
+  i13 op9 Throw NullReference -> b4 source=total-constant-array-initializer.cs:172+9
+block: b8 normal
+  i14 op10 Branch ((v6 < 0) || (v6 >= len(v5))) ? b9 : b10 source=total-constant-array-initializer.cs:172+9
+block: b9 throw
+  i15 op10 Throw IndexOutOfRange -> b4 source=total-constant-array-initializer.cs:172+9
+block: b10 normal
+  i16 op11 Assign v7:int[width=32,signed=True] = v5[v6] source=total-constant-array-initializer.cs:172+9
+  i17 op12 Assign v8:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-constant-array-initializer.cs:184+6
+  i18 op13 Assign v9:int[width=32,signed=True] = 1 source=total-constant-array-initializer.cs:191+1
+  i19 op14 Branch (v8 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b11 : b12 source=total-constant-array-initializer.cs:184+9
+block: b11 throw
+  i20 op14 Throw NullReference -> b4 source=total-constant-array-initializer.cs:184+9
+block: b12 normal
+  i21 op15 Branch ((v9 < 0) || (v9 >= len(v8))) ? b13 : b14 source=total-constant-array-initializer.cs:184+9
+block: b13 throw
+  i22 op15 Throw IndexOutOfRange -> b4 source=total-constant-array-initializer.cs:184+9
+block: b14 normal
+  i23 op16 Assign v10:int[width=32,signed=True] = v8[v9] source=total-constant-array-initializer.cs:184+9
+  i24 op17 Assign v11:int[width=32,signed=True] = (v7 + v10) source=total-constant-array-initializer.cs:172+21
+  i25 op6 Assign v0:int[width=32,signed=True] = v11 source=total-constant-array-initializer.cs:172+21
+  i26 op6 Return v0 source=total-constant-array-initializer.cs:172+21
+term: ir0 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir1 Variable type=t1:int width=32 signed=True value=v2
+term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir3 Binary type=t0:bool width=0 signed=False value=(v2 < 0)
+term: ir5 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir7 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v4
+term: ir8 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v1
+term: ir9 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v5
+term: ir10 Variable type=t1:int width=32 signed=True value=v6
+term: ir11 Length type=t1:int width=32 signed=True value=len(v5)
+term: ir12 Binary type=t0:bool width=0 signed=False value=(v6 >= len(v5))
+term: ir13 Binary type=t0:bool width=0 signed=False value=(v6 < 0)
+term: ir14 Binary type=t0:bool width=0 signed=False value=((v6 < 0) || (v6 >= len(v5)))
+term: ir15 SequenceAccess type=t1:int width=32 signed=True value=v5[v6]
+term: ir16 Null type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=(("<no-assembly>::System.Int32[]"#t4)null)
+term: ir17 Binary type=t0:bool width=0 signed=False value=(v5 == (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir18 Variable type=t1:int width=32 signed=True value=v7
+term: ir19 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v8
+term: ir20 Variable type=t1:int width=32 signed=True value=v9
+term: ir21 Length type=t1:int width=32 signed=True value=len(v8)
+term: ir22 Binary type=t0:bool width=0 signed=False value=(v9 >= len(v8))
+term: ir23 Binary type=t0:bool width=0 signed=False value=(v9 < 0)
+term: ir24 Binary type=t0:bool width=0 signed=False value=((v9 < 0) || (v9 >= len(v8)))
+term: ir25 SequenceAccess type=t1:int width=32 signed=True value=v8[v9]
+term: ir26 Binary type=t0:bool width=0 signed=False value=(v8 == (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir27 Variable type=t1:int width=32 signed=True value=v10
+term: ir28 Binary type=t1:int width=32 signed=True value=(v7 + v10)
+term: ir29 Variable type=t1:int width=32 signed=True value=v11
+term: ir30 Variable type=t1:int width=32 signed=True value=v0

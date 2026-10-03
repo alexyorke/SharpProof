@@ -176,6 +176,22 @@ public readonly struct FrontendProgramAbstention
 
 public sealed partial class FrontendProgramLoweringResult
 {
+    internal bool ConstructionLimitExceeded { get; set; }
+    internal bool IsShadowCallSkeleton { get; set; }
+    internal ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition> CallPreconditions { get; set; } =
+        ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition>.Empty;
+    internal ImmutableDictionary<IrCallInstruction, IMethodSymbol> PreservedSourceCalls { get; set; } =
+        ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Empty;
+    internal object? TotalOrigin { get; }
+    internal FrontendProgramLoweringResult(
+        IrProgram program, FrontendSubsetClassification classification,
+        ImmutableArray<FrontendVariableBinding> variables, ImmutableArray<IrVarId> captures,
+        ImmutableArray<FrontendProgramAbstention> abstentions, object totalOrigin)
+        : this(program, classification, variables, captures, abstentions)
+    {
+        TotalOrigin = ArgumentNullGuard.NotNull(totalOrigin, nameof(totalOrigin));
+    }
+
     internal FrontendProgramLoweringResult(
         IrProgram program,
         FrontendSubsetClassification classification,
@@ -191,5 +207,5 @@ public sealed partial class FrontendProgramLoweringResult
             default)
     {
     }
-    public bool IsExact => Classification.IsExact;
+    public bool IsExact => Classification.IsExact && !IsShadowCallSkeleton;
 }

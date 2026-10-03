@@ -36,7 +36,9 @@ internal static class CompilerCompilationCapture
                 {
                     snapshot.Path = $"<compiler-generated:{index}>";
                 }
-                else if (!seenPaths.Add(tree.FilePath))
+                // Different raw spellings can normalize to the same path.
+                // A real filename can also occupy a generated collision suffix.
+                while (!seenPaths.Add(snapshot.Path))
                 {
                     snapshot.Path = $"{snapshot.Path}#{index}";
                 }

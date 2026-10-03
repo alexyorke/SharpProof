@@ -1,0 +1,163 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v4:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:200+1
+  i6 op3 Assign v5:int[width=32,signed=True] = 0 source=total-string-concat-conditional-fault.cs:205+1
+  i7 op4 Assign v6:bool[width=0,signed=False] = (v4 == v5) source=total-string-concat-conditional-fault.cs:200+6
+  i8 op1 Branch v6 ? b4 : b3 source=total-string-concat-conditional-fault.cs:200+6
+block: b3 cfg:3
+  i9 op5 Assign v7:string[width=0,signed=False] = "b" source=total-string-concat-conditional-fault.cs:215+3
+  i10 op6 Assign v8:string[width=0,signed=False] = v7 source=total-string-concat-conditional-fault.cs:215+3
+  i11 op0 Goto b5 source=none
+block: b4 cfg:2
+  i12 op7 Assign v9:string[width=0,signed=False] = "a" source=total-string-concat-conditional-fault.cs:209+3
+  i13 op8 Assign v8:string[width=0,signed=False] = v9 source=total-string-concat-conditional-fault.cs:209+3
+  i14 op0 Goto b5 source=none
+block: b5 cfg:4
+  i15 op9 Assign v10:string[width=0,signed=False] = v8 source=total-string-concat-conditional-fault.cs:200+18
+  i16 op10 Assign v11:string[width=0,signed=False] = "c" source=total-string-concat-conditional-fault.cs:222+3
+  i17 op11 Branch false ? b12 : b13 source=total-string-concat-conditional-fault.cs:199+26
+block: b6 cfg:5
+  i23 op14 Assign v14:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:229+1
+  i24 op15 Assign v15:int[width=32,signed=True] = 0 source=total-string-concat-conditional-fault.cs:234+1
+  i25 op16 Assign v16:bool[width=0,signed=False] = (v14 == v15) source=total-string-concat-conditional-fault.cs:229+6
+  i26 op13 Branch v16 ? b8 : b7 source=total-string-concat-conditional-fault.cs:229+6
+block: b7 cfg:7
+  i27 op17 Assign v17:string[width=0,signed=False] = "e" source=total-string-concat-conditional-fault.cs:258+3
+  i28 op18 Assign v18:string[width=0,signed=False] = v17 source=total-string-concat-conditional-fault.cs:258+3
+  i29 op0 Goto b9 source=none
+block: b8 cfg:6
+  i30 op19 Assign v26:string[width=0,signed=False] = (("string"#t2)null) source=total-string-concat-conditional-fault.cs:238+17
+  i31 op20 Assign v27:string[width=0,signed=False] = "d" source=total-string-concat-conditional-fault.cs:243+3
+  i32 op21 Assign v28:int[width=32,signed=True] = 10 source=total-string-concat-conditional-fault.cs:248+2
+  i33 op22 Assign v29:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:253+1
+  i34 op23 Branch (v29 == 0) ? b14 : b15 source=total-string-concat-conditional-fault.cs:248+6
+block: b9 cfg:8
+  i56 op31 Assign v32:string[width=0,signed=False] = v13 source=total-string-concat-conditional-fault.cs:199+26
+  i57 op32 Assign v33:string[width=0,signed=False] = v18 source=total-string-concat-conditional-fault.cs:229+32
+  i58 op33 Branch (((len(v10) > 0) && true) || (((len(v10) > 0) || true) && (len(v33) > 0))) ? b24 : b25 source=total-string-concat-conditional-fault.cs:199+63
+block: b10 cfg:9
+  i67 op0 Return void source=none
+block: b11 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b12 concat:allocate
+  i18 op11 Allocate t2:string source=total-string-concat-conditional-fault.cs:199+26
+  i19 op11 Goto b13 source=total-string-concat-conditional-fault.cs:199+26
+block: b13 concat:join
+  i20 op11 Assign v12:string[width=0,signed=False] = (v10 ++ "c") source=total-string-concat-conditional-fault.cs:199+26
+  i21 op12 Assign v13:string[width=0,signed=False] = v12 source=total-string-concat-conditional-fault.cs:199+26
+  i22 op0 Goto b6 source=none
+block: b14 throw
+  i35 op23 Throw DivideByZero -> b11 source=total-string-concat-conditional-fault.cs:248+6
+block: b15 normal
+  i36 op24 Branch ((v28 == -2147483648) && (v29 == -1)) ? b16 : b17 source=total-string-concat-conditional-fault.cs:248+6
+block: b16 throw
+  i37 op24 Throw Overflow -> b11 source=total-string-concat-conditional-fault.cs:248+6
+block: b17 normal
+  i38 op25 Assign v30:int[width=32,signed=True] = (v28 / v29) source=total-string-concat-conditional-fault.cs:248+6
+  i39 op19 Assign v19:string[width=0,signed=False] = v27 source=total-string-concat-conditional-fault.cs:238+17
+  i40 op19 Assign v22:int[width=32,signed=True] = v30 source=total-string-concat-conditional-fault.cs:238+17
+  i41 op19 Goto b19 source=total-string-concat-conditional-fault.cs:238+17
+block: b18 call:continued
+  i54 op29 Assign v18:string[width=0,signed=False] = v26 source=total-string-concat-conditional-fault.cs:238+17
+  i55 op0 Goto b9 source=none
+block: b19 call:body
+  i42 op26 Assign v20:string[width=0,signed=False] = v19 source=none
+  i43 op26 Assign v21:string[width=0,signed=False] = v19 source=none
+  i44 op26 Assign v23:int[width=32,signed=True] = v22 source=none
+  i45 op26 Assign v24:int[width=32,signed=True] = v22 source=none
+  i46 op26 Goto b20 source=none
+block: b20 call:body
+  i47 op26 Goto b21 source=none
+block: b21 call:body
+  i48 op28 Assign v31:string[width=0,signed=False] = v20 source=total-string-concat-conditional-fault.cs:134+4
+  i49 op27 Assign v25:string[width=0,signed=False] = v31 source=total-string-concat-conditional-fault.cs:134+4
+  i50 op27 Assign v26:string[width=0,signed=False] = v25 source=total-string-concat-conditional-fault.cs:134+4
+  i51 op27 Goto b18 source=total-string-concat-conditional-fault.cs:134+4
+block: b22 call:body
+  i52 op26 Goto b18 source=none
+block: b23 call:body
+  i53 op26 ExceptionalExit source=none
+block: b24 concat:allocate
+  i59 op33 Allocate t2:string source=total-string-concat-conditional-fault.cs:199+63
+  i60 op33 Goto b25 source=total-string-concat-conditional-fault.cs:199+63
+block: b25 concat:join
+  i61 op33 Assign v34:string[width=0,signed=False] = ((v10 ++ "c") ++ v33) source=total-string-concat-conditional-fault.cs:199+63
+  i62 op34 Branch (v34 == (("string"#t2)null)) ? b26 : b27 source=total-string-concat-conditional-fault.cs:198+72
+block: b26 throw
+  i63 op34 Throw NullReference -> b11 source=total-string-concat-conditional-fault.cs:198+72
+block: b27 normal
+  i64 op35 Assign v35:int[width=32,signed=True] = len(v34) source=total-string-concat-conditional-fault.cs:198+72
+  i65 op30 Assign v3:int[width=32,signed=True] = v35 source=total-string-concat-conditional-fault.cs:198+72
+  i66 op30 Return v3 source=total-string-concat-conditional-fault.cs:198+72
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v1
+term: ir2 Variable type=t1:int width=32 signed=True value=v4
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir4 Variable type=t1:int width=32 signed=True value=v5
+term: ir5 Binary type=t0:bool width=0 signed=False value=(v4 == v5)
+term: ir6 Variable type=t0:bool width=0 signed=False value=v6
+term: ir7 String type=t2:string width=0 signed=False value="b"
+term: ir8 Variable type=t2:string width=0 signed=False value=v7
+term: ir9 String type=t2:string width=0 signed=False value="a"
+term: ir10 Variable type=t2:string width=0 signed=False value=v9
+term: ir11 Variable type=t2:string width=0 signed=False value=v8
+term: ir12 Variable type=t2:string width=0 signed=False value=v10
+term: ir13 String type=t2:string width=0 signed=False value="c"
+term: ir15 Boolean type=t0:bool width=0 signed=False value=false
+term: ir16 Binary type=t2:string width=0 signed=False value=(v10 ++ "c")
+term: ir17 Variable type=t2:string width=0 signed=False value=v12
+term: ir18 Variable type=t1:int width=32 signed=True value=v14
+term: ir19 Variable type=t1:int width=32 signed=True value=v15
+term: ir20 Binary type=t0:bool width=0 signed=False value=(v14 == v15)
+term: ir21 Variable type=t0:bool width=0 signed=False value=v16
+term: ir22 String type=t2:string width=0 signed=False value="e"
+term: ir23 Variable type=t2:string width=0 signed=False value=v17
+term: ir24 Variable type=t2:string width=0 signed=False value=v26
+term: ir25 Null type=t2:string width=0 signed=False value=(("string"#t2)null)
+term: ir26 String type=t2:string width=0 signed=False value="d"
+term: ir27 Variable type=t2:string width=0 signed=False value=v27
+term: ir28 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir29 Variable type=t1:int width=32 signed=True value=v28
+term: ir30 Variable type=t1:int width=32 signed=True value=v29
+term: ir31 Binary type=t0:bool width=0 signed=False value=(v29 == 0)
+term: ir32 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir33 Binary type=t0:bool width=0 signed=False value=(v28 == -2147483648)
+term: ir34 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir35 Binary type=t0:bool width=0 signed=False value=(v29 == -1)
+term: ir36 Binary type=t0:bool width=0 signed=False value=((v28 == -2147483648) && (v29 == -1))
+term: ir37 Binary type=t1:int width=32 signed=True value=(v28 / v29)
+term: ir38 Variable type=t1:int width=32 signed=True value=v30
+term: ir39 Variable type=t2:string width=0 signed=False value=v19
+term: ir40 Variable type=t1:int width=32 signed=True value=v22
+term: ir41 Variable type=t2:string width=0 signed=False value=v20
+term: ir42 Variable type=t2:string width=0 signed=False value=v31
+term: ir43 Variable type=t2:string width=0 signed=False value=v25
+term: ir44 Variable type=t2:string width=0 signed=False value=v13
+term: ir46 Variable type=t2:string width=0 signed=False value=v18
+term: ir47 Variable type=t2:string width=0 signed=False value=v33
+term: ir48 Length type=t1:int width=32 signed=True value=len(v10)
+term: ir49 Binary type=t0:bool width=0 signed=False value=(len(v10) > 0)
+term: ir51 Boolean type=t0:bool width=0 signed=False value=true
+term: ir52 Binary type=t0:bool width=0 signed=False value=((len(v10) > 0) && true)
+term: ir53 Binary type=t0:bool width=0 signed=False value=((len(v10) > 0) || true)
+term: ir54 Length type=t1:int width=32 signed=True value=len(v33)
+term: ir55 Binary type=t0:bool width=0 signed=False value=(len(v33) > 0)
+term: ir56 Binary type=t0:bool width=0 signed=False value=(((len(v10) > 0) || true) && (len(v33) > 0))
+term: ir57 Binary type=t0:bool width=0 signed=False value=(((len(v10) > 0) && true) || (((len(v10) > 0) || true) && (len(v33) > 0)))
+term: ir59 Binary type=t2:string width=0 signed=False value=((v10 ++ "c") ++ v33)
+term: ir60 Variable type=t2:string width=0 signed=False value=v34
+term: ir61 Length type=t1:int width=32 signed=True value=len(v34)
+term: ir62 Binary type=t0:bool width=0 signed=False value=(v34 == (("string"#t2)null))
+term: ir63 Variable type=t1:int width=32 signed=True value=v35
+term: ir64 Variable type=t1:int width=32 signed=True value=v3

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -28,7 +29,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void RoundTripPreservesEveryTermInstructionAndLocationShape()
     {
-        var fixture = CreateFixture();
+        var fixture = CreateFixture(includeAllocation: true);
 
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
@@ -39,11 +40,17 @@ public sealed class PortableIrGraphCodecTests
             decoded.Factory,
             decoded.Program,
             decoded.Roots);
+        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
+        var empty = totalFactory.EmptyArray(totalFactory.GetOrCreateSequenceType(totalFactory.IntegerType));
+        var encodedEmpty = PortableIrGraphCodec.Encode(totalFactory, null, [empty]);
+        var decodedEmpty = PortableIrGraphCodec.Decode(encodedEmpty.Graph);
+        Assert.That(decodedEmpty.Roots.Single(), Is.TypeOf<IrEmptyArrayTerm>());
+        AssertGraphJsonEqual(encodedEmpty.Graph, PortableIrGraphCodec.Encode(decodedEmpty.Factory, null, decodedEmpty.Roots).Graph);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                encoded.Graph.Terms.Select(static row => row.Kind).Distinct(),
+                encoded.Graph.Terms.Concat(encodedEmpty.Graph.Terms).Select(static row => row.Kind).Distinct(),
                 Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
             Assert.That(
                 encoded.Graph.Blocks
@@ -350,7 +357,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void CanonicalGoldenWireRoundTripsWithoutChangingBytes()
     {
-        var fixture = CreateFixture();
+        var fixture = CreateFixture(includeExceptionEdges: false);
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
             fixture.Program,
@@ -360,10 +367,34 @@ public sealed class PortableIrGraphCodecTests
             WorkerProtocolJson.Options);
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
 
+        Assert.That(encoded.Graph.Semantics, Is.EqualTo(IrExecutionSemantics.Legacy));
+        Assert.That(encoded.Graph.Operations.Select(operation => operation.SourceSpan), Has.All.Null);
+        Assert.That(encoded.Graph.Blocks.SelectMany(block => block.Instructions).Select(instruction => instruction.Origin),
+            Has.All.EqualTo(IrHavocOrigin.Approximation));
+
         Assert.That(
             hash,
             Is.EqualTo(
-                "AAA27C6AF3E73A71C545B94A78F722AE239012EB150972129D2FF6BABBF54E5B"));
+                "3DAAF8FCCFCD144CF735A4ECEEA0B078B414CC404E203A04BB8D24A6FE49AE29"));
+
+        var previous = JsonNode.Parse(bytes)!;
+        previous.AsObject().Remove("semantics");
+        foreach (var operation in previous["operations"]!.AsArray())
+        {
+            operation!.AsObject().Remove("sourceSpan");
+        }
+        foreach (var block in previous["blocks"]!.AsArray())
+        {
+            foreach (var instruction in block!["instructions"]!.AsArray())
+            {
+                instruction!.AsObject().Remove("origin");
+            }
+        }
+        var previousBytes = JsonSerializer.SerializeToUtf8Bytes(previous, WorkerProtocolJson.Options);
+        Assert.That(Convert.ToHexString(SHA256.HashData(previousBytes)),
+            Is.EqualTo("369E597B3404366C0029C4B06E0C21DFC18C951557107EC703AE574AC483F51F"));
+        TestContext.Progress.WriteLine($"Canonical wire: {bytes.Length} bytes; previous {previousBytes.Length}; " +
+            $"{encoded.Graph.Types.Length} types; {encoded.Graph.Terms.Length} terms.");
 
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
@@ -843,7 +874,7 @@ public sealed class PortableIrGraphCodecTests
         {
             Types = [
                 new() { Kind = IrTypeKind.Boolean, Name = "bool" },
-                new() { Kind = IrTypeKind.Integer, Name = "int" },
+                new() { Kind = IrTypeKind.Integer, Name = "int", Signed = true },
                 new() { Kind = IrTypeKind.String, Name = "string" },
                 new() { Kind = IrTypeKind.Reference, Name = "object" }
             ]
@@ -899,7 +930,7 @@ public sealed class PortableIrGraphCodecTests
         return graph;
     }
 
-    private static CodecFixture CreateFixture()
+    private static CodecFixture CreateFixture(bool includeExceptionEdges = true, bool includeAllocation = false)
     {
         var factory = new IrFactory();
         var boxType = factory.GetOrCreateReferenceType(
@@ -962,6 +993,7 @@ public sealed class PortableIrGraphCodecTests
         var whenTrue = builder.CreateBlock("true");
         var whenFalse = builder.CreateBlock("false");
         var exit = builder.CreateBlock("exit");
+        var exceptionalExit = includeExceptionEdges ? builder.CreateBlock("exceptional-exit") : (IrBlockId?)null;
         var memberLocation = builder.MemberLocation(valueMember, boxTerm);
         var sequenceLocation = builder.SequenceLocation(sequenceTerm, numberTerm);
         builder.Assign(entry, factory.CreateOperation("same"), result, numberTerm);
@@ -969,6 +1001,15 @@ public sealed class PortableIrGraphCodecTests
         builder.Store(entry, factory.CreateOperation("store-member"), memberLocation, numberTerm);
         builder.Load(entry, factory.CreateOperation("load-sequence"), result, sequenceLocation);
         builder.Store(entry, factory.CreateOperation("store-sequence"), sequenceLocation, numberTerm);
+        if (includeAllocation)
+        {
+            builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType);
+            builder.Allocate(entry, factory.CreateOperation("allocate-string"), factory.StringType);
+            builder.Allocate(entry, factory.CreateOperation("allocate-value"), boxType, box);
+            builder.Lock(entry, factory.CreateOperation("synchronize"), boxTerm);
+            foreach (var region in Enum.GetValues<IrWriteRegion>())
+            { builder.Write(entry, factory.CreateOperation("write:" + region), region); }
+        }
         builder.Call(
             entry,
             factory.CreateOperation("call"),
@@ -991,7 +1032,15 @@ public sealed class PortableIrGraphCodecTests
             whenFalse);
         builder.Goto(whenTrue, factory.CreateOperation("goto"), exit);
         builder.Return(whenFalse, factory.CreateOperation("return-false"), numberTerm);
-        builder.Return(exit, factory.CreateOperation("return"), numberTerm);
+        if (exceptionalExit is { } exceptional)
+        {
+            builder.Throw(exit, factory.CreateOperation("throw"), IrExceptionKind.DivideByZero, exceptional);
+            builder.ExceptionalExit(exceptional, factory.CreateOperation("exceptional-exit"));
+        }
+        else
+        {
+            builder.Return(exit, factory.CreateOperation("return"), numberTerm);
+        }
         var program = builder.Build();
         return new CodecFixture(
             factory,

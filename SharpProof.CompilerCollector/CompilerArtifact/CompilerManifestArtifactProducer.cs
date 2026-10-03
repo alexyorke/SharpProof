@@ -53,7 +53,8 @@ internal static class CompilerManifestArtifactProducer
                     compilation,
                     new IrFactory(),
                     specificationPackAuthority,
-                    snapshot.SyntaxTrees);
+                    snapshot.SyntaxTrees,
+                    snapshot.References);
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
                 return artifact.AttachEffectEvidence(item);
@@ -71,7 +72,10 @@ internal static class CompilerManifestArtifactProducer
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
             CompilerDiagnostics = diagnosticArtifacts,
-            Callables = callables
+            Callables = callables,
+            ReachableSource = diagnosticArtifacts.Length == 0
+                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees, specificationPackAuthority, cancellationToken)
+                : null
         };
         return artifact;
     }

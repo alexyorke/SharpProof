@@ -18,8 +18,7 @@ public sealed class ProjectDagTests
             ["SharpProof.CompilerArtifact"] = ["SharpProof.Ir", "SharpProof.Worker.Protocol"],
             ["SharpProof.CompilerCollector"] = [
                 "SharpProof.Analyzer.Core",
-                "SharpProof.CompilerArtifact",
-                "SharpProof.Summaries"
+                "SharpProof.CompilerArtifact"
             ],
             ["SharpProof.ContractForGenerator"] = [],
             ["SharpProof.Contracts"] = ["SharpProof.Frontend"],
@@ -27,10 +26,13 @@ public sealed class ProjectDagTests
             ["SharpProof.Effects"] = ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"],
             ["SharpProof.Frontend"] = ["SharpProof.Attributes", "SharpProof.Ir"],
             ["SharpProof.Fuzz"] = [
+                "SharpProof.Attributes",
+                "SharpProof.CompilerCollector",
                 "SharpProof.Frontend",
                 "SharpProof.Host",
                 "SharpProof.Smt",
-                "SharpProof.Testing"
+                "SharpProof.Testing",
+                "SharpProof.Worker"
             ],
             ["SharpProof.Gates"] = [
                 "SharpProof.Analyzer",
@@ -43,7 +45,6 @@ public sealed class ProjectDagTests
             ["SharpProof.Ir"] = [],
             ["SharpProof.Smt"] = ["SharpProof.Verify"],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
-            ["SharpProof.Summaries"] = ["SharpProof.Ir"],
             ["SharpProof.Verify"] = ["SharpProof.Specs"],
             ["SharpProof.Worker"] = [
                 "SharpProof.CompilerArtifact",

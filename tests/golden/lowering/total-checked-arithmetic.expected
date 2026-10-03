@@ -1,0 +1,137 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+contract: Requires safety=true value=(v0 == 1073741824)
+contract: Ensures safety=((!((((v2 >= 0) && true) && ((v2 + 1) < 0)) || (((v2 < 0) && false) && ((v2 + 1) >= 0)))) && ((!(v3 == (v2 + 1))) || true)) value=((v3 == (v2 + 1)) && (v1 == 7))
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op2 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op2 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op2 Goto b2 source=none
+block: b1 finally:dispatch
+  i43 op2 Branch (v5 == 0) ? b23 : b24 source=none
+block: b2 cfg:0
+  i4 op2 Goto b3 source=none
+block: b3 cfg:1
+  i5 op2 Goto b4 source=none
+block: b4 cfg:2
+  i6 op2 Goto b5 source=none
+block: b5 cfg:3
+  i7 op2 Goto b7 source=none
+block: b6 cfg:4
+  i8 op2 Goto b7 source=none
+block: b7 cfg:5
+  i9 op2 Goto b8 source=none
+block: b8 cfg:6
+  i10 op5 Assign v6:int[width=32,signed=True] = v1 source=total-checked-arithmetic.cs:340+8
+  i11 op6 Assign v7:int[width=32,signed=True] = v1 source=total-checked-arithmetic.cs:345+3
+  i12 op7 Branch ((((v7 >= 0) && true) && ((v7 + 1) < 0)) || (((v7 < 0) && false) && ((v7 + 1) >= 0))) ? b13 : b14 source=total-checked-arithmetic.cs:345+3
+block: b9 cfg:7
+  i31 op14 Assign v10:int[width=32,signed=True] = v1 source=total-checked-arithmetic.cs:407+1
+  i32 op13 Assign v3:int[width=32,signed=True] = v10 source=total-checked-arithmetic.cs:407+1
+  i36 op13 Goto b22 source=total-checked-arithmetic.cs:407+1
+block: b10 cfg:8
+  i37 op15 Assign v11:int[width=32,signed=True] = 7 source=total-checked-arithmetic.cs:444+1
+  i38 op16 Assign v1:int[width=32,signed=True] = v11 source=total-checked-arithmetic.cs:440+5
+  i39 op16 Write Local source=total-checked-arithmetic.cs:440+5
+  i40 op2 Goto b1 source=none
+block: b11 cfg:9
+  i41 op2 Return void source=none
+block: b12 exceptional:exit
+  i2 op2 ExceptionalExit source=none
+block: b13 throw
+  i15 op7 Throw Overflow -> b15 source=total-checked-arithmetic.cs:345+3
+block: b14 normal
+  i16 op8 Assign v8:int[width=32,signed=True] = (v7 + 1) source=total-checked-arithmetic.cs:345+3
+  i17 op9 Assign v1:int[width=32,signed=True] = v8 source=total-checked-arithmetic.cs:345+3
+  i18 op9 Write Local source=total-checked-arithmetic.cs:345+3
+  i19 op10 Branch ((((v6 >= 0) && (v7 >= 0)) && ((v6 + v7) < 0)) || (((v6 < 0) && (v7 < 0)) && ((v6 + v7) >= 0))) ? b16 : b17 source=total-checked-arithmetic.cs:340+8
+block: b15 catch:entry
+  i13 op7 Assign v4:int[width=32,signed=True] = 0 source=total-checked-arithmetic.cs:345+3
+  i14 op7 Goto b9 source=total-checked-arithmetic.cs:345+3
+block: b16 throw
+  i22 op10 Throw Overflow -> b18 source=total-checked-arithmetic.cs:340+8
+block: b17 normal
+  i23 op11 Assign v9:int[width=32,signed=True] = (v6 + v7) source=total-checked-arithmetic.cs:340+8
+  i24 op12 Assign v1:int[width=32,signed=True] = v9 source=total-checked-arithmetic.cs:340+8
+  i25 op12 Write Local source=total-checked-arithmetic.cs:340+8
+  i26 op4 Assign v3:int[width=32,signed=True] = v9 source=total-checked-arithmetic.cs:340+8
+  i30 op4 Goto b20 source=total-checked-arithmetic.cs:340+8
+block: b18 catch:entry
+  i20 op10 Assign v4:int[width=32,signed=True] = 1 source=total-checked-arithmetic.cs:340+8
+  i21 op10 Goto b9 source=total-checked-arithmetic.cs:340+8
+block: b19 return:captured
+  i27 op4 Return v3 source=total-checked-arithmetic.cs:340+8
+block: b20 finally:entry
+  i28 op4 Assign v5:int[width=32,signed=True] = 0 source=total-checked-arithmetic.cs:340+8
+  i29 op4 Goto b10 source=total-checked-arithmetic.cs:340+8
+block: b21 return:captured
+  i33 op13 Return v3 source=total-checked-arithmetic.cs:407+1
+block: b22 finally:entry
+  i34 op13 Assign v5:int[width=32,signed=True] = 1 source=total-checked-arithmetic.cs:407+1
+  i35 op13 Goto b10 source=total-checked-arithmetic.cs:407+1
+block: b23 finally:continue
+  i42 op4 Goto b19 source=total-checked-arithmetic.cs:340+8
+block: b24 finally:dispatch
+  i45 op2 Goto b25 source=none
+block: b25 finally:continue
+  i44 op13 Goto b21 source=total-checked-arithmetic.cs:407+1
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Boolean type=t0:bool width=0 signed=False value=true
+term: ir2 Integer type=t1:int width=32 signed=True bits=1073741824 value=1073741824
+term: ir3 Binary type=t0:bool width=0 signed=False value=(v0 == 1073741824)
+term: ir4 Variable type=t1:int width=32 signed=True value=v3
+term: ir5 Variable type=t1:int width=32 signed=True value=v2
+term: ir6 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir7 Binary type=t1:int width=32 signed=True value=(v2 + 1)
+term: ir8 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir9 Binary type=t0:bool width=0 signed=False value=(v2 >= 0)
+term: ir10 Binary type=t0:bool width=0 signed=False value=((v2 >= 0) && true)
+term: ir11 Binary type=t0:bool width=0 signed=False value=((v2 + 1) < 0)
+term: ir12 Binary type=t0:bool width=0 signed=False value=(((v2 >= 0) && true) && ((v2 + 1) < 0))
+term: ir13 Binary type=t0:bool width=0 signed=False value=(v2 < 0)
+term: ir14 Boolean type=t0:bool width=0 signed=False value=false
+term: ir15 Binary type=t0:bool width=0 signed=False value=((v2 < 0) && false)
+term: ir16 Binary type=t0:bool width=0 signed=False value=((v2 + 1) >= 0)
+term: ir17 Binary type=t0:bool width=0 signed=False value=(((v2 < 0) && false) && ((v2 + 1) >= 0))
+term: ir18 Binary type=t0:bool width=0 signed=False value=((((v2 >= 0) && true) && ((v2 + 1) < 0)) || (((v2 < 0) && false) && ((v2 + 1) >= 0)))
+term: ir19 Unary type=t0:bool width=0 signed=False value=(!((((v2 >= 0) && true) && ((v2 + 1) < 0)) || (((v2 < 0) && false) && ((v2 + 1) >= 0))))
+term: ir20 Binary type=t0:bool width=0 signed=False value=(v3 == (v2 + 1))
+term: ir21 Variable type=t1:int width=32 signed=True value=v1
+term: ir22 Integer type=t1:int width=32 signed=True bits=7 value=7
+term: ir23 Binary type=t0:bool width=0 signed=False value=(v1 == 7)
+term: ir24 Binary type=t0:bool width=0 signed=False value=((v3 == (v2 + 1)) && (v1 == 7))
+term: ir26 Unary type=t0:bool width=0 signed=False value=(!(v3 == (v2 + 1)))
+term: ir27 Binary type=t0:bool width=0 signed=False value=((!(v3 == (v2 + 1))) || true)
+term: ir28 Binary type=t0:bool width=0 signed=False value=((!((((v2 >= 0) && true) && ((v2 + 1) < 0)) || (((v2 < 0) && false) && ((v2 + 1) >= 0)))) && ((!(v3 == (v2 + 1))) || true))
+term: ir29 Variable type=t1:int width=32 signed=True value=v6
+term: ir30 Variable type=t1:int width=32 signed=True value=v7
+term: ir31 Binary type=t1:int width=32 signed=True value=(v7 + 1)
+term: ir32 Binary type=t0:bool width=0 signed=False value=(v7 >= 0)
+term: ir33 Binary type=t0:bool width=0 signed=False value=((v7 >= 0) && true)
+term: ir34 Binary type=t0:bool width=0 signed=False value=((v7 + 1) < 0)
+term: ir35 Binary type=t0:bool width=0 signed=False value=(((v7 >= 0) && true) && ((v7 + 1) < 0))
+term: ir36 Binary type=t0:bool width=0 signed=False value=(v7 < 0)
+term: ir37 Binary type=t0:bool width=0 signed=False value=((v7 < 0) && false)
+term: ir38 Binary type=t0:bool width=0 signed=False value=((v7 + 1) >= 0)
+term: ir39 Binary type=t0:bool width=0 signed=False value=(((v7 < 0) && false) && ((v7 + 1) >= 0))
+term: ir40 Binary type=t0:bool width=0 signed=False value=((((v7 >= 0) && true) && ((v7 + 1) < 0)) || (((v7 < 0) && false) && ((v7 + 1) >= 0)))
+term: ir41 Variable type=t1:int width=32 signed=True value=v8
+term: ir42 Binary type=t1:int width=32 signed=True value=(v6 + v7)
+term: ir43 Binary type=t0:bool width=0 signed=False value=(v6 >= 0)
+term: ir44 Binary type=t0:bool width=0 signed=False value=((v6 >= 0) && (v7 >= 0))
+term: ir45 Binary type=t0:bool width=0 signed=False value=((v6 + v7) < 0)
+term: ir46 Binary type=t0:bool width=0 signed=False value=(((v6 >= 0) && (v7 >= 0)) && ((v6 + v7) < 0))
+term: ir47 Binary type=t0:bool width=0 signed=False value=(v6 < 0)
+term: ir48 Binary type=t0:bool width=0 signed=False value=((v6 < 0) && (v7 < 0))
+term: ir49 Binary type=t0:bool width=0 signed=False value=((v6 + v7) >= 0)
+term: ir50 Binary type=t0:bool width=0 signed=False value=(((v6 < 0) && (v7 < 0)) && ((v6 + v7) >= 0))
+term: ir51 Binary type=t0:bool width=0 signed=False value=((((v6 >= 0) && (v7 >= 0)) && ((v6 + v7) < 0)) || (((v6 < 0) && (v7 < 0)) && ((v6 + v7) >= 0)))
+term: ir52 Variable type=t1:int width=32 signed=True value=v9
+term: ir53 Variable type=t1:int width=32 signed=True value=v10
+term: ir54 Variable type=t1:int width=32 signed=True value=v11
+term: ir55 Variable type=t1:int width=32 signed=True value=v5
+term: ir56 Binary type=t0:bool width=0 signed=False value=(v5 == 0)

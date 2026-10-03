@@ -46,10 +46,15 @@ public sealed class SharpProofWorker : IDisposable
             {
                 ContainerNativeLibrary.InstallZ3ResolverRequired(
                     typeof(Microsoft.Z3.Context).Assembly);
-                return new IrSmtBackend(
+                return new NativeCallableBackend(
                     new IrSmtBackendOptions(queryRlimit));
             }, queryRlimit);
     }
+    internal static SharpProofWorker CreateNative(WorkerBudgets budgets)
+    {
+        return Create(budgets);
+    }
+
     public Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)
     {
@@ -80,6 +85,8 @@ public sealed class SharpProofWorker : IDisposable
         }
 
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        CompilerCallablePreparation[]? interruptedTargets = null;
+        CallableVerificationResult[]? interruptedResults = null;
         using var projectBoundary =
             CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
@@ -107,6 +114,19 @@ public sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse Interrupted(WorkerInputSnapshot? input = null)
         {
             var canceled = cancellationToken.IsCancellationRequested;
+            if (input != null && interruptedTargets != null && interruptedResults != null)
+            {
+                // Lanes have settled before this projection. Keep their validated
+                // publications and synthesize interruption results only for work not started.
+                var settled = interruptedTargets.Select((target, index) => interruptedResults[index] ?? Unknown(target,
+                    canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout)).ToArray();
+                var projected = ProjectResults(settled);
+                var run = WorkerResultAssembler.Classify(projected.Callables, projected.Claims);
+                return WorkerResultAssembler.Create(input.InputHash, input.CompilerManifest.Manifest,
+                    run.Status, run.Failure, projected.Callables, projected.Claims, request.Budgets,
+                    WorkerCacheStatus.Disabled, Elapsed(started), requestHash: requestHash, versions: Versions());
+            }
             return WorkerResultAssembler.CreateIncomplete(
                 input?.InputHash ?? WorkerResultAssembler.EmptyInputHash, requestHash,
                 input?.CompilerManifest.Manifest ?? WorkerResultAssembler.EmptyManifest(), request.Budgets,
@@ -129,6 +149,7 @@ public sealed class SharpProofWorker : IDisposable
         WorkerInputSnapshot snapshot;
         VerificationLane[] solverLanes = [];
         var ownsInjectedBackendRunGate = false;
+        var authoritativeResponseCompleted = false;
         try
         {
             snapshot = preparedInput == null
@@ -272,9 +293,11 @@ public sealed class SharpProofWorker : IDisposable
                         : WorkerClaimReason.InfrastructureFailure);
             }
             var results = new CallableVerificationResult[orderedTargets.Length];
+            interruptedTargets = orderedTargets;
+            interruptedResults = results;
             for (var index = 0; index < orderedTargets.Length; index++)
             {
-                if (!orderedTargets[index].IsSuccess)
+                if (!CanVerifyTarget(orderedTargets[index]))
                 {
                     results[index] = CallableVerificationPolicy.FailedLowering(
                         orderedTargets[index], projectBoundary.Token);
@@ -328,13 +351,13 @@ public sealed class SharpProofWorker : IDisposable
                         return;
                     }
 
-                    if (!orderedTargets[index].IsSuccess)
+                    if (!CanVerifyTarget(orderedTargets[index]))
                     {
                         continue;
                     }
 
                     ThrowIfProjectInterrupted();
-                    var result = await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
+                    var result = await VerifyNativeTargetAsync(lane.Backend, orderedTargets[index], request.Budgets,
                         lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
                         projectBoundary, cancellationToken).ConfigureAwait(false);
                     results[index] = result;
@@ -342,9 +365,7 @@ public sealed class SharpProofWorker : IDisposable
                             WorkerCallableCoverageReason.MethodTimeout &&
                         !projectBoundary.IsCancellationRequested)
                     {
-                        var renewal = lane.Renew(
-                            solverLanes,
-                            request.Budgets.MaximumExpressionDepth);
+                        var renewal = lane.Renew(solverLanes);
                         if (renewal != LaneRenewalResult.Success)
                         {
                             if (renewal == LaneRenewalResult.Unsupported && _backend != null)
@@ -431,12 +452,13 @@ public sealed class SharpProofWorker : IDisposable
                     Elapsed(started));
             }
             ThrowIfProjectInterrupted();
+            authoritativeResponseCompleted = true;
             return response;
         }
         catch (OperationCanceledException) { return Interrupted(snapshot); }
         finally
         {
-            if (ownsInjectedBackendRunGate && projectBoundary.IsCancellationRequested)
+            if (ownsInjectedBackendRunGate && !authoritativeResponseCompleted && projectBoundary.IsCancellationRequested)
             {
                 _injectedBackendPoisoned = true;
             }
@@ -555,7 +577,7 @@ public sealed class SharpProofWorker : IDisposable
                 error = "The injected SMT backend was interrupted and cannot be reused.";
                 return LaneCreationResult.InfrastructureFailure;
             }
-            lanes = [new VerificationLane(_backend, budgets.MaximumExpressionDepth, null, null,
+            lanes = [new VerificationLane(_backend, null, null,
                 _readConsumedResourceCount)];
             return LaneCreationResult.Success;
         }
@@ -571,7 +593,7 @@ public sealed class SharpProofWorker : IDisposable
                     throw new InvalidOperationException("The backend factory returned the same backend for multiple lanes.");
                 }
 
-                created.Add(new VerificationLane(backend, budgets.MaximumExpressionDepth,
+                created.Add(new VerificationLane(backend,
                     backend as IDisposable, _backendFactory));
             }
             lanes = [.. created];
@@ -599,8 +621,11 @@ public sealed class SharpProofWorker : IDisposable
     internal static int CountSolverTargets(
         IEnumerable<CompilerCallablePreparation> targets)
     {
-        return targets.Count(static target => target.IsSuccess);
+        return targets.Count(CanVerifyTarget);
     }
+
+    private static bool CanVerifyTarget(CompilerCallablePreparation target)
+    { return target.IsSuccess || target.Total != null || target.TotalEntry != null && target.FailureReason != WorkerClaimReason.UnsupportedCallable; }
 
     private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectResults(CallableVerificationResult[] results)
@@ -619,23 +644,24 @@ public sealed class SharpProofWorker : IDisposable
 
     private static Func<long>? ReadResources(ISmtBackend backend)
     {
-        return backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null;
+        return backend switch
+        {
+            NativeCallableBackend native => () => native.ConsumedResourceCount,
+            _ => null
+        };
     }
 
     private sealed class VerificationLane(
-        ISmtBackend backend, int maximumExpressionDepth,
+        ISmtBackend backend,
         IDisposable? ownedBackend, Func<ISmtBackend>? backendFactory, Func<long>? resourceReader = null)
     {
         private readonly Func<ISmtBackend>? _backendFactory = backendFactory;
         private IDisposable? _ownedBackend = ownedBackend;
-        private (ISmtBackend Backend, CallableVerifier Verifier, Func<long>? ResourceReader)
-            _backend = ProjectBackend(backend, maximumExpressionDepth, resourceReader);
+        private (ISmtBackend Backend, Func<long>? ResourceReader)
+            _backend = ProjectBackend(backend, resourceReader);
         internal ISmtBackend Backend => _backend.Backend;
-        internal CallableVerifier Verifier => _backend.Verifier;
         internal Func<long>? ReadConsumedResourceCount => _backend.ResourceReader;
-        internal LaneRenewalResult Renew(
-            VerificationLane[] lanes,
-            int maximumExpressionDepth)
+        internal LaneRenewalResult Renew(VerificationLane[] lanes)
         {
             if (_backendFactory == null)
             {
@@ -665,7 +691,7 @@ public sealed class SharpProofWorker : IDisposable
                     replacementOwner = replacement as IDisposable;
                     _ownedBackend = null;
                     priorOwner?.Dispose();
-                    _backend = ProjectBackend(replacement, maximumExpressionDepth);
+                    _backend = ProjectBackend(replacement);
                     _ownedBackend = replacementOwner;
                     replacementOwner = null;
                     return LaneRenewalResult.Success;
@@ -687,12 +713,11 @@ public sealed class SharpProofWorker : IDisposable
                 }
             }
         }
-        private static (ISmtBackend, CallableVerifier, Func<long>?) ProjectBackend(
-            ISmtBackend backend, int maximumExpressionDepth,
+        private static (ISmtBackend, Func<long>?) ProjectBackend(
+            ISmtBackend backend,
             Func<long>? resourceReader = null)
         {
-            return (backend, new CallableVerifier(backend, maximumExpressionDepth),
-                resourceReader ?? ReadResources(backend));
+            return (backend, resourceReader ?? ReadResources(backend));
         }
         internal void DisposeOwnedBackend()
         {

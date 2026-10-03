@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 19;
+    internal const int Current = 28;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -94,6 +94,114 @@ internal sealed record CompilerCallablePreparation(
     internal bool IsSuccess => FailureReason == WorkerClaimReason.None;
     internal ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
     internal CompilerCompilationSnapshot Compilation { get; init; } = new();
+    internal CompilerTotalCallablePreparation? Total { get; init; }
+    internal CompilerTotalEntryPreparation? TotalEntry { get; init; }
+}
+
+internal sealed record CompilerTotalEntryPreparation(string CallableId, IrFactory Factory,
+    ImmutableArray<CompilerTotalParameter> Parameters, ImmutableArray<CompilerTotalClause> Clauses);
+
+internal sealed record CompilerTotalCallablePreparation(
+    string CallableId,
+    IrProgram Program,
+    ImmutableArray<CompilerTotalParameter> Parameters,
+    IrVarId? Result,
+    ImmutableArray<CompilerTotalClause> Clauses,
+    bool IsBodyAbstraction = false)
+{
+    internal ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints { get; init; } = [];
+    internal ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions { get; init; } = [];
+    internal bool EffectsCompleteAtEntry { get; init; }
+    internal ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
+}
+
+// Detached graph validation only. External source ownership is established
+// separately by the shadow envelope; the owner label is not authentication.
+internal sealed class CompilerDecodedShadowBody
+{
+    private CompilerDecodedShadowBody(CompilerTotalCallablePreparation body)
+    { Body = body; }
+
+    internal CompilerTotalCallablePreparation Body { get; }
+
+    internal static CompilerDecodedShadowBody Decode(string ownerId,
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
+    {
+        return new(CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(ownerId, artifact, cancellationToken, metadataReferences));
+    }
+}
+
+internal sealed record CompilerTotalExceptionConstraint(string ClaimId, ImmutableArray<IrExceptionKind> AllowedKinds);
+
+internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction, string CalleeIdentity,
+    int ClauseOrdinal, OperationId ClauseSite, IrTerm Value, IrTerm Safe,
+    CompilerMetadataClauseOrigin? MetadataClause = null)
+{
+    internal ImmutableArray<CompilerShadowCallHop> Ancestry { get; init; } = [];
+}
+
+internal sealed record CompilerShadowCallHop(string CallerIdentity, string CalleeIdentity, IrSourceSpan Site);
+
+internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
+
+internal sealed record CompilerTotalClause(CompilerContractKind Kind, IrTerm Value, IrTerm Safe,
+    OperationId Operation, string? ClaimId, string? AssumptionId);
+
+internal sealed class CompilerTotalCallableArtifact
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool EffectsCompleteAtEntry { get; set; }
+    public string[] ValidEffectClaimIds { get; set; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsBodyAbstraction { get; set; }
+    public PortableIrGraph Graph { get; set; } = new();
+    public CompilerTotalParameterArtifact[] Parameters { get; set; } = [];
+    public int Result { get; set; } = -1;
+    public CompilerTotalClauseArtifact[] Clauses { get; set; } = [];
+    public CompilerTotalExceptionConstraintArtifact[] ExceptionConstraints { get; set; } = [];
+    public CompilerTotalCallPreconditionArtifact[] CallPreconditions { get; set; } = [];
+}
+
+internal sealed record CompilerMetadataClauseOrigin(string AssemblyIdentity, string ImageSha256,
+    string ModuleName, string ModuleMvid, int MethodToken, int ParameterOrdinal, int ParameterSequence,
+    int ParameterToken, int AttributeToken, int ConstructorToken, string AttributeIdentity,
+    string ConstructorIdentity, string Kind, long Minimum, long Maximum,
+    ImmutableArray<byte> ConstructorSignature, ImmutableArray<byte> ValueBlob);
+
+internal sealed class CompilerTotalCallPreconditionArtifact
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerMetadataClauseOrigin? MetadataClause { get; set; }
+
+    public int InstructionIndex { get; set; } = -1;
+    public string CalleeIdentity { get; set; } = string.Empty;
+    public int ClauseOrdinal { get; set; } = -1;
+    public int ClauseSite { get; set; } = -1;
+    public int ValueRoot { get; set; } = -1;
+    public int SafeRoot { get; set; } = -1;
+}
+
+internal sealed class CompilerTotalExceptionConstraintArtifact
+{
+    public string ClaimId { get; set; } = string.Empty;
+    public IrExceptionKind[] AllowedKinds { get; set; } = [];
+}
+
+internal sealed class CompilerTotalParameterArtifact
+{
+    public int Entry { get; set; } = -1;
+    public int Current { get; set; } = -1;
+    public int Old { get; set; } = -1;
+}
+
+internal sealed class CompilerTotalClauseArtifact
+{
+    public CompilerContractKind Kind { get; set; }
+    public int ValueRoot { get; set; } = -1;
+    public int SafeRoot { get; set; } = -1;
+    public int Operation { get; set; } = -1;
+    public string? ClaimId { get; set; }
+    public string? AssumptionId { get; set; }
 }
 
 internal sealed record CompilerPreparedClause(
@@ -193,6 +301,10 @@ internal sealed class CompilerCallableArtifact
     public CompilerVariableArtifact[] Variables { get; set; } = [];
     public CompilerBodyArtifact? Body { get; set; }
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerTotalCallableArtifact? Total { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerTotalCallableArtifact? TotalEntry { get; set; }
 }
 
 internal sealed class CompilerEffectClaimArtifact
@@ -429,6 +541,55 @@ internal sealed class CompilerManifestArtifact
     public int MaximumExpressionDepth { get; set; } = WorkerBudgets.DefaultMaximumExpressionDepth;
     public CompilerDiagnosticArtifact[] CompilerDiagnostics { get; set; } = [];
     public CompilerCallableArtifact[] Callables { get; set; } = [];
+    public CompilerReachableSourceArtifact? ReachableSource { get; set; }
+}
+
+// Shadow input for interprocedural effect analysis. An absent or incomplete
+// body never supplies an effect fact or a normal-completion guarantee.
+internal sealed class CompilerReachableSourceArtifact
+{
+    public bool CollectionComplete { get; set; }
+    public CompilerSourceRootArtifact[] Roots { get; set; } = [];
+    public CompilerSourceBodyArtifact[] Bodies { get; set; } = [];
+    public CompilerSourceDocumentArtifact[] Documents { get; set; } = [];
+}
+
+internal sealed class CompilerSourceDocumentArtifact
+{
+    public int SourceTreeOrdinal { get; set; }
+    public string Path { get; set; } = string.Empty;
+    public int MaximumBodyEnd { get; set; }
+}
+
+internal sealed class CompilerSourceRootArtifact
+{
+    public string CallableId { get; set; } = string.Empty;
+    public string BodyId { get; set; } = string.Empty;
+}
+
+internal sealed class CompilerSourceBodyArtifact
+{
+    public string BodyId { get; set; } = string.Empty;
+    public string MethodIdentity { get; set; } = string.Empty;
+    public string CallIdentity { get; set; } = string.Empty;
+    public bool IsStatic { get; set; }
+    public string[] ParameterTypes { get; set; } = [];
+    public string? ReturnType { get; set; }
+    public int SourceTreeOrdinal { get; set; }
+    public int Start { get; set; }
+    public int Length { get; set; }
+    public bool CallsComplete { get; set; }
+    public bool EffectsCompleteAtEntry { get; set; }
+    public string[] Callees { get; set; } = [];
+    public PortableIrGraph? Graph { get; set; }
+    public bool IsCallSkeleton { get; set; }
+    public CompilerSourceCallArtifact[] SourceCalls { get; set; } = [];
+}
+
+internal sealed class CompilerSourceCallArtifact
+{
+    public int InstructionIndex { get; set; }
+    public string CalleeBodyId { get; set; } = string.Empty;
 }
 
 internal readonly struct CompilerEffectConstraintRule(

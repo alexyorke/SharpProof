@@ -88,7 +88,8 @@ public enum IrExceptionKind
     Overflow = 1,
     NullReference = 2,
     IndexOutOfRange = 3,
-    InvalidCast = 4
+    InvalidCast = 4,
+    Argument = 5
 }
 
 public enum IrProgramExecutionStatus
@@ -131,15 +132,16 @@ public sealed class IrUnsupportedInfo
 
 public sealed class IrExceptionInfo
 {
-    internal IrExceptionInfo(IrExceptionKind kind, string detail)
+    internal IrExceptionInfo(IrExceptionKind kind, string detail, OperationId? site = null)
     {
-        (Kind, Detail) =
-            (kind, detail);
+        (Kind, Detail, Site) =
+            (kind, detail, site);
     }
 
     public IrExceptionKind Kind { get; }
 
     public string Detail { get; }
+    public OperationId? Site { get; }
 }
 
 public sealed partial class IrEvaluationResult
@@ -173,11 +175,15 @@ public sealed partial class IrProgramExecutionResult
         IrUnsupportedInfo? unsupported,
         IrExceptionInfo? exception,
         ImmutableDictionary<IrVarId, IrValue> values,
-        int steps
+        int steps,
+        bool consumedApproximation = false,
+        ImmutableHashSet<IrVarId>? approximationVariables = null
     )
     {
         (Status, ReturnValue, Instruction, Unsupported, Exception, Values, Steps) =
             (status, returnValue, instruction, unsupported, exception, values, steps);
+        ConsumedApproximation = consumedApproximation;
+        ApproximationVariables = approximationVariables ?? ImmutableHashSet<IrVarId>.Empty;
     }
 
     public IrProgramExecutionStatus Status { get; }
@@ -193,6 +199,8 @@ public sealed partial class IrProgramExecutionResult
     public ImmutableDictionary<IrVarId, IrValue> Values { get; }
 
     public int Steps { get; }
+    public bool ConsumedApproximation { get; }
+    public ImmutableHashSet<IrVarId> ApproximationVariables { get; }
 }
 
 public enum IrTermKind
@@ -208,7 +216,8 @@ public enum IrTermKind
     Conditional = 8,
     Cast = 9,
     Length = 10,
-    SequenceAccess = 11
+    SequenceAccess = 11,
+    EmptyArray = 12
 }
 
 public enum IrOpaquePurity
@@ -219,10 +228,12 @@ public enum IrOpaquePurity
 
 public sealed class IrTypeInfo
 {
-    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType)
+    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType,
+        int width = 0, bool signed = false)
     {
         (Id, Name, Kind, ElementType) =
             (id, name, kind, elementType);
+        (Width, Signed) = (width, signed);
     }
 
     public IrTypeId Id { get; }
@@ -232,6 +243,11 @@ public sealed class IrTypeInfo
     public IrTypeKind Kind { get; }
 
     public IrTypeId? ElementType { get; }
+
+    // Width zero is the temporary legacy integer semantics used during shadow rollout.
+    public int Width { get; }
+
+    public bool Signed { get; }
 }
 
 public sealed class IrVariableInfo
@@ -282,15 +298,17 @@ public sealed class IrMemberInfo
 
 public sealed class IrOperationInfo
 {
-    internal IrOperationInfo(OperationId id, IrStringId? description)
+    internal IrOperationInfo(OperationId id, IrStringId? description, IrSourceSpan? sourceSpan = null)
     {
         (Id, Description) =
             (id, description);
+        SourceSpan = sourceSpan;
     }
 
     public OperationId Id { get; }
 
     public IrStringId? Description { get; }
+    public IrSourceSpan? SourceSpan { get; }
 }
 
 public abstract class IrTerm
@@ -320,12 +338,20 @@ public sealed class IrBooleanTerm : IrTerm
 
 public sealed class IrIntegerTerm : IrTerm
 {
-    internal IrIntegerTerm(IrId id, IrTypeId type, long value) : base(id, type, IrTermKind.Integer)
+    internal IrIntegerTerm(IrId id, IrTypeId type, IrInteger value) : base(id, type, IrTermKind.Integer)
     {
-        Value = value;
+        Integer = value;
     }
 
-    public long Value { get; }
+    internal IrInteger Integer { get; }
+
+    public long Value => Integer.Int64;
+
+    public ulong Bits => Integer.Bits;
+
+    public int Width => Integer.Width;
+
+    public bool Signed => Integer.Signed;
 }
 
 public sealed class IrStringTerm : IrTerm
@@ -343,6 +369,11 @@ public sealed class IrNullTerm : IrTerm
     internal IrNullTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.Null)
     {
     }
+}
+
+public sealed class IrEmptyArrayTerm : IrTerm
+{
+    internal IrEmptyArrayTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.EmptyArray) { }
 }
 
 public sealed class IrVariableTerm : IrTerm
@@ -491,7 +522,22 @@ public enum IrInstructionKind
     Havoc = 6,
     Branch = 7,
     Goto = 8,
-    Return = 9
+    Return = 9,
+    Throw = 10,
+    ExceptionalExit = 11,
+    Allocate = 12,
+    Write = 13,
+    Lock = 14
+}
+
+public enum IrWriteRegion
+{
+    Local = 0,
+    Parameter = 1,
+    Field = 2,
+    Static = 3,
+    Element = 4,
+    Unknown = 5
 }
 
 public enum IrLocationKind
@@ -566,6 +612,39 @@ public abstract partial class IrInstruction
     public IrInstructionKind Kind { get; }
 
     public OperationId Operation { get; }
+}
+
+public sealed class IrAllocationInstruction : IrInstruction
+{
+    internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
+        IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
+        : base(id, IrInstructionKind.Allocate, operation)
+    { AllocatedType = allocatedType; Target = target; Length = length; InitialValues = initialValues.IsDefault ? [] : initialValues; }
+
+    public IrTypeId AllocatedType { get; }
+    public IrVarId? Target { get; }
+    public IrTerm? Length { get; }
+    public ImmutableArray<IrTerm> InitialValues { get; }
+}
+
+// A synchronization attempt is an explicit effect and a concrete replay
+// barrier. It does not claim acquisition, release, completion or exception facts.
+public sealed class IrLockInstruction : IrInstruction
+{
+    internal IrLockInstruction(IrInstructionId id, OperationId operation, IrTerm receiver)
+        : base(id, IrInstructionKind.Lock, operation)
+    { Receiver = receiver; }
+
+    public IrTerm Receiver { get; }
+}
+
+public sealed class IrWriteInstruction : IrInstruction
+{
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
+        : base(id, IrInstructionKind.Write, operation)
+    { Region = region; }
+
+    public IrWriteRegion Region { get; }
 }
 
 public sealed class IrAssignInstruction : IrInstruction
@@ -680,16 +759,38 @@ public sealed class IrHavocInstruction : IrInstruction
         IrInstructionId id,
         OperationId operation,
         IrHavocKind havocKind,
-        ImmutableArray<IrVarId> variables
+        ImmutableArray<IrVarId> variables,
+        IrHavocOrigin origin = IrHavocOrigin.Approximation
     ) : base(id, IrInstructionKind.Havoc, operation)
     {
         (HavocKind, Variables) =
             (havocKind, variables);
+        Origin = origin;
     }
 
     public IrHavocKind HavocKind { get; }
 
     public ImmutableArray<IrVarId> Variables { get; }
+    public IrHavocOrigin Origin { get; }
+}
+
+public sealed class IrThrowInstruction : IrInstruction
+{
+    internal IrThrowInstruction(IrInstructionId id, OperationId operation,
+        IrExceptionKind exceptionKind, IrBlockId target)
+        : base(id, IrInstructionKind.Throw, operation)
+    {
+        (ExceptionKind, Target) = (exceptionKind, target);
+    }
+
+    public IrExceptionKind ExceptionKind { get; }
+    public IrBlockId Target { get; }
+}
+
+public sealed class IrExceptionalExitInstruction : IrInstruction
+{
+    internal IrExceptionalExitInstruction(IrInstructionId id, OperationId operation)
+        : base(id, IrInstructionKind.ExceptionalExit, operation) { }
 }
 
 public sealed class IrBranchInstruction : IrInstruction

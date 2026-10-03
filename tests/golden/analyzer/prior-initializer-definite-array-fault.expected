@@ -1,0 +1,4 @@
+SP0027 Warning prior-initializer-definite-array-fault.cs:20:25-20:38 Call to 'Need' violates precondition 'value > 0'
+SP0027 Warning prior-initializer-definite-array-fault.cs:26:39-26:52 Call to 'Need' violates precondition 'value > 0'
+SP0027 Warning prior-initializer-definite-array-fault.cs:32:45-32:58 Call to 'Need' violates precondition 'value > 0'
+SP0027 Warning prior-initializer-definite-array-fault.cs:38:44-38:57 Call to 'Need' violates precondition 'value > 0'

@@ -11,6 +11,8 @@ namespace SharpProof.CompilerArtifact;
 
 internal sealed class PortableIrGraph
 {
+    [System.Text.Json.Serialization.JsonRequired]
+    public IrExecutionSemantics Semantics { get; set; }
     public bool HasProgram { get; set; }
     public PortableIrType[] Types { get; set; } = [];
     public int[] Identities { get; set; } = [];
@@ -26,12 +28,18 @@ internal sealed class PortableIrGraph
 internal sealed class PortableIrType(
     IrTypeKind kind = default,
     string? name = null,
-    int element = -1
+    int element = -1,
+    int width = 0,
+    bool signed = false
 )
 {
     public IrTypeKind Kind { get; set; } = kind;
     public string Name { get; set; } = name ?? string.Empty;
     public int Element { get; set; } = element;
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Width { get; set; } = width;
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool Signed { get; set; } = signed;
 }
 
 internal sealed class PortableIrVariable(
@@ -66,6 +74,18 @@ internal sealed class PortableIrOperation(
 )
 {
     public string? Description { get; set; } = description;
+    [System.Text.Json.Serialization.JsonRequired]
+    public PortableIrSourceSpan? SourceSpan { get; set; }
+}
+
+internal sealed class PortableIrSourceSpan
+{
+    [System.Text.Json.Serialization.JsonRequired]
+    public string Document { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Start { get; set; }
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Length { get; set; }
 }
 
 internal sealed class PortableIrTerm(
@@ -87,6 +107,8 @@ internal sealed class PortableIrTerm(
     public int C { get; set; } = c;
     public int D { get; set; } = d;
     public long Number { get; set; } = number;
+    [System.Text.Json.Serialization.JsonRequired]
+    public ulong Bits { get; set; }
     public string? Text { get; set; } = text;
     public int[] Items { get; set; } = items ?? [];
 }
@@ -123,6 +145,8 @@ internal sealed class PortableIrInstruction(
     public int C { get; set; } = c;
     public int[] Items { get; set; } = items ?? [];
     public PortableIrLocation? Location { get; set; } = location;
+    [System.Text.Json.Serialization.JsonRequired]
+    public IrHavocOrigin Origin { get; set; } = IrHavocOrigin.Approximation;
 }
 
 internal sealed class PortableIrBlock(
@@ -139,7 +163,8 @@ internal sealed class DecodedPortableIrGraph(
     IrProgram? program,
     IrTerm[] roots,
     IrVarId[] variables,
-    IrInstruction[] instructions
+    IrInstruction[] instructions,
+    OperationId[] operations
 )
 {
     internal IrFactory Factory { get; } = factory;
@@ -147,17 +172,20 @@ internal sealed class DecodedPortableIrGraph(
     internal IReadOnlyList<IrTerm> Roots { get; } = roots;
     internal IReadOnlyList<IrVarId> Variables { get; } = variables;
     internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions;
+    internal IReadOnlyList<OperationId> Operations { get; } = operations;
 }
 
 internal sealed class EncodedPortableIrGraph(
     PortableIrGraph graph,
     IReadOnlyDictionary<IrVarId, int> variableIndices,
-    IReadOnlyDictionary<IrInstructionId, int> instructionIndices
+    IReadOnlyDictionary<IrInstructionId, int> instructionIndices,
+    IReadOnlyDictionary<OperationId, int> operationIndices
 )
 {
     internal PortableIrGraph Graph { get; } = graph;
     internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices;
     internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices;
+    internal IReadOnlyDictionary<OperationId, int> OperationIndices { get; } = operationIndices;
 }
 
 internal static class PortableIrWireCatalog
@@ -191,6 +219,16 @@ internal static class PortableIrWireCatalog
         IrHavocKind.Memory,
         IrHavocKind.VariablesAndMemory
     ];
+    internal static readonly ImmutableArray<IrHavocOrigin> HavocOrigins = [
+        IrHavocOrigin.Input, IrHavocOrigin.SpecResult, IrHavocOrigin.Approximation
+    ];
+    internal static readonly ImmutableArray<IrExecutionSemantics> ExecutionSemantics = [
+        IrExecutionSemantics.Legacy, IrExecutionSemantics.Total
+    ];
+    internal static readonly ImmutableArray<IrExceptionKind> ExceptionKinds = [
+        IrExceptionKind.DivideByZero, IrExceptionKind.Overflow, IrExceptionKind.NullReference,
+        IrExceptionKind.IndexOutOfRange, IrExceptionKind.InvalidCast, IrExceptionKind.Argument
+    ];
 }
 
 internal readonly struct PortableIrSlotMapping(
@@ -216,6 +254,7 @@ internal static class PortableIrSlotCatalog
     new("Cast", ["termIndex", "unused", "unused", "unused", "unused", "unused", "empty"]),
     new("Length", ["termIndex", "unused", "unused", "unused", "unused", "unused", "empty"]),
     new("SequenceAccess", ["termIndex", "termIndex", "unused", "unused", "unused", "unused", "empty"]),
+    new("EmptyArray", ["unused", "unused", "unused", "unused", "unused", "unused", "empty"]),
     ];
 
     internal static readonly ImmutableArray<PortableIrSlotMapping> Locations = [
@@ -234,6 +273,11 @@ internal static class PortableIrSlotCatalog
     new("Branch", ["termIndex", "blockIndex", "blockIndex", "unused", "empty", "unused"]),
     new("Goto", ["blockIndex", "unused", "unused", "unused", "empty", "unused"]),
     new("Return", ["optionalTermIndex", "unused", "unused", "unused", "empty", "unused"]),
+    new("Throw", ["exceptionKind", "blockIndex", "unused", "unused", "empty", "unused"]),
+    new("ExceptionalExit", ["unused", "unused", "unused", "unused", "empty", "unused"]),
+    new("Allocate", ["typeIndex", "optionalVariableIndex", "optionalTermIndex", "unused", "termIndices", "unused"]),
+    new("Write", ["writeRegion", "unused", "unused", "unused", "empty", "unused"]),
+    new("Lock", ["termIndex", "unused", "unused", "unused", "empty", "unused"]),
     ];
 }
 
@@ -248,7 +292,8 @@ internal static partial class PortableIrGraphCodec
             return new(
                 value.Kind,
                 _factory.GetString(value.Name),
-                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1);
+                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1,
+                value.Width, value.Signed);
         }
 
         private PortableIrVariable VariableRow(IrVarId id)
@@ -275,7 +320,15 @@ internal static partial class PortableIrGraphCodec
         {
             var value = _factory.GetOperationInfo(id);
             return new(
-                value.Description.HasValue ? _factory.GetString(value.Description.Value) : null);
+                value.Description.HasValue ? _factory.GetString(value.Description.Value) : null)
+            {
+                SourceSpan = value.SourceSpan is { } span ? new PortableIrSourceSpan
+                {
+                    Document = span.Document,
+                    Start = span.Start,
+                    Length = span.Length
+                } : null
+            };
         }
     }
 }
@@ -300,9 +353,10 @@ internal static class PortableIrGraphCodecProjections
         return term switch
         {
             IrBooleanTerm value => row(term, value.Value ? 1 : 0, -1, -1, -1, 0, null, null),
-            IrIntegerTerm value => row(term, -1, -1, -1, -1, value.Value, null, null),
+            IrIntegerTerm value => IntegerRow(value, row),
             IrStringTerm value => row(term, -1, -1, -1, -1, 0, stringValue(value.Value), null),
             IrNullTerm => row(term, -1, -1, -1, -1, 0, null, null),
+            IrEmptyArrayTerm => row(term, -1, -1, -1, -1, 0, null, null),
             IrVariableTerm value => row(term, variableIndex(value.Variable), -1, -1, -1, 0, null, null),
             IrOpaqueTerm value => row(
                 term,
@@ -382,6 +436,7 @@ internal static class PortableIrGraphCodecProjections
 
     internal static PortableIrInstruction EncodeInstruction(
         IrInstruction instruction,
+        Func<IrTypeId, int> typeIndex,
         Func<OperationId, int> operationIndex,
         Func<IrVarId, int> variableIndex,
         Func<IrTerm, int> termIndex,
@@ -398,6 +453,12 @@ internal static class PortableIrGraphCodecProjections
     {
         return instruction switch
         {
+            IrAllocationInstruction allocation => row(instruction, operationIndex(instruction.Operation),
+                typeIndex(allocation.AllocatedType), optionalVariableIndex(allocation.Target), optionalTermIndex(allocation.Length), termIndices(allocation.InitialValues), null),
+            IrLockInstruction synchronization => row(instruction, operationIndex(instruction.Operation),
+                termIndex(synchronization.Receiver), -1, -1, null, null),
+            IrWriteInstruction write => row(instruction, operationIndex(instruction.Operation),
+                (int)write.Region, -1, -1, null, null),
             IrAssignInstruction value => row(
                 instruction,
                 operationIndex(instruction.Operation),
@@ -478,8 +539,20 @@ internal static class PortableIrGraphCodecProjections
                 -1,
                 null,
                 null),
+            IrThrowInstruction value => row(instruction, operationIndex(instruction.Operation),
+                (int)value.ExceptionKind, blockIndex(value.Target), -1, null, null),
+            IrExceptionalExitInstruction => row(instruction, operationIndex(instruction.Operation),
+                -1, -1, -1, null, null),
             _ => throw invalid()
         };
+    }
+
+    private static PortableIrTerm IntegerRow(IrIntegerTerm value,
+        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+    {
+        var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
+        result.Bits = value.Width == 0 ? 0 : value.Bits;
+        return result;
     }
 
     internal static IrTerm DecodeTerm(
@@ -501,9 +574,13 @@ internal static class PortableIrGraphCodecProjections
         return row.Kind switch
         {
             IrTermKind.Boolean when row.A is 0 or 1 => factory.Boolean(row.A == 1),
-            IrTermKind.Integer => factory.Integer(row.Number),
+            IrTermKind.Integer when factory.GetTypeInfo(type(row.Type)).Width == 0 && row.Bits == 0 =>
+                factory.Integer(row.Number),
+            IrTermKind.Integer when factory.GetTypeInfo(type(row.Type)).Width != 0 && row.Number == 0 =>
+                factory.IntegerBits(type(row.Type), row.Bits),
             IrTermKind.String when row.Text != null => factory.String(row.Text),
             IrTermKind.Null => factory.Null(type(row.Type)),
+            IrTermKind.EmptyArray => factory.EmptyArray(type(row.Type)),
             IrTermKind.Variable => factory.Variable(variable(row.A)),
             IrTermKind.Opaque => DecodeOpaque(
                 row,
@@ -585,6 +662,7 @@ internal static class PortableIrGraphCodecProjections
         IrProgramBuilder builder,
         IrBlockId block,
         PortableIrInstruction row,
+        Func<int, IrTypeId> type,
         Func<int, OperationId> operation,
         Func<int, IrVarId> variable,
         Func<int, IrMemberId> member,
@@ -600,6 +678,9 @@ internal static class PortableIrGraphCodecProjections
     {
         return row.Kind switch
         {
+            IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A), optionalVariable(row.B), optionalTerm(row.C), terms(row.Items).ToImmutableArray()),
+            IrInstructionKind.Write => builder.Write(block, operation(row.Operation), (IrWriteRegion)row.A),
+            IrInstructionKind.Lock => builder.Lock(block, operation(row.Operation), term(row.A)),
             IrInstructionKind.Assign => builder.Assign(
                 block,
                 operation(row.Operation),
@@ -634,6 +715,7 @@ internal static class PortableIrGraphCodecProjections
                 block,
                 operation(row.Operation),
                 havocKind(row.A),
+                row.Origin,
                 variables(row.Items)),
             IrInstructionKind.Branch => builder.Branch(
                 block,
@@ -649,6 +731,9 @@ internal static class PortableIrGraphCodecProjections
                 block,
                 operation(row.Operation),
                 optionalTerm(row.A)),
+            IrInstructionKind.Throw => builder.Throw(block, operation(row.Operation),
+                (IrExceptionKind)row.A, blockAt(row.B)),
+            IrInstructionKind.ExceptionalExit => builder.ExceptionalExit(block, operation(row.Operation)),
             _ => throw invalid()
         };
     }

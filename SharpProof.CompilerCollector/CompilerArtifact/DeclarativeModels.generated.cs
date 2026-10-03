@@ -8,7 +8,38 @@ namespace SharpProof.CompilerArtifact;
 internal sealed partial record ClaimManifestBuildResult(
     WorkerClaimManifest Manifest,
     ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> Targets
-);
+)
+{
+    // Null means the optional source census was not requested.
+    internal CompilerPotentialCallInventory? PotentialCalls { get; init; }
+}
+
+// The first source census covers outer static scalar methods. It is separate
+// from mandatory claim membership and does not authorize a native proof.
+internal sealed record CompilerPotentialCallInventory(
+    ImmutableArray<CompilerPotentialCallOwner> Owners,
+    ImmutableArray<CompilerPotentialCallGap> Gaps);
+
+internal sealed record CompilerPotentialCallOwner(
+    IMethodSymbol Method,
+    MethodDeclarationSyntax Declaration,
+    SemanticModel SemanticModel,
+    string CallableId,
+    ImmutableArray<SharpProof.Analyzer.PotentialRequiresCallSite> Calls,
+    bool DiscoveryComplete);
+
+internal sealed record CompilerPotentialCallGap(int TreeOrdinal, int Start, int Length, string Reason,
+    string? ReferenceAssemblyName = null);
+
+// Compiler-owned preparation only; it cannot enter mandatory worker routing.
+internal sealed record CompilerShadowPreparation(CompilerTotalCallablePreparation Body)
+{
+    internal string OwnerId => Body.CallableId;
+}
+
+internal sealed record CompilerShadowPreparationBatch(
+    ImmutableArray<CompilerShadowPreparation> Callers,
+    ImmutableArray<CompilerPotentialCallGap> Gaps);
 
 internal sealed partial record ManifestCallableTarget(
     IMethodSymbol Method,
@@ -29,7 +60,8 @@ internal sealed partial record ManifestClaim(
 
 internal sealed partial record ManifestEffectClaim(
     WorkerClaimManifestEntry Entry,
-    CompilerEffectClaimArtifact Evidence
+    CompilerEffectClaimArtifact Evidence,
+    bool HasValidConstraint
 );
 
 internal sealed partial class ClaimManifestBuilder

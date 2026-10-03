@@ -68,18 +68,18 @@ and protocol validation have their own non-overlapping inventories rather than
  its matcher/instantiator source are one audited
  `apiSpecificationCatalog` component. The contract API vocabulary has its own
  `contractApiCatalog` component; its generated output is limited to descriptors
- and ordered tables, while lookup behavior remains handwritten. The C# scalar type, conversion, checked
-arithmetic, IR enum vocabulary, and operator rules likewise live in the
-`CSharpScalarSemantics.generated.cs` and `IrOperatorCatalog.generated.cs`
-tables. The portable IR wire-enum and slot tables and wire projection
+ and ordered tables, while lookup behavior remains handwritten.
+`CSharpOperationSemantics` owns scalar widths, operator mappings, guarded
+local faults, explicit Roslyn decisions and analyzer-stage support flags.
+Source and IL lowering share its metadata. The remaining analyzer range domain
+uses a signed-long projection; CFG traversal contains no language rules.
+`IrOperatorCatalog.generated.cs` owns IR factory operator validation.
+The portable IR wire-enum and slot tables and wire projection
 adapters are declarative, while the codec keeps
  indexing, depth/cycle, canonicality, and malformed-input validation handwritten.
 The effect-contract mapping catalog similarly owns finite capability, region,
 direct-event, and reference-family mappings; effect analysis and fail-closed
 validation remain handwritten.
-The operation-support catalog similarly owns the finite Roslyn operation lists
-for contract-expression lowering and effect discovery; support queries,
-lowering, shape checks, and fail-closed behavior remain handwritten.
 Finite output, result-label, policy, operation-stage, and effect-wiring
 projections live in the per-project `*Projections.generated.cs` tables;
 replay, validation, and analysis algorithms remain handwritten.
@@ -186,12 +186,518 @@ Object property order is irrelevant. Semantic validation checks enum values,
 nulls, claim ownership, dense ordinals, assumptions, and allowed result payloads.
 Counts are derived from the callable and claim arrays rather than stored again.
 
-The compiler produces a schema-19 closed artifact containing selected claims,
+The compiler produces a schema-21 closed artifact containing selected claims,
 portable typed IR, relational/spec call bindings, effect constraints and replay
 events, diagnostics, and mapped locations. One SHA-256 covers the full canonical
 artifact bytes, including effect-only callables without a graph. Source and
 reference inventories and duplicated provenance authorities are absent from the
 wire. Producer reporting IDs remain stable opaque labels.
+
+Schema 21 requires an explicit execution mode, havoc origin, and nullable
+UTF-16 source span for each operation. The temporary Total mode uses signed
+32-bit default integers, deterministic bitvector division and remainder, and
+explicit Throw/ExceptionalExit edges. Legacy remains authoritative during
+migration, and the existing SMT backend rejects Total queries. The candidate
+CallableSolverSession encodes total Boolean and fixed-width integer terms in
+one native solver per callable. Each query activates its own assumption subset
+and negated goal; models contain only that query's requested variables. It
+shares native scheduling and resource accounting with the legacy backend, while
+active cancellation or recognized infrastructure failure retires only the
+candidate session. An explicit candidate frontend shares typed scalar operation
+rules between body evaluation and guarded clauses. Body operands are captured
+in source order; local fault guards lead to Throw/ExceptionalExit. Clauses keep
+safety separate from value, including through Old and lazy expressions. A shared
+context gives entry inputs, mutable parameter storage, Old snapshots, and Result
+distinct identities. Validated specification calls are omitted from runtime
+body evaluation. Async and partial/generic contexts, ref locals, heap operations,
+unsupported metadata bodies, ordinary irreducible loops and point Assume instructions inside cycles
+currently abstain.
+The compiler-owned source-call route admits nonrecursive same-compilation static
+scalar methods. Each invocation evaluates arguments once in source order, maps
+them to parameter ordinals, and owns a fresh Entry/Current/Old/Result frame.
+Default arguments must be scalar constants. Callee contracts are excluded without
+adding their Requires or Ensures as proof premises. Requires-only binding is
+independent of unsupported elided Ensures predicates; emitted specification
+arguments retain their executable behavior.
+All nested frames share the same construction cap and cancellation boundary.
+Eager source calls transport internal precondition markers through the Total
+artifact codec into passive candidates. Each marker owns its callee, clause and
+call/declaration sites. Occurrence queries use prefix facts, and the native
+solver validates a violation by observing that exact marker in original IR.
+Bounded loop queries can supply witnesses but cannot establish proofs. These
+shadow obligations do not depend on normal-return feasibility or change the
+public claim manifest and diagnostic authority.
+The collector also ships a shadow reachable-source table, built lazily from
+claim roots with one body per source declaration and deterministic call edges.
+Shared helpers are deduplicated and recursive edges terminate collection.
+Leaf bodies use the same Total lowering. Admitted direct source calls remain
+portable, explicitly marked shadow skeletons without expanding callee bodies.
+Elided invocation arguments and deferred lambda/local-function bodies do not
+add executed call edges. Missing bodies, unknown dispatch and collection limits
+remain boundaries. Entry initialization completeness is separate from body IR.
+The worker validates body identities, source bounds, graph semantics, roots and
+edge closure. This shadow table supplies no published proof authority.
+The frontend has a separate internal call-preserving route for the next shadow
+consumer. It records source-call instruction identities and evaluated arguments
+without expanding callee bodies, including recursive calls. An explicit result
+marker excludes these skeletons from executable exact Total admission. Portable
+call-to-body mappings validate every call index, callee identity and signature.
+EffectSummaryFixpoint uses iterative SCC traversal and a monotone worklist to
+join local and callee may-effects. Recursive components may diverge; recursion
+alone does not add allocation or write effects. Call exception/completion facts
+and modular external effect facts remain unresolved. Shadow lowering shares
+the eager route's approved scalar API/specification model resolver and owned
+Array.Empty model for omitted params. The three effect-shadow reports
+observe summary coverage without changing native outcomes or compiler authority.
+Document bounds come from the selected declarations rather than full-file
+checksums or lengths, preserving artifact stability for unrelated constants.
+Unsupported allocation operands retain their evaluation prefix and produce an
+unknown value of the enclosing expression's type. A failed receiver, dimension
+or boxing operand cannot become a differently typed allocation result.
+Original expanded IR retains callee returns, finally bodies, and escaping throw
+kind/site for replay and caller catch routing. Async, iterator, generic, ref/params,
+unmodeled type-initialization calls remain unsupported. When an
+outer filter can observe a callee fault, fresh frames share one program builder.
+Each frame searches its own handlers first, then continues search at the caller's
+captured lexical point before running the immutable inner-to-outer finally
+prefix. A selected handler stops search; a fault during unwind starts fresh
+search from the faulting frame. Calls within a filter finish their own unwind
+before rejection resumes the original exception. Root entry and final validation
+remain owned by the caller. Ordinary calls retain the separate frame composition.
+Replacement exceptions can create shared filter/finally cycles; the owned loop
+proof and bounded witness encodings keep conservative completed Unknown results
+distinct from absent evidence. Havoc can lose correlations between earlier
+filter mutations and a later replacement search, leaving a valid postcondition
+Unknown when the bounded search is also inconclusive.
+
+The typed implementation-IL route admits bounded static scalar managed methods
+and object/string null, copy and identity transfers
+from an exact captured implementation image. The collector verifies assembly,
+module, method token, signature and backing metadata, then hashes the immutable
+bytes it actually decodes. It validates every instruction and stack merge before
+allocating an owned frame. IL operands use CLI stack widths; short storage and
+returns truncate, loads extend, and unsigned opcodes control interpretation.
+Boolean transfers require proven canonical zero/one stack values. Reference stack
+shapes preserve the object/string type and null provenance through merges;
+reference arithmetic, ordering and general conversions remain closed. The
+all-members metadata binding compares intrinsic types and assembly identities
+without requiring symbols from different compilations to be the same instance.
+Body and IL
+arithmetic share the same wrap values and overflow/division fault guards.
+Arguments, local/parameter mutation, dependencies and returns expand into original
+typed IR with fresh frame storage and one shared construction/recursion budget.
+Escaping IL faults retain image/token/offset provenance and route through caller
+filter search, catches and finally; concrete counterexamples replay that owned
+original graph and project only canonical caller inputs.
+
+Only AnyCPU and amd64 IL-only implementation images are admitted. Reference-only
+images, effectful type initialization, module initialization, vararg/unmanaged/synchronized methods, IL
+exception regions, array/length/native operations, unsupported opcodes and
+cross-module dependency calls remain closed. Nonrecursive exact same-module
+dependencies are supported. Broader typed metadata coverage remains required
+before the Phase 2 exit.
+
+An implementation type initializer containing only Nop instructions and Ret is
+admitted after checking the captured PE body. Exception regions, locals,
+synchronization and declarative security reject this empty-initializer admission.
+Other initializer bodies remain unsupported by concrete lowering.
+
+Total IR string equality denotes reference identity, matching its native Ref
+encoding and implementation-IL ceq. Legacy IR retains string content equality.
+The source semantic table still rejects non-null string content comparisons.
+Concrete string witnesses preserve aliases; distinct empty Ref tokens abstain
+because the decoder's CLR construction would return the same empty string.
+
+The compiled metadata conversion matrix checks all 162 source/target/mode pairs
+across the nine integral C# types, including char, in checked and unchecked mode.
+Each pair round-trips the real collector artifact and compares original IR with
+compiled execution at source limits, target limits and adjacent values within
+the source domain. These boundary checks supplement the seeded metadata oracle;
+they do not exhaust every input value or qualify unsupported IL operations.
+
+The Total source candidate also admits object, string and single-dimensional
+arrays of scalar, object or string elements for null, copy, identity and length
+observations. Reads from scalar arrays with int/uint indexes also emit ordered
+NullReference and IndexOutOfRange faults, after evaluating both operands.
+Native element functions preserve each observed scalar element in decoded
+array witnesses, including aliases. Array writes, reference-element reads,
+built-in string content comparisons, general reference casts and allocation
+remain closed. Long/ulong indexes remain closed because their native-width
+conversion can overflow before a null check and source evidence does not bind
+that architecture. Length reads emit guarded NullReference faults in bodies
+and safe conditions in clauses. The native
+candidate uses one uninterpreted Ref sort and a length function with the full
+0..Int32.MaxValue range; null has mathematical length zero, while source reads
+still fault. SAT model decoding preserves array and object aliases, creates
+concrete string and array witnesses, and charges their size before allocation.
+An oversized witness abstains without restricting the proof input domain.
+These source controls do not qualify reference implementation IL or complete
+the Phase 2 exit.
+
+The fuzz campaign's schema 7 result separately accounts for generated Total
+programs. Each case compares compiled execution with the original Total IR
+interpreter and checks a true and false postcondition through the native
+callable solver and owned replay. Cases cover scalar wrapping and checked
+overflow, finally return capture, source calls, Boolean bodies, finite loops,
+and reference null, identity, length and scalar-array read observations.
+Array-read cases use seed-derived elements and indexes, and have a separately
+validated coverage count. Loop postconditions relate
+the result to the current parameter after a cut; compiled and original execution
+still compare the exact finite result. Escaping null faults must also have no
+modeled normal return. The campaign requires all cases to agree, and runs of
+at least 1,000 cases require every body category and all thirteen input types.
+The fuzz executable references Worker to exercise its callable solver through
+a trusted source tooling adapter; Worker still has no compiler-facing dependency.
+The separate metadata-program oracle compiles scalar implementation images,
+captures them through the real collector, round-trips the artifact, and compares
+compiled caller execution with original IR and native true/false goals.
+Its coverage requires every case to agree; runs of at least 1,000 cases require
+all ten scalar types and seven recipes: wrapping addition, checked subtraction,
+multiplication, branches, same-module dependencies, division and remainder.
+Source caller handlers catch modeled arithmetic faults. The tooling executable
+references the collector and attributes for this adapter; the worker remains
+compiler-neutral. These generators do not qualify reference implementation IL,
+IL exception regions, native-width index conversions, heap writes or the
+remaining Phase 2 exit conditions.
+
+Ordinary reducible scalar loops use the owned proof/search route below.
+Checked scalar Add, Subtract, Multiply and
+unary Plus/Minus use the same wrap value and guarded overflow rules in bodies
+and clauses. Increment/decrement and `+=`, `-=`, `*=` compound assignments preserve
+the resolved promotions and checked storage conversion. Earlier operand effects
+remain visible when the operator faults; its own storage write occurs only on
+the normal edge. Overflow routes through the same catch/finally machinery as
+other scalar faults. These rules use the existing integer widths without a
+wider numeric type or a frontend solver dependency.
+
+The candidate region route supports scalar faults, throw-null, ordered canonical
+runtime catches, and nested rethrow. Each lexical catch snapshots both the
+original exception kind and throwing operation, so an inner handled fault cannot
+replace an outer rethrow's provenance. Each finally region is lowered once
+with its own continuation selector. Return values are captured before finally mutates
+storage; exceptional continuations resume the original throw explicitly after
+mixed normal and exceptional joins. Construction is bounded and cancelable, and
+the original graph may be cyclic. Scalar catch filters search in lexical order
+before any finally unwind. A false or faulting filter retains its earlier storage
+effects and resumes search for the original exception. The selected handler owns
+only the finally regions left on its route; a fault during unwind replaces the
+original exception and cancels the handler. Nested and sibling finally regions
+form inner-to-outer continuation chains, preserving captured returns throughout.
+Exception-object locals, object construction, unsupported calls, and heap effects remain
+incomplete. Scalar loops through catches/finally and generated cycles that search
+a shared filter again retain their original bodies for replay. Native enrollment
+uses the exception-component abstraction below; unsupported instructions and
+invalid pending-exception or missing-storage paths still close.
+Owned scalar local storage receives typed initial values at the live body entry,
+after the complete contract prologue. Valid C# definite assignment makes those
+values unobservable; they preserve normal-only local assignments across a shared
+finally join. Canonical parameter and Old identities retain their existing rules.
+
+The standalone passive VC builder owns one immutable Total scalar candidate.
+It derives SSA writes, guarded joins, block and edge reachability, and normal
+return obligations from owned scalar programs. Unchanged incoming
+versions are forwarded. Entry feasibility activates guarded Requires and the
+intrinsic typed domains; body Assume filters point reachability and retains its
+own core provenance. Construction is bounded and cancelable. Each callable
+uses one solver session with the existing method resource meter. Refutations
+must validate every SSA assignment and replay the original body and guarded
+postcondition; displayed models contain canonical entry parameters only. The
+source test adapter rejects mixed contexts and incomplete lowering. Legal
+prologue Assume clauses carry their static Safe-and-Value filter in the original
+Total program, with used UserAssume IDs retained for conditional and vacuous
+proofs. Their elided arguments do not emit runtime evaluations or throws.
+Late or conditional placement remains unsupported. Decoding binds each filter
+to its owned clause and requires reachable prologue placement before body
+execution. The optional Total artifact and shadow comparison reuse decoded
+preparations; authoritative worker responses and cache claims remain legacy.
+`TotalCallableVerifier` owns candidate orchestration independently of legacy
+lowering success and shadow reporting. It publishes each completed claim with
+canonical entry evidence and assumption usage before starting the next claim,
+so later cancellation preserves earlier kernel-validated results.
+The native verifier may also borrow a worker-owned backend and its matching
+method resource budget. It never disposes that backend or resets the shared
+budget. Both full-callable and independent entry queries use ProofKernel on
+the supplied session; default standalone verification still owns its session.
+The internal `SharpProofWorker.CreateNative` qualification route uses one native
+session per callable factory and keeps resource counts monotonic across each
+lane. It admits independently prepared typed callables even when legacy lowering
+failed, projects native claims into ordinary worker responses, and retains
+completed claims across a later method interruption.
+The same native route retains settled results after project timeout or caller
+cancellation, including earlier completed callables. Only unfinished claims
+receive interruption reasons; the final response is classified from its retained
+evidence and is not written to the verification cache during interruption.
+Compiler effect evidence uses separately published entry feasibility; an unconstrained effect-only entry
+needs no SMT query. The public worker creation path now selects native typed
+verification through both the static factory and injected-backend constructor.
+`NativeExceptionEffectVerifier` is the Phase 3 qualification entry point for
+decoded effect-only callable artifacts. It checks entry feasibility and then
+uncaught-exit reachability using the passive SSA session and method budget.
+The compiler captures claim-owned allowed exception kinds using exact bound
+core-library hierarchies. The codec validates claim ownership, canonical kinds
+and the entry/body boundary. The worker never matches short exception names or
+reconstructs Roslyn types. Missing optional constraints remain Unknown; declared
+DoesNotThrow and AllowedExceptions claims share one callable session and meter.
+Native admission accepts original generic declarations when every parameter and
+return value has a supported domain and every operation lowers completely.
+Nominal references support identity and null checks; type-parameter values,
+user-defined equality, reference casts and unmodeled member operations abstain.
+Constructed method symbols cannot borrow an original declaration's parameter
+bindings. Constraint validity is captured before legacy language admission can
+downgrade its published claim. Invalid allowances still have no native constraint,
+including at contradictory entry. Model replay requires exact type and factory
+ownership even when nominal display names match.
+Exception kinds use predecessor-guarded phi facts. Refutations require original
+IR replay and are compared with compiled C# execution in artifact qualification
+tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.
+The compiler effect assembler remains authoritative during this rollout.
+The `SharpProof.Gates exception-shadow` command separately instruments the pinned
+200-method OSS corpus with DoesNotThrow. It compares raw legacy analyzer
+outcomes, published compiler evidence, and native results after production
+artifact serialization and decoding. Every selected method remains in the
+coverage and old-proof denominator, including unsupported bodies. `--limit 10`
+runs a sorted sample; samples cannot satisfy the exhaustive retention gate.
+Concrete native refutations are independently compiled and invoked when their
+static, nongeneric scalar/string/null inputs can be represented. Unsupported
+invocation shapes remain explicit oracle gaps. Runtime confirmations concern
+counterexamples only; they do not establish universal proofs. The report
+separates comparison success from the 95% old-proof retention gate and does not
+qualify allocation, write, lock, capability, or call-precondition effects.
+Typed `Allocate` instructions capture core `new object()` expressions and
+scalar boxing to `object`. An optional reference target receives a fresh nonnull
+identity, with guarded freshness facts against tracked references of the same
+type. Replay creates a distinct identity on each execution. Boxing lowers its
+operand before allocation; boxed contents and unboxing remain unsupported.
+An optional Int32 length extends Allocate to fresh zero-initialized sequences.
+Source dimension faults and negative-length Overflow edges precede allocation.
+SSA constrains the fresh reference, exact length and normal continuation;
+concrete replay creates CLR-default elements within its work budget. Symbolic
+array sizes stay unbounded. Constant initializers carry matching literal terms
+and an exact constant size through Allocate, codec validation and replay. SSA
+constrains scalar element values; reference elements remain overapproximated.
+Nonempty constant array collection expressions reuse this constructor after
+their collection-specific conversion. Source params frames admit explicit
+arrays/nulls and constant expanded arrays, preserving argument source order.
+Empty expanded arguments require the owned Array.Empty model and retain its
+cached identity; explicit new T[0] remains fresh. Nonconstant initializers,
+dynamic params expansion and array writes remain incomplete. Empty collection
+expressions and spreads abstain; default-array contents are overapproximated.
+The allocation table also recognizes explicit delegate construction for static
+or nonvirtual reference receivers. Receiver evaluation precedes a null guard
+that throws the appended Argument exception kind before allocation when the
+value directly escapes. Release emission can erase an unused construction and
+its null check. Other uses therefore include a scoped Boolean approximation;
+nonnull receivers avoid reading it, and concrete refutations reject consumed
+approximation values. The decoder permits only one Boolean temporary per such
+Havoc, excluding parameters and result storage, Input/SpecResult origins and
+memory effects. The fresh delegate value never calls its target. Exception capture, portable validation,
+catch dispatch and native allowed-exception constraints preserve the exact
+System.ArgumentException kind. Cached method-group/lambda conversions, generic
+targets, capturing closures and virtual, override or value-type receivers remain incomplete. The production artifact preserves type and site ownership; passive
+SSA records guarded reachability and original-program replay observes the
+allocation site. Native ZeroAllocations qualification excludes reachable
+throw sites as potential implicit allocations, including caught faults.
+String/string `+` chains with at most four operands after constant merging and
+the owned two-string `String.Concat` model emit string-typed allocation sites,
+guarded by at least two nonempty operands. Null is treated as empty; constant
+strings merge before the guard. Flattened operands survive CFG flow captures,
+so a captured prefix does not allocate before a later conditional operand.
+Passive SSA substitutes concatenation expressions and their observations,
+avoiding artificial model values for abstract concatenation lengths. Unmatched
+concatenation sites still block allocation proofs. Longer chains, formatting
+overloads, params arrays, string content, body abstractions and incomplete
+source static/module initialization remain unsupported by this qualification.
+Validated effect claim IDs are captured before legacy language admission and
+decoded as a canonical owned set. Missing admission data abstains even at a
+contradictory entry. Compiled C# tests independently measure thread allocation
+bytes on concrete paths after delegate construction and JIT warmup.
+`SharpProof.Gates allocation-shadow` measures this replacement on the same
+pinned universe with ZeroAllocations annotations. Concrete feasible entries
+are replayed before invoking independently compiled source through a direct
+delegate. Arguments and warmup are outside thread-allocation measurements.
+Generic methods use bounded int and string representative closures; unsupported
+inputs and incomplete executions remain explicit gaps. Independent conservative
+IL reachability checks allocation, throw and call sites, including filter handlers.
+A potential IL site remains a gap when preconditions may exclude its edge.
+Runtime observations do not establish a universal proof. This command does not
+qualify an authority switch or complete the implicit-allocation table.
+Typed Write events carry Local, Parameter, Field, Static, Element or
+Unknown regions and owned operation sites through artifacts, loop transformation,
+passive SSA and original-program replay. Source local assignments, increments
+and compound assignments emit Local events, including by-value parameter
+rebinding. Primitive source field stores emit Parameter, Field or Static events,
+capturing receivers before the RHS and checking null after RHS evaluation.
+Volatile, readonly, external and initialization-sensitive stores abstain; heap
+reads and array stores remain incomplete. The native
+purity shadow forbids reachable nonlocal events; allocation remains compatible
+with purity. The allocation and purity routes share claim admission, entry
+feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.
+`SharpProof.Gates purity-shadow` compares every pinned method against raw legacy
+purity results; independent mutation oracles remain explicit gaps. Compiler
+effect authority remains in place.
+Typed Lock instructions record validated Monitor.Enter/Exit attempts, including
+C# lock statements and source-helper frames. Concrete replay observes the
+attempt and stops before synchronization. Native purity excludes reachable
+attempts; postcondition, exception, allocation and normal-completion proofs also
+require them to be unreachable. These guards preserve the boundary around
+blocking, runtime allocation and exceptions; no monitor-state model is implied.
+A deliberate replay stop at a Lock instruction is CounterexampleNotReplayable,
+so it remains a complete semantic Unknown and supports validated cache reuse.
+The fresh receiver in the lock-local worker golden now exposes synchronization;
+its previous postcondition proof is explicitly triaged as Unknown.
+Preconditions can exclude a lock path. Only the compiler's matched lockTaken
+Boolean local is admitted among unnamed generated locals.
+Native lanes do not instantiate the legacy callable verifier or predicate
+executor. Temporary legacy comparison fixtures explicitly select their internal
+route; legacy implementation retirement remains a separate gate.
+The VC golden stage checks typed public verification for the retired raw
+executor and obligation-builder fixtures: joins, faults, calls, domains, and
+assumption usage. Native construction and session tests retain cancellation,
+state-growth, graph-limit, and method-budget guards. Expression-bodied callees
+bind through transparent checked and parenthesis syntax wrappers while retaining
+Roslyn's overflow semantics.
+Legacy comparison fixtures explicitly construct the legacy backend. An explicitly
+native worker ignores the legacy shadow switch, so qualification cannot silently
+run an additional legacy comparison or emit its reports.
+A trial public-factory switch exposed remaining parity gaps in API specification
+models (string concatenation and `Array.Empty` result facets). The native
+`Array.Empty<T>()` model now covers every supported scalar, string and object
+element type. It uses the approved compiler-resolved framework symbol and an
+exact typed empty-array term with non-nullness, zero length and cached identity.
+SMT encoding supplies those intrinsic facts, and decoded aliases replay as the
+same concrete empty array. Compiled C# runtime comparisons and artifact
+round-trip validation cover the model. Native two-string concatenation also uses
+the approved framework symbol and preserves argument order and faults. String
+literals retain non-nullness, exact UTF-16 length and canonical empty identity.
+Concatenation retains empty-operand aliases and non-nullness; two nonempty operands
+have no content or input-related length facts in SMT. The VC builder forwards
+concatenation value expressions for nullness and length observations instead of
+requiring SAT replay to reproduce a fresh allocation's identity. String content
+comparisons remain unsupported at binding. VC admission also rejects non-null
+string identity comparisons in callables that concatenate strings; existing
+metadata identity transfers without concatenation retain their support.
+Runtime comparisons cover nullable, empty and nonempty operands and aliases. Existing
+proof expectations remain requirements for the transition; they have not been
+weakened to accommodate these gaps. Typed scalar improvements also change several
+legacy outcomes and proof cores. Public-worker tests now require exact typed
+conversion proofs, replayed scalar and reference counterexamples, explicit fault
+edges, and native normal-completion selectors. Integer domains are intrinsic
+bitvector constraints and require no legacy domain selectors. An exact
+zero-dividend encoding avoids expanding 64-bit division while retaining Z3's
+division-by-zero completion; C# postcondition faults remain separate safety goals.
+Native Int32 `Math.Abs` calls use the approved compiler-resolved API symbol and
+the shared scalar semantic rule. The rule computes typed absolute values and
+emits an explicit overflow edge for `int.MinValue`; arguments are evaluated
+before that edge, and caller exception handlers remain active. Boundary cases
+are compared with compiled C# execution. A source type named `System.Math` does
+not receive this model.
+The explicitly selected scalar specification pack also lowers into typed native
+terms. Catalog version/hash, approved assembly identity and signature checks
+remain in force. Its current Int32 `Math.Max` declaration keeps 32-bit signed
+comparisons, evaluates arguments in source order and preserves their parameter
+ordinals. Unsupported term forms or mismatched argument types abstain. This
+route does not invoke the legacy relational-summary builder; disabled packs do
+not provide native call models.
+Source inlining discards callee specification assumptions while preserving the
+caller's own declared assumptions. Elided callee contract calls stay elided;
+emitted calls return to ordinary source/implementation-IL lowering, including
+argument evaluation and faults. An emitted argument fault can reach the caller's
+handler or eliminate normal return. No callee assumption becomes an untracked
+caller premise. Unsupported emitted calls remain incomplete, and asynchronous
+callee completion remains unsupported.
+Native contract binding includes parameter and return `Positive`, `InRange`, and
+supported reference `NotNull` attributes. Numeric predicates use the value's
+signedness and width, including `ulong`; bounds outside the scalar domain fold
+to Boolean comparisons rather than wrapping. Attribute source spans and manifest
+evidence remain bound through the version 28 compiler artifact. Direct clauses
+precede return attributes, and parameter attributes use immutable entry values.
+Companion clauses bind in a separate clause context and substitute
+parameters by ordinal into the target's entry, current, and Old identities.
+Companion source spans and evidence remain bound to the manifest. Verification
+and concrete replay execute the original target body; the companion body supplies
+only its validated clauses. Ordinary nonvirtual instance bodies may use scalar
+parameters and supported reference observations. Instance companion binding
+omits its receiver parameter only after validating its exact declaring type;
+clauses that read receiver state remain unsupported. Instance calls inside bodies
+and virtual or override instance roots remain unsupported.
+The shadow comparison consumes the same Total-to-worker claim projection needed
+by the authority transition. It names counterexamples from canonical Total entry
+parameters rather than legacy variable ids, preserves full unsigned values, and
+quotes string displays to retain empty strings, whitespace and UTF-16 units in
+the existing nonblank model wire format. Missing or mistyped inputs, foreign
+assumptions and incomplete publications cannot publish a proof or refutation.
+Normal completion has an explicit SSA definition, so even a body with no return
+instructions carries kernel-validated normal-exit provenance in a vacuity proof
+core. This total fresh definition does not constrain the admitted input domain.
+Entry feasibility is published separately, before the normal-completion query,
+and its original kernel evidence remains available after that query. A reachable
+entry remains feasible when the body always throws or bounded return search is
+inconclusive. Only the Requires query can establish contradictory entry; its
+core maps to the manifest precondition ids. Manifest version 24 carries a separate
+body-free Total entry graph. Requires binding can succeed independently of an
+unsupported body or Ensures expression. Decoding rejects bodies, result roles,
+non-Requires clauses, missing or foreign assumption ids, and predicates outside
+canonical entry inputs. Body Assume clauses cannot constrain this entry query.
+The independent native query preserves cancellation and existing resource budgets.
+Effect routing still uses legacy entry evidence pending authority qualification.
+Entry qualification enumerates every callable from the 54 source-comparison
+fixtures and all 64 worker golden sources, including fixtures without claims.
+It records enrollment and Unknown results, rejects contradictions between known
+legacy/native results, and requires every known legacy entry result to remain
+known. Native entry cores may use only manifest precondition ids. This bounded
+qualification does not establish postcondition or effect authority retirement.
+
+When concrete body lowering fails within the existing construction bound, a
+callable with only scalar parameters and result may carry an explicitly marked
+body abstraction. It preserves Entry and Old, forgets every mutable parameter
+and result, and represents an arbitrary normal return. Decoding validates that
+exact shape; reference signatures and body Assume clauses remain excluded.
+UNSAT may prove a universally valid postcondition. SAT establishes neither a
+normal-return witness nor a refutation, and publishes no model or vacuity.
+This explicit marker leaves ordinary concrete replay's unread-approximation
+behavior unchanged. Postcondition qualification also compares every claim in
+the source and worker golden universe and rejects each lost legacy proof,
+in addition to aggregate proof counts and soundness disagreements.
+The native entry and postcondition gates compare directly with the qualified
+legacy baseline captured at commit 86fa6ea90. The baseline accounts for all 173
+callables and 253 postconditions, including Unknown results. Postconditions use
+fixture, callable signature and clause ordinal as their key; metadata build
+hashes are intentionally excluded. This keeps proof-retention and contradiction
+checks usable after the legacy execution path is retired.
+
+Ordinary reducible scalar loops retain their original cyclic Total program for
+concrete replay. The worker derives two bounded encodings from that same owner.
+For proof, each natural-loop header havocs all scalar storage written by its
+loop and cuts back edges. Every finite original return is represented by its
+last loop iteration, including zero trips, nested loops and control exits; Entry
+and Old remain immutable. Only UNSAT of this overapproximation establishes a
+proof or absence of normal completion. Cut stops are lowering facts, never user
+assumptions. Ordinary irreducible loops and point Assume instructions inside
+cycles remain unsupported.
+
+Cyclic components containing modeled Throw flow use a separate proof tier. Each
+external entry (or program entry inside the component) has a nondeterministic
+router that havocs the union of written scalar storage and selects any component
+block. Original blocks remain shared; DFS cycle-closing edges are cut. A finite
+execution is represented by its suffix after its last cut edge: the router selects
+that target with its actual state, and the suffix crosses no deleted edge. Entry,
+Old and every unmodified variable remain exact. Internal choices and stops have
+Lowered provenance, never UserAssume IDs. No pending exception is synthesized;
+an encoded naked ExceptionalExit or missing nonmodified binding rejects
+enrollment. Router expansion is charged and capped before allocation. This tier
+establishes normal-return/poststate properties only and does not preserve skipped
+effect-site reachability. Its abstract SAT models never refute an original clause.
+
+Counterexample and normal-witness search unrolls at most four back-edge
+traversals. SAT must validate all SSA facts and replay the original cyclic body
+within the existing 4096-step bound. Bounded UNSAT establishes neither a proof
+nor vacuity. If that search is inconclusive, an independently established
+abstract Ensures proof may still be reported with unknown normal feasibility
+and no vacuity. A completed bounded search reports Unknown/SolverIncomplete
+and counts as checked; skipped, interrupted or refused queries stay unchecked.
+Both encodings share one solver session and the existing method resource meter.
+Cyclic artifact validation computes finite pending-throw and body-start states,
+rejecting every body path that re-enters the contract prologue or initialization.
 
 The artifact is trusted build output. ArtifactValidator checks its digest,
 validates semantic shape and claim/type/IR bindings, and decodes each graph once.
@@ -210,6 +716,13 @@ Unsupported instructions on other paths do not block replay. Executed calls
 without a concrete registered host become CounterexampleNotReplayable;
 inconsistent replay becomes CounterexampleReplayFailed.
 
+Modeled replay tracks approximation values only when they are actually read,
+including reads in the original postcondition and its explicit Total-mode
+guard. Overwritten values and untaken lazy operands do not count as reads.
+Input havoc binds to the original entry model; generic spec-result havoc
+cannot authorize Refuted. Total replay without a successful clause guard
+abstains, so deterministic completion values cannot hide an undefined clause.
+
 Effect replay remains an interpreter of compiler-produced unconditional events.
 It derives effects, capabilities, and exact exception hierarchy, evaluates the
 selected constraint, and matches the witness. It does not execute user code or
@@ -224,8 +737,16 @@ does not change the semantic cache payload.
 RunVerifier starts one worker process with a hard deadline and kills its process
 tree on timeout or cancellation. The worker's project budget includes launcher
 artifact preparation and uses elapsed-time checks as well as cancellation.
-Validated manifest, request, optional SARIF, and result are published atomically,
-with the result written last. Docker owns CPU and memory isolation.
+The child prepares manifest, request, optional SARIF, and result in its private
+invocation directory. RunVerifier holds sorted leases for the canonical stable
+members through promotion and validation against that private invocation. Each
+file is replaced atomically, with the result written last. Standalone launcher
+publication, invalidation, and reset use the same leases. Their lock sidecars stay
+in place to keep cooperating owners on the same lock. Before rewriting child
+destinations, publishers reject outputs inside the declared worker runtime,
+including existing leaf symlinks into it. Invalidation uses the same path check.
+Input and publication failures retain the launcher's exit codes and messages.
+Docker owns CPU and memory isolation.
 
 ## Activation and release gates
 

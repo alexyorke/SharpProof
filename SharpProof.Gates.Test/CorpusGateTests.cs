@@ -11,6 +11,163 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void NativeContractCoverageUsesCompanionTreeIdentity(bool collidingPaths)
+    {
+        var options = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp12);
+        var implementation = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("""
+            public static class Helper { public static int Target(int value) => value; }
+            public static class Caller { public static int Root(int value) => Helper.Target(value); }
+            """, options, "Implementation.cs");
+        var companion = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("""
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Helper))]
+            public static class HelperContracts {
+                public static int Target(int value) { Contract.Requires(value > 0); return value; }
+            }
+            """, options, collidingPaths ? "Implementation.cs" : "Companion.cs");
+        var occupiedSuffix = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            "internal class Unused {}", options, "Implementation.cs#1");
+        var compilation = AnalyzerGateHost.CreateCompilation("", "CompanionCoverage")
+            .RemoveAllSyntaxTrees().AddSyntaxTrees(implementation, companion, occupiedSuffix);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+            SharpProof.Worker.Protocol.WorkerFeatureSet.All,
+            SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
+        var body = batch.Callers.Single().Body;
+        var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId,
+            SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!, CancellationToken.None);
+        var match = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+        Assert.That(match.Expected, Is.EqualTo(1));
+        Assert.That(match.Matched, Is.EqualTo(1));
+        Assert.That(match.Failures, Is.Empty);
+        var missing = CorpusGate.MatchNativeContractCalls(compilation,
+            [detached.Body with { CallPreconditions = [] }]);
+        Assert.That(missing.Expected, Is.EqualTo(1));
+        Assert.That(missing.Matched, Is.Zero);
+        Assert.That(missing.Failures, Has.Some.StartsWith("MissingNativeObligation:"));
+        var row = detached.Body.CallPreconditions.Single();
+        var factory = detached.Body.Program.Factory;
+        var span = factory.GetOperationInfo(row.ClauseSite).SourceSpan!;
+        var wrongSite = factory.CreateOperation("coverage-negative",
+            new SharpProof.Ir.IrSourceSpan(span.Document, span.Start + 1, span.Length));
+        var substituted = CorpusGate.MatchNativeContractCalls(compilation,
+            [detached.Body with { CallPreconditions = [row with { ClauseSite = wrongSite }] }]);
+        Assert.That(substituted.Expected, Is.EqualTo(1));
+        Assert.That(substituted.Matched, Is.Zero);
+        Assert.That(substituted.Failures, Has.Some.StartsWith("UnexpectedNativeObligation:"));
+        Assert.That(substituted.Failures, Has.Some.StartsWith("MissingNativeObligation:"));
+    }
+
+    [Test]
+    public async Task NativeShadowCallersQualifyEveryContractCorpusVariantWithOriginalReplay()
+    {
+        SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var root = RepositoryLayout.FindRoot();
+        var snapshotPath = Path.Combine(root, "SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
+        var snapshotBefore = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
+        var frozen = (await File.ReadAllLinesAsync(snapshotPath)).Where(static line => line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal))
+            .ToDictionary(static line => line.Split('|')[0], StringComparer.Ordinal);
+        var cases = CorpusCatalog.CreateSyntheticCases().Where(static item => item.Mode == "contracts").ToArray();
+        Assert.That(cases, Has.Length.EqualTo(100));
+        Assert.That(cases.Select(static item => item.SeedId).Distinct().Count(), Is.EqualTo(10));
+        Assert.That(frozen.Keys, Is.EquivalentTo(cases.Select(static item => item.Id)));
+        foreach (var seed in cases.GroupBy(static item => item.SeedId, StringComparer.Ordinal))
+        {
+            Assert.That(seed.Select(static item => item.Variant), Is.EquivalentTo(Enum.GetValues<CorpusVariant>()), seed.Key);
+        }
+        var rows = new List<(string Seed, string Outcome, string Reason)>();
+        var managedRows = new List<(string Seed, string Outcome)>();
+        foreach (var item in cases)
+        {
+            var compilation = AnalyzerGateHost.CreateCompilation(item.Source, "ShadowCorpus_" + item.SeedId);
+            var census = CorpusGate.CensusContractCalls(compilation);
+            Assert.Multiple(new Action(() =>
+            {
+                Assert.That(census.PublicOwners, Is.EqualTo(1), item.Id);
+                Assert.That(census.PotentialCalls, Is.EqualTo(1), item.Id);
+                Assert.That(census.BoundRequires, Is.EqualTo(1), item.Id);
+                Assert.That(census.Complete, Is.True, item.Id);
+                Assert.That(census.Unpublished, Is.True, item.Id);
+                Assert.That(census.ManifestUnchanged, Is.True, item.Id);
+                Assert.That(census.Failures, Is.Empty, item.Id);
+            }));
+            var originalManifest = System.Text.Json.JsonSerializer.Serialize(
+                new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest);
+            var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+                SharpProof.Worker.Protocol.WorkerFeatureSet.All,
+                SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+                SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            Assert.That(System.Text.Json.JsonSerializer.Serialize(
+                new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest),
+                Is.EqualTo(originalManifest), item.Id);
+            Assert.That(batch.Gaps, Is.Empty, item.Id);
+            Assert.That(batch.Callers, Has.Length.EqualTo(1), item.Id);
+            var body = batch.Callers.Single().Body;
+            Assert.That(body.Clauses, Is.Empty, item.Id);
+            Assert.That(body.IsBodyAbstraction, Is.False, item.Id);
+            Assert.That(body.ValidEffectClaimIds, Is.Empty, item.Id);
+            Assert.That(body.ExceptionConstraints, Is.Empty, item.Id);
+            Assert.That(body.CallPreconditions, Has.Length.EqualTo(1), item.Id);
+            var encoded = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!;
+            var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(
+                body.CallableId, encoded, CancellationToken.None);
+            Assert.That(detached.Body.Program.Factory, Is.Not.SameAs(body.Program.Factory), item.Id);
+            var coverage = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+            Assert.That(coverage.Expected, Is.EqualTo(1), item.Id);
+            Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
+            Assert.That(coverage.Failures, Is.Empty, item.Id);
+            var managed = await CorpusGate.ObserveManagedContractClausesAsync(compilation, CancellationToken.None);
+            Assert.That(managed.Gaps, Is.Empty, item.Id);
+            Assert.That(managed.Clauses, Has.Length.EqualTo(1), item.Id);
+            var managedClause = managed.Clauses.Single();
+            var nativeClause = detached.Body.CallPreconditions.Single();
+            var marker = detached.Body.Program.Blocks.SelectMany(static block => block.Instructions)
+                .Single(instruction => instruction.Id == nativeClause.Instruction);
+            var callSpan = detached.Body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan!;
+            var clauseSpan = detached.Body.Program.Factory.GetOperationInfo(nativeClause.ClauseSite).SourceSpan!;
+            var nativeKey = new ContractCoverageKey(body.CallableId, nativeClause.CalleeIdentity, nativeClause.ClauseOrdinal,
+                new(callSpan.Document, callSpan.Start, callSpan.Length),
+                new(clauseSpan.Document, clauseSpan.Start, clauseSpan.Length));
+            Assert.That(managedClause.Key, Is.EqualTo(nativeKey), item.Id);
+            managedRows.Add((item.SeedId, managedClause.Outcome));
+            var candidate = SharpProof.Worker.PassiveCallableArtifactAdapter.EnrollShadow(detached);
+            Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
+            using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
+            var result = await solver.VerifyCallPreconditionAsync(0);
+            Assert.That(result.Reason, Is.EqualTo(SharpProof.Worker.Protocol.WorkerClaimReason.None), item.Id);
+            var outcome = result.Outcome switch
+            {
+                SharpProof.Verify.ProvenOutcome => "Proven",
+                SharpProof.Verify.RefutedOutcome => "Refuted",
+                _ => "Unknown"
+            };
+            rows.Add((item.SeedId, outcome, result.Reason.ToString()));
+            var expected = item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted";
+            Assert.That(outcome, Is.EqualTo(expected), item.Id + ":" + result.Reason);
+            Assert.That(managedClause.Outcome, Is.EqualTo(item.SeedId == "C06" ? "Unknown" : expected), item.Id);
+            if (outcome == "Refuted")
+            {
+                var replay = plan!.ReplayCallPrecondition(0, result.EntryModel, CancellationToken.None);
+                Assert.That(replay, Is.Not.Null, item.Id);
+                Assert.That(result.CallPreconditionWitness, Is.EqualTo(replay), item.Id);
+            }
+            var legacy = await CorpusGate.ObserveCaseAsync(item, CancellationToken.None);
+            Assert.That(legacy.ToCanonicalLine(), Is.EqualTo(frozen[item.Id]), item.Id + ": legacy changed");
+        }
+        Assert.That(rows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
+        Assert.That(rows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(70));
+        Assert.That(managedRows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
+        Assert.That(managedRows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(60));
+        Assert.That(managedRows.Count(static row => row.Outcome == "Unknown"), Is.EqualTo(10));
+        var snapshotAfter = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
+        Assert.That(snapshotAfter, Is.EqualTo(snapshotBefore));
+    }
+
     private const string CorpusSnapshotHeader = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
 
     [Test]
@@ -932,5 +1089,127 @@ public sealed class CorpusGateTests
             Assert.That(openSource[2], Is.EqualTo("Abstained"));
             Assert.That(openSource[3], Does.StartWith("SP0047@Warning@"));
         }
+    }
+}
+
+
+[TestFixture]
+public sealed class IndependentPinnedRequiresCensusTests
+{
+    private sealed record Row(string Owner, string Callee, int ClauseOrdinal, int CallStart, int CallLength,
+        int ClauseStart, int ClauseLength);
+
+    private static Row[] Census(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, out int declarations, out int declaredRequires)
+    {
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")!;
+        Assert.That(api, Is.Not.Null);
+        Assert.That(api.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(api.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(SharpProof.Attributes.Contract).Assembly.GetName().Name));
+        var clauses = new Dictionary<IMethodSymbol, List<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>>(SymbolEqualityComparer.Default);
+        var calls = new List<(IMethodSymbol Owner, IMethodSymbol Target, Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax Syntax)>();
+        declarations = 0;
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            var model = compilation.GetSemanticModel(tree);
+            var root = tree.GetRoot();
+            declarations += root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Count();
+            foreach (var invocation in root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>())
+            {
+                if (Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol is not IMethodSymbol target)
+                { continue; }
+                if (model.GetEnclosingSymbol(invocation.SpanStart) is not IMethodSymbol owner)
+                { continue; }
+                if (SymbolEqualityComparer.Default.Equals(target.ContainingType, api))
+                {
+                    if (target.Name == "Requires")
+                    {
+                        Assert.That(target.IsStatic && target.ReturnsVoid && target.Arity == 0 && target.Parameters.Length == 1 &&
+                            target.Parameters[0].Type.SpecialType == SpecialType.System_Boolean, Is.True);
+                        if (!clauses.TryGetValue(owner.OriginalDefinition, out var owned))
+                        { clauses.Add(owner.OriginalDefinition, owned = []); }
+                        owned.Add(invocation);
+                    }
+                    continue;
+                }
+                calls.Add((owner, target.OriginalDefinition, invocation));
+            }
+        }
+        declaredRequires = clauses.Values.Sum(static owned => owned.Count);
+        var rows = new List<Row>();
+        foreach (var call in calls)
+        {
+            if (!clauses.TryGetValue(call.Target, out var required))
+            { continue; }
+            var ordinal = 0;
+            foreach (var clause in required.OrderBy(static clause => clause.SpanStart))
+            {
+                rows.Add(new(call.Owner.GetDocumentationCommentId()!, call.Target.GetDocumentationCommentId()!, ordinal++,
+                    call.Syntax.SpanStart, call.Syntax.Span.Length, clause.SpanStart, clause.Span.Length));
+            }
+        }
+        return [.. rows];
+    }
+
+    [Test]
+    public async Task AllPinnedSourcesHaveAnIndependentDirectRequiresCensus()
+    {
+        var root = RepositoryLayout.FindRoot();
+        var synthetic = CorpusCatalog.CreateSyntheticCases();
+        Assert.That(synthetic, Has.Length.EqualTo(262));
+        var declarations = 0;
+        var obligations = 0;
+        var contractIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in synthetic)
+        {
+            var compilation = AnalyzerGateHost.CreateCompilation(item.Source, "Independent_" + item.SeedId);
+            var rows = Census(compilation, out var count, out var clauseDeclarations);
+            declarations += count;
+            Assert.That(clauseDeclarations, Is.EqualTo(item.Mode == "contracts" ? 1 : 0), item.Id);
+            Assert.That(rows, Has.Length.EqualTo(item.Mode == "contracts" ? 1 : 0), item.Id);
+            if (item.Mode != "contracts")
+            { continue; }
+            Assert.That(contractIds.Add(item.Id), Is.True);
+            obligations += rows.Length;
+            var row = rows.Single();
+            Assert.That(row.ClauseOrdinal, Is.Zero, item.Id);
+            var tree = compilation.SyntaxTrees.Single();
+            var model = compilation.GetSemanticModel(tree);
+            var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+                .Single(invocation => invocation.SpanStart == row.CallStart && invocation.Span.Length == row.CallLength);
+            var owner = (IMethodSymbol)model.GetEnclosingSymbol(syntax.SpanStart)!;
+            Assert.That(owner.IsStatic && owner.MethodKind == MethodKind.Ordinary && owner.DeclaredAccessibility == Accessibility.Public,
+                Is.True, item.Id);
+            Assert.That(syntax.Ancestors().Any(static node => node is Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax or
+                Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousFunctionExpressionSyntax), Is.False, item.Id);
+            var existing = CorpusGate.CensusContractCalls(compilation);
+            Assert.That(existing.PublicOwners, Is.EqualTo(1), item.Id);
+            Assert.That(existing.PotentialCalls, Is.EqualTo(rows.Length), item.Id);
+            Assert.That(existing.BoundRequires, Is.EqualTo(rows.Length), item.Id);
+            Assert.That(existing.Complete && existing.Unpublished && existing.ManifestUnchanged, Is.True, item.Id);
+            Assert.That(existing.Failures, Is.Empty, item.Id);
+            var managed = await CorpusGate.ObserveManagedContractClausesAsync(compilation, CancellationToken.None);
+            Assert.That(managed.Gaps, Is.Empty, item.Id);
+            Assert.That(managed.Clauses, Has.Length.EqualTo(rows.Length), item.Id);
+            var observed = managed.Clauses.Single();
+            Assert.That((observed.Key.Call.Start, observed.Key.Call.Length, observed.Key.ClauseOrdinal,
+                observed.Key.Clause.Start, observed.Key.Clause.Length),
+                Is.EqualTo((row.CallStart, row.CallLength, row.ClauseOrdinal, row.ClauseStart, row.ClauseLength)), item.Id);
+            Assert.That(observed.Outcome, Is.EqualTo(item.SeedId == "C06" ? "Unknown" :
+                item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted"), item.Id);
+        }
+        Assert.That(obligations, Is.EqualTo(100));
+        var snapshot = await File.ReadAllLinesAsync(Path.Combine(root, "SharpProof.Gates", "Corpus", "expected.canonical.snapshot"));
+        var pinnedContractIds = snapshot.Where(static line => line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal))
+            .Select(static line => line.Split('|')[0]).ToArray();
+        Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));
+        var document = OpenSourceCorpusCatalog.Load(root);
+        Assert.That(document.Methods, Has.Length.EqualTo(200));
+        var oss = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
+        var ossRows = Census(oss, out var ossDeclarations, out var ossDeclaredRequires);
+        Assert.That(ossRows, Is.Empty);
+        Assert.That(ossDeclaredRequires, Is.Zero);
+        await TestContext.Progress.WriteLineAsync($"independent-census synthetic={synthetic.Length} methodDeclarations={declarations} requiresObligations={obligations} " +
+            $"ossSelected={document.Methods.Length} ossTrees={oss.SyntaxTrees.Length} ossMethodDeclarations={ossDeclarations} ossRequiresObligations={ossRows.Length}");
     }
 }

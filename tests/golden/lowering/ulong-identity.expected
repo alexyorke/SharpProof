@@ -1,0 +1,11 @@
+mode: Legacy
+classification: ClosedAbstention/UnsupportedType
+entry: b0
+block: b0 cfg:0:Entry
+  i0 op0 Goto b1
+block: b1 cfg:1:Block
+  i1 op1 Return pure:m0()
+block: b2 cfg:2:Exit
+  i2 op2 Return void
+term: ir0 Opaque type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.UInt64 width=0 signed=False value=pure:m0()
+diagnostic: op1 UnsupportedType cfg:1:0:None

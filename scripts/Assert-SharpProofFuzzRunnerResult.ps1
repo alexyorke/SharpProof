@@ -110,7 +110,7 @@ function Assert-SharpProofFuzzRunnerResult {
                 'SchemaVersion', 'Cases', 'Seed', 'MaximumParallelism',
                 'Agreements', 'Abstentions', 'FrontendAgreements',
                 'SmtAgreements', 'PartialSmtAgreements', 'FrontendCoverage',
-                'CoverageSatisfied', 'Failures', 'Passed')
+                'TotalProgramCoverage', 'MetadataProgramCoverage', 'CoverageSatisfied', 'Failures', 'Passed')
 
         $schema = Get-ExactJsonInt32 $root 'SchemaVersion'
         $cases = Get-ExactJsonInt32 $root 'Cases'
@@ -125,7 +125,7 @@ function Assert-SharpProofFuzzRunnerResult {
         $coverageSatisfied = Get-ExactJsonBoolean $root 'CoverageSatisfied'
         $passed = Get-ExactJsonBoolean $root 'Passed'
 
-        if ($schema -ne 4) { throw "Unsupported fuzz schema '$schema'." }
+        if ($schema -ne 7) { throw "Unsupported fuzz schema '$schema'." }
         if ($cases -lt 1) {
             throw 'The fuzz runner case count must be positive.'
         }
@@ -180,6 +180,61 @@ function Assert-SharpProofFuzzRunnerResult {
             throw 'Frontend exception coverage exceeds the executed case count.'
         }
 
+        $totalCoverage = $root.GetProperty('TotalProgramCoverage')
+        $totalProperties = @(
+            'Cases', 'Agreements', 'NativeProofs', 'NativeRefutations',
+            'WrappedBodies', 'CheckedBodies', 'FinallyBodies', 'SourceCalls',
+            'BooleanBodies', 'LoopBodies', 'ReferenceBodies', 'ExceptionalExits', 'TypeMask', 'ArrayReadBodies')
+        if ($totalCoverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'Total program coverage must be a JSON object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($totalCoverage.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -RejectDuplicates -Expected $totalProperties -Description 'Total program coverage'
+        $totalValues = [ordered]@{}
+        foreach ($name in $totalProperties) {
+            $count = Get-ExactJsonInt32 $totalCoverage $name
+            if ($count -lt 0) { throw "Total program coverage '$name' is negative." }
+            $totalValues[$name] = $count
+        }
+        [long]$bodyTotal = 0
+        foreach ($name in @('WrappedBodies', 'CheckedBodies', 'FinallyBodies', 'SourceCalls',
+                'BooleanBodies', 'LoopBodies', 'ReferenceBodies')) {
+            $bodyTotal += [long]$totalValues[$name]
+            if ($cases -ge 1000 -and $totalValues[$name] -eq 0) {
+                throw "Total program coverage '$name' is missing."
+            }
+        }
+        if ($totalValues.Cases -ne $cases -or $totalValues.Agreements -ne $cases -or
+            $totalValues.NativeProofs -ne $cases -or $bodyTotal -ne $cases -or
+            [long]$totalValues.NativeRefutations + $totalValues.ExceptionalExits -ne $cases -or
+            $totalValues.ExceptionalExits -gt $totalValues.ReferenceBodies -or
+            $totalValues.ArrayReadBodies -gt $totalValues.ReferenceBodies -or
+            $totalValues.TypeMask -lt 1 -or $totalValues.TypeMask -gt 8191 -or
+            ($cases -ge 1000 -and ($totalValues.TypeMask -ne 8191 -or $totalValues.ExceptionalExits -eq 0 -or $totalValues.ArrayReadBodies -eq 0))) {
+            throw 'Total program coverage does not form a complete agreement partition.'
+        }
+
+        $metadataCoverage = $root.GetProperty('MetadataProgramCoverage')
+        $metadataProperties = @('Cases', 'Agreements', 'NativeProofs', 'NativeRefutations', 'TypeMask', 'RecipeMask')
+        if ($metadataCoverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'Metadata program coverage must be a JSON object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($metadataCoverage.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -Description 'Metadata program coverage' -RejectDuplicates -Expected $metadataProperties
+        $metadataValues = [ordered]@{}
+        foreach ($name in $metadataProperties) {
+            $metadataValues[$name] = Get-ExactJsonInt32 $metadataCoverage $name
+        }
+        if ($metadataValues.Cases -ne $cases -or $metadataValues.Agreements -ne $cases -or
+            $metadataValues.NativeProofs -ne $cases -or $metadataValues.NativeRefutations -ne $cases -or
+            $metadataValues.TypeMask -lt 1 -or $metadataValues.TypeMask -gt 1023 -or
+            $metadataValues.RecipeMask -lt 1 -or $metadataValues.RecipeMask -gt 127 -or
+            ($cases -ge 1000 -and ($metadataValues.TypeMask -ne 1023 -or $metadataValues.RecipeMask -ne 127))) {
+            throw 'Metadata program coverage does not form complete native agreement evidence.'
+        }
+
         $failures = $root.GetProperty('Failures')
         if ($failures.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
             throw 'Fuzz failures must be a non-null JSON array.'
@@ -220,6 +275,8 @@ function Assert-SharpProofFuzzRunnerResult {
             SmtAgreements = $smtAgreements
             PartialSmtAgreements = $partialSmtAgreements
             FrontendCoverage = [pscustomobject]$coverageValues
+            TotalProgramCoverage = [pscustomobject]$totalValues
+            MetadataProgramCoverage = [pscustomobject]$metadataValues
             CoverageSatisfied = $coverageSatisfied
             Failures = [object[]]@()
             Passed = $passed

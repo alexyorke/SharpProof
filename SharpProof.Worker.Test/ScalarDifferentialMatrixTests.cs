@@ -16,6 +16,135 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ScalarDifferentialMatrixTests
 {
+    [TestCase(null, null)]
+    [TestCase(null, "")]
+    [TestCase("", "")]
+    [TestCase("left", null)]
+    [TestCase(null, "right")]
+    [TestCase("left", "right")]
+    [TestCase("a\0b", "\ud83d\ude00")]
+    public void StringConcatAgreesWithCompiledRuntime(string? left, string? right)
+    {
+        using var project = DifferentialProject.Create("""
+            #nullable enable
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                [return: NotNull]
+                public static string Target(string? left, string? right) { return string.Concat(left, right); }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var factory = total.Program.Factory;
+        var values = new[] { left, right };
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.Select((parameter, ordinal) => (parameter.Entry, Value: values[ordinal] is { } text
+                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type)))
+                .ToDictionary(item => item.Entry, item => item.Value));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(execution.ReturnValue!.Kind, Is.EqualTo(IrValueKind.String));
+        var runtimeValue = (string)method.Invoke(null, [left, right])!;
+        Assert.That(execution.ReturnValue.String, Is.EqualTo(runtimeValue));
+        Assert.That(ReferenceEquals(execution.ReturnValue.String, left), Is.EqualTo(ReferenceEquals(runtimeValue, left)));
+        Assert.That(ReferenceEquals(execution.ReturnValue.String, right), Is.EqualTo(ReferenceEquals(runtimeValue, right)));
+        if (runtimeValue.Length == 0)
+        { Assert.That(runtimeValue, Is.SameAs(string.Empty)); }
+    }
+
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    [TestCase("bool")]
+    [TestCase("string")]
+    [TestCase("object")]
+    public void EmptyArrayFacetsAndIdentityAgreeWithCompiledRuntime(string elementType)
+    {
+        using var project = DifferentialProject.Create($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                [return: InRange(1, 1)]
+                public static int Target(int unused) {
+                    var first = Array.Empty<{{elementType}}>();
+                    var second = Array.Empty<{{elementType}}>();
+                    return first != null && first.Length == 0 && first == second ? 1 : 0;
+                }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry,
+                parameter => total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(execution.ReturnValue!.Integer, Is.EqualTo((int)method.Invoke(null, [0])!));
+        Assert.That(execution.ReturnValue.Integer, Is.EqualTo(1));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void CalleeContractArgumentExecutionAgreesAcrossCompiledRuntimeAndNativeIr(bool emitted, bool caught)
+    {
+        var directive = emitted ? "#define SHARPPROOF_CONTRACTS" : "#undef SHARPPROOF_CONTRACTS";
+        var body = caught ? "try { return Helper(value); } catch (DivideByZeroException) { return 7; }" : "return Helper(value);";
+        using var project = DifferentialProject.Create($$"""
+            {{directive}}
+            using System;
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                private static int Helper(int value) { Contract.Assume(1 / value > 0); return -1; }
+                [return: InRange(7, 7)]
+                public static int Target(int value) { {{body}} }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var factory = total.Program.Factory;
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry,
+                parameter => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        object? value = null;
+        Exception? exception = null;
+        try
+        { value = method.Invoke(null, [0]); }
+        catch (TargetInvocationException failure) { exception = failure.InnerException; }
+        if (emitted && !caught)
+        {
+            Assert.That(exception, Is.TypeOf<DivideByZeroException>());
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+        }
+        else
+        {
+            Assert.That(exception, Is.Null);
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.ReturnValue!.Integer, Is.EqualTo((int)value!));
+        }
+    }
+
     private static readonly ScalarCase[] SupportedCases = [
         new(
             "SByte",
@@ -444,7 +573,7 @@ public sealed class ScalarDifferentialMatrixTests
                         item.MethodName);
                     Assert.That(
                         result.ProofCore,
-                        Does.Contain("body:normal-completion"),
+                        Has.Some.StartsWith("normal-completion:"),
                         item.MethodName);
                 }
             }
@@ -452,7 +581,7 @@ public sealed class ScalarDifferentialMatrixTests
     }
 
     [Test]
-    public async Task WidthSensitiveConversionsRemainTypedUnknown()
+    public async Task WidthSensitiveConversionsAreProvenWithTypedSemantics()
     {
         using var project = DifferentialProject.Create(
             CreateUnsupportedConversionSource());
@@ -473,10 +602,10 @@ public sealed class ScalarDifferentialMatrixTests
             Assert.That(conversions, Has.Length.EqualTo(4));
             Assert.That(
                 conversions.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 conversions.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.All.EqualTo(WorkerClaimReason.None));
         }
     }
 

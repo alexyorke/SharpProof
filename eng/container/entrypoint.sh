@@ -41,9 +41,25 @@ if git_directory="$(git -c safe.directory="${repo_root}" -C "${repo_root}" \
   git config --global --add safe.directory "${git_directory}"
 fi
 
+unset SHARPPROOF_GOLDEN_SOURCE_ROOT
 if [[ "${command_name}" = "dev" ]]; then
   exec /bin/bash "$@"
 fi
+
+case "${command_name}" in
+  test|test-changed|semantic-tests|portable-tests|worker-tests|package-tests)
+    golden_source_root="$(realpath -e "${SHARPPROOF_LOOP_SOURCE_ROOT:-${repo_root}}")"
+    if [[ ! -f "${golden_source_root}/SharpProof.slnx" ||
+      ! -f "${golden_source_root}/SharpProof.Release.props" ]]; then
+      echo "SharpProof golden source root is not a repository." >&2
+      exit 125
+    fi
+    export SHARPPROOF_GOLDEN_SOURCE_ROOT="${golden_source_root}"
+    ;;
+  *)
+    unset SHARPPROOF_UPDATE_GOLDEN
+    ;;
+esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
@@ -163,6 +179,12 @@ if [[ "${source_has_git}" = "true" ]] &&
   # artifact mount. A trailing-slash ignore rule matches directories but
   # not this symlink, so exclude the exact task-local link explicitly.
   printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
+  # Both copied source and additions from the applied snapshot must appear
+  # in changed-line checks. Only the disposable task index is modified.
+  while IFS= read -r -d '' untracked_path; do
+    git -C "${task_root}" add --intent-to-add -- "${untracked_path}"
+  done < <(git -C "${task_root}" ls-files \
+    --others --exclude-standard -z --)
 fi
 export SHARPPROOF_REPO_ROOT="${task_root}"
 cd "${task_root}"

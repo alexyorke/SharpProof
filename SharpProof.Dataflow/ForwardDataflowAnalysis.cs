@@ -1,5 +1,12 @@
 namespace SharpProof.Dataflow;
 
+internal enum DataflowAnalysisFailure
+{
+    None,
+    NonmonotoneTransfer,
+    IterationLimit
+}
+
 public sealed class ForwardDataflowAnalysisOptions(
     int widenAfter = 2,
     int maxIterations = 10_000)
@@ -99,6 +106,24 @@ public static class ForwardDataflowAnalysis
         }
     }
 
+    // Advisory callers receive a typed failure without inspecting private exception names.
+    // Existing Analyze/AnalyzeWithoutResult behavior is preserved.
+    internal static bool TryAnalyze<T>(DataflowGraph<T> graph, IAbstractDomain<T> domain, T initialState,
+        out DataflowAnalysisResult<T>? result, out DataflowAnalysisFailure failure,
+        ForwardDataflowAnalysisOptions? options = null)
+    {
+        result = null;
+        try
+        {
+            result = AnalyzeCore(graph, domain, initialState, options ?? new ForwardDataflowAnalysisOptions(), produceResult: true);
+            failure = DataflowAnalysisFailure.None;
+            return true;
+        }
+        catch (DataflowMonotonicityException)
+        { failure = DataflowAnalysisFailure.NonmonotoneTransfer; return false; }
+        catch (DataflowConvergenceException)
+        { failure = DataflowAnalysisFailure.IterationLimit; return false; }
+    }
     /// <summary>
     /// Runs the solver for callers that only need transfer side effects.
     /// </summary>

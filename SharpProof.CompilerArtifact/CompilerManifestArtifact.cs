@@ -282,6 +282,7 @@ internal static class CompilerManifestArtifactJson
         RequireValid(HasValidCallableStates(
             value.Callables,
             value.CompilerDiagnostics.Length != 0));
+        CompilerReachableSourceValidator.Validate(value, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (validateDecodability &&
             !HasDecodableCallables(value, cancellationToken))
@@ -407,8 +408,8 @@ internal static class CompilerManifestArtifactJson
         return callables?.All(callable =>
             callable != null &&
             (!hasCompilerDiagnostics ||
-             callable.FailureReason ==
-                CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason) &&
+             (callable.FailureReason ==
+                CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason && callable.Total == null)) &&
             (callable.FailureReason ==
                 CompilerCallableArtifactReasonCatalog.SuccessReason ||
              CompilerCallableArtifactReasonCatalog.IsFailureReason(

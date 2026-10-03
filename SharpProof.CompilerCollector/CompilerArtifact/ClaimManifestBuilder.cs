@@ -12,17 +12,32 @@ internal sealed partial class ClaimManifestBuilder(
         "M:Program.<Main>$(System.String[])";
 
     private readonly CSharpCompilation _compilation =
-        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-    private readonly ContractClauseInventoryBuilder _clauses =
-        ContractClauseInventoryBuilder.ForCompilation(compilation);
-    private readonly ContractSelectionInventory _attributes =
-        ContractSelectionInventory.ForCompilation(compilation);
-    private readonly EffectiveContractSourceResolver _contractSources =
-        EffectiveContractSourceResolver.ForCompilation(compilation);
-    private readonly AnalyzerSession _effectSession =
-        new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
+        InitializeCompilation(compilation, cancellationToken);
+    // Optional source guards must run before any semantic inventory is created.
+    private readonly Lazy<ContractClauseInventoryBuilder> _lazyClauses =
+        new(() => ContractClauseInventoryBuilder.ForCompilation(compilation));
+    private readonly Lazy<ContractSelectionInventory> _lazyAttributes =
+        new(() => ContractSelectionInventory.ForCompilation(compilation));
+    private readonly Lazy<ContractApiSymbols?> _lazyIntrinsics =
+        new(() => ContractApiSymbols.TryCreate(compilation));
+    private readonly Lazy<EffectiveContractSourceResolver> _lazyContractSources =
+        new(() => EffectiveContractSourceResolver.ForCompilation(compilation));
+    private readonly Lazy<AnalyzerSession> _lazyEffectSession =
+        new(() => new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken));
+    private ContractClauseInventoryBuilder _clauses => _lazyClauses.Value;
+    private ContractSelectionInventory _attributes => _lazyAttributes.Value;
+    private ContractApiSymbols? _intrinsics => _lazyIntrinsics.Value;
+    private EffectiveContractSourceResolver _contractSources => _lazyContractSources.Value;
+    private AnalyzerSession _effectSession => _lazyEffectSession.Value;
 
-    internal ClaimManifestBuildResult Build()
+    private static CSharpCompilation InitializeCompilation(CSharpCompilation compilation, CancellationToken cancellationToken)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        cancellationToken.ThrowIfCancellationRequested();
+        return compilation;
+    }
+
+    internal ClaimManifestBuildResult Build(bool includePotentialCallShadow = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var discovered = DiscoverMethods().Select(CreateSeed).ToImmutableArray();
@@ -48,7 +63,228 @@ internal sealed partial class ClaimManifestBuilder(
                     .Concat(target.EffectClaims.Select(static claim => claim.Entry)))]
         };
         WorkerProtocolJson.SealManifest(manifest);
-        return new ClaimManifestBuildResult(manifest, targets.ToImmutable());
+        var result = new ClaimManifestBuildResult(manifest, targets.ToImmutable());
+        return includePotentialCallShadow
+            ? result with { PotentialCalls = DiscoverPotentialCallShadow(result.Targets) }
+            : result;
+    }
+
+    internal CompilerPotentialCallInventory BuildPotentialCallShadow(bool allowReferenceOwners = false)
+    {
+        return DiscoverPotentialCallShadow(ImmutableDictionary.Create<IMethodSymbol, ManifestCallableTarget>(
+            SymbolEqualityComparer.Default), allowReferenceOwners);
+    }
+
+    // Separate source census: it must not change mandatory manifest membership
+    // or the selected nested callable ordinal stream.
+    private CompilerPotentialCallInventory DiscoverPotentialCallShadow(
+        ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> published, bool allowReferenceOwners = false)
+    {
+        var owners = ImmutableArray.CreateBuilder<CompilerPotentialCallOwner>();
+        var gaps = ImmutableArray.CreateBuilder<CompilerPotentialCallGap>();
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var guarded = new List<(SyntaxTree Tree, ImmutableArray<SyntaxNode> Nodes)>();
+        var remainingSyntaxNodes = 1_048_576;
+        var treeOrdinal = 0;
+        foreach (var tree in _compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (treeOrdinal >= CompilerPreparedBody.MaximumInstructions)
+            {
+                gaps.Add(new(treeOrdinal, 0, 0, "InventoryBudget"));
+                return new([], gaps.ToImmutable());
+            }
+            var root = tree.GetRoot(cancellationToken);
+            if (!TryCollectPotentialSyntax(root, ref remainingSyntaxNodes, out var nodes))
+            {
+                gaps.Add(new(treeOrdinal++, root.SpanStart, root.Span.Length, "SyntaxBudget"));
+                // Contract screening may bind source targets or companions in
+                // any tree. No optional binding occurs unless every tree passed.
+                return new([], gaps.ToImmutable());
+            }
+            guarded.Add((tree, nodes));
+            treeOrdinal++;
+        }
+        if (GuardReferencedPotentialSyntax(ref remainingSyntaxNodes) is { } referenceGap)
+        {
+            gaps.Add(referenceGap);
+            return new([], gaps.ToImmutable());
+        }
+        treeOrdinal = 0;
+        foreach (var (tree, nodes) in guarded)
+        {
+            SemanticModel? model = null;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (node is not MethodDeclarationSyntax declaration)
+                {
+                    continue;
+                }
+                if (owners.Count + gaps.Count >= CompilerPreparedBody.MaximumInstructions)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "InventoryBudget"));
+                    return new(owners.ToImmutable(), gaps.ToImmutable());
+                }
+                if (!declaration.Modifiers.Any(SyntaxKind.StaticKeyword) ||
+                    declaration.Modifiers.Any(SyntaxKind.AsyncKeyword) ||
+                    declaration.TypeParameterList != null ||
+                    declaration.Ancestors().OfType<TypeDeclarationSyntax>().Any(static type => type.TypeParameterList != null) ||
+                    declaration.DescendantNodes().Any(static child =>
+                        child is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or YieldStatementSyntax))
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedOwner"));
+                    continue;
+                }
+                if (declaration.Body == null && declaration.ExpressionBody == null)
+                {
+                    // Partial definition declarations do not execute a body.
+                    continue;
+                }
+                model ??= SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, tree);
+                var method = model.GetDeclaredSymbol(declaration, cancellationToken);
+                if (method == null)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingSymbol"));
+                    continue;
+                }
+                method = ContractClauseInventoryBuilder.NormalizeCallable(method);
+                if (method.MethodKind != MethodKind.Ordinary || !method.IsStatic)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedOwner"));
+                    continue;
+                }
+                if (!seen.Add(method))
+                {
+                    continue;
+                }
+                if (method.ReturnsByRef || method.ReturnsByRefReadonly ||
+                    method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+                        !SupportedShadowOwnerType(parameter.Type, allowReferenceOwners)) ||
+                    !method.ReturnsVoid && !SupportedShadowOwnerType(method.ReturnType, allowReferenceOwners))
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedSignature"));
+                    continue;
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (model.GetOperation(declaration, cancellationToken) is not IMethodBodyOperation operation ||
+                    operation.Parent != null || operation.Syntax != declaration)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingBody"));
+                    continue;
+                }
+                var calls = new RequiresCallSiteDiscovery(method, declaration, model, cancellationToken,
+                    suppliedOperationRoot: operation).GetPotentialCalls(_effectSession.HasPotentialCallPreconditions,
+                    out var complete);
+                var owned = calls ?? [];
+                if (!calls.HasValue || owned.Any(call => !SymbolEqualityComparer.Default.Equals(call.Owner, method)))
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "IncompleteOwnership"));
+                    complete = false;
+                }
+                else if (!complete)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "IncompleteCalls"));
+                }
+                var id = published.TryGetValue(method, out var selected)
+                    ? selected.Entry.CallableId : SemanticClaimIdentity.CreateCallableId(method);
+                owners.Add(new(method, declaration, model, id, owned, complete));
+            }
+            treeOrdinal++;
+        }
+        return new(owners.ToImmutable(), gaps.ToImmutable());
+    }
+
+    private static bool SupportedShadowOwnerType(ITypeSymbol type, bool allowReferenceOwners)
+    {
+        return SharpProof.Frontend.CSharpOperationSemantics.IsScalar(type) ||
+            allowReferenceOwners && type.TypeKind != TypeKind.Dynamic &&
+            type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate;
+    }
+
+    private CompilerPotentialCallGap? GuardReferencedPotentialSyntax(ref int remainingNodes)
+    {
+        var pending = new Stack<Compilation>();
+        var visited = new HashSet<Compilation> { _compilation };
+        var treeOwners = new Dictionary<SyntaxTree, Compilation>();
+        foreach (var tree in _compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            treeOwners.Add(tree, _compilation);
+        }
+        pending.Push(_compilation);
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
+            foreach (var reference in current.References)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (--remainingNodes < 0)
+                {
+                    return new(0, 0, 0, "ReferenceBudget", current.AssemblyName);
+                }
+                if (reference is not CompilationReference source || !visited.Add(source.Compilation))
+                {
+                    continue;
+                }
+                if (visited.Count > CompilerPreparedBody.MaximumInstructions)
+                {
+                    return new(0, 0, 0, "ReferenceBudget", source.Compilation.AssemblyName);
+                }
+                var ordinal = 0;
+                foreach (var tree in source.Compilation.SyntaxTrees)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (treeOwners.TryGetValue(tree, out var owner) && !ReferenceEquals(owner, source.Compilation))
+                    {
+                        return new(ordinal, 0, 0, "ReferenceOwnership", source.Compilation.AssemblyName);
+                    }
+                    treeOwners[tree] = source.Compilation;
+                    var root = tree.GetRoot(cancellationToken);
+                    if (!TryCollectPotentialSyntax(root, ref remainingNodes, out _))
+                    {
+                        return new(ordinal, root.SpanStart, root.Span.Length, "ReferenceSyntaxBudget",
+                            source.Compilation.AssemblyName);
+                    }
+                    ordinal++;
+                }
+                pending.Push(source.Compilation);
+            }
+        }
+        return null;
+    }
+
+    private bool TryCollectPotentialSyntax(SyntaxNode root, ref int remainingNodes,
+        out ImmutableArray<SyntaxNode> nodes)
+    {
+        const int maximumNodes = 65_536;
+        var pending = new Stack<(SyntaxNode Node, int Depth)>();
+        var collected = ImmutableArray.CreateBuilder<SyntaxNode>();
+        pending.Push((root, 0));
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (node, depth) = pending.Pop();
+            if (depth > 128 || collected.Count >= maximumNodes || --remainingNodes < 0)
+            {
+                nodes = [];
+                return false;
+            }
+            collected.Add(node);
+            foreach (var child in node.ChildNodes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (pending.Count + collected.Count >= maximumNodes)
+                {
+                    nodes = [];
+                    return false;
+                }
+                pending.Push((child, depth + 1));
+            }
+        }
+        nodes = collected.OrderBy(static node => node.SpanStart).ToImmutableArray();
+        return true;
     }
 
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
@@ -209,7 +445,7 @@ internal sealed partial class ClaimManifestBuilder(
         var candidates = clauses
             .Select(clause => new ClaimCandidate(
                 SemanticClaimIdentity.CreateInvocationFingerprint(
-                    clause.Invocation, target, source, usesCompanion),
+                    clause.Invocation, target, source, usesCompanion, _intrinsics),
                 clause.Location,
                 usesCompanion
                     ? WorkerClaimEvidence.CompanionClause
@@ -294,7 +530,7 @@ internal sealed partial class ClaimManifestBuilder(
                         ? WorkerAssumptionKind.Precondition
                         : WorkerAssumptionKind.UserAssume,
                     SemanticClaimIdentity.CreateInvocationFingerprint(
-                        clause.Invocation, target, source, usesCompanion)));
+                        clause.Invocation, target, source, usesCompanion, _intrinsics)));
             }
             foreach (var parameter in target.Parameters)
             {
@@ -451,7 +687,7 @@ internal sealed partial class ClaimManifestBuilder(
         };
         var evidence = CreateEffectEvidence(claimId, evaluation, isSupported);
         CompilerEffectClaimArtifactCodec.Seal(evidence);
-        return new ManifestEffectClaim(entry, evidence);
+        return new ManifestEffectClaim(entry, evidence, evaluation.Reason != EffectEvaluationReason.UnsupportedContract);
     }
 
     private CompilerEffectClaimArtifact CreateEffectEvidence(
@@ -557,13 +793,15 @@ internal sealed partial class ClaimManifestBuilder(
     private ImmutableArray<IMethodSymbol> DiscoverMethods()
     {
         var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var assemblySelected = _compilation.Assembly.GetAttributes().Any(RequiresScopeDiscovery);
+        var selectedTrees = SelectedScopeTrees();
         foreach (var tree in _compilation.SyntaxTrees)
         {
             var root = tree.GetRoot(cancellationToken);
             // Semantic-model creation binds every nested local function. Skip
             // trees with no SharpProof syntax so an unrelated deeply nested
             // tree cannot exhaust Roslyn's binder stack during discovery.
-            if (!MayContainSharpProofSyntax(root))
+            if (!assemblySelected && !selectedTrees.Contains(tree) && !MayContainSharpProofSyntax(root))
             {
                 continue;
             }
@@ -656,6 +894,10 @@ internal sealed partial class ClaimManifestBuilder(
 
         static bool MayContainSharpProofSyntax(SyntaxNode root)
         {
+            // An alias declared in another tree can name any attribute. Let
+            // semantic selection decide whether attributed trees are relevant.
+            if (root.DescendantNodesAndSelf().Any(static node => node is AttributeSyntax))
+            { return true; }
             foreach (var token in root.DescendantTokens())
             {
                 if (token.ValueText is
@@ -699,6 +941,42 @@ internal sealed partial class ClaimManifestBuilder(
         }
     }
 
+    private bool RequiresScopeDiscovery(AttributeData attribute)
+    {
+        return ContractSelectionInventory.Is(attribute, _attributes.Trusted) ||
+            _attributes.IsRejectedControlAttribute(attribute);
+    }
+
+    private HashSet<SyntaxTree> SelectedScopeTrees()
+    {
+        var trees = new HashSet<SyntaxTree>();
+        var pending = new Stack<(INamespaceOrTypeSymbol Scope, bool Selected)>();
+        pending.Push((_compilation.Assembly.GlobalNamespace, false));
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (scope, inheritedSelection) = pending.Pop();
+            var selected = inheritedSelection;
+            if (scope is INamedTypeSymbol type)
+            {
+                selected |= type.GetAttributes().Any(RequiresScopeDiscovery);
+                if (selected)
+                {
+                    foreach (var declaration in type.DeclaringSyntaxReferences)
+                    { trees.Add(declaration.SyntaxTree); }
+                }
+            }
+            if (scope is INamespaceSymbol @namespace)
+            {
+                foreach (var child in @namespace.GetNamespaceMembers())
+                { pending.Push((child, selected)); }
+            }
+            foreach (var child in scope.GetTypeMembers())
+            { pending.Push((child, selected)); }
+        }
+        return trees;
+    }
+
     private CallableSeed CreateSeed(IMethodSymbol method)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -715,6 +993,30 @@ internal sealed partial class ClaimManifestBuilder(
     private ImmutableDictionary<IMethodSymbol, string> CreateCallableIds(
         ImmutableArray<CallableSeed> callables)
     {
+        // Identity ancestry is required even when the ancestor has no claims.
+        // Keep its membership separate from callable publication.
+        var required = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var pending = new Stack<IMethodSymbol>();
+        foreach (var seed in callables)
+        {
+            if (HasManifestIdentity(seed) || TrustedAttributes(seed.Method).Any())
+            {
+                required.Add(seed.Method);
+                pending.Push(seed.Method);
+            }
+        }
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (pending.Pop().ContainingSymbol is IMethodSymbol containing)
+            {
+                var parent = ContractClauseInventoryBuilder.NormalizeCallable(containing);
+                if (required.Add(parent))
+                {
+                    pending.Push(parent);
+                }
+            }
+        }
         var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
@@ -737,6 +1039,29 @@ internal sealed partial class ClaimManifestBuilder(
                          .Select(static (seed, ordinal) => (seed, ordinal)))
             {
                 ordinals.Add(item.seed.Method, item.ordinal);
+            }
+        }
+
+        // Preserve all existing selected-sibling slots. Append the required
+        // plain ancestors and trust-only siblings; unrelated siblings use none.
+        foreach (var group in required
+                     .Where(static method => method.MethodKind is
+                         MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                     .Select(CreateSeed)
+                     .GroupBy(static seed => seed.Method.ContainingSymbol!, SymbolEqualityComparer.Default))
+        {
+            var ordinal = group.Count(seed => ordinals.ContainsKey(seed.Method));
+            foreach (var seed in group.Where(seed => !ordinals.ContainsKey(seed.Method))
+                         .OrderBy(seed => seed.Declaration == null
+                             ? int.MaxValue : _clauses.GetTreeOrdinal(seed.Declaration.SyntaxTree))
+                         .ThenBy(static seed => seed.Declaration?.SpanStart ?? int.MaxValue))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (seed.Declaration == null)
+                {
+                    throw new InvalidOperationException("A required nested callable has no source declaration.");
+                }
+                ordinals.Add(seed.Method, ordinal++);
             }
         }
 
@@ -796,10 +1121,8 @@ internal sealed partial class ClaimManifestBuilder(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var nested = unresolved.Pop();
-                // Clause-free nested callables are intentionally excluded from
-                // the stable ordinal sequence. They may still be visited while
-                // resolving a containing callable, so use a deterministic
-                // neutral ordinal rather than failing the entire manifest.
+                // Unneeded clause-free callables do not participate in published
+                // identity. Required ancestors already have distinct ordinals.
                 var ordinal = ordinals.TryGetValue(nested, out var value)
                     ? value
                     : 0;

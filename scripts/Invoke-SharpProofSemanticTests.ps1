@@ -319,7 +319,7 @@ try {
             $arguments = @('vstest', $assembly)
             $arguments += '/TestCaseFilter:' + $task.Filter
             $arguments += '/logger:console;verbosity=minimal'
-            $arguments += "/logger:trx;LogFileName=$($task.Name).trx"
+            $arguments += "/logger:trx;LogFilePrefix=$($task.Name)"
             $arguments += '/ResultsDirectory:' + (
                 Join-Path $resultsRoot $task.Name)
             if ($task.PSObject.Properties.Name -contains 'RunSettings') {
@@ -336,7 +336,7 @@ try {
             $arguments += @(
                 '--filter', $task.Filter,
                 '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFileName=$($task.Name).trx",
+                '--logger', "trx;LogFilePrefix=$($task.Name)",
                 '--results-directory', (Join-Path $resultsRoot $task.Name))
             if ($task.ProjectParallelism -gt 0) {
                 $arguments += "/m:$($task.ProjectParallelism)"

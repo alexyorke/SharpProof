@@ -10,6 +10,59 @@ public sealed class RoslynProgramLowerer(
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly Func<IMethodSymbol, bool> _isKnownPure = isKnownPure ?? (static _ => false);
 
+    public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context)
+    {
+        return LowerCandidate(graph, context, default);
+    }
+
+    public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullGuard.NotNull(context, nameof(context));
+        if (!ReferenceEquals(_factory, context.Factory))
+        {
+            throw new ArgumentException("The context belongs to another factory.", nameof(context));
+        }
+        return new RoslynTotalProgramLowerer(context, cancellationToken).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
+    }
+
+    internal FrontendProgramLoweringResult LowerShadowSourceBody(ControlFlowGraph graph, TotalLoweringContext context,
+        Func<IMethodSymbol, bool> preserveSourceCall, CancellationToken cancellationToken,
+        Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null)
+    {
+        ArgumentNullGuard.NotNull(graph, nameof(graph));
+        ArgumentNullGuard.NotNull(context, nameof(context));
+        ArgumentNullGuard.NotNull(preserveSourceCall, nameof(preserveSourceCall));
+        if (!ReferenceEquals(_factory, context.Factory))
+        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
+        var calls = resolveScalarModel != null && graph.OriginalOperation.SemanticModel?.Compilation is { } compilation
+            ? new TotalSourceCallSession(compilation, static _ => false, null, cancellationToken, resolveScalarModel) : null;
+        return new RoslynTotalProgramLowerer(context, cancellationToken, calls,
+            preserveSourceCall: preserveSourceCall).Lower(graph);
+    }
+
+    internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
+        Func<TotalLoweringContext, bool> prepareCallee, CancellationToken cancellationToken)
+    {
+        return LowerCandidate(graph, context, prepareCallee, null, cancellationToken);
+    }
+
+    internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
+        Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
+        Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
+        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
+    {
+        ArgumentNullGuard.NotNull(graph, nameof(graph));
+        ArgumentNullGuard.NotNull(context, nameof(context));
+        ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
+        if (!ReferenceEquals(_factory, context.Factory))
+        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
+        if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
+        { return LowerCandidate(graph, context, cancellationToken); }
+        return new RoslynTotalProgramLowerer(context, cancellationToken,
+            new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata)).Lower(graph);
+    }
+
     public FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));

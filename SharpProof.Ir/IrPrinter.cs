@@ -19,7 +19,7 @@ public sealed partial class IrPrinter(IrFactory factory)
             var textLength = node switch
             {
                 IrStringTerm text => _factory.GetString(text.Value).Length,
-                IrNullTerm or IrCastTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
+                IrNullTerm or IrCastTerm or IrEmptyArrayTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
                 _ => 0
             };
             var cost = 64L + 6L * textLength + children.Sum(child => costs[child.Id]);

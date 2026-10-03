@@ -21,7 +21,7 @@ public static class OperationSubsetClassifier
                 FrontendAbstention.UnknownOperationKind);
         }
 
-        if (OperationSupportCatalog.IsSupported(
+        if (CSharpOperationSemantics.IsSupported(
                 stage,
                 kind))
         {

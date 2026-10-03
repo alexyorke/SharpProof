@@ -33,7 +33,8 @@ internal static partial class SemanticClaimIdentity
     }
 
     internal static string CreateInvocationFingerprint(
-        IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source, bool usesCompanion)
+        IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source, bool usesCompanion,
+        ContractApiSymbols? intrinsics = null)
     {
         invocation = ArgumentNullGuard.NotNull(invocation, nameof(invocation));
 
@@ -42,7 +43,7 @@ internal static partial class SemanticClaimIdentity
             return CreateMalformedInvocationFingerprint(invocation, target, source);
         }
 
-        var context = new ClaimIdentityContext(target, source, usesCompanion);
+        var context = new ClaimIdentityContext(target, source, usesCompanion) { Intrinsics = intrinsics };
         return CreateOperationFingerprint(invocation.Arguments[0].Value, context);
     }
 
@@ -93,7 +94,7 @@ internal static partial class SemanticClaimIdentity
 
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1");
-        WriteMethod(writer, method, new ClaimIdentityContext(method, method, false));
+        WriteMethod(writer, method, new ClaimIdentityContext(method, method, false), forCallableIdentity: true);
         return "spm1:" + writer.Finish();
     }
     internal static string CreateNestedCallableId(
@@ -113,7 +114,7 @@ internal static partial class SemanticClaimIdentity
         method = NormalizeCallable(method);
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1").Add(parentId).Add(siblingOrdinal);
-        WriteMethod(writer, method, new ClaimIdentityContext(method, method, false));
+        WriteMethod(writer, method, new ClaimIdentityContext(method, method, false), forCallableIdentity: true);
         return "spm1:" + writer.Finish();
     }
     internal static string CreateContainerId(ISymbol symbol)
@@ -325,7 +326,7 @@ internal static partial class SemanticClaimIdentity
                 WriteType(writer, type, context);
                 return;
             case IPropertySymbol property:
-                WriteReferenceId(writer, property);
+                WriteNamedMember(writer, property, context);
                 WriteType(writer, property.Type, context);
                 writer.Add(property.Parameters.Length);
                 foreach (var parameter in property.Parameters)
@@ -335,11 +336,11 @@ internal static partial class SemanticClaimIdentity
                 }
                 return;
             case IFieldSymbol field:
-                WriteReferenceId(writer, field);
+                WriteNamedMember(writer, field, context);
                 WriteType(writer, field.Type, context);
                 return;
             case IEventSymbol @event:
-                WriteReferenceId(writer, @event);
+                WriteNamedMember(writer, @event, context);
                 WriteType(writer, @event.Type, context);
                 return;
             case IParameterSymbol parameter:
@@ -351,7 +352,23 @@ internal static partial class SemanticClaimIdentity
         }
     }
 
-    private static void WriteMethod(CanonicalHashWriter writer, IMethodSymbol? method, ClaimIdentityContext context)
+    private static void WriteNamedMember(CanonicalHashWriter writer, ISymbol member, ClaimIdentityContext context)
+    {
+        if (RequiresStructuralContainerId(member))
+        {
+            WriteSpecialContainingTypeIdentity(writer, member);
+        }
+        writer.Add(member.MetadataName);
+        WriteType(writer, member.ContainingType, context);
+        writer.Add(DocumentationCommentId.CreateDeclarationId(member.OriginalDefinition));
+        if (!SymbolEqualityComparer.Default.Equals(member.ContainingAssembly, context.Source.ContainingAssembly))
+        {
+            writer.Add("referenced-assembly").Add(member.ContainingAssembly.Identity.ToString());
+        }
+    }
+
+    private static void WriteMethod(CanonicalHashWriter writer, IMethodSymbol? method, ClaimIdentityContext context,
+        bool forCallableIdentity = false)
     {
         if (method == null)
         {
@@ -360,7 +377,31 @@ internal static partial class SemanticClaimIdentity
         }
         writer.Add(method.MethodKind.ToString()).Add(method.Arity).Add(method.IsStatic);
         WriteSpecialContainingTypeIdentity(writer, method);
-        WriteReferenceId(writer, method);
+        if (forCallableIdentity && method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction ||
+            context.Intrinsics is { } intrinsics && (intrinsics.IsResult(method) || intrinsics.IsOld(method)))
+        {
+            // Nested callable identity is supplied by its ancestor and sibling
+            // slot. Synthesized names must not make it depend on source trivia.
+            WriteReferenceId(writer, method);
+        }
+        else if (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+        {
+            WriteNestedTargetIdentity(writer, method, context);
+        }
+        else
+        {
+            // Roslyn's reference IDs do not identify method symbols. Preserve
+            // named targets even when their signatures need structural encoding.
+            writer.Add(method.MetadataName);
+            WriteType(writer, method.ContainingType, context);
+            writer.Add(DocumentationCommentId.CreateDeclarationId(
+                (method.PartialImplementationPart ?? method).OriginalDefinition));
+            if (!forCallableIdentity && !SymbolEqualityComparer.Default.Equals(
+                method.ContainingAssembly, context.Source.ContainingAssembly))
+            {
+                writer.Add("referenced-assembly").Add(method.ContainingAssembly.Identity.ToString());
+            }
+        }
         writer.Add(method.TypeArguments.Length);
         foreach (var argument in method.TypeArguments)
         {
@@ -375,6 +416,71 @@ internal static partial class SemanticClaimIdentity
         }
         writer.Add(method.RefKind.ToString());
         WriteType(writer, method.ReturnType, context);
+    }
+
+    private static void WriteNestedTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
+        ClaimIdentityContext context)
+    {
+        var chain = new Stack<IMethodSymbol>();
+        while (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+        {
+            chain.Push(method);
+            if (method.ContainingSymbol is not IMethodSymbol parent)
+            {
+                break;
+            }
+            method = parent;
+        }
+        writer.Add("nested-method-target");
+        if (method.MethodKind is not (MethodKind.AnonymousFunction or MethodKind.LocalFunction))
+        {
+            WriteMethod(writer, method, context, forCallableIdentity: true);
+        }
+        else
+        {
+            writer.Add(CreateContainerId(method.ContainingSymbol));
+        }
+        foreach (var nested in chain)
+        {
+            var declaration = nested.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ??
+                throw new InvalidOperationException("A nested method target has no source declaration.");
+            var container = declaration.Ancestors().FirstOrDefault(static node =>
+                node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node)) ??
+                declaration.SyntaxTree.GetRoot();
+            var ordinal = 0;
+            var found = false;
+            foreach (var node in container.DescendantNodes(node =>
+                         ReferenceEquals(node, container) || !IsNestedCallableSyntax(node)))
+            {
+                if (!IsNestedCallableSyntax(node))
+                {
+                    continue;
+                }
+                if (node.SyntaxTree == declaration.SyntaxTree && node.Span == declaration.Span &&
+                    node.RawKind == declaration.RawKind)
+                {
+                    found = true;
+                    break;
+                }
+                ordinal++;
+            }
+            if (!found)
+            {
+                throw new InvalidOperationException("A nested method target has no lexical sibling role.");
+            }
+            writer.Add(ordinal);
+            WriteMethod(writer, nested, context, forCallableIdentity: true);
+        }
+    }
+
+    private static bool IsNestedCallableSyntax(SyntaxNode node)
+    {
+        return node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
+    }
+
+    private readonly partial record struct ClaimIdentityContext
+    {
+        internal ContractApiSymbols? Intrinsics { get; init; }
     }
 
     private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
@@ -511,9 +617,33 @@ internal static partial class SemanticClaimIdentity
             writer.Add("type-parameter").Add(depth).Add(parameter.Ordinal);
             return;
         }
+        if (parameter.ContainingSymbol is IMethodSymbol ancestor &&
+            TryGetContainingMethodDepth(context.Source, ancestor, out var methodDepth))
+        {
+            writer.Add("ancestor-method-parameter").Add(methodDepth).Add(parameter.Ordinal);
+            return;
+        }
         writer.Add("external-type-parameter").Add(parameter.TypeParameterKind.ToString())
             .Add(parameter.Ordinal)
             .Add(parameter.ContainingSymbol.MetadataName);
+    }
+
+    private static bool TryGetContainingMethodDepth(
+        IMethodSymbol source, IMethodSymbol candidate, out int depth)
+    {
+        var candidateDefinition = ContractClauseInventoryBuilder.NormalizeCallable(candidate).OriginalDefinition;
+        depth = 1;
+        for (var current = source.ContainingSymbol as IMethodSymbol;
+             current != null;
+             current = current.ContainingSymbol as IMethodSymbol, depth++)
+        {
+            if (SymbolEqualityComparer.Default.Equals(
+                ContractClauseInventoryBuilder.NormalizeCallable(current).OriginalDefinition, candidateDefinition))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static bool TryGetContainingTypeDepth(
@@ -609,6 +739,13 @@ internal static partial class SemanticClaimIdentity
                 writer.Add(Utf16WellFormedness.IsWellFormed(text)
                     ? text
                     : "ill-formed-utf16");
+                break;
+            case char codeUnit when char.IsSurrogate(codeUnit):
+                // Legal char constants need not form a Unicode scalar value.
+                // Preserve their exact UTF-16 unit without passing it through
+                // the strict UTF-8 string encoder. Other char identities stay
+                // byte-identical to the established string representation.
+                writer.Add((int)codeUnit);
                 break;
             case ITypeSymbol type:
                 WriteType(writer, type, context);

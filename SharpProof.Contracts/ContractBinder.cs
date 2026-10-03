@@ -1,6 +1,6 @@
 namespace SharpProof.Contracts;
 
-public sealed class ContractBinder
+public sealed partial class ContractBinder
 {
     private const int MaximumDiagnosticConditionLength = 512;
 
@@ -237,7 +237,8 @@ public sealed class ContractBinder
                 condition,
                 clause.SourceOperation,
                 clause.Evidence,
-                clause.DiagnosticText));
+                clause.DiagnosticText,
+                clause.SourceSyntax));
         }
 
         var attributeFailure = BindClosedAttributes(
@@ -319,7 +320,7 @@ public sealed class ContractBinder
                     ? BoundContractEvidence.Companion
                     : BoundContractEvidence.CompilerBoundInvocation,
                 FormatDiagnosticSourceText(
-                    invocation.Arguments[0].Value.Syntax)));
+                    invocation.Arguments[0].Value.Syntax), invocation.Syntax.GetReference()));
         }
         return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
     }
@@ -513,7 +514,7 @@ public sealed class ContractBinder
                 condition,
                 _factory.CreateOperation("closed-attribute"),
                 BoundContractEvidence.ClosedAttribute,
-                diagnosticText));
+                diagnosticText, attribute.ApplicationSyntaxReference));
         }
         return ContractBindingFailure.None;
     }

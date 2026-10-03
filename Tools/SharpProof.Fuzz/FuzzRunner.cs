@@ -92,11 +92,13 @@ public sealed record FuzzSummary(
     int SmtAgreements,
     int PartialSmtAgreements,
     FrontendFuzzCoverage FrontendCoverage,
+    TotalProgramFuzzCoverage TotalProgramCoverage,
+    MetadataProgramFuzzCoverage MetadataProgramCoverage,
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
-        SchemaVersion == 4 &&
+        SchemaVersion == 7 &&
         Cases > 0 &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
@@ -104,9 +106,15 @@ public sealed record FuzzSummary(
         FrontendCoverage != null &&
         FrontendCoverage.HasValidCounts &&
         FrontendCoverage.HasValidExceptionCounts(Cases) &&
+        TotalProgramCoverage != null &&
+        TotalProgramCoverage.HasValidCounts &&
+        TotalProgramCoverage.Cases == Cases &&
+        TotalProgramCoverage.Agreements == Cases &&
+        MetadataProgramCoverage != null && MetadataProgramCoverage.HasValidCounts &&
+        MetadataProgramCoverage.Cases == Cases && MetadataProgramCoverage.Agreements == Cases &&
         CoverageSatisfied &&
         (Cases < FuzzOptions.DefaultCases ||
-         FrontendCoverage.HasExpandedCategories) &&
+         (FrontendCoverage.HasExpandedCategories && TotalProgramCoverage.HasExpandedCategories && MetadataProgramCoverage.HasExpandedCategories)) &&
         Abstentions == 0 &&
         Agreements == Cases &&
         FrontendAgreements == Cases &&
@@ -194,7 +202,7 @@ public static class FuzzRunner
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
 
-                var factory = new IrFactory();
+                var factory = new IrFactory(IrExecutionSemantics.Total);
                 var preparedFormula = CreateTotalFiniteDomainFormula(
                     factory,
                     caseSeed,
@@ -294,7 +302,7 @@ public static class FuzzRunner
                         minimizedFrontendResult.Detail));
                     break;
                 case "finite-domain-smt":
-                    var factory = new IrFactory();
+                    var factory = new IrFactory(IrExecutionSemantics.Total);
                     var preparedFormula = CreateTotalFiniteDomainFormula(
                         factory,
                         caseSeed,
@@ -328,7 +336,7 @@ public static class FuzzRunner
                         minimizedSmtResult.Detail));
                     break;
                 case "partial-term-smt":
-                    var partialFactory = new IrFactory();
+                    var partialFactory = new IrFactory(IrExecutionSemantics.Total);
                     var partialCase = PartialTermSmtCaseGenerator.Create(
                         partialFactory,
                         unchecked(caseSeed ^ 0x243F6A88));
@@ -351,8 +359,14 @@ public static class FuzzRunner
             }
         }
 
+        var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
+        failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
+        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
+        var metadataPrograms = await MetadataProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken: cancellationToken);
+        failures.AddRange(metadataPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
+        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || metadataPrograms.Coverage.HasExpandedCategories;
         return new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,
@@ -362,6 +376,8 @@ public static class FuzzRunner
             smtAgreements,
             partialSmtAgreements,
             frontendCoverage,
+            totalPrograms.Coverage,
+            metadataPrograms.Coverage,
             coverageSatisfied,
             [.. failures]);
     }

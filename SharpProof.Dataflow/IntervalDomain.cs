@@ -123,13 +123,13 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
         }
 
         if (right.LowerBound.HasValue &&
-            (!left.LowerBound.HasValue || left.LowerBound.Value < right.LowerBound.Value))
+            EffectiveEndpoint(left, atOrAbove: true) < right.LowerBound.Value)
         {
             return false;
         }
 
         if (right.UpperBound.HasValue &&
-            (!left.UpperBound.HasValue || left.UpperBound.Value > right.UpperBound.Value))
+            EffectiveEndpoint(left, atOrAbove: false) > right.UpperBound.Value)
         {
             return false;
         }
@@ -144,12 +144,8 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
             return left.IsBottom ? right : left;
         }
 
-        var lower = left.LowerBound.HasValue && right.LowerBound.HasValue
-            ? (long?)Math.Min(left.LowerBound.Value, right.LowerBound.Value)
-            : null;
-        var upper = left.UpperBound.HasValue && right.UpperBound.HasValue
-            ? (long?)Math.Max(left.UpperBound.Value, right.UpperBound.Value)
-            : null;
+        var lower = Math.Min(EffectiveEndpoint(left, atOrAbove: true), EffectiveEndpoint(right, atOrAbove: true));
+        var upper = Math.Max(EffectiveEndpoint(left, atOrAbove: false), EffectiveEndpoint(right, atOrAbove: false));
         var (modulus, remainder) = GetCongruenceHull(left, right);
         return Create(lower, upper, modulus, remainder);
     }
@@ -178,6 +174,21 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
             ? previous.UpperBound
             : null;
         return Create(lower, upper, modulus, remainder);
+    }
+
+    private static long EffectiveEndpoint(IntervalValue value, bool atOrAbove)
+    {
+        if (value.IsSingleton)
+        { return value.SingletonValue; }
+        var bound = atOrAbove ? value.LowerBound : value.UpperBound;
+        if (bound.HasValue)
+        { return bound.Value; }
+        var carrierBound = atOrAbove ? long.MinValue : long.MaxValue;
+        if (value.Modulus.IsOne)
+        { return carrierBound; }
+        if (!TryCongruentBoundary(carrierBound, value.Modulus, value.Remainder, atOrAbove, out var endpoint))
+        { throw new InvalidOperationException("A nonbottom canonical interval must have a representable endpoint."); }
+        return endpoint;
     }
 
     private static (BigInteger Modulus, BigInteger Remainder) GetCongruenceHull(

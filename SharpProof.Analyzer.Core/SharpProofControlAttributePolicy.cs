@@ -21,8 +21,16 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        _ = ValidateDeclaredScopeAndShouldSuppress(symbol, session, reportDiagnostic, cancellationToken);
+    }
+
+    internal static bool ValidateDeclaredScopeAndShouldSuppress(
+        ISymbol symbol, AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
         var attributes = symbol.GetAttributes();
-        _ = ValidateScope(
+        var suppressed = ValidateScope(
             symbol,
             attributes,
             session,
@@ -47,6 +55,7 @@ internal static class SharpProofControlAttributePolicy
                 location,
                 reportDiagnostic);
         }
+        return suppressed;
     }
 
     internal static void ReportRejectedContractApi(

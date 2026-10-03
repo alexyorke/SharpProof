@@ -1,0 +1,41 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] current=v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] old=v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False]
+parameter: 1 entry=v3:int[width=32,signed=True] current=v4:int[width=32,signed=True] old=v5:int[width=32,signed=True]
+result: v6:int[width=32,signed=True]
+variable: v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] source=cell
+variable: v4:int[width=32,signed=True] source=value
+block: b0 entry
+  i0 op0 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v0 source=none
+  i2 op0 Assign v4:int[width=32,signed=True] = v3 source=none
+  i3 op0 Assign v5:int[width=32,signed=True] = v3 source=none
+  i5 op0 Goto b1 source=none
+block: b1 cfg:0
+  i6 op0 Goto b2 source=none
+block: b2 cfg:1
+  i7 op1 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-discarded-instance-int-mutation.cs:175+4
+  i8 op2 Branch (v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b5 : b6 source=total-discarded-instance-int-mutation.cs:173+12
+block: b3 cfg:2
+  i15 op0 Return void source=none
+block: b4 exceptional:exit
+  i4 op0 ExceptionalExit source=none
+block: b5 throw
+  i9 op2 Throw NullReference -> b4 source=total-discarded-instance-int-mutation.cs:173+12
+block: b6 normal
+  i10 op3 Assign v8:int[width=32,signed=True] = 0 source=total-discarded-instance-int-mutation.cs:173+12
+  i11 op4 Write Parameter source=total-discarded-instance-int-mutation.cs:173+12
+  i12 op6 Assign v9:int[width=32,signed=True] = v4 source=total-discarded-instance-int-mutation.cs:202+5
+  i13 op5 Assign v6:int[width=32,signed=True] = v9 source=total-discarded-instance-int-mutation.cs:202+5
+  i14 op5 Return v6 source=total-discarded-instance-int-mutation.cs:202+5
+term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v3
+term: ir2 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v1
+term: ir3 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v7
+term: ir4 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir5 Null type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null))
+term: ir8 Variable type=t1:int width=32 signed=True value=v4
+term: ir9 Variable type=t1:int width=32 signed=True value=v9
+term: ir10 Variable type=t1:int width=32 signed=True value=v6

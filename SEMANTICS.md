@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 12 separates `WorkerRunStatus` from
+Worker protocol version 13 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -195,53 +195,26 @@ such a local precondition unless an equivalent valid `Requires` contract is
 already declared on an overridden or implemented member. Callers must use the
 base or interface contract that is visible at the dispatch site.
 
-## Relational callee summaries
+## Direct callee verification
 
-Worker postcondition verification may compose a direct callee only when the
-build-time collector constructs a complete quantifier-free relation in the
-shared typed IR. The relation describes normal completion and the result in
-terms of receiver-free scalar input variables. It is an ordinary solver
-formula, not a trusted `Proven` result. The caller remains `Proven` only when
-Z3 establishes the composed obligation and the proof core passes the normal
-hygiene checks.
+Source callees and captured implementation IL expand directly into the
+caller's Total program. Verification uses the composed body and does not
+import callee contract premises. Calls require direct, supported dispatch and
+bounded exact lowering. Recursive expansion, unsupported operations, and
+resource exhaustion abstain or retain a conservative body abstraction.
 
-The current source-summary boundary is one exact current-compilation
-declaration for a static, non-generic method with Boolean or supported-integer
-parameters and result. Its selected CFG must be acyclic and every reachable
-instruction and direct dependency must lower exactly. Recursive dependency
-components, virtual or instance dispatch, references, heap operations,
-unsupported arithmetic, and summary budget failures abstain.
+Implementation IL requires an exact file-backed captured PE whose metadata
+matches the reference Roslyn compiled against. Reference assemblies and
+facades cannot provide implementation authority. Verification applies to that
+captured implementation; deployment must resolve the same binary. The bounded
+IL subset is not a general IL interpreter or metadata effect inference.
 
-An implementation-IL summary is admissible only for an external method with
-the same static scalar shape and an exact file-backed implementation PE. The
-collector requires raw metadata equality with the metadata Roslyn compiled
-against, rejects reference assemblies and facades as body authority, and
-decodes only a bounded scalar opcode set. A missing body, changed image,
-unsupported opcode, cross-module target, loop, recursion, unresolved call, or
-resource limit abstains. This facility is not a general IL interpreter and is
-not used for metadata effect inference. A `Proven` claim whose proof core
-contains `il-summary:` is conditional on the deployed application resolving
-the exact captured implementation binary; the collector records that binary's
-provenance but cannot observe a later runtime or publish-time assembly choice.
-The SARIF claim message makes this runtime-binary assumption visible so a
-consumer can bind the deployment asset to the captured PE or treat the claim
-as requiring review.
-
-An audited specification-pack summary is admissible only when its pack ID was
-explicitly selected by `SharpProofSpecificationPacks`. Packs are embedded,
-strictly schema-validated data with exact method signature, assembly-name, and
-public-key-token constraints. Arbitrary consumer files are not pack authority.
-The current embedded pack catalog schema is 2; `dotnet.scalar@1` contains the audited
-`System.Math.Max(int, int)` relation. An absent, unknown, malformed, or
-identity-mismatched pack never contributes a fact.
-
-Every summary call seals its origin, SHA-256 evidence, pack identity when
-applicable, and the canonical transitive provenance of every composed
-dependency. Compiler artifact schema 18, relational-summary schema version 2,
-and specification-pack schema version 1 validate that closure before backend
-creation.
-Unsupported or incomplete calls remain `Unknown`; neither a convenient method
-name nor a reference-assembly body can become an assumption.
+Audited scalar specification packs require explicit selection through
+`SharpProofSpecificationPacks`. Embedded pack data has exact method signature,
+assembly-name, and public-key-token constraints. Consumer files cannot provide
+pack authority. Embedded catalog schema 2 includes `dotnet.scalar@1`, which
+lowers `System.Math.Max(int, int)` into Total operations. Absent or unsupported
+packs do not supply facts. Legacy relational-summary production is retired.
 
 ## Effects
 
@@ -425,18 +398,19 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 18 produced
+The packaged verifier consumes compiler artifact schema version 28 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
-metadata. It also carries canonical relational-summary calls and their complete
-source, implementation-IL, or audited-pack dependency provenance, plus the
-admitted unconditional allocation, exact-framework-throw, and synchronization
+metadata for the remaining legacy API-spec payload. Typed Total graphs carry
+composed source and metadata bodies. The artifact also contains admitted
+unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
-their source-tree identities and spans. Worker protocol version 12 and semantic
-cache schema version 14 carry the current wire break. Relational-summary schema
-version 2 and specification-pack schema version 1 govern the new evidence. The
+their source-tree identities and spans. Worker protocol version 13 and semantic
+cache schema version 15 carry the current wire break. The legacy relational-summary schema field remains in the envelope, but
+nonempty relational-summary descriptors are rejected. Specification-pack
+schema version 1 describes scalar-pack selection. The
 artifact further carries compiler error
 diagnostics and mapped locations, handwritten and generated tree hashes, raw
 and effective per-tree preprocessor symbols, and parse evidence, plus a bounded
@@ -464,6 +438,164 @@ Analyzer configuration is represented by its observable effects on the final
 compilation and effective SharpProof options. Compiler error diagnostics fail
 verification as `CompilationFailure`; malformed lowered evidence or an
 expression-depth mismatch fails as `CompilerManifestMismatch`.
+
+Postcondition verification uses the compiler's typed Total IR and native
+bitvector verification conditions. Every worker construction path uses this
+verifier. Entry feasibility uses body-independent predicates, and completed
+claim results survive a later interruption. Bounded loop search can establish
+a refutation only through original-body replay; a bounded UNSAT result cannot
+prove a cyclic program. Unsupported async and iterator callables abstain.
+Compiler-produced effect evidence remains authoritative for effect claims.
+Native exception-effect qualification uses the same passive SSA body facts.
+Uncaught exits retain guarded exception kinds across joins; allowed kinds are
+checked at the exit rather than inferred from absence of a normal return.
+The compiler normalizes each declared DoesNotThrow or AllowedExceptions
+constraint using the bound core-library exception hierarchy and exact type
+identities. A source-defined same-name type cannot allow a core-library fault.
+Owned constraint rows survive artifact round-trip; malformed, duplicate,
+foreign or noncanonical rows are rejected. Missing optional rows abstain,
+including on contradictory entry conditions. Multiple exception claims share
+one method budget while retaining their separate constraints.
+SAT evidence must replay an explicit uncaught throw in the original body,
+without reading approximation values. Loop cuts can prove unreachability;
+finite search can only supply replayed violations. Call abstractions abstain
+until their throwing behavior is represented. These qualification results do
+not replace compiler effect publication.
+
+Native allocation qualification captures core `new object()` expressions and
+boxing of supported scalar values to `object`. Value-producing allocations
+create fresh nonnull reference identities. Boxing evaluates its operand before
+the allocation event, including any operand fault. Boxed contents, unboxing and
+runtime type tests remain unsupported.
+Single-dimensional zero-initialized arrays with Int32 dimensions produce fresh
+sequence identities and their exact lengths. Dimension evaluation and negative
+length Overflow faults precede allocation. Concrete replay initializes elements
+to their CLR defaults and charges array size to its work budget; this never caps
+symbolic inputs. Constant initializers carry typed literal elements in the same
+allocation instruction, with exact scalar element facts in the VC and contents
+in replay. Reference elements remain overapproximated. Nonempty constant
+collection expressions targeting supported arrays use the same allocation and
+contents model. Source params calls preserve explicit arrays and nulls;
+constant expanded arguments allocate a fresh array. Empty expanded params use
+the compiler's Array.Empty cache only when its owned model is available.
+Nonconstant initializer evaluation, dynamic params expansion and array mutation
+are not yet represented. Empty collection expressions and spreads remain
+incomplete. Default-array element contents remain an
+overapproximation in the VC.
+Explicit delegate construction for static or nonvirtual reference receivers
+records a fresh allocation without executing the target. Instance receiver
+evaluation precedes construction. Directly escaping delegates retain the null
+check, which throws the modeled System.ArgumentException before allocation.
+Release emission can erase an unused construction and its null check; other
+uses therefore carry a Boolean approximation of the check. A nonnull receiver
+short-circuits that approximation, while reads on uncertain null paths prevent
+concrete refutations. Universal proofs must hold for both choices. The exact
+argument kind remains distinct from ArgumentNullException and
+ArgumentOutOfRangeException. Generic targets,
+compiler-cached method-group/lambda conversions, capturing closures and virtual,
+override or value-type receivers remain unsupported until their semantics are represented.
+String/string `+` chains with at most four operands after constant merging and
+the owned two-string `String.Concat` model emit guarded string allocation sites.
+At least two nonempty operands are required; null operands count as empty.
+Constant expressions reuse their literal, and adjacent constants merge before
+choosing the allocation guard. CFG captures preserve flattened operands and
+defer prefix allocation until the root, after later operand evaluation. Longer
+chains, object/formatting overloads and compiler-created params arrays remain
+incomplete. String content and concatenation-related length proofs are deferred.
+The shadow runtime oracle measures concrete feasible entries in
+independently compiled source after argument construction and warmup. An empty
+model for a zero-parameter method is distinct from an infeasible entry. Generic
+closures are bounded representatives; unsupported inputs remain explicit gaps.
+Conservative IL reachability also includes exception-filter handlers. These
+observations do not establish a universal proof. Allocation events retain an
+owned type and operation site through
+artifact capture, loop transformation and passive SSA. A refutation requires
+that the original program execute an allocation site without approximation
+reads. A proof excludes all represented allocation and throw sites, including
+caught faults that can allocate runtime exceptions. Unmodeled string allocation,
+call abstractions and source static/module initialization abstain. Validated
+claim ownership and complete entry initialization must survive decoding before
+entry infeasibility can establish a vacuous result. This qualification remains
+separate from authoritative compiler effect results.
+
+Write events classify Local, Parameter, Field, Static, Element and Unknown
+regions. Native purity forbids reachable nonlocal events and permits allocation.
+By-value parameter rebinding is Local. Primitive source field stores carry
+nonlocal events with ordered receiver capture, RHS evaluation and null faults.
+Heap reads, array stores, volatile fields, external fields, unsupported calls
+and incomplete initialization abstain; this shadow does not change compiler
+effect authority. Refutation requires an original-program write-site witness
+without approximation reads. Bounded loop search never establishes a proof.
+
+Lock events denote synchronization attempts, including Monitor.Enter/Exit and
+ordinary C# lock statements. Replay stops at the attempt and may refute purity
+from the owned site without claiming acquisition, release, completion or an
+exception kind. All other body proofs require synchronization sites to be
+unreachable under their preconditions. Allocation witnesses must still observe
+an explicit allocation; a reachable lock alone yields an incomplete result.
+Original postcondition replay stops at synchronization with a semantic
+CounterexampleNotReplayable result, rather than an infrastructure failure.
+Such complete Unknown responses remain eligible for validated caching.
+
+Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
+cases carry explicit normal-completion predicates for arithmetic faults and
+short-circuiting, checked against independently executed C# operators. Finite
+domain checks that exhaust their symbolic-query budget retry the same bounded
+domain with exact input assignments; UNSAT requires every partition to be
+UNSAT. An unsupported or exhausted partition remains an abstention.
+The SMT backend accepts only Total IR; the legacy unbounded-integer encoder
+and its implicit Defined channel have been removed. Arithmetic faults must
+be represented explicitly in normal-completion predicates or control flow.
+CSharpOperationSemantics owns the scalar type/operator metadata, explicit
+Roslyn operation decisions, stage-support flags and local throw classification.
+Source and IL scalar lowering share integer widths and operator rules. The
+remaining analyzer range domain uses an explicit signed-long projection of
+the same metadata; it does not admit UInt64 arithmetic. CFG reachability helpers
+contain no scalar or throw classification rules.
+
+Source calls and captured implementation IL expand directly into the caller's
+Total program. The compiler no longer produces relational-summary descriptors.
+Supported eager source calls record each callee Requires clause after argument
+evaluation and before executing the callee body. Captured arguments replace the
+callee Entry values in an owned boolean marker containing Safe && Value. The
+marker neither assumes the precondition nor changes runtime control flow.
+Artifacts validate a complete association between markers and obligation rows.
+New consumers accept legacy artifacts without these shadow rows. Older strict
+consumers reject the new field; artifact and worker-binary digests separate
+their cache identities.
+Internal native queries prove each occurrence from its execution prefix; a
+refutation requires original-IR replay of the exact false marker without
+approximation. Later exceptions or assumptions do not erase that observation.
+Bounded loop search supplies witnesses only. Mandatory public call claims,
+plain-caller discovery, metadata coverage and analyzer authority remain pending.
+An additional shadow artifact collects source methods reachable from claim
+roots once, retains recursive call edges, and excludes unrelated methods.
+Admitted bodies carry Total leaf IR or explicitly marked source-call skeletons;
+unsupported bodies and unknown dispatch stay explicit boundaries. Entry initialization is
+tracked separately. This table does not supply proof or completion facts and
+does not change compiler effect authority.
+An internal frontend route can instead retain supported direct source calls
+without expanding their bodies. Its shadow call skeleton carries an explicit
+marker and is never classified as executable exact Total lowering. It preserves
+argument evaluation, but supplies no callee exception or completion guarantee;
+the collector records validated instruction-to-body mappings for this route.
+A shadow SCC fixpoint joins local and callee may-effects without recursive
+graph traversal. Cycles may diverge but do not invent allocation or write
+effects. Call exceptions and normal completion remain unresolved, and caught
+callee faults remain conservatively present. External facts are not yet
+enrolled as modular facts in this consumer; missing IR and entry initialization
+remain unknown. Its lowering reuses the same approved scalar API/specification
+models as eager Total lowering, including owned Array.Empty for omitted params.
+When an allocation operand is unsupported, lowering preserves earlier operand
+effects and returns an unknown value with the allocation expression's type;
+the enclosing body remains incomplete.
+Closed generic outer types may share a source helper body when its intrinsic
+parameter and result types do not depend on the outer arguments; top-level
+generic callable admission is unchanged. Metadata boolean `and`, `or`, and
+`xor` are exact only for normalized 0/1 stack values. Other integer bitwise
+operations remain unsupported. Emitted callee contract arguments execute as
+ordinary code, including throwing result placeholders; elided arguments do
+not execute. Callee contract assumptions do not become caller proof premises.
 
 This closed artifact removes worker-side compiler reconstruction. For the
 admitted program subset, counterexample replay is independent of symbolic

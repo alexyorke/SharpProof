@@ -1,0 +1,9 @@
+authority: native
+boundary: caller canceled after completed verification
+completed-run: Complete
+completed-outcome: Proven
+canceled-run: Canceled
+cache: Disabled
+next-run: Complete
+next-failure: None
+same-backend-outcome: Proven

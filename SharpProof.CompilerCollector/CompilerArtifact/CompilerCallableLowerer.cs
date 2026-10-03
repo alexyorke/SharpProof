@@ -7,15 +7,13 @@ internal sealed class CompilerCallableLowerer
 {
     private const int MaximumBodyBlocks = 64;
     private readonly IrFactory _factory;
+    private readonly CSharpCompilation _compilation;
+    private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
+    private readonly CompilerReferenceSnapshot[]? _capturedReferences;
     private readonly ContractBinder _contracts;
     private readonly ResolvedApiSpecTable _apiSpecs;
-    private readonly CompilerRelationalSummaryProvider _summaries;
-
-    internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention =>
-        _summaries.LastImplementationIlAbstention;
-
-    internal ImmutableArray<CompilerSummaryEvidenceAuthority> SummaryEvidenceAuthorities =>
-        _summaries.SummaryEvidenceAuthorities;
+    private readonly CompilerSpecificationPackConfiguration _specificationPackAuthority;
+    private readonly CompilerSpecificationPackProvider _specificationPacks;
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
@@ -32,21 +30,34 @@ internal sealed class CompilerCallableLowerer
         CSharpCompilation compilation,
         IrFactory factory,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
+        CompilerSyntaxTreeSnapshot[]? capturedTrees = null,
+        CompilerReferenceSnapshot[]? capturedReferences = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _compilation = compilation;
+        _capturedTrees = capturedTrees;
+        _capturedReferences = capturedReferences;
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        _specificationPackAuthority = specificationPackAuthority;
         _contracts = new ContractBinder(compilation, factory);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        _summaries = new CompilerRelationalSummaryProvider(
-            compilation,
-            factory,
-            _apiSpecs,
-            specificationPackAuthority,
-            capturedTrees);
+        _specificationPacks = new CompilerSpecificationPackProvider(factory, specificationPackAuthority);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
+    {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken);
+        var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
+            _capturedReferences, _specificationPackAuthority, cancellationToken);
+        var entry = total == null
+            ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
+            : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
+                [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)]);
+        return PrepareLegacy(target, cancellationToken) with { Total = total, TotalEntry = entry };
+    }
+
+    private CompilerCallablePreparation PrepareLegacy(ManifestCallableTarget target, CancellationToken cancellationToken)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
 
@@ -211,7 +222,7 @@ internal sealed class CompilerCallableLowerer
 
         var selected = new RoslynProgramLowerer(
             _factory,
-            _summaries.IsAdmissiblePureCall).LowerSelected(
+            _apiSpecs.IsSideEffectFree).LowerSelected(
             graph, entry!, firstOperation,
             operation => ContainsElidedClause(operation, elidedClauseSites));
         var lowering = selected.Lowering;
@@ -224,7 +235,6 @@ internal sealed class CompilerCallableLowerer
         }
 
         var specCalls = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
-        var summaryCalls = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         foreach (var binding in selected.Calls)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -249,21 +259,9 @@ internal sealed class CompilerCallableLowerer
                 continue;
             }
 
-            if (TryPrepareSummaryCall(
-                    binding.Key,
-                    binding.Value,
-                    callIdentity,
-                    admissibleByValue,
-                    out var preparedSource,
-                    cancellationToken))
-            {
-                summaryCalls.Add(binding.Key.Id, preparedSource!);
-                continue;
-            }
-
             return Unsupported(out failure);
         }
-        if (specCalls.Count + summaryCalls.Count != selected.Calls.Count)
+        if (specCalls.Count != selected.Calls.Count)
         {
             return Unsupported(out failure);
         }
@@ -273,7 +271,7 @@ internal sealed class CompilerCallableLowerer
             lowering.Program,
             parameterBindings,
             specCalls.ToImmutable(),
-            summaryCalls.ToImmutable());
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);
     }
 
     private static CompilerPreparedBody? Unsupported(out WorkerClaimReason failure)
@@ -323,7 +321,7 @@ internal sealed class CompilerCallableLowerer
 
     private static CompilerIntegerInterval? IntegerInterval(SpecialType? type)
     {
-        return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
+        return type.HasValue && CSharpOperationSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
             ? new(semantics.Minimum, semantics.Maximum) : null;
     }
 
@@ -337,10 +335,9 @@ internal sealed class CompilerCallableLowerer
             return false;
         }
 
-        // An explicitly enabled relational pack owns overlapping calls.  Let
-        // the summary path preserve its relation instead of reducing the call
-        // to the scalar API specification first.
-        if (_summaries.CanResolveSpecificationPack(invocation.TargetMethod))
+        // Enabled scalar packs are lowered by the Total path. Do not replace
+        // their operations with a less precise legacy API-spec descriptor.
+        if (_specificationPacks.CanResolve(invocation.TargetMethod))
         {
             return false;
         }
@@ -373,66 +370,6 @@ internal sealed class CompilerCallableLowerer
             throws.NormalCompletion != null;
     }
 
-    private bool TryPrepareSummaryCall(
-        IrCallInstruction call,
-        IInvocationOperation invocation,
-        string callIdentity,
-        bool admissibleByValue,
-        out CompilerPreparedSummaryCall? prepared,
-        CancellationToken cancellationToken)
-    {
-        prepared = null;
-        if (!admissibleByValue ||
-            !_summaries.TryGet(
-                invocation.TargetMethod,
-                call.Member,
-                cancellationToken,
-                out var summary) ||
-            summary == null)
-        {
-            return false;
-        }
-
-        if (!string.Equals(
-                summary.Signature.Provenance.EvidenceCallIdentity,
-                callIdentity,
-                StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        IrSummaryInstantiation instantiated;
-        try
-        {
-            instantiated = IrRelationalSummaryInstantiator.Instantiate(
-                summary,
-                call.Receiver,
-                call.Arguments,
-                call.Id.Value);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        prepared = new CompilerPreparedSummaryCall(
-            call.Id,
-            callIdentity,
-            ToCompilerOrigin(summary.Signature.Provenance.Origin),
-            instantiated.Result,
-            [.. instantiated.FreshVariables.Skip(1)],
-            instantiated.NormalRelation,
-            summary.Signature.Provenance.EvidenceSha256,
-            summary.Signature.Provenance.EvidenceIdentity,
-            [.. summary.DependencyProvenance.Select(static provenance =>
-                new CompilerPreparedSummaryEvidence(
-                    ToCompilerOrigin(provenance.Origin),
-                    provenance.EvidenceCallIdentity,
-                    provenance.EvidenceSha256,
-                    provenance.EvidenceIdentity))]);
-        return true;
-    }
-
     private static bool TryGetAdmissibleByValueCall(
         IrCallInstruction call,
         IInvocationOperation invocation)
@@ -441,21 +378,6 @@ internal sealed class CompilerCallableLowerer
             RoslynProgramLowerer.IsDirectInvocation(invocation) &&
             !invocation.TargetMethod.Parameters.Any(
                 static parameter => parameter.RefKind != RefKind.None);
-    }
-
-    private static CompilerSummaryOrigin ToCompilerOrigin(
-        IrSummaryOrigin origin)
-    {
-        return origin switch
-        {
-            IrSummaryOrigin.Source => CompilerSummaryOrigin.Source,
-            IrSummaryOrigin.ImplementationIl =>
-                CompilerSummaryOrigin.ImplementationIl,
-            IrSummaryOrigin.SpecificationPack =>
-                CompilerSummaryOrigin.SpecificationPack,
-            _ => throw new InvalidOperationException(
-                "A relational summary has an unsupported origin.")
-        };
     }
 
     private static bool TryGetCallIdentity(IMethodSymbol method, out string identity)
@@ -498,7 +420,7 @@ internal sealed class CompilerCallableLowerer
             case IrTypeKind.Boolean when sourceType?.SpecialType == SpecialType.System_Boolean:
                 resultType = _factory.BooleanType;
                 return true;
-            case IrTypeKind.Integer when CSharpScalarSemantics.IsSupportedInteger(
+            case IrTypeKind.Integer when CSharpOperationSemantics.IsSupportedInteger(
                 sourceType?.SpecialType ?? SpecialType.None):
                 resultType = _factory.IntegerType;
                 return true;

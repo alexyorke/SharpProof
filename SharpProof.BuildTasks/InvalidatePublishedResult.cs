@@ -46,7 +46,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         ContainerContract.ValidateRequired();
         string ResolvePath(string path)
         {
-            return ResolveProjectRelativePath(ProjectDirectory, path);
+            return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
         }
 
         var outputPaths = Present(ResultPath, SarifPath).Select(ResolvePath).ToArray();
@@ -82,14 +82,17 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         {
             Log.LogError("SharpProof output paths must not alias input paths.");
         }
-        if (workerDirectory != null &&
-            publicationPaths.Any(path => IsWithin(path, workerDirectory)))
+        try
         {
-            Log.LogError("SharpProof output paths must not be inside the worker runtime.");
+            PublicationPaths.ValidateWorkerRuntime(publicationPaths, workerFile);
+        }
+        catch (ArgumentException exception)
+        {
+            Log.LogError("{0}", exception.Message);
         }
         if (cachePath != null &&
-            (publicationPaths.Any(path => IsWithin(path, cachePath) || IsWithin(cachePath, path)) ||
-             workerDirectory != null && IsWithin(cachePath, workerDirectory)))
+            (publicationPaths.Any(path => PublicationPaths.IsWithin(path, cachePath) || PublicationPaths.IsWithin(cachePath, path)) ||
+             workerDirectory != null && PublicationPaths.IsWithin(cachePath, workerDirectory)))
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
         }
@@ -103,6 +106,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             return false;
         }
 
+        using var lease = PublicationLease.Acquire(publicationPaths, cancellationToken);
         foreach (var path in outputPaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -114,10 +118,4 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         return true;
     }
 
-    private static bool IsWithin(string path, string directory)
-    {
-        var root = Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar;
-        return string.Equals(path, directory, StringComparison.Ordinal) ||
-            path.StartsWith(root, StringComparison.Ordinal);
-    }
 }

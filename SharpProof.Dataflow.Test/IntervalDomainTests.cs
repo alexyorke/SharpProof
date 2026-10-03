@@ -7,6 +7,26 @@ public sealed class IntervalDomainTests
 {
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SparseCarrierEndpointsPreserveLeastUpperBounds(bool mirrored)
+    {
+        var first = mirrored ? long.MinValue + 10 : -10;
+        var last = mirrored ? 9 : long.MaxValue - 10;
+        var a = _domain.Constant(first);
+        var b = _domain.Constant(last);
+        var upper = mirrored ? _domain.Range(null, 20) : _domain.Range(-20, null);
+        var sparse = _domain.Join(a, b);
+        Assert.That(_domain.LessThanOrEqual(a, upper), Is.True);
+        Assert.That(_domain.LessThanOrEqual(b, upper), Is.True);
+        Assert.That(_domain.LessThanOrEqual(sparse, upper), Is.True);
+        Assert.That(_domain.Join(sparse, upper), Is.EqualTo(upper));
+        Assert.That(_domain.Join(a, _domain.Join(b, upper)), Is.EqualTo(_domain.Join(sparse, upper)));
+        Assert.That(_domain.Join(sparse, _domain.Constant(mirrored ? 0 : -5)), Is.EqualTo(_domain.Range(first, last)));
+        Assert.That(_domain.LessThanOrEqual(sparse, _domain.Range(first + 1, last)), Is.False);
+        Assert.That(_domain.LessThanOrEqual(sparse, _domain.Range(first, last - 1)), Is.False);
+    }
+
     private static readonly IReadOnlyList<IntervalValue> Samples = [
         IntervalValue.Bottom,
         IntervalValue.Top,

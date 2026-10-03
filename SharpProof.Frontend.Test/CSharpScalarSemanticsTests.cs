@@ -26,18 +26,18 @@ public sealed class CSharpScalarSemanticsTests
     public void SupportedIntegerCatalogIsExactAndExhaustive()
     {
         Assert.That(
-            CSharpScalarSemantics.SupportedIntegers.Select(
+            CSharpOperationSemantics.SupportedIntegers.Select(
                 static semantics => semantics.SpecialType),
             Is.Unique);
         foreach (var type in Enum.GetValues<SpecialType>())
         {
             var expected = ExpectedIntegerTypes.TryGetValue(type, out var expectedType);
-            var actual = CSharpScalarSemantics.TryGetInteger(
+            var actual = CSharpOperationSemantics.TryGetInteger(
                 type,
                 out var semantics);
             Assert.That(actual, Is.EqualTo(expected), type.ToString());
             Assert.That(
-                CSharpScalarSemantics.IsSupportedInteger(type),
+                CSharpOperationSemantics.IsSupportedInteger(type),
                 Is.EqualTo(expected),
                 type.ToString());
             if (!expected)

@@ -43,8 +43,7 @@
       "SharpProof.Gates.Test\\SharpProof.Gates.Test.csproj": 2,
       "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
       "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,
-      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2,
-      "SharpProof.Summaries.Test\\SharpProof.Summaries.Test.csproj": 2
+      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2
     }
   },
   "container": {
@@ -56,7 +55,7 @@
   "worker": {
     "protocolVersion": 13,
     "manifestSchemaVersion": 5,
-    "compilerArtifactSchemaVersion": 19,
+    "compilerArtifactSchemaVersion": 28,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -96,7 +95,6 @@
       "SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj",
       "SharpProof.Contracts/SharpProof.Contracts.csproj",
       "SharpProof.Dataflow/SharpProof.Dataflow.csproj",
-      "SharpProof.Summaries/SharpProof.Summaries.csproj",
       "SharpProof.Worker/SharpProof.Worker.csproj"
     ],
     "components": [
@@ -129,42 +127,71 @@
         "name": "lowering",
         "paths": [
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalCallableLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerShadowCallAncestryQualification.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalIlBodyProvider.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerReachableSourceCollector.cs",
           "SharpProof.Worker/ArtifactValidator.cs",
+          "SharpProof.Worker/Vc/PassiveCallableCandidate.cs",
+          "SharpProof.Worker/Vc/PassiveCallableArtifactAdapter.cs",
+          "SharpProof.Worker/Vc/TotalCallableVerifier.cs",
+          "SharpProof.Worker/Vc/NativeExceptionEffectVerifier.cs",
+          "SharpProof.Worker/Vc/NativeEffectSiteVerifier.cs",
+          "SharpProof.Worker/Vc/EffectGoalBuilder.cs",
+          "SharpProof.Worker/Vc/EffectSummaryFixpoint.cs",
+          "SharpProof.Worker/Vc/PassiveLoopCutter.cs",
+          "SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs",
+          "SharpProof.Worker/Vc/PassiveCallableVcPlan.cs",
+          "SharpProof.Worker/Vc/PassiveCallableSolver.cs",
+          "SharpProof.Worker/Vc/NativeCallableBackend.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
+          "SharpProof.CompilerArtifact/CompilerTotalCallableArtifactCodec.cs",
+          "SharpProof.CompilerArtifact/CompilerReachableSourceValidator.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
           "SharpProof.Contracts/ContractBinder.cs",
           "SharpProof.Contracts/ContractCanonicalization.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
+          "SharpProof.Contracts/TotalContractExpressionBinder.cs",
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",
           "SharpProof.Contracts/ContractApiSymbols.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
-          "SharpProof.Frontend/OperationSupportCatalog.cs"
+          "SharpProof.Frontend/TotalLoweringContext.cs",
+          "SharpProof.Frontend/TotalSourceCallSession.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Arrays.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Allocations.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Fields.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Synchronization.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.References.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Arithmetic.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Operations.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Exceptions.cs",
+          "SharpProof.Frontend/RoslynTotalExpressionLowerer.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Calls.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Il.cs",
+          "SharpProof.Frontend/TotalIlBody.cs",
+          "SharpProof.Frontend/TotalIlStack.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs"
         ]
       },
       {
-        "name": "relationalSummaryAuthority",
+        "name": "metadataCallAuthority",
         "paths": [
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerMetadataResolution.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
-          "SharpProof.Ir/IrSemanticTerms.cs",
-          "SharpProof.Summaries/IrRelationalSummary.cs",
-          "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
-          "SharpProof.Summaries/IrRelationalSummaryInstantiator.cs"
+          "SharpProof.Ir/IrSemanticTerms.cs"
         ],
-        "rationale": "These files construct, authenticate, instantiate, and consume the sealed interprocedural relation trusted by the worker."
+        "rationale": "These files authenticate captured metadata bodies and approved scalar specification-pack operations for Total lowering."
       },
       {
         "name": "execution",
         "paths": [
-          "SharpProof.Worker/CallableEvidenceBuilder.cs",
           "SharpProof.Worker/CallableEntryFeasibility.cs",
-          "SharpProof.Worker/CallableVerifier.cs",
-          "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
-          "SharpProof.Worker/SpecResultDomainProjection.cs",
           "SharpProof.Worker/SharpProofWorker.cs",
           "SharpProof.Worker/WorkerHost.cs"
         ]
@@ -172,13 +199,19 @@
       {
         "name": "obligationGeneration",
         "paths": [
-          "SharpProof.Worker/PostconditionObligationBuilder.cs"
+          "SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs"
         ]
       },
       {
         "name": "encoding",
         "paths": [
-          "SharpProof.Smt/IrSmtBackend.cs",
+          "SharpProof.Smt/BvEncoder.cs",
+          "SharpProof.Smt/BvEncoder.Arrays.cs",
+          "SharpProof.Smt/BvEncoder.References.cs",
+          "SharpProof.Smt/CallableSolverSession.cs",
+          "SharpProof.Smt/SmtNativeRunner.cs",
+          "SharpProof.Smt/SmtQueryResourceMeter.cs",
+          "SharpProof.Smt/SmtNativeUtilities.cs",
           "SharpProof.Verify/Backend.cs"
         ]
       },
@@ -207,7 +240,7 @@
       {
         "name": "scalarSemanticsCatalog",
         "paths": [
-          "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs",
           "SharpProof.Ir/IrOperatorCatalog.generated.cs"
         ]
       },
@@ -292,12 +325,6 @@
         ]
       },
       {
-        "name": "operationSupportCatalog",
-        "paths": [
-          "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
-        ]
-      },
-      {
         "name": "irModelCatalog",
         "paths": [
           "SharpProof.Ir/IrIdentifierAliases.cs",
@@ -324,6 +351,9 @@
           "SharpProof.Analyzer.Core/EffectContractDiagnostics.cs",
           "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
           "SharpProof.Analyzer.Core/ManagedContractFacts.cs",
+          "SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs",
+          "SharpProof.Analyzer.Core/Advisory/AdvisoryCallConsumer.cs",
+          "SharpProof.Analyzer.Core/Advisory/AdvisoryScalarIntervalTransfer.cs",
           "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
           "SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs",
           "SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs",
@@ -368,6 +398,8 @@
         "name": "replay",
         "paths": [
           "SharpProof.Ir/IrInterpreter.cs",
+          "SharpProof.Ir/IrInteger.cs",
+          "SharpProof.Ir/IrExecutionSemantics.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.Ir/IrProgramCallHostExecution.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
@@ -393,6 +425,7 @@
           "SharpProof.Frontend/FrontendSubset.cs",
           "SharpProof.Frontend/OperationSubsetClassifier.cs",
           "SharpProof.Worker/CallableVerificationPolicy.cs",
+          "SharpProof.Worker/CallableVerificationPolicy.Native.cs",
           "scripts/Get-SharpProofProductionInventory.ps1",
           "scripts/Get-SharpProofTcbPaths.ps1",
           "scripts/Test-SharpProofCoverage.ps1",
@@ -459,12 +492,17 @@
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
           "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
+          "SharpProof.BuildTasks/VerificationPublication.cs",
+          "SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
           "SharpProof.Host/ContainerNativeLibrary.cs",
+          "SharpProof.Host/PublicationLease.cs",
+          "SharpProof.Host/PublicationFile.cs",
+          "SharpProof.Host/PublicationPaths.cs",
           "SharpProof.Worker/Launcher/LauncherProgram.cs"
         ],
-        "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
+        "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, canonical publication member leases, invocation validation, and cooperating invalidation."
       },
       {
         "name": "portableShippingBoundary",
@@ -543,6 +581,7 @@
           "Tools/SharpProof.Fuzz/FuzzRunner.cs",
           "Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs",
           "Tools/SharpProof.Fuzz/Program.cs",
+          "Tools/SharpProof.Fuzz/TotalProgramFuzzing.cs",
           "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
           "Tools/SharpProof.Fuzz/packages.lock.json",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
@@ -576,7 +615,6 @@
           "SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj",
           "SharpProof.Contracts/SharpProof.Contracts.csproj",
           "SharpProof.Dataflow/SharpProof.Dataflow.csproj",
-          "SharpProof.Summaries/SharpProof.Summaries.csproj",
           "SharpProof.Worker/SharpProof.Worker.csproj"
         ],
         "rationale": "These project files define the evaluated Compile items and compilation options for the trusted proof pipeline."
@@ -593,13 +631,13 @@
         "paths": [
           "eng/CompilerAdditionalTextStability.cs",
           "eng/RoslynCfgFactory.cs",
-          "eng/RoslynCfgThrowFacts.cs",
+          "SharpProof.Frontend/CSharpOperationSemantics.ThrowClassification.cs",
+          "SharpProof.Frontend/RoslynCfgReachability.cs",
           "eng/RoslynSymbolFacts.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "SharpProof.CompilerArtifact/CompilerDependencyEvidenceFormatter.cs",
           "SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs",
           "SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSummarySignature.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",
           "SharpProof.Contracts/BoundContracts.cs",
           "SharpProof.Contracts/GlobalUsings.cs",
@@ -660,11 +698,10 @@
           "SharpProof.Specs/Polyfills/IsExternalInit.cs",
           "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
           "SharpProof.Specs/Polyfills/NullableAttributes.cs",
-          "SharpProof.Summaries/GlobalUsings.cs",
           "SharpProof.Worker/GlobalUsings.cs",
           "SharpProof.Worker/MethodResourceBudget.cs"
         ],
-        "rationale": "All evaluated Compile sources in the IR, SMT, Effects, Frontend, CompilerArtifact, CompilerCollector, Contracts, Dataflow, Summaries, and Worker projects are trusted pipeline code. The inventory check requires every such source to remain explicitly classified here or in another TCB component."
+        "rationale": "All evaluated Compile sources in the IR, SMT, Effects, Frontend, CompilerArtifact, CompilerCollector, Contracts, Dataflow, and Worker projects are trusted pipeline code. The inventory check requires every such source to remain explicitly classified here or in another TCB component."
       }
     ]
   },

@@ -3245,7 +3245,7 @@ internal sealed class ExceptionHandlerReachability(
         }
 
         var result = EmptyPotential;
-        foreach (var block in RoslynCfgThrowFacts.ReachableBlocks(graph))
+        foreach (var block in SharpProof.Frontend.RoslynCfgReachability.ReachableBlocks(graph))
         {
             if (block.FallThroughSuccessor?.Semantics !=
                     ControlFlowBranchSemantics.Throw ||
@@ -3464,7 +3464,7 @@ internal sealed class ExceptionHandlerReachability(
 
     private static bool CanThrowUnknown(IOperation operation)
     {
-        return RoslynCfgThrowFacts.BuiltInOperationMayThrow(operation);
+        return SharpProof.Frontend.CSharpOperationSemantics.BuiltInOperationMayThrow(operation);
     }
 
     private bool CanThrowUnknownAfterPrerequisites(IOperation operation)

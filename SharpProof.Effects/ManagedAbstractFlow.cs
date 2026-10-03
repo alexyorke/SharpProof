@@ -930,7 +930,7 @@ internal sealed class ManagedAbstractFlow
             ? Refine(
                 state,
                 rightStorage,
-                CSharpScalarSemantics.ReverseBinary(@operator),
+                CSharpOperationSemantics.ReverseBinary(@operator),
                 leftValue,
                 expected)
             : state;
@@ -1004,7 +1004,7 @@ internal sealed class ManagedAbstractFlow
 
         var normalized = expected
             ? @operator
-            : CSharpScalarSemantics.NegateBinary(@operator);
+            : CSharpOperationSemantics.NegateBinary(@operator);
         var domain = IntervalDomain.Instance;
         var refined = normalized switch
         {
@@ -2794,7 +2794,7 @@ internal readonly record struct ManagedAbstractValue
     /// Binary evaluation over IR scalars, where no Roslyn type symbol is
     /// available to bound the result. The IR integer domain is exactly Int64 —
     /// the frontend admits exact arithmetic only for <c>long</c>, see
-    /// <c>CSharpScalarSemantics.SupportsExactIrArithmetic</c> — and
+    /// <c>CSharpOperationSemantics.SupportsExactIrArithmetic</c> — and
     /// <see cref="TryArithmetic"/> already refuses any interval that leaves that
     /// range, so a computed interval is kept rather than discarded for want of a
     /// type to check it against.
@@ -2937,7 +2937,7 @@ internal readonly record struct ManagedAbstractValue
 
     internal static bool IntegerType(ITypeSymbol? type, out CSharpIntegerSemantics semantics)
     {
-        return CSharpScalarSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
+        return CSharpOperationSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
     }
 
     internal static bool IsNullableType(ITypeSymbol? type)
@@ -4431,11 +4431,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 BinaryMayCompleteNormally(binary),
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
-                ISimpleAssignmentOperation or IArrayElementReferenceOperation or
                 IFieldReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 ChildrenMayCompleteNormally(operation),
+            IArrayElementReferenceOperation element =>
+                ArrayAccessMayCompleteNormally(element),
+            ISimpleAssignmentOperation assignment =>
+                SimpleAssignmentMayCompleteNormally(assignment),
             IPropertyReferenceOperation property =>
                 ChildrenMayCompleteNormally(property) &&
                 (property.Property.IsStatic ||
@@ -4702,6 +4705,34 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             }
             return true;
         }
+    }
+
+    private bool ArrayAccessMayCompleteNormally(IArrayElementReferenceOperation element)
+    {
+        return ChildrenMayCompleteNormally(element) &&
+            (element.Parent is ISimpleAssignmentOperation assignment &&
+             ReferenceEquals(assignment.Target, element) ||
+             ArrayAccessMaySucceed(element));
+    }
+
+    private bool SimpleAssignmentMayCompleteNormally(ISimpleAssignmentOperation assignment)
+    {
+        return ChildrenMayCompleteNormally(assignment) &&
+            (assignment.Target is not IArrayElementReferenceOperation element ||
+             ArrayAccessMaySucceed(element));
+    }
+
+    private static bool ArrayAccessMaySucceed(IArrayElementReferenceOperation element)
+    {
+        if (IsDefinitelyNull(element.ArrayReference))
+        {
+            return false;
+        }
+        return element.Indices.Length != 1 ||
+            !ArrayLengthFacts.TryGetConstantLength(
+                UnwrapHarmlessValue(element.ArrayReference), out var length) ||
+            element.Indices[0].ConstantValue is not { HasValue: true, Value: int index } ||
+            index >= 0 && index < length;
     }
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)

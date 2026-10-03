@@ -1,0 +1,89 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v11:int[width=32,signed=True] = 0 source=total-source-call-frames.cs:127+27
+  i6 op3 Assign v12:int[width=32,signed=True] = v1 source=total-source-call-frames.cs:139+1
+  i7 op4 Assign v13:int[width=32,signed=True] = v1 source=total-source-call-frames.cs:150+3
+  i8 op5 Assign v14:int[width=32,signed=True] = (v13 + 1) source=total-source-call-frames.cs:150+3
+  i9 op6 Assign v1:int[width=32,signed=True] = v14 source=total-source-call-frames.cs:150+3
+  i10 op6 Write Local source=total-source-call-frames.cs:150+3
+  i11 op2 Assign v4:int[width=32,signed=True] = v12 source=total-source-call-frames.cs:127+27
+  i12 op2 Assign v7:int[width=32,signed=True] = v13 source=total-source-call-frames.cs:127+27
+  i13 op2 Goto b6 source=total-source-call-frames.cs:127+27
+block: b3 cfg:2
+  i41 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 call:continued
+  i39 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-frames.cs:127+27
+  i40 op1 Return v3 source=total-source-call-frames.cs:127+27
+block: b6 call:body
+  i14 op7 Assign v5:int[width=32,signed=True] = v4 source=none
+  i15 op7 Assign v6:int[width=32,signed=True] = v4 source=none
+  i16 op7 Assign v8:int[width=32,signed=True] = v7 source=none
+  i17 op7 Assign v9:int[width=32,signed=True] = v7 source=none
+  i18 op7 Goto b8 source=none
+block: b7 call:body
+  i19 op7 Goto b15 source=none
+block: b8 call:body
+  i20 op7 Goto b9 source=none
+block: b9 call:body
+  i21 op9 Assign v16:int[width=32,signed=True] = v5 source=total-source-call-frames.cs:236+5
+  i22 op10 Assign v17:int[width=32,signed=True] = 10 source=total-source-call-frames.cs:244+2
+  i23 op11 Assign v18:int[width=32,signed=True] = (v16 * v17) source=total-source-call-frames.cs:236+10
+  i24 op12 Assign v19:int[width=32,signed=True] = v8 source=total-source-call-frames.cs:249+6
+  i25 op13 Assign v20:int[width=32,signed=True] = (v18 + v19) source=total-source-call-frames.cs:236+19
+  i26 op8 Assign v10:int[width=32,signed=True] = v20 source=total-source-call-frames.cs:236+19
+  i27 op8 Goto b14 source=total-source-call-frames.cs:236+19
+block: b10 call:body
+  i28 op14 Assign v21:int[width=32,signed=True] = 99 source=total-source-call-frames.cs:285+2
+  i29 op15 Assign v5:int[width=32,signed=True] = v21 source=total-source-call-frames.cs:277+10
+  i30 op15 Write Local source=total-source-call-frames.cs:277+10
+  i31 op7 Goto b7 source=none
+block: b11 call:body
+  i32 op7 Goto b5 source=none
+block: b12 call:body
+  i33 op7 ExceptionalExit source=none
+block: b13 call:body
+  i34 op8 Assign v11:int[width=32,signed=True] = v10 source=total-source-call-frames.cs:236+19
+  i35 op8 Goto b5 source=total-source-call-frames.cs:236+19
+block: b14 call:body
+  i36 op8 Assign v15:int[width=32,signed=True] = 0 source=total-source-call-frames.cs:236+19
+  i37 op8 Goto b10 source=total-source-call-frames.cs:236+19
+block: b15 call:body
+  i38 op8 Goto b13 source=total-source-call-frames.cs:236+19
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v11
+term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir3 Variable type=t1:int width=32 signed=True value=v1
+term: ir4 Variable type=t1:int width=32 signed=True value=v12
+term: ir5 Variable type=t1:int width=32 signed=True value=v13
+term: ir6 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir7 Binary type=t1:int width=32 signed=True value=(v13 + 1)
+term: ir8 Variable type=t1:int width=32 signed=True value=v14
+term: ir9 Variable type=t1:int width=32 signed=True value=v4
+term: ir10 Variable type=t1:int width=32 signed=True value=v7
+term: ir11 Variable type=t1:int width=32 signed=True value=v5
+term: ir12 Variable type=t1:int width=32 signed=True value=v16
+term: ir13 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir14 Variable type=t1:int width=32 signed=True value=v17
+term: ir15 Binary type=t1:int width=32 signed=True value=(v16 * v17)
+term: ir16 Variable type=t1:int width=32 signed=True value=v18
+term: ir17 Variable type=t1:int width=32 signed=True value=v8
+term: ir18 Variable type=t1:int width=32 signed=True value=v19
+term: ir19 Binary type=t1:int width=32 signed=True value=(v18 + v19)
+term: ir20 Variable type=t1:int width=32 signed=True value=v20
+term: ir21 Variable type=t1:int width=32 signed=True value=v10
+term: ir22 Integer type=t1:int width=32 signed=True bits=99 value=99
+term: ir23 Variable type=t1:int width=32 signed=True value=v21
+term: ir24 Variable type=t1:int width=32 signed=True value=v3

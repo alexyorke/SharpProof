@@ -1,5 +1,8 @@
 using NUnit.Framework;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
+using SharpProof.Frontend;
 using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;
@@ -7,6 +10,37 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerSpecificationPackProviderTests
 {
+    [TestCase(int.MinValue, int.MaxValue)]
+    [TestCase(int.MaxValue, int.MinValue)]
+    [TestCase(int.MinValue, int.MinValue)]
+    [TestCase(int.MaxValue, int.MaxValue)]
+    [TestCase(-1, 0)]
+    [TestCase(0, -1)]
+    [TestCase(0, 0)]
+    public void TotalSpecificationPackAgreesWithRuntimeMaximum(int left, int right)
+    {
+        var compilation = CSharpCompilation.Create("PackRuntimeOracle",
+            references: [MetadataReference.CreateFromFile(typeof(Math).Assembly.Location)]);
+        var method = compilation.GetTypeByMetadataName("System.Math")!.GetMembers("Max").OfType<IMethodSymbol>()
+            .Single(candidate => candidate.Parameters.Length == 2 &&
+                candidate.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32));
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var disabled = new CompilerSpecificationPackProvider(factory, (IEnumerable<string>?)null);
+        Assert.That(disabled.ResolveTotal(method), Is.Null);
+        var enabled = new CompilerSpecificationPackProvider(factory, ["dotnet.scalar"]);
+        var model = enabled.ResolveTotal(method);
+        Assert.That(model, Is.Not.Null);
+        var integerType = factory.GetOrCreateIntegerType(32, true);
+        var rule = model!.Apply([factory.Integer(integerType, left), factory.Integer(integerType, right)]);
+        Assert.That(rule.Classification.IsExact, Is.True);
+        Assert.That(rule.Throws, Is.Empty);
+        var interpreted = new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>());
+        Assert.That(interpreted.Value!.Integer, Is.EqualTo(Math.Max(left, right)));
+        Assert.That(interpreted.Value.Type, Is.EqualTo(integerType));
+        Assert.That(model.Apply([factory.Boolean(true), factory.Integer(integerType, right)]).Classification.IsExact, Is.False);
+        Assert.That(model.Apply([]).Classification.IsExact, Is.False);
+    }
+
     [Test]
     public void ExplicitPackProviderUsesTheValidatedCatalogSelection()
     {

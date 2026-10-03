@@ -18,94 +18,10 @@ internal sealed partial record CallableEntryFeasibility(
     ImmutableHashSet<string> UsedAssumptionIds
 );
 
-internal sealed partial record CallableEntryEvidence(
-    ImmutableArray<Assumption> Assumptions,
-    IReadOnlyDictionary<ProofJustification, string> Labels,
-    IReadOnlyDictionary<ProofJustification, string> AssumptionIds,
-    ImmutableArray<IrVarId> ReplayVariables,
-    bool HasNontrivialPrecondition
-);
-
-internal readonly partial record struct CallableEntryEvidenceBuildResult(
-    CallableEntryEvidence? Evidence,
-    WorkerClaimReason FailureReason
-);
-
-internal sealed partial record CallableProofVerification(
-    ImmutableArray<WorkerClaimResult> Postconditions,
-    CallableEntryFeasibility EntryFeasibility
-);
-
-internal sealed partial record CallableEvidence(
-    ImmutableArray<Assumption> Assumptions,
-    ImmutableArray<Assumption> Preconditions,
-    ImmutableArray<Assumption> EntryDomainAssumptions,
-    IReadOnlyDictionary<ProofJustification, string> AssumptionLabels,
-    IReadOnlyDictionary<ProofJustification, string> UserAssumptionIds,
-    IrTerm NormalCompletion,
-    ImmutableArray<IrVarId> ReplayVariables,
-    bool UsesSupportedDomain
-);
-
-internal readonly partial record struct CallableEvidenceBuildResult(
-    CallableEvidence? Evidence,
-    WorkerClaimReason FailureReason
-);
-
 internal sealed partial record CallableVerificationResult(
     WorkerCallableResult Callable,
     ImmutableArray<WorkerClaimResult> Claims
 );
-
-internal sealed partial record SymbolicBodyExecution(
-    WorkerClaimReason Reason,
-    ImmutableArray<SymbolicReturn> Returns,
-    ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
-    ImmutableArray<GuardedBodySpecAssumption> SpecAssumptions,
-    ImmutableArray<GuardedBodySummaryAssumption> SummaryAssumptions
-);
-
-internal readonly partial record struct SymbolicReturn(
-    IrTerm Predicate,
-    IrTerm? ReturnTerm,
-    ImmutableDictionary<IrVarId, IrTerm> CurrentStates
-);
-
-internal readonly partial record struct GuardedBodySpecAssumption(
-    SpecId Spec,
-    string WitnessIdentifier,
-    IrTerm Guard,
-    IrTerm Predicate
-);
-
-internal readonly partial record struct GuardedBodySummaryAssumption(
-    string CallIdentity,
-    CompilerSummaryOrigin Origin,
-    string EvidenceSha256,
-    string EvidenceIdentity,
-    ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence,
-    IrTerm Guard,
-    IrTerm Predicate
-);
-
-internal readonly partial record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable);
-
-internal sealed partial class AcyclicBlockPredicateExecutor
-{
-    private sealed partial class Run
-    {
-        private readonly partial record struct FlowState(
-            int Order,
-            IrTerm Predicate,
-            ImmutableDictionary<IrVarId, IrTerm> Environment
-        );
-        private readonly partial record struct SpecApplication(
-            IrTerm Result,
-            IrTerm Predicate,
-            bool ConsumesMemoryHavoc
-        );
-    }
-}
 
 internal sealed partial class VerificationCache
 {

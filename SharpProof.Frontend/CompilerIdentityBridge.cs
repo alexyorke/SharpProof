@@ -111,7 +111,7 @@ public static class CompilerIdentityBridge
             return true;
         }
         return type.SpecialType == SpecialType.System_Boolean ||
-            CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
+            CSharpOperationSemantics.IsSupportedInteger(type.SpecialType);
     }
 
     internal static ITypeSymbol? GetNullableUnderlyingType(ITypeSymbol? type)

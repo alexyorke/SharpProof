@@ -8,6 +8,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Verify\SharpProof.Verify.csproj" />

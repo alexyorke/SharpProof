@@ -204,7 +204,7 @@ public static class IrSubstitution
 
         return term switch
         {
-            IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrVariableTerm => term,
+            IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrEmptyArrayTerm or IrVariableTerm => term,
             IrOpaqueTerm opaque => RewriteOpaque(factory, opaque),
             IrUnaryTerm unary => RewriteUnary(factory, unary),
             IrBinaryTerm binary => RewriteBinary(factory, binary),

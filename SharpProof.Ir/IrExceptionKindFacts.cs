@@ -11,6 +11,7 @@ internal static class IrExceptionKindFacts
             NullReferenceException => IrExceptionKind.NullReference,
             IndexOutOfRangeException => IrExceptionKind.IndexOutOfRange,
             InvalidCastException => IrExceptionKind.InvalidCast,
+            ArgumentException when exception.GetType() == typeof(ArgumentException) => IrExceptionKind.Argument,
             _ => null
         };
     }

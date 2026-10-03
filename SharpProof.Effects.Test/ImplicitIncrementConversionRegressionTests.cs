@@ -61,7 +61,7 @@ public sealed class ImplicitIncrementConversionRegressionTests
                 Is.False,
                 methodName);
             Assert.That(
-                SharpProof.Roslyn.RoslynCfgThrowFacts.OperationMayThrow(
+                SharpProof.Frontend.CSharpOperationSemantics.OperationMayThrow(
                     increment),
                 Is.True,
                 methodName);

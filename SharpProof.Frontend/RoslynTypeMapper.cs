@@ -22,6 +22,12 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
                 "error:" + CompilerIdentityBridge.CreateTypeDisplay(type));
         }
 
+        if (_factory.Semantics == IrExecutionSemantics.Total &&
+            CSharpOperationSemantics.MapType(_factory, type.SpecialType) is { } scalar)
+        {
+            return scalar;
+        }
+
         if (type is IArrayTypeSymbol array)
         {
             var element = GetTypeId(array.ElementType);
@@ -29,12 +35,12 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
                 CompilerIdentityBridge.InternType(_factory, array), element,
                 CompilerIdentityBridge.CreateTypeDisplay(array));
         }
-        if (CSharpScalarSemantics.IsSupportedInteger(type.SpecialType))
+        if (CSharpOperationSemantics.IsSupportedInteger(type.SpecialType))
         {
             return _factory.IntegerType;
         }
 
-        return CSharpScalarSemantics.TryGetBuiltInType(
+        return CSharpOperationSemantics.TryGetBuiltInType(
                 _factory, type.SpecialType) ??
             _factory.GetOrCreateReferenceType(
                 CompilerIdentityBridge.InternType(_factory, type),

@@ -65,6 +65,11 @@ dotnet_diagnostic.CA1032.severity = none
 dotnet_diagnostic.CA1064.severity = none
 dotnet_diagnostic.CA2000.severity = none
 
+# Internal resource and encoding exceptions are control flow at the native boundary.
+[SharpProof.Smt/SmtQueryResourceMeter.cs]
+dotnet_diagnostic.CA1032.severity = none
+dotnet_diagnostic.CA1064.severity = none
+
 # Console entry points must remain synchronous for the host contract.
 [SharpProof.Worker/Launcher/LauncherProgram.cs]
 dotnet_diagnostic.CA1849.severity = none
