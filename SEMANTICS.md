@@ -536,7 +536,14 @@ approximation. Only a `catch` of `Exception` or a bare `catch` is known to
 handle that exception, so a narrower handler abstains. A body with an opaque
 call keeps no array element reads, because the callee may write any array.
 Postconditions are still checked when a normal return exists only through
-approximations. Contract APIs, source callees, struct receivers, `ref`
+approximations.
+Nonvirtual source methods and getters inline on a class receiver. The
+receiver is null-checked after the arguments, and inside the callee `this` is
+never null. `base.Property` reads a virtual auto-property's backing field
+without dispatch. An explicit reference downcast keeps the reference and
+throws InvalidCastException for a non-null value whose type test, an
+approximation, fails. A generic container's declared class, interface and
+type-parameter types bridge to the caller's by reference casts. Contract APIs, source callees, struct receivers, `ref`
 arguments and shadow or metadata-Requires lowering never take opaque calls.
 Static and volatile reads, dispatched properties, array stores, external
 fields, other unsupported calls and incomplete initialization abstain; this shadow does not change compiler

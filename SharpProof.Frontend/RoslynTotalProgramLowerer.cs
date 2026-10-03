@@ -80,6 +80,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         {
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
+            SourceGetter = InlineSourceGetter,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ExceptionTarget = _frame == null ? null : (kind, site) => _frame.Search(kind, site, static target => target)
         };

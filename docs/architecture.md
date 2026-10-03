@@ -539,7 +539,12 @@ followed by approximation havocs of its result and of an `Unknown` exception
 flag. The VC counts each one as a possible allocation, write and lock. Replay
 continues past such a call only in model-driven replay. The collector keeps a
 body with an opaque call as an abstraction if any body or clause term reads an
-array element. The native
+array element. Source inlining also covers nonvirtual instance methods and
+getters: the caller null-checks the receiver after the arguments, and callee
+field reads through `this` stay approximations. Reference casts between class
+types are identity on the reference sort, which bridges generic container
+types and carries explicit downcasts behind an approximated InvalidCast guard.
+The native
 purity shadow forbids reachable nonlocal events; allocation remains compatible
 with purity. The allocation and purity routes share claim admission, entry
 feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.

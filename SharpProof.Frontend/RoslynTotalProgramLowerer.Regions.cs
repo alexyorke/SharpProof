@@ -92,6 +92,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
+            SourceGetter = InlineSourceGetter,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ExceptionTarget = (kind, site) => EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
                 ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))

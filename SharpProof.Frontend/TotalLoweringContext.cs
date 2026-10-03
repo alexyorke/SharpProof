@@ -110,7 +110,7 @@ public sealed class TotalLoweringContext
     // these identities themselves before executing the first instruction.
     public ImmutableArray<IrVarId> EntryVariables => [.. Parameters.Select(binding => binding.Entry)];
 
-    internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind == MethodKind.Ordinary &&
+    internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet &&
         !Target.IsVirtual && !Target.IsAbstract && !Target.IsOverride) &&
         !Target.IsAsync && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&

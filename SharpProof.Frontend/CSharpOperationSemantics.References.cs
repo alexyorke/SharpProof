@@ -20,6 +20,42 @@ internal static partial class CSharpOperationSemantics
             (IsScalar(array.ElementType) || array.ElementType.SpecialType is SpecialType.System_Object or SpecialType.System_String);
     }
 
+    // `(Derived)value` between class or interface types keeps the reference.
+    // A non-null value of another runtime type throws InvalidCastException;
+    // whether the value fits is unknown to the IR, so `fits` is approximated.
+    internal static IConversionOperation? ReferenceDowncast(IOperation operation)
+    {
+        return operation is IConversionOperation
+        {
+            IsImplicit: false, IsTryCast: false, OperatorMethod: null,
+            Conversion: { IsReference: true, IsImplicit: false },
+            Type: { TypeKind: TypeKind.Class or TypeKind.Interface, SpecialType: not (SpecialType.System_String or SpecialType.System_Object) },
+            Operand.Type: { TypeKind: TypeKind.Class or TypeKind.Interface, SpecialType: not SpecialType.System_String }
+        } conversion ? conversion : null;
+    }
+
+    internal static TotalScalarRule ReferenceDowncast(IrFactory factory, IrTypeId type, IrTerm operand, IrTerm fits)
+    {
+        var fails = factory.Binary(IrBinaryOperator.AndAlso,
+            factory.Binary(IrBinaryOperator.NotEqual, operand, factory.Null(operand.Type)), factory.Unary(IrUnaryOperator.Not, fits));
+        return new(factory.Cast(type, operand), [new(IrExceptionKind.InvalidCast, fails)], FrontendSubsetClassification.Exact);
+    }
+
+    // A constructed signature type may differ from its declaration (a generic
+    // container's type arguments). Class, interface and type-parameter values
+    // are all references, so a cast bridges them; any other type must match.
+    internal static bool SharesValueDomain(ITypeSymbol constructed, ITypeSymbol declared)
+    {
+        return SymbolEqualityComparer.Default.Equals(constructed, declared) ||
+            IsBridgedReference(constructed) && IsBridgedReference(declared);
+
+        static bool IsBridgedReference(ITypeSymbol type)
+        {
+            return type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.TypeParameter &&
+                type.SpecialType is not (SpecialType.System_String or SpecialType.System_Object);
+        }
+    }
+
     internal static bool IsValueDomain(ITypeSymbol? type)
     {
         return IsScalar(type) || IsReferenceDomain(type) || IsOpaqueDomain(type);

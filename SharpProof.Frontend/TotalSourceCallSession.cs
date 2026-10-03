@@ -116,29 +116,32 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private static string IlKey(IMethodSymbol method)
     { return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
-    internal bool TryPrepare(TotalLoweringContext caller, IInvocationOperation invocation,
-        out TotalLoweringContext? frame, out ControlFlowGraph? graph)
+    // An instance callee is a nonvirtual member on a reference receiver. Its
+    // implicit `this` is never null; field reads through it are approximations.
+    internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
+        ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph)
     {
         frame = null;
         graph = null;
-        var method = invocation.TargetMethod;
-        if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) || method.MethodKind != MethodKind.Ordinary ||
-            !method.IsStatic || method.IsAsync || method.IsExtern || method.IsVirtual ||
+        if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) ||
+            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet) ||
+            method.IsStatic != (instance == null) ||
+            instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
+            method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
             method.Arity != 0 || method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
-            invocation.Instance != null ||
             method.Parameters.Where((parameter, ordinal) =>
-                !SymbolEqualityComparer.Default.Equals(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type)).Any() ||
-            !SymbolEqualityComparer.Default.Equals(method.ReturnType, method.OriginalDefinition.ReturnType) ||
+                !CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type)).Any() ||
+            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
-            method.DeclaringSyntaxReferences.Length != 1 || invocation.Arguments.Length != method.Parameters.Length)
+            method.DeclaringSyntaxReferences.Length != 1 || arguments.Length != method.Parameters.Length)
         { return false; }
         var ordinals = new HashSet<int>();
-        foreach (var argument in invocation.Arguments)
+        foreach (var argument in arguments)
         {
             if (!Spend() || argument.Parameter is not { } parameter ||
                 !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method) ||
@@ -150,8 +153,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             { return false; }
         }
         var reference = method.DeclaringSyntaxReferences[0];
+        var declaration = reference.GetSyntax(cancellationToken);
         if (!compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
-            reference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax declaration)
+            declaration is not (MethodDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or AccessorDeclarationSyntax { ExpressionBody: not null }))
         { return false; }
         foreach (var node in declaration.DescendantNodesAndSelf())
         {

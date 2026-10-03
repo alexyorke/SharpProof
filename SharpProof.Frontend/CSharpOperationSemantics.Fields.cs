@@ -29,10 +29,16 @@ internal static partial class CSharpOperationSemantics
     // The field a nonvirtual instance property getter returns directly: an
     // auto-property's backing field, or a getter whose whole body returns one
     // field of the same instance.
-    internal static IFieldSymbol? GetterField(IPropertySymbol property)
+    // `base.Property` calls the getter without virtual dispatch.
+    internal static bool IsBaseAccess(IOperation? instance)
     {
-        if (property.IsStatic || property.IsIndexer || property.IsVirtual || property.IsAbstract ||
-            property.IsOverride || property.GetMethod is not { } getter || !property.ContainingType.IsReferenceType)
+        return instance is IInstanceReferenceOperation && instance.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.BaseExpressionSyntax;
+    }
+
+    internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
+    {
+        if (property.IsStatic || property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||
+            property.IsAbstract || property.GetMethod is not { } getter || !property.ContainingType.IsReferenceType)
         { return null; }
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));

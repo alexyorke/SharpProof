@@ -500,7 +500,10 @@ public sealed class IrInterpreter(IrFactory factory)
                 "The interpreter has no runtime type relation for this cast.");
         }
 
-        if (cast.Type == _factory.ObjectType)
+        // Total casts between class types keep the reference; a downcast's
+        // type test is a separate approximated guard.
+        if (cast.Type == _factory.ObjectType ||
+            target.Kind == IrTypeKind.Reference && _factory.Semantics == IrExecutionSemantics.Total)
         { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value.Reference)); }
 
         if (target.Kind == IrTypeKind.String)

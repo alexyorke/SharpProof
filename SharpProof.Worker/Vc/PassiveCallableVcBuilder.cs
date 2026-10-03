@@ -454,7 +454,8 @@ internal sealed class PassiveCallableVcBuilder
             return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer &&
-                    !(cast.Type == _factory.ObjectType && _factory.GetTypeInfo(cast.Operand.Type).Kind is IrTypeKind.Reference or IrTypeKind.String) ||
+                    !(cast.Type == _factory.ObjectType && _factory.GetTypeInfo(cast.Operand.Type).Kind is IrTypeKind.Reference or IrTypeKind.String ||
+                        _factory.GetTypeInfo(cast.Operand.Type).Kind == IrTypeKind.Reference && _factory.GetTypeInfo(cast.Type).Kind == IrTypeKind.Reference) ||
                 term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&
                     (binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat) ||
                         _hasStringConcat && binary.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual &&

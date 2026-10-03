@@ -82,17 +82,40 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return PreserveSourceCall(invocation, block, depth); }
         if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body)
         { return InlineMetadataCall(invocation, body, block, depth); }
-        if (_calls == null || !_calls.TryPrepare(_context, invocation, out var frame, out var graph))
+        return InlineSourceMember(invocation, invocation.TargetMethod, invocation.Instance, invocation.Arguments, block, depth);
+    }
+
+    private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
+    {
+        return _preserveSourceCall != null || property.Property.GetMethod is not { } getter ? null
+            : InlineSourceMember(property, getter, property.Instance, property.Arguments, block, depth);
+    }
+
+    private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
+        ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth)
+    {
+        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph))
         { return null; }
         var callee = frame!;
+        var site = _context.Site(invocation);
         // Nested lowering has its own region state. Capture the caller's lexical
         // search/unwind context before expanding arguments or the callee body.
         var callerRegion = _regionGraph == null ? null : _regionSource.EnclosingRegion;
         var callerFilter = callerRegion == null ? null : EnclosingRegionFilter(callerRegion);
         var externalFilterSearch = _externalFilterSearch || callerFilter != null || HasEnclosingCatchFilter(callerRegion);
-        var site = _context.Site(invocation);
         var returned = callee.Result is { } result ? _context.Temporary(_context.Factory.GetVariableInfo(result).Type) : (IrVarId?)null;
-        IrTerm marker = returned is { } resultStorage ? _context.Factory.Variable(resultStorage) : _context.Factory.Boolean(false);
+        // A generic container's declaration types bridge to the caller's.
+        IrTerm marker = returned is { } resultStorage ? Bridge(_context.Factory.Variable(resultStorage), _context.Type(method.ReturnType))
+            : _context.Factory.Boolean(false);
+        IrTerm? receiver = null;
+        if (instance != null && !_expressions.IsImplicitThis(instance))
+        {
+            var lowered = _expressions.LowerBodyValue(instance, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return new(marker, lowered.Continuation, lowered.Classification); }
+            receiver = lowered.Value;
+            block = lowered.Continuation;
+        }
         if (returned is { } initialized)
         {
             // A fault never reads a call result. Keeping its internal storage
@@ -101,7 +124,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Assign(block, site, initialized, CSharpOperationSemantics.DefaultValue(_context.Factory, type));
         }
         var arguments = new IrTerm[callee.Parameters.Length];
-        foreach (var argument in invocation.Arguments)
+        foreach (var argument in callArguments)
         {
             SpendRegion();
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
@@ -115,8 +138,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return new(marker, block, value.Classification); }
-            arguments[argument.Parameter!.Ordinal] = value.Value;
+            arguments[argument.Parameter!.Ordinal] = Bridge(value.Value,
+                _context.Factory.GetVariableInfo(callee.Parameters[argument.Parameter.Ordinal].Entry).Type);
         }
+        if (receiver != null)
+        { block = _expressions.CheckReceiver(invocation, receiver, block); }
         ImmutableArray<TotalShadowCallHop> callAncestry = [];
         if (_captureShadowCallAncestry)
         {
@@ -184,6 +210,12 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case IrWriteInstruction write:
                         _builder.Write(destination, write.Operation, write.Region);
                         break;
+                    case IrHavocInstruction { Origin: IrHavocOrigin.Approximation } havoc:
+                        _builder.Havoc(destination, havoc.Operation, havoc.HavocKind, havoc.Origin, [.. havoc.Variables]);
+                        break;
+                    case IrCallInstruction { Receiver: null, Target: null } opaque:
+                        _builder.Call(destination, opaque.Operation, null, opaque.Member, null, [.. opaque.Arguments]);
+                        break;
                     case IrAssignInstruction assign:
                         var copied = _builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
                         if (lowering.CallPreconditions.TryGetValue(assign, out var obligation))
@@ -226,6 +258,9 @@ internal sealed partial class RoslynTotalProgramLowerer
             return blocks[target];
         }
     }
+
+    private IrTerm Bridge(IrTerm value, IrTypeId type)
+    { return value.Type == type ? value : _context.Factory.Cast(type, value); }
 
     private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
     {

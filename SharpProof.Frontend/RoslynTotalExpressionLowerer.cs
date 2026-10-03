@@ -23,8 +23,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal Action? Spend { get; set; }
     internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
 
+    internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; set; }
+
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowOpaqueCalls { get; set; }
+
+    // `this` (or `base`) of a reference-type instance member is never null.
+    internal bool IsImplicitThis(IOperation? instance)
+    {
+        return instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+    }
+
+    // An instance call checks its receiver after evaluating the arguments.
+    internal IrBlockId CheckReceiver(IOperation operation, IrTerm receiver, IrBlockId block)
+    { return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Boolean(true), receiver), block).Continuation; }
 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
@@ -159,6 +172,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 ? new(_factory.Cast(_factory.ObjectType, operand.Value), operand.Continuation, operand.Classification)
                 : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
         }
+        if (depth < 256 && CSharpOperationSemantics.ReferenceDowncast(operation) is { } downcast)
+        {
+            var operand = LowerBodyValue(downcast.Operand, block, depth + 1);
+            if (!operand.Classification.IsExact)
+            { return Approximate(operation, operand.Continuation, operand.Classification.Abstention); }
+            var fits = _context.Temporary(_factory.BooleanType);
+            _builder!.Havoc(operand.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, fits);
+            return ApplyRule(operation, CSharpOperationSemantics.ReferenceDowncast(_factory, _context.Type(downcast.Type), operand.Value,
+                _factory.Variable(fits)), operand.Continuation);
+        }
         if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
         {
             var operand = LowerBodyValue(boxing.Operand, block, depth + 1);
@@ -179,9 +202,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IInvocationOperation opaqueInvocation &&
             OpaqueCall(operation, opaqueInvocation.TargetMethod, opaqueInvocation.Instance, opaqueInvocation.Arguments, block, depth) is { } invoked)
         { return invoked; }
+        if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
+            CSharpOperationSemantics.GetterField(sourceProperty.Property, CSharpOperationSemantics.IsBaseAccess(sourceProperty.Instance)) == null &&
+            SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
+        { return gotten; }
         if (depth < 256 && operation is IPropertyReferenceOperation { Property.GetMethod: { } getter } opaqueProperty &&
             !CSharpOperationSemantics.IsLength(opaqueProperty) &&
-            CSharpOperationSemantics.GetterField(opaqueProperty.Property) == null &&
+            CSharpOperationSemantics.GetterField(opaqueProperty.Property, CSharpOperationSemantics.IsBaseAccess(opaqueProperty.Instance)) == null &&
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         { return read; }
         if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
@@ -197,7 +224,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.IsSupportedFieldRead(fieldRead.Field))
         { return FieldRead(operation, fieldRead.Field, fieldRead.Instance, block, depth); }
         if (depth < 256 && operation is IPropertyReferenceOperation { Arguments.Length: 0 } propertyRead &&
-            CSharpOperationSemantics.GetterField(propertyRead.Property) is { } getterField)
+            CSharpOperationSemantics.GetterField(propertyRead.Property, CSharpOperationSemantics.IsBaseAccess(propertyRead.Instance)) is { } getterField)
         { return FieldRead(operation, getterField, propertyRead.Instance, block, depth); }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
@@ -372,8 +399,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         var field = (IFieldReferenceOperation)operation.Target;
         IrTerm? receiver = null;
-        var implicitThis = field.Instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
-            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        var implicitThis = IsImplicitThis(field.Instance);
         if (!implicitThis)
         {
             if (field.Instance == null)
@@ -408,10 +434,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
         { return null; }
         IrTerm? receiver = null;
-        var implicitThis = instance is IInstanceReferenceOperation
-        { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
-            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
-        if (instance != null && !implicitThis)
+        if (instance != null && !IsImplicitThis(instance))
         {
             var lowered = LowerBodyValue(instance, block, depth + 1);
             if (!lowered.Classification.IsExact)
@@ -429,7 +452,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = lowered.Continuation;
         }
         if (receiver != null)
-        { block = ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Boolean(true), receiver), block).Continuation; }
+        { block = CheckReceiver(operation, receiver, block); }
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
         var member = _factory.GetOrCreateMember(
@@ -464,9 +487,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         IrBlockId block, int depth)
     {
         IrTerm? receiver = null;
-        var implicitThis = instance is IInstanceReferenceOperation
-        { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
-            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        var implicitThis = IsImplicitThis(instance);
         if (!implicitThis)
         {
             if (instance == null)
@@ -486,9 +507,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         IFieldReferenceOperation field, IrBlockId block, int depth)
     {
         IrTerm? receiver = null;
-        var implicitThis = field.Instance is IInstanceReferenceOperation
-        { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
-            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        var implicitThis = IsImplicitThis(field.Instance);
         if (!field.Field.IsStatic && !implicitThis)
         {
             if (field.Instance == null)

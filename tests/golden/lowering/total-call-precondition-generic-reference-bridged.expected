@@ -1,0 +1,54 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] current=v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] old=v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] source=values
+block: b0 entry
+  i0 op0 Assign v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-generic-reference-bridged.cs:221+21
+  i6 op4 Assign v9:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32}[width=0,signed=False] = v1 source=total-call-precondition-generic-reference-bridged.cs:235+6
+  i7 op3 Assign v10:bool[width=0,signed=False] = ((("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)v9) != (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)null)) source=total-call-precondition-generic-reference-bridged.cs:221+21
+  i8 op3 Assign v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}[width=0,signed=False] = (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)v9) source=total-call-precondition-generic-reference-bridged.cs:221+21
+  i9 op3 Goto b6 source=total-call-precondition-generic-reference-bridged.cs:221+21
+block: b3 cfg:2
+  i22 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 call:continued
+  i20 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-generic-reference-bridged.cs:221+21
+  i21 op1 Return v3 source=total-call-precondition-generic-reference-bridged.cs:221+21
+block: b6 call:body
+  i10 op5 Assign v5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}[width=0,signed=False] = v4 source=none
+  i11 op5 Assign v6:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}[width=0,signed=False] = v4 source=none
+  i12 op5 Goto b7 source=none
+block: b7 call:body
+  i13 op5 Goto b8 source=none
+block: b8 call:body
+  i14 op7 Assign v11:int[width=32,signed=True] = 1 source=total-call-precondition-generic-reference-bridged.cs:382+1
+  i15 op6 Assign v7:int[width=32,signed=True] = v11 source=total-call-precondition-generic-reference-bridged.cs:382+1
+  i16 op6 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-generic-reference-bridged.cs:382+1
+  i17 op6 Goto b5 source=total-call-precondition-generic-reference-bridged.cs:382+1
+block: b9 call:body
+  i18 op5 Goto b5 source=none
+block: b10 call:body
+  i19 op5 ExceptionalExit source=none
+term: ir0 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32} width=0 signed=False value=v0
+term: ir1 Variable type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0} width=0 signed=False value=v4
+term: ir4 Null type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0} width=0 signed=False value=(("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)null)
+term: ir6 Variable type=t1:int width=32 signed=True value=v8
+term: ir7 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir8 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32} width=0 signed=False value=v1
+term: ir9 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{System.Int32} width=0 signed=False value=v9
+term: ir10 Cast type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0} width=0 signed=False value=(("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)v9)
+term: ir11 Binary type=t0:bool width=0 signed=False value=((("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)v9) != (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.List{T:Box`1:`0}"#t5)null))
+term: ir12 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir13 Variable type=t1:int width=32 signed=True value=v11
+term: ir14 Variable type=t1:int width=32 signed=True value=v7
+term: ir15 Variable type=t1:int width=32 signed=True value=v3
