@@ -173,6 +173,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
+        if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
+        {
+            var tested = LowerBodyValue(typeTestOperand, block, depth + 1);
+            if (!tested.Classification.IsExact)
+            { return Approximate(operation, tested.Continuation, tested.Classification.Abstention); }
+            var matched = _context.Temporary(_factory.BooleanType);
+            _builder!.Havoc(tested.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, matched);
+            return new(_factory.Variable(matched), tested.Continuation, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && operation is IFieldReferenceOperation fieldRead &&
             CSharpOperationSemantics.IsSupportedFieldRead(fieldRead.Field))
         { return FieldRead(operation, fieldRead.Field, fieldRead.Instance, block, depth); }
@@ -585,7 +594,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         value = operation switch
         {
             ILiteralOperation literal => CSharpOperationSemantics.Literal(_factory, literal.Type!, literal.ConstantValue.Value),
-            IDefaultValueOperation => CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
+            IDefaultValueOperation when !CSharpOperationSemantics.IsOpaqueDomain(operation.Type) =>
+                CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
             IParameterReferenceOperation parameter => _factory.Variable(_context.Variable(parameter.Parameter, state)),
             ILocalReferenceOperation local when local.Local.HasConstantValue => CSharpOperationSemantics.Literal(_factory, local.Type!, local.Local.ConstantValue),
             ILocalReferenceOperation local when local.Local.RefKind == RefKind.None => _factory.Variable(_context.Variable(local.Local)),
@@ -646,7 +656,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     }
     private IrTerm Default(ITypeSymbol? type)
     {
-        return CSharpOperationSemantics.IsValueDomain(type) ? CSharpOperationSemantics.Literal(_factory, type, null) : _factory.Boolean(false);
+        return CSharpOperationSemantics.IsValueDomain(type) && !CSharpOperationSemantics.IsOpaqueDomain(type)
+            ? CSharpOperationSemantics.Literal(_factory, type, null) : _factory.Boolean(false);
     }
     private IrTerm And(IrTerm first, IrTerm second)
     {

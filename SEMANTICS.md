@@ -525,7 +525,10 @@ nonlocal events with ordered receiver capture, RHS evaluation and null faults.
 Instance field reads, and properties that are auto-properties or only return
 one field of the same instance, run no code: a null receiver is their only
 fault and the value read is an approximation, usable by universal proofs but
-never by a concrete refutation. Static and volatile reads, dispatched
+never by a concrete refutation. Type-parameter values are opaque: they may
+be stored, passed, returned and type-tested (`value is int`), with an unknown
+test result and no effects; the JIT folds the box such a test emits, which
+runtime tests confirm. Operators, conversions and `default(T)` abstain. Static and volatile reads, dispatched
 properties, array stores, external fields, unsupported calls and incomplete
 initialization abstain; this shadow does not change compiler
 effect authority. Refutation requires an original-program write-site witness

@@ -22,7 +22,28 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsValueDomain(ITypeSymbol? type)
     {
-        return IsScalar(type) || IsReferenceDomain(type);
+        return IsScalar(type) || IsReferenceDomain(type) || IsOpaqueDomain(type);
+    }
+
+    // A type-parameter value is opaque: it may be stored, passed and returned,
+    // and type-tested, but no operator, conversion or default applies to it.
+    internal static bool IsOpaqueDomain(ITypeSymbol? type)
+    {
+        return type is ITypeParameterSymbol;
+    }
+
+    // `value is T2` on a type-parameter value runs no user code and cannot
+    // throw. Its result is unknown to the IR. The box the compiler emits for
+    // the test is folded by the JIT and does not allocate.
+    internal static IOperation? OpaqueTypeTestOperand(IOperation operation)
+    {
+        return operation switch
+        {
+            IIsTypeOperation test when IsOpaqueDomain(test.ValueOperand.Type) => test.ValueOperand,
+            IIsPatternOperation { Pattern: ITypePatternOperation or IDeclarationPatternOperation { DeclaredSymbol: null } } test
+                when IsOpaqueDomain(test.Value.Type) => test.Value,
+            _ => null
+        };
     }
 
     internal static IrTerm DefaultValue(IrFactory factory, IrTypeId type)

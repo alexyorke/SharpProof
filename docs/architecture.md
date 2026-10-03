@@ -530,7 +530,9 @@ capturing receivers before the RHS and checking null after RHS evaluation.
 Volatile, readonly, external and initialization-sensitive stores abstain; array
 stores remain incomplete. Nonvolatile instance field reads, auto-properties and
 getters that only return one field of the same instance lower to a null-receiver
-fault plus an approximated value; static reads and dispatched properties abstain. The native
+fault plus an approximated value; static reads and dispatched properties abstain.
+Type-parameter values are an opaque domain: data flow and type tests only, with
+an approximated Boolean result and no allocation (the JIT folds the test's box). The native
 purity shadow forbids reachable nonlocal events; allocation remains compatible
 with purity. The allocation and purity routes share claim admission, entry
 feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.
