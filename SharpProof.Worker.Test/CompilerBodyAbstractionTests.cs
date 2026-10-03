@@ -17,7 +17,7 @@ public sealed class CompilerBodyAbstractionTests
                 Contract.Requires(x >= 0);
                 Contract.Ensures(Contract.Result<int>() == Contract.Result<int>());
                 Contract.Ensures(Contract.Result<int>() == x);
-                System.Console.WriteLine(x);
+                System.Console.WriteLine(x.ToString());
                 throw null!;
             }
         }
@@ -32,7 +32,7 @@ public sealed class CompilerBodyAbstractionTests
             public static class Subject { public static void Target() {
                 Contract.Ensures(true);
                 Contract.Ensures(false);
-                System.Console.WriteLine(1);
+                System.Console.WriteLine(1.ToString());
                 throw null!;
             } }
             """ : Source;
@@ -85,18 +85,25 @@ public sealed class CompilerBodyAbstractionTests
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
     }
 
-    [TestCase("object")]
-    [TestCase("string")]
-    [TestCase("int[]")]
-    public void UnknownBodyCannotPreserveUnmodeledHeapObservations(string type)
+    [TestCase("object", false)]
+    [TestCase("string", false)]
+    [TestCase("int[]", true)]
+    public void UnknownBodyCannotPreserveUnmodeledHeapObservations(string type, bool unsupported)
     {
+        // Reference values pass through an opaque call exactly; an int[]
+        // argument needs an unsupported widening, and no body abstraction
+        // can preserve its heap.
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject { public static {{type}} Target({{type}} x) {
                 Contract.Ensures(true); System.Console.WriteLine(x); return x;
             } }
             """);
-        Assert.That(project.Snapshot.Callables.Single().Total, Is.Null);
+        var total = project.Snapshot.Callables.Single().Total;
+        if (unsupported)
+        { Assert.That(total, Is.Null); }
+        else
+        { Assert.That(total!.IsBodyAbstraction, Is.False); }
     }
 
     [TestCase("")]

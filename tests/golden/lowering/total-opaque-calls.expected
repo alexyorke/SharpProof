@@ -1,0 +1,103 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] current=v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] old=v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False]
+parameter: 1 entry=v3:int[width=32,signed=True] current=v4:int[width=32,signed=True] old=v5:int[width=32,signed=True]
+result: v6:int[width=32,signed=True]
+variable: v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] source=version
+variable: v4:int[width=32,signed=True] source=value
+variable: v8:int[width=32,signed=True] source=ignored
+block: b0 entry
+  i0 op0 Assign v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] = v0 source=none
+  i2 op0 Assign v4:int[width=32,signed=True] = v3 source=none
+  i3 op0 Assign v5:int[width=32,signed=True] = v3 source=none
+  i5 op0 Goto b1 source=none
+block: b1 cfg:0
+  i6 op0 Goto b2 source=none
+block: b2 cfg:1
+  i7 op0 Assign v8:int[width=32,signed=True] = 0 source=none
+  i8 op1 Assign v9:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] = v1 source=total-opaque-calls.cs:357+7
+  i9 op2 Branch (v9 == (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version"#t4)null)) ? b6 : b7 source=total-opaque-calls.cs:357+21
+block: b3 cfg:2
+  i36 op15 Assign v19:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version[width=0,signed=False] = v1 source=total-opaque-calls.cs:490+7
+  i37 op16 Branch (v19 == (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version"#t4)null)) ? b15 : b16 source=total-opaque-calls.cs:490+13
+block: b4 cfg:3
+  i48 op0 Return void source=none
+block: b5 exceptional:exit
+  i4 op0 ExceptionalExit source=none
+block: b6 throw
+  i12 op2 Throw NullReference -> b8 source=total-opaque-calls.cs:357+21
+block: b7 normal
+  i13 op3 Assign v10:bool[width=0,signed=False] = true source=total-opaque-calls.cs:357+21
+  i14 op4 Call void member=m0 receiver=none args=[] source=total-opaque-calls.cs:357+21
+  i15 op4 Havoc Variables/Approximation [v11:bool[width=0,signed=False]] source=total-opaque-calls.cs:357+21
+  i16 op4 Havoc Variables/Approximation [v12:int[width=32,signed=True]] source=total-opaque-calls.cs:357+21
+  i17 op5 Branch v11 ? b9 : b10 source=total-opaque-calls.cs:357+21
+block: b8 catch:entry
+  i10 op2 Assign v7:int[width=32,signed=True] = 0 source=total-opaque-calls.cs:357+21
+  i11 op2 Goto b3 source=total-opaque-calls.cs:357+21
+block: b9 throw
+  i20 op5 Throw Unknown -> b11 source=total-opaque-calls.cs:357+21
+block: b10 normal
+  i21 op6 Assign v13:int[width=32,signed=True] = v12 source=total-opaque-calls.cs:357+21
+  i22 op7 Call void member=m1 receiver=none args=[] source=total-opaque-calls.cs:381+28
+  i23 op7 Havoc Variables/Approximation [v14:bool[width=0,signed=False]] source=total-opaque-calls.cs:381+28
+  i24 op7 Havoc Variables/Approximation [v15:int[width=32,signed=True]] source=total-opaque-calls.cs:381+28
+  i25 op8 Branch v14 ? b12 : b13 source=total-opaque-calls.cs:381+28
+block: b11 catch:entry
+  i18 op5 Assign v7:int[width=32,signed=True] = 1 source=total-opaque-calls.cs:357+21
+  i19 op5 Goto b3 source=total-opaque-calls.cs:357+21
+block: b12 throw
+  i28 op8 Throw Unknown -> b14 source=total-opaque-calls.cs:381+28
+block: b13 normal
+  i29 op9 Assign v16:int[width=32,signed=True] = v15 source=total-opaque-calls.cs:381+28
+  i30 op10 Assign v17:int[width=32,signed=True] = (v13 + v16) source=total-opaque-calls.cs:357+52
+  i31 op11 Assign v8:int[width=32,signed=True] = v17 source=total-opaque-calls.cs:347+62
+  i32 op11 Write Local source=total-opaque-calls.cs:347+62
+  i33 op13 Assign v18:int[width=32,signed=True] = v4 source=total-opaque-calls.cs:430+5
+  i34 op12 Assign v6:int[width=32,signed=True] = v18 source=total-opaque-calls.cs:430+5
+  i35 op12 Return v6 source=total-opaque-calls.cs:430+5
+block: b14 catch:entry
+  i26 op8 Assign v7:int[width=32,signed=True] = 2 source=total-opaque-calls.cs:381+28
+  i27 op8 Goto b3 source=total-opaque-calls.cs:381+28
+block: b15 throw
+  i38 op16 Throw NullReference -> b5 source=total-opaque-calls.cs:490+13
+block: b16 normal
+  i39 op17 Assign v20:bool[width=0,signed=False] = true source=total-opaque-calls.cs:490+13
+  i40 op18 Call void member=m2 receiver=none args=[] source=total-opaque-calls.cs:490+13
+  i41 op18 Havoc Variables/Approximation [v21:bool[width=0,signed=False]] source=total-opaque-calls.cs:490+13
+  i42 op18 Havoc Variables/Approximation [v22:int[width=32,signed=True]] source=total-opaque-calls.cs:490+13
+  i43 op19 Branch v21 ? b17 : b18 source=total-opaque-calls.cs:490+13
+block: b17 throw
+  i44 op19 Throw Unknown -> b5 source=total-opaque-calls.cs:490+13
+block: b18 normal
+  i45 op20 Assign v23:int[width=32,signed=True] = v22 source=total-opaque-calls.cs:490+13
+  i46 op14 Assign v6:int[width=32,signed=True] = v23 source=total-opaque-calls.cs:490+13
+  i47 op14 Return v6 source=total-opaque-calls.cs:490+13
+term: ir0 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version width=0 signed=False value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v3
+term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir3 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version width=0 signed=False value=v1
+term: ir4 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version width=0 signed=False value=v9
+term: ir5 Boolean type=t0:bool width=0 signed=False value=true
+term: ir6 Null type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version width=0 signed=False value=(("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version"#t4)null)
+term: ir7 Binary type=t0:bool width=0 signed=False value=(v9 == (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version"#t4)null))
+term: ir10 Variable type=t1:int width=32 signed=True value=v12
+term: ir11 Variable type=t0:bool width=0 signed=False value=v11
+term: ir12 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir13 Variable type=t1:int width=32 signed=True value=v13
+term: ir14 Variable type=t1:int width=32 signed=True value=v15
+term: ir15 Variable type=t0:bool width=0 signed=False value=v14
+term: ir16 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir17 Variable type=t1:int width=32 signed=True value=v16
+term: ir18 Binary type=t1:int width=32 signed=True value=(v13 + v16)
+term: ir19 Variable type=t1:int width=32 signed=True value=v17
+term: ir20 Variable type=t1:int width=32 signed=True value=v4
+term: ir21 Variable type=t1:int width=32 signed=True value=v18
+term: ir22 Variable type=t1:int width=32 signed=True value=v6
+term: ir23 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version width=0 signed=False value=v19
+term: ir24 Binary type=t0:bool width=0 signed=False value=(v19 == (("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Version"#t4)null))
+term: ir26 Variable type=t1:int width=32 signed=True value=v22
+term: ir27 Variable type=t0:bool width=0 signed=False value=v21
+term: ir28 Variable type=t1:int width=32 signed=True value=v23

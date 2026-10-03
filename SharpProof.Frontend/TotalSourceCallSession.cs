@@ -25,6 +25,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool ConstructionLimitExceeded { get; private set; }
 
     internal bool MetadataRequiresEnabled => prepareMetadata != null;
+    // Claim lowering admits unmodeled metadata calls as opaque calls. Shadow
+    // and metadata-Requires lowering keep rejecting them.
+    internal bool OpaqueCalls { get; set; }
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
     { return prepareMetadata?.Invoke(frame, body) ?? true; }
 

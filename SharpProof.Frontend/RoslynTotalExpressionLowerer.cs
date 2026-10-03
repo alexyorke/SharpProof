@@ -23,6 +23,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal Action? Spend { get; set; }
     internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
 
+    // Shadow skeletons record call edges only; they never take opaque calls.
+    internal bool AllowOpaqueCalls { get; set; }
+
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
@@ -173,6 +176,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
+        if (depth < 256 && operation is IInvocationOperation opaqueInvocation &&
+            OpaqueCall(operation, opaqueInvocation.TargetMethod, opaqueInvocation.Instance, opaqueInvocation.Arguments, block, depth) is { } invoked)
+        { return invoked; }
+        if (depth < 256 && operation is IPropertyReferenceOperation { Property.GetMethod: { } getter } opaqueProperty &&
+            !CSharpOperationSemantics.IsLength(opaqueProperty) &&
+            CSharpOperationSemantics.GetterField(opaqueProperty.Property) == null &&
+            OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
+        { return read; }
         if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
         {
             var tested = LowerBodyValue(typeTestOperand, block, depth + 1);
@@ -378,6 +389,77 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         _builder!.Write(result.Continuation, _context.Site(operation), region);
         return result;
     }
+    // A metadata call that is neither inlined nor modeled. Its result is
+    // unknown, it may throw an exception of unknown type, and its effects are
+    // unknown; the worker treats its site as a possible allocation, write and
+    // lock. Only by-value calls on static or reference receivers qualify: a
+    // struct receiver could mutate the caller's local through `this`. Source
+    // callees stay with inlining and the effect fixpoint.
+    private TotalBodyValue? OpaqueCall(IOperation operation, IMethodSymbol method, IOperation? instance,
+        ImmutableArray<IArgumentOperation> arguments, IrBlockId block, int depth)
+    {
+        if (!AllowOpaqueCalls || !method.DeclaringSyntaxReferences.IsEmpty ||
+            IsSharpProofApi(method.ContainingNamespace) ||
+            method.ReturnsByRef || method.ReturnsByRefReadonly || method.IsStatic != (instance == null) ||
+            instance != null && instance.Type?.IsReferenceType != true ||
+            !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+            arguments.Any(argument => argument.Parameter == null ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
+        { return null; }
+        IrTerm? receiver = null;
+        var implicitThis = instance is IInstanceReferenceOperation
+        { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        if (instance != null && !implicitThis)
+        {
+            var lowered = LowerBodyValue(instance, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+            receiver = lowered.Value;
+            block = lowered.Continuation;
+        }
+        var values = new IrTerm[arguments.Length];
+        foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
+        {
+            var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+            values[arguments.IndexOf(argument)] = lowered.Value;
+            block = lowered.Continuation;
+        }
+        if (receiver != null)
+        { block = ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Boolean(true), receiver), block).Continuation; }
+        var site = _context.Site(operation);
+        var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
+        var member = _factory.GetOrCreateMember(
+            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
+            "opaque-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
+            [.. arguments.Select(argument => _context.Type(argument.Value.Type))]);
+        // The call itself is only an effect site; its result and whether it
+        // throws are approximation havocs, so no refutation may depend on them.
+        _builder!.Call(block, site, null, member, null, values);
+        var throws = _context.Temporary(_factory.BooleanType);
+        _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
+        IrTerm result = _factory.Boolean(false);
+        if (!method.ReturnsVoid)
+        {
+            var target = _context.Temporary(resultType);
+            _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
+            result = _factory.Variable(target);
+        }
+        return ApplyRule(operation, new TotalScalarRule(result,
+            [new(IrExceptionKind.Unknown, _factory.Variable(throws))], FrontendSubsetClassification.Exact), block);
+    }
+
+    // Contract and attribute APIs are specifications, never opaque calls.
+    private static bool IsSharpProofApi(INamespaceSymbol? space)
+    {
+        while (space is { IsGlobalNamespace: false, ContainingNamespace.IsGlobalNamespace: false })
+        { space = space.ContainingNamespace; }
+        return space is not { IsGlobalNamespace: false } || space.Name == "SharpProof";
+    }
+
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth)
     {

@@ -21,6 +21,8 @@ internal sealed class PassiveCallableSolver : IDisposable
     private readonly MethodResourceBudget _budget;
     private readonly ProofKernel _kernel;
     private bool _entryFeasible;
+    // A normal return was found, but only through approximation havocs.
+    private bool _approximateNormalReturn;
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan,
         uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit)
@@ -224,7 +226,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
     }
 
-    internal bool CanCheckWithoutNormalWitness => (_plan.LoopSearch != null || _plan.HasBodyAbstraction) && _entryFeasible;
+    internal bool CanCheckWithoutNormalWitness =>
+        (_plan.LoopSearch != null || _plan.HasBodyAbstraction || _approximateNormalReturn) && _entryFeasible;
 
     private async Task<PassiveCallableCheckResult> VerifyBodyAsync(VerificationQuery query,
         CallableReplayContext replay, CancellationToken cancellationToken)
@@ -253,6 +256,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         { return new(PassiveCallableFeasibilityKind.Unknown, entry, entry); }
         _entryFeasible = true;
         var normal = await VerifyNormalCompletionAsync(cancellationToken).ConfigureAwait(false);
+        _approximateNormalReturn = normal.Reason == WorkerClaimReason.CounterexampleNotReplayable;
         return new(normal.Outcome switch
         {
             RefutedOutcome => PassiveCallableFeasibilityKind.Feasible,

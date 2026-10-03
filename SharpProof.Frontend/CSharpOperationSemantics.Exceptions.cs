@@ -12,6 +12,8 @@ internal static partial class CSharpOperationSemantics
             IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
             IrExceptionKind.InvalidCast => "System.InvalidCastException",
             IrExceptionKind.Argument => "System.ArgumentException",
+            // Its hierarchy is just Exception and Object, so only those catch it.
+            IrExceptionKind.Unknown => "System.Exception",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }

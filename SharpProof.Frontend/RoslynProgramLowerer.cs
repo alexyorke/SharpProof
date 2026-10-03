@@ -50,7 +50,7 @@ public sealed class RoslynProgramLowerer(
     internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
         Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
-        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
+        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
@@ -60,7 +60,8 @@ public sealed class RoslynProgramLowerer(
         if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
         { return LowerCandidate(graph, context, cancellationToken); }
         return new RoslynTotalProgramLowerer(context, cancellationToken,
-            new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata)).Lower(graph);
+            new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata)
+            { OpaqueCalls = opaqueCalls }).Lower(graph);
     }
 
     public FrontendProgramLoweringResult Lower(ControlFlowGraph graph)

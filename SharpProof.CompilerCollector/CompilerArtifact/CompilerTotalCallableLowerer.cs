@@ -68,11 +68,14 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         if (graph == null)
         { return null; }
-        var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken);
+        var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken,
+            opaqueCalls: true);
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;
-        if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions)
+        if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
+            OpaqueCallMayChangeReadElements(context.Factory, lowering.Program,
+                binding.Clauses.SelectMany(clause => new[] { clause.Value, clause.SafeCondition })))
         {
             if (lowering.ConstructionLimitExceeded || graph.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
                 graph.Blocks.Sum(block => block.Operations.Length) > CompilerPreparedBody.MaximumInstructions ||
@@ -247,10 +250,54 @@ internal static class CompilerTotalCallableLowerer
         };
     }
 
+    // The IR reads an array element as a pure function of the reference, which
+    // holds while no lowered code writes elements. An opaque call may write any
+    // array, so a body with one keeps no array element reads.
+    private static bool OpaqueCallMayChangeReadElements(IrFactory factory, IrProgram program, IEnumerable<IrTerm> clauses)
+    {
+        var instructions = program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        if (!instructions.Any(instruction => instruction is IrCallInstruction { Receiver: null, Target: null }))
+        { return false; }
+        var pending = new Stack<IrTerm>(instructions.SelectMany(IrInstructionFacts.ReadTerms).Concat(clauses));
+        while (pending.Count != 0)
+        {
+            switch (pending.Pop())
+            {
+                case IrSequenceAccessTerm access:
+                    if (factory.GetTypeInfo(access.Sequence.Type).Kind != IrTypeKind.String)
+                    { return true; }
+                    pending.Push(access.Sequence);
+                    pending.Push(access.Index);
+                    break;
+                case IrOpaqueTerm:
+                    return true;
+                case IrUnaryTerm unary:
+                    pending.Push(unary.Operand);
+                    break;
+                case IrBinaryTerm binary:
+                    pending.Push(binary.Left);
+                    pending.Push(binary.Right);
+                    break;
+                case IrConditionalTerm conditional:
+                    pending.Push(conditional.Condition);
+                    pending.Push(conditional.WhenTrue);
+                    pending.Push(conditional.WhenFalse);
+                    break;
+                case IrCastTerm cast:
+                    pending.Push(cast.Operand);
+                    break;
+                case IrLengthTerm length:
+                    pending.Push(length.Value);
+                    break;
+            }
+        }
+        return false;
+    }
+
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
         ControlFlowGraph graph, TotalLoweringContext context, CompilerReferenceSnapshot[]? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
-        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false)
+        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
     {
         context.AllowObjectWidening = enableMetadataRequires;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
@@ -296,7 +343,8 @@ internal static class CompilerTotalCallableLowerer
             return true;
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
             method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks),
-            enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null);
+            enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null,
+            opaqueCalls);
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory,

@@ -532,7 +532,14 @@ stores remain incomplete. Nonvolatile instance field reads, auto-properties and
 getters that only return one field of the same instance lower to a null-receiver
 fault plus an approximated value; static reads and dispatched properties abstain.
 Type-parameter values are an opaque domain: data flow and type tests only, with
-an approximated Boolean result and no allocation (the JIT folds the test's box). The native
+an approximated Boolean result and no allocation (the JIT folds the test's box).
+Claim lowering (`TotalSourceCallSession.OpaqueCalls`) turns unmodeled metadata
+calls into opaque calls. Each is a target-less `IrCallInstruction` effect site,
+followed by approximation havocs of its result and of an `Unknown` exception
+flag. The VC counts each one as a possible allocation, write and lock. Replay
+continues past such a call only in model-driven replay. The collector keeps a
+body with an opaque call as an abstraction if any body or clause term reads an
+array element. The native
 purity shadow forbids reachable nonlocal events; allocation remains compatible
 with purity. The allocation and purity routes share claim admission, entry
 feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.

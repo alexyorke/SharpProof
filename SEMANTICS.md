@@ -528,9 +528,18 @@ fault and the value read is an approximation, usable by universal proofs but
 never by a concrete refutation. Type-parameter values are opaque: they may
 be stored, passed, returned and type-tested (`value is int`), with an unknown
 test result and no effects; the JIT folds the box such a test emits, which
-runtime tests confirm. Operators, conversions and `default(T)` abstain. Static and volatile reads, dispatched
-properties, array stores, external fields, unsupported calls and incomplete
-initialization abstain; this shadow does not change compiler
+runtime tests confirm. Operators, conversions and `default(T)` abstain.
+A metadata call with no model, IL body or contract (an opaque call) takes
+by-value arguments on a static or reference receiver. It may allocate, write,
+synchronize and throw an exception of unknown type. Its result is an
+approximation. Only a `catch` of `Exception` or a bare `catch` is known to
+handle that exception, so a narrower handler abstains. A body with an opaque
+call keeps no array element reads, because the callee may write any array.
+Postconditions are still checked when a normal return exists only through
+approximations. Contract APIs, source callees, struct receivers, `ref`
+arguments and shadow or metadata-Requires lowering never take opaque calls.
+Static and volatile reads, dispatched properties, array stores, external
+fields, other unsupported calls and incomplete initialization abstain; this shadow does not change compiler
 effect authority. Refutation requires an original-program write-site witness
 without approximation reads. Bounded loop search never establishes a proof.
 

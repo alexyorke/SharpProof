@@ -4,14 +4,14 @@ request-bindings: True
 cache: Written
 postconditions: 1
 enrolled: 1
-checked: 0
+checked: 1
 unknown: 1
 proven: 0
 refuted: 0
 row: M:Subject.BContractLock#0
   totalPresent: True
   enrolled: True
-  checked: False
+  checked: True
   outcome: Unknown
   reason: CounterexampleNotReplayable
   vacuity: None
@@ -23,14 +23,14 @@ request-bindings: True
 cache: Hit
 postconditions: 1
 enrolled: 1
-checked: 0
+checked: 1
 unknown: 1
 proven: 0
 refuted: 0
 row: M:Subject.BContractLock#0
   totalPresent: True
   enrolled: True
-  checked: False
+  checked: True
   outcome: Unknown
   reason: CounterexampleNotReplayable
   vacuity: None

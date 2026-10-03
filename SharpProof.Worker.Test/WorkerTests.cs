@@ -2586,10 +2586,11 @@ public sealed class WorkerTests
                 Environment.NewLine,
                 response.Errors.Select(error =>
                     error.Code + ": " + error.Message)));
+        // Enumerable.Empty is an opaque call: its result is unknown.
         var record = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.CounterexampleNotReplayable);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
@@ -3689,11 +3690,8 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = AssertClaimVerdict(
-            response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.CounterexampleNotReplayable);
-        Assert.That(record.ProofCore, Is.Empty);
+        // Math.Sign is opaque; the modeled Math.Abs alone proves the result.
+        AssertClaimVerdict(response, WorkerClaimOutcome.Proven, WorkerClaimReason.None);
     }
 
     [Test]

@@ -92,6 +92,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
+            AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ExceptionTarget = (kind, site) => EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
                 ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site))
         };
@@ -329,7 +330,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (parent.Kind == ControlFlowRegionKind.TryAndCatch)
                 {
                     var handler = parent.NestedRegions.FirstOrDefault(candidate =>
-                        candidate.Kind == ControlFlowRegionKind.Catch && _regionCatchKinds[candidate].Contains(token.Kind));
+                        candidate.Kind == ControlFlowRegionKind.Catch && Catches(candidate, token.Kind));
                     if (handler != null)
                     {
                         target = RegionCatchEntry(handler, token);
@@ -342,6 +343,16 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         return EnterRegionFinallyChain(throughFinally, target, token.Site, token,
             preserveResult: HasEnclosingRegionFinally(source));
+    }
+
+    // An Unknown exception is caught by Exception/Object handlers; whether a
+    // narrower handler would catch it is not known, so lowering abstains.
+    private bool Catches(ControlFlowRegion handler, IrExceptionKind kind)
+    {
+        var kinds = _regionCatchKinds[handler];
+        if (kind == IrExceptionKind.Unknown && !kinds.Contains(IrExceptionKind.Unknown))
+        { throw new RegionIncompleteException(); }
+        return kinds.Contains(kind);
     }
 
     private IrBlockId RegionCatchEntry(ControlFlowRegion caught, RegionExceptionToken token)
@@ -395,7 +406,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             foreach (var token in tokens)
             {
                 SpendRegion();
-                if (_regionCatchKinds[request.Catch].Contains(token.Kind))
+                if (Catches(request.Catch, token.Kind))
                 {
                     selected.Add(token);
                 }

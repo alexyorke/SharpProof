@@ -243,6 +243,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         return Unsupported(instruction, values, steps, instruction is IrLoadInstruction
                             ? "Concrete execution requires a memory host for load."
                             : "Concrete execution requires a memory host for store.");
+                    case IrCallInstruction { Target: null } when callHost == null && replayOptions != null &&
+                        _factory.Semantics == IrExecutionSemantics.Total:
+                        // An opaque call in model-driven replay: its result and
+                        // exception are approximation havocs and the heap is never
+                        // read concretely, so replay continues past it. Plain
+                        // execution still stops at every call.
+                        break;
                     case IrCallInstruction call:
                         {
                             var callResult = IrProgramCallHostExecution.Execute(

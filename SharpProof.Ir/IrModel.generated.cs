@@ -89,7 +89,10 @@ public enum IrExceptionKind
     NullReference = 2,
     IndexOutOfRange = 3,
     InvalidCast = 4,
-    Argument = 5
+    Argument = 5,
+    // Any exception of an unknown type, raised by an opaque call. Only a
+    // catch of System.Exception or System.Object is known to catch it.
+    Unknown = 6
 }
 
 public enum IrProgramExecutionStatus

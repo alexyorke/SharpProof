@@ -565,6 +565,9 @@ internal static class CompilerTotalCallableArtifactCodec
                 havoc.Variables[0] != result && !parameters.Any(parameter => havoc.Variables[0] == parameter.Entry ||
                     havoc.Variables[0] == parameter.Current || havoc.Variables[0] == parameter.Old);
         }
+        // An opaque call is an effect site only; its result is a separate havoc.
+        if (instruction is IrCallInstruction call)
+        { return call.Receiver == null && call.Target == null; }
         return instruction.Kind is IrInstructionKind.Allocate or IrInstructionKind.Write or IrInstructionKind.Lock or IrInstructionKind.Assign or
             IrInstructionKind.Branch or IrInstructionKind.Goto or IrInstructionKind.Return or IrInstructionKind.Throw or
             IrInstructionKind.ExceptionalExit or IrInstructionKind.Assume;
