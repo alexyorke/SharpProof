@@ -115,6 +115,22 @@ internal sealed record CompilerTotalCallablePreparation(
     internal ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
 }
 
+// Detached graph validation only. External source ownership is established
+// separately by the shadow envelope; the owner label is not authentication.
+internal sealed class CompilerDecodedShadowBody
+{
+    private CompilerDecodedShadowBody(CompilerTotalCallablePreparation body)
+    { Body = body; }
+
+    internal CompilerTotalCallablePreparation Body { get; }
+
+    internal static CompilerDecodedShadowBody Decode(string ownerId,
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
+    {
+        return new(CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(ownerId, artifact, cancellationToken));
+    }
+}
+
 internal sealed record CompilerTotalExceptionConstraint(string ClaimId, ImmutableArray<IrExceptionKind> AllowedKinds);
 
 internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction, string CalleeIdentity,

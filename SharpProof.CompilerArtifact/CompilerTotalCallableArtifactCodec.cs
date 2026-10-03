@@ -69,7 +69,7 @@ internal static class CompilerTotalCallableArtifactCodec
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
         CancellationToken cancellationToken)
     {
-        var decoded = DecodeCore(artifact, entry, claims, entryOnly: false, cancellationToken);
+        var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken);
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
         {
             ExceptionConstraints = decoded.ExceptionConstraints,
@@ -82,8 +82,30 @@ internal static class CompilerTotalCallableArtifactCodec
     internal static CompilerTotalEntryPreparation? DecodeEntry(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, CancellationToken cancellationToken)
     {
-        var decoded = DecodeCore(artifact, entry, [], entryOnly: true, cancellationToken);
+        var decoded = DecodeCore(artifact, entry.Assumptions, [], entryOnly: true, cancellationToken);
         return decoded == null ? null : new(entry.CallableId, decoded.Factory, decoded.Parameters, decoded.Clauses);
+    }
+
+    internal static CompilerDecodedShadowBody DecodeShadowBody(string ownerId,
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
+    {
+        return CompilerDecodedShadowBody.Decode(ownerId, artifact, cancellationToken);
+    }
+
+    internal static CompilerTotalCallablePreparation DecodeShadowBodyCore(string ownerId,
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullGuard.NotNull(artifact, nameof(artifact));
+        Require(!string.IsNullOrWhiteSpace(ownerId) && ownerId.Length <= CompilerPreparedBody.MaximumInstructions,
+            "A shadow body has an invalid owner label.");
+        Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry &&
+            artifact.Clauses is { Length: 0 } && artifact.ValidEffectClaimIds is { Length: 0 } &&
+            artifact.ExceptionConstraints is { Length: 0 },
+            "A shadow body cannot carry own contracts, effects or abstraction.");
+        var decoded = DecodeCore(artifact, [], [], entryOnly: false, cancellationToken)!;
+        return new(ownerId, decoded.Program!, decoded.Parameters, decoded.Result, [])
+        { CallPreconditions = decoded.CallPreconditions };
     }
 
     private sealed record DecodedTotal(IrFactory Factory, IrProgram? Program, ImmutableArray<CompilerTotalParameter> Parameters,
@@ -91,7 +113,7 @@ internal static class CompilerTotalCallableArtifactCodec
         ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions);
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
-        WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
+        WorkerAssumptionEvidence[] assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
         bool entryOnly, CancellationToken cancellationToken)
     {
         if (artifact == null)
@@ -110,6 +132,24 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(artifact.Parameters.All(parameter => parameter != null) && artifact.Clauses.All(clause => clause != null) &&
             artifact.CallPreconditions.All(call => call != null),
             "The Total callable metadata contains a missing row.");
+        // Reject cheap Total bounds before portable materialization/re-encoding.
+        var graph = artifact.Graph;
+        if (graph.Roots == null || graph.Blocks == null)
+        { throw new InvalidDataException("The Total graph is incomplete."); }
+        Require(graph.Roots.Length == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
+            "The Total graph has an invalid mode or root closure.");
+        Require(graph.Blocks.Length <= CompilerPreparedBody.MaximumInstructions,
+            "The Total graph exceeds its program bound.");
+        var remainingInstructions = CompilerPreparedBody.MaximumInstructions;
+        foreach (var block in graph.Blocks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (block == null || block.Instructions == null)
+            { throw new InvalidDataException("The Total graph contains an incomplete block."); }
+            Require(block.Instructions.Length <= remainingInstructions,
+                "The Total graph exceeds its program bound.");
+            remainingInstructions -= block.Instructions.Length;
+        }
         var externalVariables = artifact.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
             .Concat(artifact.Result == -1 ? Array.Empty<int>() : [artifact.Result]).Distinct().OrderBy(index => index).ToArray();
         var externalOperations = artifact.Clauses.Select(clause => clause.Operation).Concat(artifact.CallPreconditions.Select(call => call.ClauseSite))
@@ -159,8 +199,8 @@ internal static class CompilerTotalCallableArtifactCodec
         var entryVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Entry));
         var currentVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Current));
         var postconditions = claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
-        var preconditions = entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        var userAssumptions = entryOnly ? [] : entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();
+        var preconditions = assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
+        var userAssumptions = entryOnly ? [] : assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();
         var clauses = ImmutableArray.CreateBuilder<CompilerTotalClause>(artifact.Clauses.Length);
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
@@ -347,6 +387,7 @@ internal static class CompilerTotalCallableArtifactCodec
             ValidateBodyAbstraction(program, result, clauses, parameters);
             return;
         }
+        ValidateCanonicalRoleWrites(program, parameters, cancellationToken);
         var assumptions = new Dictionary<OperationId, CompilerTotalClause>();
         foreach (var clause in clauses.Where(clause => clause.Kind == CompilerContractKind.Assume))
         {
@@ -355,11 +396,20 @@ internal static class CompilerTotalCallableArtifactCodec
             assumptions.Add(clause.Operation, clause);
         }
         var pointSites = new HashSet<OperationId>();
+        var resultType = result is { } variable ? program.Factory.GetVariableInfo(variable).Type : (IrTypeId?)null;
         foreach (var block in program.Blocks)
         {
             foreach (var instruction in block.Instructions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                Require(IsSourceInstruction(program, instruction, result, parameters),
+                    "The Total source program contains unsupported executable evidence.");
+                // CFG lowering retains disconnected empty exit blocks. A
+                // value-bearing return still must match the canonical result.
+                if (instruction is IrReturnInstruction { Value: not null } returned)
+                {
+                    Require(returned.Value?.Type == resultType, "The Total return type disagrees with its canonical result.");
+                }
                 if (instruction is IrAssumeInstruction point)
                 {
                     Require(assumptions.TryGetValue(point.Operation, out var clause) && pointSites.Add(point.Operation) &&
@@ -379,20 +429,14 @@ internal static class CompilerTotalCallableArtifactCodec
         }
         if (assumptions.Count != 0)
         { ValidateAssumptionPrologue(program, parameters, order, pointSites.Count, cancellationToken); }
-        var resultType = result is { } variable ? program.Factory.GetVariableInfo(variable).Type : (IrTypeId?)null;
         var pendingThrows = new Dictionary<IrBlockId, bool> { [program.Entry] = false };
         foreach (var blockId in order)
         {
             var block = program.GetBlock(blockId);
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var instruction in block.Instructions)
+            if (block.Terminator is IrReturnInstruction returned)
             {
-                Require(IsSourceInstruction(program, instruction, result, parameters),
-                    "The Total source program contains unsupported executable evidence.");
-                if (instruction is IrReturnInstruction returned)
-                {
-                    Require(returned.Value?.Type == resultType, "The Total return type disagrees with its canonical result.");
-                }
+                Require(returned.Value?.Type == resultType, "The Total return type disagrees with its canonical result.");
             }
             var pending = pendingThrows[blockId];
             if (block.Terminator is IrExceptionalExitInstruction)
@@ -567,6 +611,51 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             cancellationToken.ThrowIfCancellationRequested();
             Require(--remaining >= 0, "The Total cyclic validation exceeds its construction bound.");
+        }
+    }
+
+    private static void ValidateCanonicalRoleWrites(IrProgram program,
+        IEnumerable<CompilerTotalParameter> parameters, CancellationToken cancellationToken)
+    {
+        var canonical = parameters.ToArray();
+        var entry = program.GetBlock(program.Entry);
+        var inputs = new HashSet<IrVarId>(canonical.Select(static parameter => parameter.Entry));
+        var snapshots = new HashSet<IrVarId>(canonical.Select(static parameter => parameter.Old));
+        var snapshotWriters = new HashSet<IrInstructionId>();
+        var ordinal = 0;
+        foreach (var parameter in canonical)
+        {
+            Initialization(parameter.Current, parameter.Entry, false);
+            Initialization(parameter.Old, parameter.Entry, true);
+        }
+        foreach (var block in program.Blocks)
+        {
+            foreach (var instruction in block.Instructions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var variable in IrInstructionFacts.WrittenVariables(instruction))
+                {
+                    Require(!inputs.Contains(variable) &&
+                        (!snapshots.Contains(variable) || snapshotWriters.Contains(instruction.Id)),
+                        "The Total source body overwrites an immutable canonical input.");
+                }
+            }
+            if (canonical.Length != 0 && IrInstructionFacts.TryGetSuccessors(block.Terminator) is { } successors)
+            {
+                Require(successors.First != program.Entry && successors.Second != program.Entry,
+                    "The Total source body re-enters its canonical input initialization.");
+            }
+        }
+        void Initialization(IrVarId target, IrVarId source, bool snapshot)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(ordinal < entry.Instructions.Length && entry.Instructions[ordinal] is IrAssignInstruction assign &&
+                assign.Target == target && assign.Value is IrVariableTerm value && value.Variable == source &&
+                program.Factory.GetOperationInfo(assign.Operation).SourceSpan == null,
+                "The Total source prologue is missing its canonical input initialization.");
+            if (snapshot)
+            { snapshotWriters.Add(entry.Instructions[ordinal].Id); }
+            ordinal++;
         }
     }
 

@@ -10,6 +10,255 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void EmptyStructuralReturnsAreOnlyAllowedOutsideReachableNonvoidFlow(bool reachable)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateIntegerType(32, true);
+        var result = factory.CreateVariable("result", type);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var operation = factory.CreateOperation("structural-exit");
+        if (reachable)
+        { builder.Return(entry, operation); }
+        else
+        {
+            builder.Return(entry, operation, factory.Integer(type, 1));
+            builder.Return(builder.CreateBlock("unused-cfg-exit"), operation);
+        }
+        var body = new CompilerTotalCallablePreparation("M:Subject.Root", builder.Build(), [], result, []);
+        var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
+        if (reachable)
+        {
+            Assert.Throws<InvalidDataException>(new Action(() =>
+                CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, dto, CancellationToken.None)));
+        }
+        else
+        {
+            var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, dto, CancellationToken.None);
+            Assert.That(decoded.Body.Program.Blocks, Has.Length.EqualTo(2));
+        }
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void ShadowDecoderChecksExecutableEvidenceInEveryBlock(bool reachable, bool wrongReturn)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var operation = factory.CreateOperation("block-validation");
+        var selected = reachable ? entry : builder.CreateBlock("detached");
+        if (!reachable)
+        { builder.Return(entry, operation); }
+        if (wrongReturn)
+        { builder.Return(selected, operation, factory.Integer(factory.GetOrCreateIntegerType(32, true), 1)); }
+        else
+        {
+            builder.Assert(selected, operation, factory.Boolean(false));
+            builder.Return(selected, operation);
+        }
+        var preparation = new CompilerTotalCallablePreparation("M:Subject.Root", builder.Build(), [], null, []);
+        var dto = CompilerTotalCallableArtifactCodec.Encode(preparation)!;
+        var failure = Assert.Throws<InvalidDataException>(new Action(() =>
+            CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, dto, CancellationToken.None)));
+        Assert.That(failure!.Message, Is.EqualTo(wrongReturn
+            ? "The Total return type disagrees with its canonical result."
+            : "The Total source program contains unsupported executable evidence."));
+    }
+
+    [TestCase("clauses")]
+    [TestCase("null-clauses")]
+    [TestCase("effects")]
+    [TestCase("null-effects")]
+    [TestCase("exceptions")]
+    [TestCase("null-exceptions")]
+    [TestCase("abstraction")]
+    [TestCase("entry-effects")]
+    [TestCase("markers")]
+    [TestCase("null-markers")]
+    [TestCase("owner")]
+    public void ShadowDecoderRejectsClaimedMetadataAndMalformedMarkers(string mutation)
+    {
+        var (ownerId, dto) = CreateShadowBodyArtifact();
+        switch (mutation)
+        {
+            case "clauses":
+                dto.Clauses = [new CompilerTotalClauseArtifact()];
+                break;
+            case "null-clauses":
+                dto.Clauses = null!;
+                break;
+            case "effects":
+                dto.ValidEffectClaimIds = ["unowned"];
+                break;
+            case "null-effects":
+                dto.ValidEffectClaimIds = null!;
+                break;
+            case "exceptions":
+                dto.ExceptionConstraints = [new CompilerTotalExceptionConstraintArtifact()];
+                break;
+            case "null-exceptions":
+                dto.ExceptionConstraints = null!;
+                break;
+            case "abstraction":
+                dto.IsBodyAbstraction = true;
+                break;
+            case "entry-effects":
+                dto.EffectsCompleteAtEntry = true;
+                break;
+            case "markers":
+                dto.CallPreconditions = [];
+                break;
+            case "null-markers":
+                dto.CallPreconditions = null!;
+                break;
+            case "owner":
+                ownerId = " ";
+                break;
+        }
+        Assert.Throws<InvalidDataException>(new Action(() =>
+            CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, CancellationToken.None)));
+    }
+
+    [Test]
+    public async Task ShadowDecoderDetachesOwnedGraphFromMutablePayload()
+    {
+        SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var (ownerId, dto) = CreateShadowBodyArtifact();
+        var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, CancellationToken.None);
+        var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var before = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That(before.Outcome, Is.TypeOf<RefutedOutcome>(), before.Reason.ToString());
+        Assert.That(before.CallPreconditionWitness, Is.Not.Null);
+        dto.Graph.Roots = [];
+        dto.Parameters[0].Entry = dto.Parameters[0].Current;
+        dto.CallPreconditions[0].CalleeIdentity = "unrelated::M:Other.Helper";
+        dto.CallPreconditions[0].InstructionIndex = -1;
+        var after = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That(after.Outcome, Is.TypeOf<RefutedOutcome>(), after.Reason.ToString());
+        Assert.That(after.CallPreconditionWitness, Is.EqualTo(before.CallPreconditionWitness));
+        Assert.That(plan!.ReplayCallPrecondition(0, after.EntryModel, CancellationToken.None),
+            Is.EqualTo(before.CallPreconditionWitness));
+        Assert.That(after.EntryModel.Keys, Is.EquivalentTo(decoded.Body.Parameters.Select(static parameter => parameter.Entry)));
+        Assert.That(decoded.Body.CallPreconditions[0].CalleeIdentity, Is.Not.EqualTo(dto.CallPreconditions[0].CalleeIdentity));
+        var reenrolled = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(reenrolled, out var freshPlan, out var freshReason), Is.True, freshReason.ToString());
+        using var freshSolver = new PassiveCallableSolver(freshPlan!);
+        var fresh = await freshSolver.VerifyCallPreconditionAsync(0);
+        Assert.That(fresh.Outcome, Is.TypeOf<RefutedOutcome>(), fresh.Reason.ToString());
+        Assert.That(fresh.CallPreconditionWitness, Is.EqualTo(before.CallPreconditionWitness));
+        Assert.That(freshPlan!.ReplayCallPrecondition(0, fresh.EntryModel, CancellationToken.None),
+            Is.EqualTo(before.CallPreconditionWitness));
+        Assert.Throws<InvalidDataException>(new Action(() =>
+            CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, CancellationToken.None)));
+    }
+
+    private static (string OwnerId, CompilerTotalCallableArtifact Artifact) CreateShadowBodyArtifact()
+    {
+        var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
+        var callable = artifact.Callables.Single(static owner => owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 });
+        var total = callable.Total!;
+        total.EffectsCompleteAtEntry = false;
+        total.ValidEffectClaimIds = [];
+        total.ExceptionConstraints = [];
+        return (callable.CallableId, total);
+    }
+
+    [TestCase("baseline", false)]
+    [TestCase("entry-before", true)]
+    [TestCase("entry", true)]
+    [TestCase("old", true)]
+    [TestCase("current", false)]
+    public void CanonicalRootInputsRemainImmutableWithoutOwnClauses(string mutation, bool rejected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateIntegerType(32, true);
+        var entry = factory.CreateVariable("entry:0", type);
+        var current = factory.CreateVariable("current:0", type);
+        var old = factory.CreateVariable("old:0", type);
+        var result = factory.CreateVariable("result", type);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        var operation = factory.CreateOperation("canonical-test");
+        if (mutation == "entry-before")
+        { builder.Assign(block, operation, entry, factory.Integer(type, 1)); }
+        builder.Assign(block, operation, current, factory.Variable(entry));
+        builder.Assign(block, operation, old, factory.Variable(entry));
+        if (mutation == "entry")
+        { builder.Assign(block, operation, entry, factory.Integer(type, 1)); }
+        if (mutation == "old")
+        { builder.Assign(block, operation, old, factory.Integer(type, 1)); }
+        if (mutation == "current")
+        { builder.Assign(block, operation, current, factory.Integer(type, 1)); }
+        builder.Assign(block, operation, result, factory.Variable(mutation == "old" ? old : current));
+        builder.Return(block, operation, factory.Variable(result));
+        var preparation = new CompilerTotalCallablePreparation("M:Subject.Root(System.Int32)~System.Int32",
+            builder.Build(), [new(entry, current, old)], result, []);
+        var encoded = CompilerTotalCallableArtifactCodec.Encode(preparation)!;
+        var owner = new WorkerCallableManifestEntry { CallableId = preparation.CallableId };
+        if (rejected)
+        {
+            var failure = Assert.Throws<InvalidDataException>(new Action(() =>
+                CompilerTotalCallableArtifactCodec.Decode(encoded, owner, [], CancellationToken.None)));
+            Assert.Throws<InvalidDataException>(new Action(() =>
+                CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, encoded, CancellationToken.None)));
+            Assert.That(failure!.Message, Is.EqualTo(mutation == "entry-before"
+                ? "The Total source prologue is missing its canonical input initialization."
+                : "The Total source body overwrites an immutable canonical input."));
+        }
+        else
+        {
+            var ordinary = CompilerTotalCallableArtifactCodec.Decode(encoded, owner, [], CancellationToken.None)!;
+            var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, encoded, CancellationToken.None).Body;
+            Assert.That(decoded.CallableId, Is.EqualTo(ordinary.CallableId));
+            var input = decoded.Parameters.Single().Entry;
+            var execution = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
+                new Dictionary<IrVarId, IrValue>
+                { [input] = decoded.Program.Factory.CreateIntegerValue(decoded.Program.Factory.GetVariableInfo(input).Type, 0L) });
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.GetCurrentValue(input)!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
+            Assert.That(execution.GetCurrentValue(decoded.Parameters.Single().Old)!.IntegerNumericValue,
+                Is.EqualTo(System.Numerics.BigInteger.Zero));
+            Assert.That(execution.ReturnValue!.IntegerNumericValue,
+                Is.EqualTo(new System.Numerics.BigInteger(mutation == "current" ? 1 : 0)));
+        }
+    }
+
+    [TestCase("roots", "The Total graph has an invalid mode or root closure.")]
+    [TestCase("blocks", "The Total graph exceeds its program bound.")]
+    [TestCase("instructions", "The Total graph exceeds its program bound.")]
+    public void TotalGraphBoundsRejectBeforeMaterializingMalformedTerms(string mutation, string expectedMessage)
+    {
+        var artifact = CreateArtifact("""
+            using SharpProof.Attributes;
+            public static class Subject { [ZeroAllocations] public static int Root() => 1; }
+            """);
+        var total = artifact.Callables.Single().Total!;
+        switch (mutation)
+        {
+            case "roots":
+                total.Graph.Roots = Enumerable.Repeat(0, 65_536).ToArray();
+                break;
+            case "blocks":
+                total.Graph.Blocks = Enumerable.Repeat(total.Graph.Blocks[0], 4097).ToArray();
+                break;
+            case "instructions":
+                total.Graph.Blocks[0].Instructions = Enumerable.Repeat(total.Graph.Blocks[0].Instructions[0], 4097).ToArray();
+                break;
+        }
+        total.Graph.Terms[0].Type = -1;
+        var failure = Assert.Throws<InvalidDataException>(new Action(() =>
+            CompilerTotalCallableArtifactCodec.Decode(total, artifact.Manifest.Callables.Single(),
+                [.. artifact.Manifest.Claims], CancellationToken.None)));
+        Assert.That(failure!.Message, Is.EqualTo(expectedMessage));
+    }
+
     [TestCase("remove-one")]
     [TestCase("remove-all")]
     [TestCase("callee")]

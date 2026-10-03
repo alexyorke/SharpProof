@@ -40,6 +40,11 @@ internal sealed record CorpusGateResult(
 internal sealed record ContractCallCensus(int PublicOwners, int PotentialCalls, int BoundRequires,
     bool Complete, bool Unpublished, bool ManifestUnchanged, ImmutableArray<string> Failures);
 
+internal readonly record struct ContractPhysicalSpan(string Document, int Start, int Length);
+internal readonly record struct ContractCoverageKey(string OwnerId, string CalleeIdentity, int ClauseOrdinal,
+    ContractPhysicalSpan Call, ContractPhysicalSpan Clause);
+internal sealed record ContractCoverageMatch(int Expected, int Matched, ImmutableArray<string> Failures);
+
 internal static class CorpusGate
 {
     internal static ContractCallCensus CensusContractCalls(CSharpCompilation compilation)
@@ -66,6 +71,76 @@ internal static class CorpusGate
             owners.All(static owner => owner.DiscoveryComplete),
             owners.All(owner => !baseline.Manifest.Callables.Any(entry => entry.CallableId == owner.CallableId)),
             JsonSerializer.Serialize(baseline.Manifest) == JsonSerializer.Serialize(shadow.Manifest), failures.ToImmutable());
+    }
+
+    internal static ContractCoverageMatch MatchNativeContractCalls(CSharpCompilation compilation,
+        IEnumerable<CompilerTotalCallablePreparation> bodies)
+    {
+        var failures = ImmutableArray.CreateBuilder<string>();
+        var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        var documents = compilation.SyntaxTrees.Select((tree, index) => (Tree: tree, Path: snapshots[index].Path))
+            .ToDictionary(static row => row.Tree, static row => row.Path);
+        var expected = new HashSet<ContractCoverageKey>();
+        var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
+        failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
+        foreach (var owner in inventory.Owners.Where(static owner => owner.Method.DeclaredAccessibility == Accessibility.Public))
+        {
+            if (!owner.DiscoveryComplete)
+            { failures.Add("DiscoveryIncomplete:" + owner.CallableId); }
+            foreach (var call in owner.Calls)
+            {
+                if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
+                { failures.Add("UnsupportedClauseOwner:" + owner.CallableId); continue; }
+                var tree = call.Target.DeclaringSyntaxReferences[0].SyntaxTree;
+                if (!documents.TryGetValue(tree, out var document))
+                { failures.Add("ForeignClauseTree:" + owner.CallableId); continue; }
+                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var context = new TotalLoweringContext(factory, call.Target);
+                var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+                if (!binding.IsSuccess)
+                { failures.Add("RequiresBindingFailed:" + binding.Failure); continue; }
+                var ordinal = 0;
+                foreach (var clause in binding.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires))
+                {
+                    var span = factory.GetOperationInfo(clause.SourceOperation).SourceSpan;
+                    var originalPath = string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath;
+                    if (span == null || span.Length == 0 || span.Document != originalPath)
+                    { failures.Add("ClauseSourceSpanMismatch:" + owner.CallableId); ordinal++; continue; }
+                    var key = new ContractCoverageKey(owner.CallableId, CompilerIdentityBridge.CreateSymbolDisplay(call.Target),
+                        ordinal++, new(documents[call.Syntax.SyntaxTree], call.Syntax.SpanStart, call.Syntax.Span.Length),
+                        new(document, span.Start, span.Length));
+                    if (!expected.Add(key))
+                    { failures.Add("DuplicateSourceObligation:" + key); }
+                }
+            }
+        }
+        var seen = new HashSet<ContractCoverageKey>();
+        var matched = new HashSet<ContractCoverageKey>();
+        foreach (var body in bodies)
+        {
+            var instructions = body.Program.Blocks.SelectMany(static block => block.Instructions)
+                .ToDictionary(static instruction => instruction.Id);
+            foreach (var obligation in body.CallPreconditions)
+            {
+                if (!instructions.TryGetValue(obligation.Instruction, out var instruction) || instruction is not IrAssignInstruction marker)
+                { failures.Add("NativeMarkerMissing:" + body.CallableId); continue; }
+                var call = body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan;
+                var clause = body.Program.Factory.GetOperationInfo(obligation.ClauseSite).SourceSpan;
+                if (call == null || clause == null || call.Length == 0 || clause.Length == 0)
+                { failures.Add("NativeSourceSpanMissing:" + body.CallableId); continue; }
+                var key = new ContractCoverageKey(body.CallableId, obligation.CalleeIdentity, obligation.ClauseOrdinal,
+                    new(call.Document, call.Start, call.Length), new(clause.Document, clause.Start, clause.Length));
+                if (!seen.Add(key))
+                { failures.Add("DuplicateNativeObligation:" + key); }
+                else if (!expected.Contains(key))
+                { failures.Add("UnexpectedNativeObligation:" + key); }
+                else
+                { matched.Add(key); }
+            }
+        }
+        foreach (var missing in expected.Except(matched))
+        { failures.Add("MissingNativeObligation:" + missing); }
+        return new(expected.Count, matched.Count, failures.ToImmutable());
     }
 
     public static async Task<CorpusGateResult> RunAsync(

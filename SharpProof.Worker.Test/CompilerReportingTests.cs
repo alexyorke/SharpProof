@@ -7,6 +7,40 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReportingTests
 {
+    private static readonly string[][] CapturedPathCases = [
+        ["Subject.cs", "./Subject.cs"],
+        ["Subject.cs", "Subject.cs", "Subject.cs#1"],
+        ["Subject.cs#2", "Subject.cs", "Subject.cs"],
+        ["Subject.cs#3", "Subject.cs#3#3", "Subject.cs", "Subject.cs"],
+        ["", "", "<compiler-generated:0>"]
+    ];
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void CapturedDocumentsHaveUniqueFinalIdentities(int caseIndex)
+    {
+        var paths = CapturedPathCases[caseIndex];
+        var compilation = TestCompilation.Create("DocumentIdentityTests", paths.Select((path, index) =>
+            (path, "public static class Subject" + index + " { public static int Root() => " + index + "; }")).ToArray());
+        var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        Assert.That(snapshots.Select(static snapshot => snapshot.Path).Distinct(StringComparer.Ordinal).Count(),
+            Is.EqualTo(paths.Length));
+        var trees = compilation.SyntaxTrees.ToArray();
+        for (var ordinal = 0; ordinal < trees.Length; ordinal++)
+        {
+            var independentlyCaptured = CompilerCompilationCapture.CaptureTree(trees[ordinal], CancellationToken.None);
+            Assert.That(snapshots[ordinal].Sha256, Is.EqualTo(independentlyCaptured.Sha256));
+            Assert.That(snapshots[ordinal].TextLength, Is.EqualTo(independentlyCaptured.TextLength));
+            var originalPath = string.IsNullOrEmpty(paths[ordinal])
+                ? $"<compiler-generated:{ordinal}>" : CompilerCaptureIdentity.NormalizePath(paths[ordinal]);
+            if (!snapshots.Take(ordinal).Any(snapshot => snapshot.Path == originalPath))
+            { Assert.That(snapshots[ordinal].Path, Is.EqualTo(originalPath)); }
+        }
+    }
+
     [TestCase(null)]
     [TestCase("")]
     [TestCase(" ")]

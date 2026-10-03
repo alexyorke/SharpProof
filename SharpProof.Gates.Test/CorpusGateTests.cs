@@ -60,10 +60,15 @@ public sealed class CorpusGateTests
             Assert.That(body.ValidEffectClaimIds, Is.Empty, item.Id);
             Assert.That(body.ExceptionConstraints, Is.Empty, item.Id);
             Assert.That(body.CallPreconditions, Has.Length.EqualTo(1), item.Id);
-            var candidate = new SharpProof.Worker.PassiveCallableCandidate(body.CallableId, body.Program,
-                [.. body.Parameters.Select(static parameter => new SharpProof.Worker.PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))],
-                body.Result, [], [], body.IsBodyAbstraction,
-                [.. body.CallPreconditions.Select(static clause => new SharpProof.Worker.PassiveCallPrecondition(clause.Instruction, clause.Value, clause.Safe))]);
+            var encoded = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!;
+            var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(
+                body.CallableId, encoded, CancellationToken.None);
+            Assert.That(detached.Body.Program.Factory, Is.Not.SameAs(body.Program.Factory), item.Id);
+            var coverage = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+            Assert.That(coverage.Expected, Is.EqualTo(1), item.Id);
+            Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
+            Assert.That(coverage.Failures, Is.Empty, item.Id);
+            var candidate = SharpProof.Worker.PassiveCallableArtifactAdapter.EnrollShadow(detached);
             Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
             using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
             var result = await solver.VerifyCallPreconditionAsync(0);

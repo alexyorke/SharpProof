@@ -4,6 +4,17 @@ namespace SharpProof.Worker;
 // It never reparses a graph or introduces candidate evidence into worker routing.
 internal static class PassiveCallableArtifactAdapter
 {
+    // Separate structural shadow enrollment; never creates a manifest row.
+    internal static PassiveCallableCandidate EnrollShadow(CompilerDecodedShadowBody preparation)
+    {
+        ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        var total = preparation.Body;
+        return new(total.CallableId, total.Program,
+            [.. total.Parameters.Select(static parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))],
+            total.Result, [], [], false,
+            [.. total.CallPreconditions.Select(static call => new PassiveCallPrecondition(call.Instruction, call.Value, call.Safe))]);
+    }
+
     internal static PassiveCallableCandidate? Enroll(CompilerCallablePreparation preparation)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
