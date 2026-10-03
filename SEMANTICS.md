@@ -572,7 +572,12 @@ never null. `base.Property` reads a virtual auto-property's backing field
 without dispatch. An explicit reference downcast keeps the reference and
 throws InvalidCastException for a non-null value whose type test, an
 approximation, fails. A generic container's declared class, interface and
-type-parameter types bridge to the caller's by reference casts. A dispatched (virtual, abstract, override or interface) source call is also
+type-parameter types bridge to the caller's by reference casts.
+Source setters and indexers inline the same way: an accessor takes its
+property's arguments, a setter takes the assigned value as its final `value`
+parameter, and the assignment's value is the assigned one. Effect claims on
+virtual and overriding methods verify the body as written; a postcondition on
+such a method stays unsupported, since it binds every override. A dispatched (virtual, abstract, override or interface) source call is also
 opaque. Non-scalar struct and enum values are an opaque domain like type
 parameters: only opaque calls read them, so a call that mutates a struct
 through `this` changes nothing the IR observes. Struct and type-parameter

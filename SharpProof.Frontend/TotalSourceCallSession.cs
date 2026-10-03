@@ -120,13 +120,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     // An instance callee is a nonvirtual member on a reference receiver. Its
     // implicit `this` is never null; field reads through it are approximations.
+    // An accessor takes its property's arguments, and a setter also takes the
+    // assigned value as its final `value` parameter.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
-        ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph)
+        ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
+        bool assigned = false)
     {
         frame = null;
         graph = null;
         if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) ||
-            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet) ||
+            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet) ||
+            assigned != (method.MethodKind == MethodKind.PropertySet) ||
             method.IsStatic != (instance == null) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
             method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
@@ -140,13 +144,14 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
-            method.DeclaringSyntaxReferences.Length != 1 || arguments.Length != method.Parameters.Length)
+            method.DeclaringSyntaxReferences.Length != 1 || arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length)
         { return false; }
         var ordinals = new HashSet<int>();
         foreach (var argument in arguments)
         {
             if (!Spend() || argument.Parameter is not { } parameter ||
-                !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method) ||
+                !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method) &&
+                    !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method.AssociatedSymbol) ||
                 !ordinals.Add(parameter.Ordinal) ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue or ArgumentKind.ParamArray) ||
                 argument.ArgumentKind == ArgumentKind.ParamArray && !parameter.IsParams ||

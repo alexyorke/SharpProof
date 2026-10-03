@@ -43,6 +43,10 @@ internal static class CompilerTotalCallableLowerer
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }
         var ensures = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Ensures).ToArray();
+        // A postcondition on an overridable method is a contract for every
+        // override; only effect claims, which describe this body, are verified.
+        if (ensures.Length != 0 && (target.Method.IsVirtual || target.Method.IsOverride))
+        { return null; }
         var requires = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires).ToArray();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
         var assumptions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToArray();

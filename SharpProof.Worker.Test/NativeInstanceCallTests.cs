@@ -25,6 +25,8 @@ public sealed class NativeInstanceCallTests
             public void Reset() { _count = 0; }
             public int Peek() { return _count; }
             public virtual int Dispatched(int value) { return value; }
+            public int Value { get { return _count; } set { _count = value; } }
+            public int this[int index] { get { return index * 2; } set { _count = value + index; } }
         }
         """;
 
@@ -88,6 +90,31 @@ public sealed class NativeInstanceCallTests
             "Contract.Requires(counter != null); " + body + " } }");
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
+    }
+
+    // A setter takes the assigned value as its final parameter, and the
+    // assignment's value is the assigned one.
+    [TestCase("return counter.Value = value;", "value")]
+    [TestCase("return counter[value];", "value * 2")]
+    [TestCase("counter[value] = 3; return counter[value];", "value * 2")]
+    public async Task SettersAndIndexersInline(string body, string result)
+    {
+        var preparation = Prepare("public static class C { public static int Target(Counter counter, int value) { " +
+            "Contract.Requires(counter != null && value > -1000 && value < 1000); " +
+            "Contract.Ensures(Contract.Result<int>() == " + result + "); " + body + " } }", effects: false);
+        var results = new List<WorkerClaimResult>();
+        await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
+            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, CancellationToken.None);
+        Assert.That(results[^1].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), results[^1].Reason.ToString());
+    }
+
+    [Test]
+    public async Task SetterFieldWritesAreImpure()
+    {
+        var preparation = Prepare("public static class C { [EnforcePure] public static void Target(Counter counter) { " +
+            "Contract.Requires(counter != null); counter.Value = 1; } }");
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 
     [Test]

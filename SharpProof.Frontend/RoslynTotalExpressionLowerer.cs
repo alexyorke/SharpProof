@@ -24,6 +24,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
 
     internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; set; }
+    internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; set; }
 
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowOpaqueCalls { get; set; }
@@ -221,6 +222,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IInvocationOperation opaqueInvocation &&
             OpaqueCall(operation, opaqueInvocation.TargetMethod, opaqueInvocation.Instance, opaqueInvocation.Arguments, block, depth) is { } invoked)
         { return invoked; }
+        if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
+            SourceSetter?.Invoke(setter, block, depth) is { } set)
+        { return set; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
             CSharpOperationSemantics.GetterField(sourceProperty.Property, CSharpOperationSemantics.IsBaseAccess(sourceProperty.Instance)) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)

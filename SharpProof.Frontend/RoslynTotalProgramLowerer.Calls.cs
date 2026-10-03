@@ -91,10 +91,18 @@ internal sealed partial class RoslynTotalProgramLowerer
             : InlineSourceMember(property, getter, property.Instance, property.Arguments, block, depth);
     }
 
-    private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
-        ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth)
+    // `target[arguments] = value` evaluates the receiver, the arguments and the
+    // value, then runs the setter; the expression's value is the assigned one.
+    private TotalBodyValue? InlineSourceSetter(ISimpleAssignmentOperation assignment, IrBlockId block, int depth)
     {
-        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph))
+        return _preserveSourceCall != null || assignment.Target is not IPropertyReferenceOperation { Property.SetMethod: { } setter } property
+            ? null : InlineSourceMember(assignment, setter, property.Instance, property.Arguments, block, depth, assignment.Value);
+    }
+
+    private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
+        ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null)
+    {
+        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);
@@ -140,6 +148,16 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return new(marker, block, value.Classification); }
             arguments[argument.Parameter!.Ordinal] = Bridge(value.Value,
                 _context.Factory.GetVariableInfo(callee.Parameters[argument.Parameter.Ordinal].Entry).Type);
+        }
+        if (assigned != null)
+        {
+            var value = _expressions.LowerBodyValue(assigned, block, depth + 1);
+            block = value.Continuation;
+            if (!value.Classification.IsExact)
+            { return new(marker, block, value.Classification); }
+            arguments[arguments.Length - 1] = Bridge(value.Value,
+                _context.Factory.GetVariableInfo(callee.Parameters[callee.Parameters.Length - 1].Entry).Type);
+            marker = value.Value;
         }
         if (receiver != null)
         { block = _expressions.CheckReceiver(invocation, receiver, block); }

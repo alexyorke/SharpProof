@@ -81,6 +81,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
             SourceGetter = InlineSourceGetter,
+            SourceSetter = InlineSourceSetter,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             OpaqueEffects = _calls?.OpaqueEffects,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
