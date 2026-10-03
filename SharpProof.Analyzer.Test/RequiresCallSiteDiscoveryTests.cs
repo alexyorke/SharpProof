@@ -100,6 +100,47 @@ public sealed class RequiresCallSiteDiscoveryTests
         }
     }
 
+    [TestCase(2, true)]
+    [TestCase(200, false)]
+    public void PotentialInventoryBoundsDelegateStabilityWork(int count, bool expectedComplete)
+    {
+        var calls = string.Concat(Enumerable.Repeat("action();", count));
+        var assignments = string.Concat(Enumerable.Repeat("action = Positive;", count));
+        var compilation = AnalyzerTestHost.CreateCompilation($$"""
+            public static class Subject {
+                static void Positive() { }
+                public static void Call() {
+                    System.Action action = Positive;
+                    {{calls}}
+                    {{assignments}}
+                }
+            }
+            """, []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var sites = CreateDiscovery(compilation, declaration)
+            .GetPotentialCalls(static target => target.Name == "Positive", out var complete);
+        Assert.That(complete, Is.EqualTo(expectedComplete));
+        Assert.That(sites.HasValue, Is.EqualTo(expectedComplete));
+        if (sites.HasValue)
+        {
+            Assert.That(sites.Value, Has.Length.EqualTo(count));
+        }
+    }
+    [Test]
+    public void PotentialInventoryRejectsASuppliedDescendantOperation()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "public static class Subject { public static void Call() { Target(); } static void Target() { } }", []);
+        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.Identifier.ValueText == "Call");
+        var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+        var invocation = model.GetOperation(declaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single());
+        var discovery = new RequiresCallSiteDiscovery((IMethodSymbol)model.GetDeclaredSymbol(declaration)!,
+            declaration, model, CancellationToken.None, suppliedOperationRoot: invocation);
+        Assert.That(discovery.GetPotentialCalls(static _ => true, out var complete), Is.Null);
+        Assert.That(complete, Is.False);
+    }
     [Test]
     public void PotentialInventoryRejectsAForeignSuppliedOperationRoot()
     {

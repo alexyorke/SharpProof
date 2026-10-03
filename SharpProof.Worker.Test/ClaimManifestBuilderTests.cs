@@ -16,11 +16,144 @@ namespace SharpProof.Worker.Test;
 public sealed class ClaimManifestBuilderTests
 {
     private static readonly int[] DenseOrdinals = [0, 1];
+    private static readonly string[] PotentialOwnerGapReasons =
+        ["UnsupportedOwner", "UnsupportedSignature", "IncompleteCalls"];
     private static readonly WorkerClaimEvidence[] CompanionEvidence = [
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
     ];
 
+    [Test]
+    public void PotentialCallShadowFindsPlainSeparateFileCallersWithoutChangingManifest()
+    {
+        var compilation = GetCompilation(
+            ("Helper.cs", """
+                using SharpProof.Attributes;
+                public static class Helper {
+                    public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                }
+                """),
+            ("Caller.cs", "public static class Caller { public static int Root(int value) => Helper.Positive(value); }"));
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true);
+        Assert.That(baseline.PotentialCalls, Is.Null);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(shadow.Manifest),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
+        var caller = shadow.PotentialCalls!.Owners.Single(static owner => owner.Method.Name == "Root");
+        Assert.That(caller.DiscoveryComplete, Is.True);
+        Assert.That(caller.Calls, Has.Length.EqualTo(1));
+        Assert.That(caller.Calls.Single().Target.Name, Is.EqualTo("Positive"));
+        Assert.That(caller.CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(caller.Method)));
+        Assert.That(shadow.Manifest.Callables.Any(entry => entry.CallableId == caller.CallableId), Is.False);
+        Assert.That(shadow.PotentialCalls.Gaps, Is.Empty);
+    }
+
+    [Test]
+    public void PotentialCallShadowRetainsIncompleteAndUnsupportedOwnerGaps()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            public static class Subject {
+                public static void Root() { System.Action callback = () => { }; }
+                public static void Dynamic(dynamic value) { value.Invoke(); }
+                public static int Incomplete() => new Buffer()[^1];
+                public class Buffer { public int Length => 2; public int this[int index] => index; }
+            }
+            """));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Gaps.Select(static gap => gap.Reason),
+            Is.EquivalentTo(PotentialOwnerGapReasons));
+        Assert.That(shadow.Owners.Single().Method.Name, Is.EqualTo("Incomplete"));
+        Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.False);
+    }
+
+    [Test]
+    public void PotentialCallShadowRejectsDeepPlainSyntaxBeforeSemanticBinding()
+    {
+        var expression = new string('!', 256) + "value";
+        var tree = CSharpSyntaxTree.ParseText(
+            "public static class Subject { public static bool Root(bool value) => " + expression + "; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Plain.cs");
+        // Avoid TestCompilation.Create/GetDiagnostics: those bind before the guard.
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps, Has.Length.EqualTo(1));
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void PotentialCallShadowGuardsCrossTreeCalleesBeforeContractScreening()
+    {
+        var expression = new string('!', 256) + "value";
+        var caller = CSharpSyntaxTree.ParseText(
+            "public static class Caller { public static bool Root(bool value) => Deep.Callee(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var callee = CSharpSyntaxTree.ParseText(
+            "public static class Deep { public static bool Callee(bool value) => " + expression + "; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Deep.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [caller, callee], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps.Single().TreeOrdinal, Is.EqualTo(1));
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+    [TestCase(8, true)]
+    [TestCase(256, false)]
+    public void PotentialCallShadowGuardsReferencedSourceBeforeContractScreening(int depth, bool expectedComplete)
+    {
+        var expression = new string('!', depth) + "value";
+        var calleeTree = CSharpSyntaxTree.ParseText(
+            "using SharpProof.Attributes; public static class Helper { public static bool Positive(bool value) " +
+            "{ Contract.Requires(value); return " + expression + "; } }",
+            new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Helper.cs");
+        var dependency = CSharpCompilation.Create("HelperLibrary", [calleeTree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var callerTree = CSharpSyntaxTree.ParseText(
+            "public static class Caller { public static bool Root(bool value) => Helper.Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [callerTree],
+            TestMetadataReferences.WithSharpProof.Add(dependency.ToMetadataReference()),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        if (expectedComplete)
+        {
+            Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.True);
+            Assert.That(shadow.Owners.Single().Calls, Has.Length.EqualTo(1));
+            Assert.That(shadow.Gaps, Is.Empty);
+        }
+        else
+        {
+            Assert.That(shadow.Owners, Is.Empty);
+            Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("ReferenceSyntaxBudget"));
+            Assert.That(shadow.Gaps.Single().ReferenceAssemblyName, Is.EqualTo("HelperLibrary"));
+        }
+    }
+    [Test]
+    public void PotentialCallShadowRejectsAmbiguousReferencedTreeOwnership()
+    {
+        var shared = CSharpSyntaxTree.ParseText("""
+            using SharpProof.Attributes;
+            public static class Helper {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+            }
+            """, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Helper.cs");
+        var first = CSharpCompilation.Create("FirstLibrary", [shared], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var second = CSharpCompilation.Create("SecondLibrary", [shared], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var caller = CSharpSyntaxTree.ParseText(
+            "extern alias first; public static class Caller { public static int Root(int value) => first::Helper.Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [caller], TestMetadataReferences.WithSharpProof
+            .Add(first.ToMetadataReference(aliases: ["first"]))
+            .Add(second.ToMetadataReference(aliases: ["second"])),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("ReferenceOwnership"));
+    }
     [Test]
     public void SelectedDescendantsOfPlainSiblingLambdasHaveDistinctIdentities()
     {

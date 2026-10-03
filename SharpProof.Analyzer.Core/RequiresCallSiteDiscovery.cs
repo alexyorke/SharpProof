@@ -46,7 +46,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             hasPotentialPreconditions, nameof(hasPotentialPreconditions));
 
         if (!TryGetOperationRoot(out var operationRoot) ||
-            operationRoot.Syntax.SyntaxTree != semanticModel.SyntaxTree)
+            operationRoot.Syntax.SyntaxTree != semanticModel.SyntaxTree || operationRoot.Parent != null)
         {
             return null;
         }
@@ -70,6 +70,30 @@ internal sealed partial class RequiresCallSiteDiscovery(
             cancellationToken);
         var delegateTargets = GetDirectDelegateTargets(rawOperations.Value, cancellationToken);
         var remainingWork = 65_536;
+        long delegateInvocations = 0;
+        foreach (var operation in operations.Value)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (operation is IInvocationOperation { TargetMethod.MethodKind: MethodKind.DelegateInvoke })
+            {
+                delegateInvocations++;
+            }
+        }
+        long invalidations = 0;
+        foreach (var target in delegateTargets.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            invalidations += target.Invalidations.Length;
+        }
+        // Stability queries scan invalidations and up to two ancestor chains.
+        // Charge a conservative bound before entering those nested scans.
+        var delegateWork = delegateInvocations * (invalidations + 1) * 256;
+        if (delegateWork > remainingWork)
+        {
+            complete = false;
+            return null;
+        }
+        remainingWork -= (int)delegateWork;
         foreach (var operation in operations.Value)
         {
             cancellationToken.ThrowIfCancellationRequested();

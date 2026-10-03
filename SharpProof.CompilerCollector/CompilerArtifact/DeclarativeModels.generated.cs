@@ -8,7 +8,28 @@ namespace SharpProof.CompilerArtifact;
 internal sealed partial record ClaimManifestBuildResult(
     WorkerClaimManifest Manifest,
     ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> Targets
-);
+)
+{
+    // Null means the optional source census was not requested.
+    internal CompilerPotentialCallInventory? PotentialCalls { get; init; }
+}
+
+// The first source census covers outer static scalar methods. It is separate
+// from mandatory claim membership and does not authorize a native proof.
+internal sealed record CompilerPotentialCallInventory(
+    ImmutableArray<CompilerPotentialCallOwner> Owners,
+    ImmutableArray<CompilerPotentialCallGap> Gaps);
+
+internal sealed record CompilerPotentialCallOwner(
+    IMethodSymbol Method,
+    MethodDeclarationSyntax Declaration,
+    SemanticModel SemanticModel,
+    string CallableId,
+    ImmutableArray<SharpProof.Analyzer.PotentialRequiresCallSite> Calls,
+    bool DiscoveryComplete);
+
+internal sealed record CompilerPotentialCallGap(int TreeOrdinal, int Start, int Length, string Reason,
+    string? ReferenceAssemblyName = null);
 
 internal sealed partial record ManifestCallableTarget(
     IMethodSymbol Method,

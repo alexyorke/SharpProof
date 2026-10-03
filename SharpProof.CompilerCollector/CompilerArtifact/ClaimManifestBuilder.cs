@@ -23,7 +23,7 @@ internal sealed partial class ClaimManifestBuilder(
     private readonly AnalyzerSession _effectSession =
         new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
 
-    internal ClaimManifestBuildResult Build()
+    internal ClaimManifestBuildResult Build(bool includePotentialCallShadow = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var discovered = DiscoverMethods().Select(CreateSeed).ToImmutableArray();
@@ -49,7 +49,215 @@ internal sealed partial class ClaimManifestBuilder(
                     .Concat(target.EffectClaims.Select(static claim => claim.Entry)))]
         };
         WorkerProtocolJson.SealManifest(manifest);
-        return new ClaimManifestBuildResult(manifest, targets.ToImmutable());
+        var result = new ClaimManifestBuildResult(manifest, targets.ToImmutable());
+        return includePotentialCallShadow
+            ? result with { PotentialCalls = DiscoverPotentialCallShadow(result.Targets) }
+            : result;
+    }
+
+    // Separate source census: it must not change mandatory manifest membership
+    // or the selected nested callable ordinal stream.
+    private CompilerPotentialCallInventory DiscoverPotentialCallShadow(
+        ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> published)
+    {
+        var owners = ImmutableArray.CreateBuilder<CompilerPotentialCallOwner>();
+        var gaps = ImmutableArray.CreateBuilder<CompilerPotentialCallGap>();
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var guarded = new List<(SyntaxTree Tree, ImmutableArray<SyntaxNode> Nodes)>();
+        var remainingSyntaxNodes = 1_048_576;
+        var treeOrdinal = 0;
+        foreach (var tree in _compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (treeOrdinal >= CompilerPreparedBody.MaximumInstructions)
+            {
+                gaps.Add(new(treeOrdinal, 0, 0, "InventoryBudget"));
+                return new([], gaps.ToImmutable());
+            }
+            var root = tree.GetRoot(cancellationToken);
+            if (!TryCollectPotentialSyntax(root, ref remainingSyntaxNodes, out var nodes))
+            {
+                gaps.Add(new(treeOrdinal++, root.SpanStart, root.Span.Length, "SyntaxBudget"));
+                // Contract screening may bind source targets or companions in
+                // any tree. No optional binding occurs unless every tree passed.
+                return new([], gaps.ToImmutable());
+            }
+            guarded.Add((tree, nodes));
+            treeOrdinal++;
+        }
+        if (GuardReferencedPotentialSyntax(ref remainingSyntaxNodes) is { } referenceGap)
+        {
+            gaps.Add(referenceGap);
+            return new([], gaps.ToImmutable());
+        }
+        treeOrdinal = 0;
+        foreach (var (tree, nodes) in guarded)
+        {
+            SemanticModel? model = null;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (node is not MethodDeclarationSyntax declaration)
+                {
+                    continue;
+                }
+                if (owners.Count + gaps.Count >= CompilerPreparedBody.MaximumInstructions)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "InventoryBudget"));
+                    return new(owners.ToImmutable(), gaps.ToImmutable());
+                }
+                if (!declaration.Modifiers.Any(SyntaxKind.StaticKeyword) ||
+                    declaration.Modifiers.Any(SyntaxKind.AsyncKeyword) ||
+                    declaration.TypeParameterList != null ||
+                    declaration.Ancestors().OfType<TypeDeclarationSyntax>().Any(static type => type.TypeParameterList != null) ||
+                    declaration.DescendantNodes().Any(static child =>
+                        child is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or YieldStatementSyntax))
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedOwner"));
+                    continue;
+                }
+                if (declaration.Body == null && declaration.ExpressionBody == null)
+                {
+                    // Partial definition declarations do not execute a body.
+                    continue;
+                }
+                model ??= SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, tree);
+                var method = model.GetDeclaredSymbol(declaration, cancellationToken);
+                if (method == null)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingSymbol"));
+                    continue;
+                }
+                method = ContractClauseInventoryBuilder.NormalizeCallable(method);
+                if (method.MethodKind != MethodKind.Ordinary || !method.IsStatic)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedOwner"));
+                    continue;
+                }
+                if (!seen.Add(method))
+                {
+                    continue;
+                }
+                if (method.ReturnsByRef || method.ReturnsByRefReadonly ||
+                    method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None ||
+                        !SharpProof.Frontend.CSharpOperationSemantics.IsScalar(parameter.Type)) ||
+                    !method.ReturnsVoid && !SharpProof.Frontend.CSharpOperationSemantics.IsScalar(method.ReturnType))
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedSignature"));
+                    continue;
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (model.GetOperation(declaration, cancellationToken) is not IMethodBodyOperation operation ||
+                    operation.Parent != null || operation.Syntax != declaration)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingBody"));
+                    continue;
+                }
+                var calls = new RequiresCallSiteDiscovery(method, declaration, model, cancellationToken,
+                    suppliedOperationRoot: operation).GetPotentialCalls(_effectSession.HasPotentialCallPreconditions,
+                    out var complete);
+                var owned = calls ?? [];
+                if (!calls.HasValue || owned.Any(call => !SymbolEqualityComparer.Default.Equals(call.Owner, method)))
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "IncompleteOwnership"));
+                    complete = false;
+                }
+                else if (!complete)
+                {
+                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "IncompleteCalls"));
+                }
+                var id = published.TryGetValue(method, out var selected)
+                    ? selected.Entry.CallableId : SemanticClaimIdentity.CreateCallableId(method);
+                owners.Add(new(method, declaration, model, id, owned, complete));
+            }
+            treeOrdinal++;
+        }
+        return new(owners.ToImmutable(), gaps.ToImmutable());
+    }
+
+    private CompilerPotentialCallGap? GuardReferencedPotentialSyntax(ref int remainingNodes)
+    {
+        var pending = new Stack<Compilation>();
+        var visited = new HashSet<Compilation> { _compilation };
+        var treeOwners = new Dictionary<SyntaxTree, Compilation>();
+        foreach (var tree in _compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            treeOwners.Add(tree, _compilation);
+        }
+        pending.Push(_compilation);
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
+            foreach (var reference in current.References)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (--remainingNodes < 0)
+                {
+                    return new(0, 0, 0, "ReferenceBudget", current.AssemblyName);
+                }
+                if (reference is not CompilationReference source || !visited.Add(source.Compilation))
+                {
+                    continue;
+                }
+                if (visited.Count > CompilerPreparedBody.MaximumInstructions)
+                {
+                    return new(0, 0, 0, "ReferenceBudget", source.Compilation.AssemblyName);
+                }
+                var ordinal = 0;
+                foreach (var tree in source.Compilation.SyntaxTrees)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (treeOwners.TryGetValue(tree, out var owner) && !ReferenceEquals(owner, source.Compilation))
+                    {
+                        return new(ordinal, 0, 0, "ReferenceOwnership", source.Compilation.AssemblyName);
+                    }
+                    treeOwners[tree] = source.Compilation;
+                    var root = tree.GetRoot(cancellationToken);
+                    if (!TryCollectPotentialSyntax(root, ref remainingNodes, out _))
+                    {
+                        return new(ordinal, root.SpanStart, root.Span.Length, "ReferenceSyntaxBudget",
+                            source.Compilation.AssemblyName);
+                    }
+                    ordinal++;
+                }
+                pending.Push(source.Compilation);
+            }
+        }
+        return null;
+    }
+
+    private bool TryCollectPotentialSyntax(SyntaxNode root, ref int remainingNodes,
+        out ImmutableArray<SyntaxNode> nodes)
+    {
+        const int maximumNodes = 65_536;
+        var pending = new Stack<(SyntaxNode Node, int Depth)>();
+        var collected = ImmutableArray.CreateBuilder<SyntaxNode>();
+        pending.Push((root, 0));
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (node, depth) = pending.Pop();
+            if (depth > 128 || collected.Count >= maximumNodes || --remainingNodes < 0)
+            {
+                nodes = [];
+                return false;
+            }
+            collected.Add(node);
+            foreach (var child in node.ChildNodes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (pending.Count + collected.Count >= maximumNodes)
+                {
+                    nodes = [];
+                    return false;
+                }
+                pending.Push((child, depth + 1));
+            }
+        }
+        nodes = collected.OrderBy(static node => node.SpanStart).ToImmutableArray();
+        return true;
     }
 
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
