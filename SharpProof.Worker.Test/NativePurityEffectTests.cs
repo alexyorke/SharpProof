@@ -420,6 +420,190 @@ public sealed class NativePurityEffectTests
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
     }
 
+    [TestCase("State++;", 1)]
+    [TestCase("++State;", 1)]
+    [TestCase("State--;", -1)]
+    [TestCase("--State;", -1)]
+    [TestCase("_ = State++;", 1)]
+    [TestCase("_ = ++State;", 1)]
+    [TestCase("_ = State--;", -1)]
+    [TestCase("_ = --State;", -1)]
+    [TestCase("_ = (long)State++;", 1)]
+    [TestCase("_ = (long)++State;", 1)]
+    [TestCase("_ = unchecked((byte)State++);", 1)]
+    [TestCase("_ = (ulong)(short)State++;", 1)]
+    public async Task DiscardedUncheckedStaticIntMutationRefutesPurity(string body, int expectedState)
+    {
+        var source = Source(body + " return x;", "public static int State;");
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("StaticMutationOracle", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("StaticMutationOracle", isCollectible: true);
+        try
+        {
+            var type = runtime.LoadFromStream(image).GetType("C")!;
+            var run = type.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
+            Assert.That(run(7), Is.EqualTo(7));
+            Assert.That(type.GetField("State")!.GetValue(null), Is.EqualTo(expectedState));
+        }
+        finally { runtime.Unload(); }
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        Assert.That(preparation.Total, Is.Not.Null);
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().ToArray();
+        Assert.That(writes, Has.Length.EqualTo(1));
+        Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
+        Assert.That(result.WriteWitness, Is.EqualTo(writes[0].Operation));
+        var factory = preparation.Total.Program.Factory;
+        var input = preparation.Total.Parameters.Single().Entry;
+        var observed = 0;
+        var execution = new IrProgramInterpreter(factory).Execute(preparation.Total.Program,
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 7L) },
+            maximumSteps: 10000, replayOptions: new IrProgramReplayOptions(static _ => null)
+            {
+                WritePrefixObserver = (write, approximate) =>
+                {
+                    Assert.That(approximate, Is.False);
+                    Assert.That(write.Operation, Is.EqualTo(result.WriteWitness));
+                    observed++;
+                }
+            });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(7)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(observed, Is.EqualTo(1));
+    }
+
+    [TestCase("public static int State;", "return State++;")]
+    [TestCase("public static int State;", "checked { State++; } return x;")]
+    [TestCase("public static int State;", "State += x; return x;")]
+    [TestCase("public static volatile int State;", "State++; return x;")]
+    [TestCase("public static int State; static C() { State = 1; }", "State++; return x;")]
+    [TestCase("public static int State = 1;", "State++; return x;")]
+    [TestCase("public static byte State;", "State++; return x;")]
+    [TestCase("public sealed class Cell { public int State; }", "new Cell().State++; return x;")]
+    [TestCase("public static int State;", "int _ = 0; _ = State++; return x;")]
+    [TestCase("public static int State;", "long _ = 0; _ = (long)State++; return x;")]
+    [TestCase("public static int State;", "_ = checked((byte)unchecked(State++)); return x;")]
+    [TestCase("public static int State;", "_ = (object)State++; return x;")]
+    [TestCase("public static int State; public struct Wrapper { public static implicit operator Wrapper(int value) => default; }", "_ = (Wrapper)State++; return x;")]
+    [TestCase("public static int State;", "int ignored = State++; return x;")]
+    [TestCase("public static int State;", "return State++ + x;")]
+    public async Task UnsupportedStaticFieldMutationSlicesRemainUnknown(string members, string body)
+    {
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(body, members))), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Null);
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+
+    [TestCase("cell.Value++;", false, IrWriteRegion.Parameter, 6, 10, 7)]
+    [TestCase("++cell.Value;", false, IrWriteRegion.Parameter, 6, 10, 7)]
+    [TestCase("cell.Value--;", false, IrWriteRegion.Parameter, 4, 10, 7)]
+    [TestCase("--cell.Value;", false, IrWriteRegion.Parameter, 4, 10, 7)]
+    [TestCase("_ = cell.Value++;", false, IrWriteRegion.Parameter, 6, 10, 7)]
+    [TestCase("_ = ++cell.Value;", false, IrWriteRegion.Parameter, 6, 10, 7)]
+    [TestCase("_ = cell.Value--;", false, IrWriteRegion.Parameter, 4, 10, 7)]
+    [TestCase("_ = --cell.Value;", false, IrWriteRegion.Parameter, 4, 10, 7)]
+    [TestCase("cell.Value++;", true, IrWriteRegion.Parameter, 5, 10, 7)]
+    [TestCase("_ = --cell.Value;", true, IrWriteRegion.Parameter, 5, 10, 7)]
+    [TestCase("var local = cell; local.Value++;", false, IrWriteRegion.Field, 6, 10, 7)]
+    [TestCase("(cell = other).Value++;", false, IrWriteRegion.Field, 5, 11, 7)]
+    [TestCase("(cell = other).Value--;", true, IrWriteRegion.Field, 5, 9, 7)]
+    [TestCase("(x++ > 0 ? cell : other).Value++;", false, IrWriteRegion.Field, 6, 10, 8)]
+    public async Task DiscardedInstanceMutationPreservesReceiverFaultAndWrite(
+        string body, bool nullReceiver, IrWriteRegion region, int final, int otherFinal, int returned)
+    {
+        var rebind = body?.StartsWith("(cell = other)", StringComparison.Ordinal) == true;
+        var source = InstanceMutationSource("Contract.Requires(cell " + (nullReceiver ? "==" : "!=") + " null); Contract.Requires(other != null); " + body + " return x;");
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("InstanceMutationPrototype", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var runtime = new System.Runtime.Loader.AssemblyLoadContext("InstanceMutationPrototype", isCollectible: true);
+        try
+        {
+            var assembly = runtime.LoadFromStream(image);
+            var type = assembly.GetType("C")!;
+            var cellType = assembly.GetType("Cell")!;
+            var cell = Activator.CreateInstance(cellType)!;
+            var other = Activator.CreateInstance(cellType)!;
+            cellType.GetField("Value")!.SetValue(cell, 5);
+            cellType.GetField("Value")!.SetValue(other, 10);
+            var method = type.GetMethod("Target")!;
+            if (nullReceiver && !rebind)
+            {
+                var thrown = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => method.Invoke(null, [null, other, 7])));
+                Assert.That(thrown!.InnerException, Is.TypeOf<NullReferenceException>());
+            }
+            else
+            { Assert.That(method.Invoke(null, [nullReceiver ? null : cell, other, 7]), Is.EqualTo(returned)); }
+            Assert.That(cellType.GetField("Value")!.GetValue(cell), Is.EqualTo(final));
+            Assert.That(cellType.GetField("Value")!.GetValue(other), Is.EqualTo(otherFinal));
+        }
+        finally { runtime.Unload(); }
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var faults = nullReceiver && !rebind;
+        Assert.That(result.Outcome, faults ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        var total = preparation.Total!;
+        var write = total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().Single(item => item.Region != IrWriteRegion.Local);
+        Assert.That(write.Region, Is.EqualTo(region));
+        Assert.That(result.WriteWitness, faults ? Is.Null : Is.EqualTo(write.Operation));
+        var factory = total.Program.Factory;
+        var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
+        var observed = 0;
+        var replay = new IrProgramInterpreter(factory).Execute(total.Program, new Dictionary<IrVarId, IrValue>
+        {
+            [entries[0]] = nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object()),
+            [entries[1]] = factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()),
+            [entries[2]] = factory.CreateIntegerValue(factory.GetVariableInfo(entries[2]).Type, 7L)
+        }, 10000, new IrProgramReplayOptions(static _ => null)
+        {
+            WritePrefixObserver = (item, approximate) =>
+            {
+                Assert.That(approximate, Is.False);
+                if (item.Region != IrWriteRegion.Local)
+                { Assert.That(item.Operation, Is.EqualTo(write.Operation)); observed++; }
+            }
+        });
+        Assert.That(replay.Status, Is.EqualTo(faults ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(observed, Is.EqualTo(faults ? 0 : 1));
+        if (!faults)
+        { Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(returned))); }
+    }
+
+    [TestCase("cell.Value += x;", "public int Value;")]
+    [TestCase("checked { cell.Value++; }", "public int Value;")]
+    [TestCase("return cell.Value++;", "public int Value;")]
+    [TestCase("int ignored = cell.Value++;", "public int Value;")]
+    [TestCase("int _ = 0; _ = cell.Value++;", "public int Value;")]
+    [TestCase("_ = (long)cell.Value++;", "public int Value;")]
+    [TestCase("cell.Value++;", "public volatile int Value;")]
+    [TestCase("cell.Value++;", "public byte Value;")]
+    [TestCase("cell.Value++;", "public int Value; static Cell() { }")]
+    public async Task OtherInstanceMutationShapesRemainClosed(string body, string field)
+    {
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(InstanceMutationSource(body + " return x;", field))), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.Null);
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+    [Test]
+    public async Task ImplicitThisMutationUsesOwnedFieldRegion()
+    {
+        const string source = "using SharpProof.Attributes; public sealed class C { public int Value; [EnforcePure] public int Target(int x) { Value++; return x; } }";
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
+    }
+
+    private static string InstanceMutationSource(string body, string field = "public int Value;")
+    { return "using SharpProof.Attributes; public sealed class Cell { " + field + " } public static class C { [EnforcePure] public static int Target(Cell cell, Cell other, int x) { " + body + " } }"; }
+
+
     private static string SynchronizationSource(string body)
     {
         return "using SharpProof.Attributes; public static class C { [EnforcePure, ZeroAllocations] " +

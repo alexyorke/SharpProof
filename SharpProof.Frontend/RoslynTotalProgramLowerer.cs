@@ -4,9 +4,11 @@ namespace SharpProof.Frontend;
 // unchanged ordinary CFG path; unsupported forms remain incomplete.
 internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext context, CancellationToken cancellationToken,
     TotalSourceCallSession? calls = null, bool externalFilterSearch = false,
-    Func<IMethodSymbol, bool>? preserveSourceCall = null)
+    Func<IMethodSymbol, bool>? preserveSourceCall = null, ImmutableArray<TotalShadowCallHop> shadowAncestry = default, bool? captureShadowCallAncestry = null)
 {
     private readonly TotalLoweringContext _context = context;
+    private readonly ImmutableArray<TotalShadowCallHop> _shadowAncestry = shadowAncestry.IsDefault ? [] : shadowAncestry;
+    private readonly bool _captureShadowCallAncestry = captureShadowCallAncestry ?? context.CaptureShadowCallAncestry;
     private IrProgramBuilder _builder = new(context.Factory);
     private readonly List<FrontendProgramAbstention> _abstentions = [];
     private readonly Dictionary<BasicBlock, IrBlockId> _blocks = [];
@@ -146,6 +148,53 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { _frame.Return(block, site, value); }
     }
 
+    private IIncrementOrDecrementOperation? TryDiscardedStaticFieldMutation(IOperation operation)
+    {
+        var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+        var conversionAllowed = false;
+        if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
+        {
+            discarded = assignment.Value;
+            conversionAllowed = true;
+        }
+        var depth = 0;
+        while (discarded is IParenthesizedOperation or IConversionOperation)
+        {
+            if (++depth >= 256)
+            { return null; }
+            SpendRegion();
+            if (discarded is IParenthesizedOperation parenthesized)
+            {
+                discarded = parenthesized.Operand;
+                continue;
+            }
+            var conversion = (IConversionOperation)discarded;
+            if (!conversionAllowed || conversion.IsChecked || conversion.OperatorMethod != null || !conversion.Conversion.IsNumeric ||
+                !CSharpOperationSemantics.TryGetScalarInteger(conversion.Type?.SpecialType ?? SpecialType.None, out _) ||
+                !CSharpOperationSemantics.TryGetScalarInteger(conversion.Operand.Type?.SpecialType ?? SpecialType.None, out _))
+            { return null; }
+            discarded = conversion.Operand;
+        }
+        return discarded is IIncrementOrDecrementOperation { IsChecked: false, OperatorMethod: null, Target: IFieldReferenceOperation { Field.IsStatic: true, Field.Type.SpecialType: SpecialType.System_Int32, Instance: null } field } increment &&
+            CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) ? increment : null;
+    }
+
+    private IIncrementOrDecrementOperation? TryDiscardedInstanceFieldMutation(IOperation operation)
+    {
+        var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+        if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
+        { discarded = assignment.Value; }
+        var depth = 0;
+        while (discarded is IParenthesizedOperation parenthesized)
+        {
+            if (++depth >= 256)
+            { return null; }
+            SpendRegion();
+            discarded = parenthesized.Operand;
+        }
+        return discarded is IIncrementOrDecrementOperation { IsChecked: false, OperatorMethod: null, Target: IFieldReferenceOperation { Field.IsStatic: false, Field.Type.SpecialType: SpecialType.System_Int32 } field } increment &&
+            CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) ? increment : null;
+    }
     private IrBlockId Statement(IOperation operation, IrBlockId block)
     {
         SpendRegion();
@@ -159,6 +208,18 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         if (_context.IsSpecificationOperation(operation))
         {
             return block;
+        }
+        if (TryDiscardedStaticFieldMutation(operation) is { } discardedMutation)
+        {
+            _builder.Write(block, _context.Site(discardedMutation), IrWriteRegion.Static);
+            return block;
+        }
+        if (TryDiscardedInstanceFieldMutation(operation) is { } discardedInstanceMutation)
+        {
+            var value = _expressions.LowerDiscardedInstanceFieldMutation(discardedInstanceMutation, block);
+            if (!value.Classification.IsExact)
+            { _abstentions.Add(new(_context.Site(operation), value.Classification.Abstention)); }
+            return value.Continuation;
         }
         switch (operation)
         {

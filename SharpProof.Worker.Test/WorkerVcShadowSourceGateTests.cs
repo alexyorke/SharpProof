@@ -263,11 +263,17 @@ public sealed class WorkerVcShadowSourceGateTests
 
     internal static ShadowSourceCase[] QualificationCases()
     {
-        // Reachable-source cases qualify collector/codec integrity through
-        // their dedicated driver. They are outside the frozen Phase 2
-        // callable authority baseline; retain every original baseline case.
-        var goldenNames = GoldenTest.Cases("worker").Where(name => !GoldenTest.Load("worker", name).Source
-            .StartsWith("// golden-scenario: reachable-source\n", StringComparison.Ordinal)).ToArray();
+        // Reachable-source, synchronization projection, and metadata Requires cases qualify through
+        // dedicated drivers. They are outside the frozen Phase 2 callable
+        // authority baseline; retain every original baseline case.
+        var goldenNames = GoldenTest.Cases("worker").Where(name =>
+        {
+            var source = GoldenTest.Load("worker", name).Source;
+            return !source.StartsWith("// golden-scenario: reachable-source\n", StringComparison.Ordinal) &&
+                !source.StartsWith("// golden-scenario: synchronization-projection\n", StringComparison.Ordinal) &&
+                !source.StartsWith("// golden-scenario: typed-il-call-requires\n", StringComparison.Ordinal) &&
+                !source.StartsWith("// golden-scenario: shadow-call-ancestry-tampered-predicate\n", StringComparison.Ordinal);
+        }).ToArray();
         Assert.That(goldenNames, Has.Length.EqualTo(64));
         var cases = Universe.Concat(goldenNames.Select(name =>
         {

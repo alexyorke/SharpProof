@@ -1,0 +1,2 @@
+SP0027 Warning record-byref-implicit-base-requires.cs:10:49-10:52 Call to '.ctor' violates precondition 'false'
+SP0027 Warning record-byref-implicit-base-requires.cs:15:46-15:49 Call to '.ctor' violates precondition 'false'

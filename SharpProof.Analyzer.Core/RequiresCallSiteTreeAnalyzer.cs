@@ -69,6 +69,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return AnalyzerSemanticOutcome.NotApplicable;
         }
 
+        if (potentialOwners.Contains(caller))
+        {
+            session.ObserveAdvisoryCalls(caller, declaration, cancellationToken);
+        }
+
         if (!discovery.TryCreateGraph(
                 out var operationRoot,
                 out var graph))

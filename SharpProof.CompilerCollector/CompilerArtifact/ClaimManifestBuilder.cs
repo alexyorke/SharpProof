@@ -69,16 +69,16 @@ internal sealed partial class ClaimManifestBuilder(
             : result;
     }
 
-    internal CompilerPotentialCallInventory BuildPotentialCallShadow()
+    internal CompilerPotentialCallInventory BuildPotentialCallShadow(bool allowReferenceOwners = false)
     {
         return DiscoverPotentialCallShadow(ImmutableDictionary.Create<IMethodSymbol, ManifestCallableTarget>(
-            SymbolEqualityComparer.Default));
+            SymbolEqualityComparer.Default), allowReferenceOwners);
     }
 
     // Separate source census: it must not change mandatory manifest membership
     // or the selected nested callable ordinal stream.
     private CompilerPotentialCallInventory DiscoverPotentialCallShadow(
-        ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> published)
+        ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> published, bool allowReferenceOwners = false)
     {
         var owners = ImmutableArray.CreateBuilder<CompilerPotentialCallOwner>();
         var gaps = ImmutableArray.CreateBuilder<CompilerPotentialCallGap>();
@@ -159,9 +159,9 @@ internal sealed partial class ClaimManifestBuilder(
                     continue;
                 }
                 if (method.ReturnsByRef || method.ReturnsByRefReadonly ||
-                    method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None ||
-                        !SharpProof.Frontend.CSharpOperationSemantics.IsScalar(parameter.Type)) ||
-                    !method.ReturnsVoid && !SharpProof.Frontend.CSharpOperationSemantics.IsScalar(method.ReturnType))
+                    method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+                        !SupportedShadowOwnerType(parameter.Type, allowReferenceOwners)) ||
+                    !method.ReturnsVoid && !SupportedShadowOwnerType(method.ReturnType, allowReferenceOwners))
                 {
                     gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedSignature"));
                     continue;
@@ -193,6 +193,13 @@ internal sealed partial class ClaimManifestBuilder(
             treeOrdinal++;
         }
         return new(owners.ToImmutable(), gaps.ToImmutable());
+    }
+
+    private static bool SupportedShadowOwnerType(ITypeSymbol type, bool allowReferenceOwners)
+    {
+        return SharpProof.Frontend.CSharpOperationSemantics.IsScalar(type) ||
+            allowReferenceOwners && type.TypeKind != TypeKind.Dynamic &&
+            type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate;
     }
 
     private CompilerPotentialCallGap? GuardReferencedPotentialSyntax(ref int remainingNodes)

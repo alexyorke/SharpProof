@@ -100,7 +100,12 @@ internal static partial class RequiresCallSiteAnalyzer
             ImmutableDictionary<int, long>.Empty,
             CanReplay: true,
             Flow: null,
-            ManagedFlowStatus.BudgetExceeded);
+            ManagedFlowStatus.BudgetExceeded)
+        {
+            OriginKind = initializer == null ? PotentialRequiresCallOrigin.ImplicitBaseConstructor :
+                PotentialRequiresCallOrigin.ExplicitPrimaryBaseConstructor,
+            CallRoleIndex = 0
+        };
 
         var analysis = new Analysis(
                 constructor,
@@ -127,18 +132,25 @@ internal static partial class RequiresCallSiteAnalyzer
                 foreach (var call in RequiresCallSiteDiscovery
                              .CreateUnflowedCandidates(
                                  operation,
-                                 semanticModel))
+                                 semanticModel,
+                                 collectCallRoles: session.RequiresObserver != null))
                 {
-                    if (!nestedCalls.Any(existing =>
-                            existing.Syntax.SyntaxTree ==
-                                call.Syntax.SyntaxTree &&
-                            existing.Syntax.Span ==
-                                call.Syntax.Span &&
-                            SymbolEqualityComparer.Default.Equals(
-                                existing.TargetMethod,
-                                call.TargetMethod)))
+                    var existingIndex = nestedCalls.FindIndex(existing =>
+                        existing.Syntax.SyntaxTree == call.Syntax.SyntaxTree &&
+                        existing.Syntax.Span == call.Syntax.Span &&
+                        SymbolEqualityComparer.Default.Equals(existing.TargetMethod, call.TargetMethod));
+                    if (existingIndex < 0)
                     {
                         nestedCalls.Add(call);
+                    }
+                    else if (session.RequiresObserver != null)
+                    {
+                        var existing = nestedCalls[existingIndex];
+                        nestedCalls[existingIndex] = existing with
+                        {
+                            MergedRoleCoverage = existing.MergedRoleCoverage || call.MergedRoleCoverage ||
+                                existing.CallRoleIndex != call.CallRoleIndex || existing.OriginKind != call.OriginKind
+                        };
                     }
                 }
             }
@@ -253,7 +265,8 @@ internal static partial class RequiresCallSiteAnalyzer
                 cancellationToken,
                 graph,
                 operationRoot,
-                suppliedInitializerOperation);
+                suppliedInitializerOperation,
+                collectCallRoles: session.RequiresObserver != null);
 
         internal AnalyzerSemanticOutcome Run(
             bool requireCallerOwnership = true)
@@ -289,6 +302,11 @@ internal static partial class RequiresCallSiteAnalyzer
             var capture = new RequiresObservationCapture();
             var outcome = AnalyzeCallSiteCore(candidate, requireCallerOwnership, capture);
             cancellationToken.ThrowIfCancellationRequested();
+            if (candidate.MergedRoleCoverage || candidate.OriginKind == null || candidate.CallRoleIndex < 0)
+            {
+                observer.ObserveGap(new(caller, candidate, candidate.MergedRoleCoverage ?
+                    "MergedCallRoleCoverage" : "UnavailableCallRoleCoverage"));
+            }
             capture.Publish(observer, caller, candidate);
             return outcome;
         }

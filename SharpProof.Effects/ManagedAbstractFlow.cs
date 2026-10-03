@@ -4431,11 +4431,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 BinaryMayCompleteNormally(binary),
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
-                ISimpleAssignmentOperation or IArrayElementReferenceOperation or
                 IFieldReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 ChildrenMayCompleteNormally(operation),
+            IArrayElementReferenceOperation element =>
+                ArrayAccessMayCompleteNormally(element),
+            ISimpleAssignmentOperation assignment =>
+                SimpleAssignmentMayCompleteNormally(assignment),
             IPropertyReferenceOperation property =>
                 ChildrenMayCompleteNormally(property) &&
                 (property.Property.IsStatic ||
@@ -4702,6 +4705,34 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             }
             return true;
         }
+    }
+
+    private bool ArrayAccessMayCompleteNormally(IArrayElementReferenceOperation element)
+    {
+        return ChildrenMayCompleteNormally(element) &&
+            (element.Parent is ISimpleAssignmentOperation assignment &&
+             ReferenceEquals(assignment.Target, element) ||
+             ArrayAccessMaySucceed(element));
+    }
+
+    private bool SimpleAssignmentMayCompleteNormally(ISimpleAssignmentOperation assignment)
+    {
+        return ChildrenMayCompleteNormally(assignment) &&
+            (assignment.Target is not IArrayElementReferenceOperation element ||
+             ArrayAccessMaySucceed(element));
+    }
+
+    private static bool ArrayAccessMaySucceed(IArrayElementReferenceOperation element)
+    {
+        if (IsDefinitelyNull(element.ArrayReference))
+        {
+            return false;
+        }
+        return element.Indices.Length != 1 ||
+            !ArrayLengthFacts.TryGetConstantLength(
+                UnwrapHarmlessValue(element.ArrayReference), out var length) ||
+            element.Indices[0].ConstantValue is not { HasValue: true, Value: int index } ||
+            index >= 0 && index < length;
     }
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)

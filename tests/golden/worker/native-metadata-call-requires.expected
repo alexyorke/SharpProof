@@ -1,0 +1,8 @@
+shadow callers: 1
+preconditions: 1
+origin: metadata
+clause source span: none
+native: Refuted
+original replay witness: matched
+input 0: marker false, return 2
+input 1: marker true, return 12

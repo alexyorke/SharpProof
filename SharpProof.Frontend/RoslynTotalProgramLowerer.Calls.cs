@@ -117,13 +117,22 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return new(marker, block, value.Classification); }
             arguments[argument.Parameter!.Ordinal] = value.Value;
         }
-        RecordCallPreconditions(callee, arguments, block, site);
+        ImmutableArray<TotalShadowCallHop> callAncestry = [];
+        if (_captureShadowCallAncestry)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            if (_shadowAncestry.Length >= 256 || _context.Factory.GetOperationInfo(site).SourceSpan is not { } callSpan)
+            { throw new RegionIncompleteException(); }
+            callAncestry = _shadowAncestry.Add(new(CompilerIdentityBridge.CreateSymbolDisplay(_context.Target),
+                CompilerIdentityBridge.CreateSymbolDisplay(callee.Target), callSpan));
+        }
+        RecordCallPreconditions(callee, arguments, block, site, callAncestry);
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
             { throw new RegionIncompleteException(); }
             var continued = _builder.CreateBlock("call:continued");
-            var composed = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch)
+            var composed = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry)
             {
                 _builder = _builder,
                 _frame = new((source, operation, value) =>
@@ -141,7 +150,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Goto(block, site, composed._frame.Entry);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
-        var lowering = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch).Lower(graph!);
+        var lowering = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry).Lower(graph!);
         if (!lowering.IsExact)
         { return new(marker, block, lowering.Classification); }
         var program = lowering.Program;
@@ -218,7 +227,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
     }
 
-    private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site)
+    private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
     {
         if (callee.SourceCallPreconditions.IsEmpty)
         { return; }
@@ -241,7 +250,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // imported assumption. The callee still executes normally.
             var marker = _builder.Assign(block, site, _context.Temporary(_context.Factory.BooleanType, name),
                 _context.Factory.Binary(IrBinaryOperator.AndAlso, safe, value));
-            _callPreconditions.Add(marker, new(identity, ordinal, clause.ClauseSite, value, safe));
+            _callPreconditions.Add(marker, new(identity, ordinal, clause.ClauseSite, value, safe, ancestry: ancestry));
         }
     }
 

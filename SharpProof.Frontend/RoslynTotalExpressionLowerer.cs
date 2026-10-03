@@ -144,6 +144,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             }
             return AllocateValue(operation, block);
         }
+        if (depth < 256 && _context.AllowObjectWidening && operation is IConversionOperation
+            {
+                IsImplicit: true, OperatorMethod: null, Type.SpecialType: SpecialType.System_Object,
+                Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate
+            } widening &&
+            widening.Conversion.IsReference)
+        {
+            var operand = LowerBodyValue(widening.Operand, block, depth + 1);
+            return operand.Classification.IsExact
+                ? new(_factory.Cast(_factory.ObjectType, operand.Value), operand.Continuation, operand.Classification)
+                : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
+        }
         if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
         {
             var operand = LowerBodyValue(boxing.Operand, block, depth + 1);
@@ -330,6 +342,27 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             deferred ? operands : default), site);
     }
 
+    internal TotalBodyValue LowerDiscardedInstanceFieldMutation(IIncrementOrDecrementOperation operation, IrBlockId block)
+    {
+        var field = (IFieldReferenceOperation)operation.Target;
+        IrTerm? receiver = null;
+        var implicitThis = field.Instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        if (!implicitThis)
+        {
+            if (field.Instance == null)
+            { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
+            var instance = LowerBodyValue(field.Instance, block, 1);
+            if (!instance.Classification.IsExact)
+            { return Approximate(operation, instance.Continuation, instance.Classification.Abstention); }
+            receiver = instance.Value;
+            block = instance.Continuation;
+        }
+        var result = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, _factory.Integer(0), receiver), block);
+        var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+        _builder!.Write(result.Continuation, _context.Site(operation), region);
+        return result;
+    }
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldReferenceOperation field, IrBlockId block, int depth)
     {

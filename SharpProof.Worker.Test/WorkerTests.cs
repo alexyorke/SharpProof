@@ -2632,13 +2632,16 @@ public sealed class WorkerTests
             using SharpProof.Attributes;
             public static class Subject {
                 private static int s_ambient;
-                private static void TouchAmbient() => s_ambient++;
+                private static void TouchAmbient(ref int[] value) {
+                    s_ambient++;
+                    value = null;
+                }
 
                 public static int[] Unsafe() {
                     Contract.Ensures(
                         Contract.Result<int[]>() != null);
                     var result = Array.Empty<int>();
-                    TouchAmbient();
+                    TouchAmbient(ref result);
                     return result;
                 }
             }
@@ -2652,7 +2655,7 @@ public sealed class WorkerTests
         var record = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
+            WorkerClaimReason.UnsupportedCallable);
         Assert.That(record.ProofCore, Is.Empty);
     }
 

@@ -1,0 +1,26 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=value
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op1 Write Static source=total-discarded-static-int-mutation.cs:136+7
+  i6 op2 Write Static source=total-discarded-static-int-mutation.cs:173+7
+  i7 op4 Assign v4:int[width=32,signed=True] = v1 source=total-discarded-static-int-mutation.cs:198+5
+  i8 op3 Assign v3:int[width=32,signed=True] = v4 source=total-discarded-static-int-mutation.cs:198+5
+  i9 op3 Return v3 source=total-discarded-static-int-mutation.cs:198+5
+block: b3 cfg:2
+  i10 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v1
+term: ir2 Variable type=t1:int width=32 signed=True value=v4
+term: ir3 Variable type=t1:int width=32 signed=True value=v3

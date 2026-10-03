@@ -133,6 +133,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             ResolveMethod(reader, assembly, handle, method.ContainingModule.Name) is not { } resolved ||
             !SameSignature(method, resolved) || !NoInitialization(pe, reader, definition.GetDeclaringType()))
         { return null; }
+        if (!TryCaptureClosedAttributes(compilation, reader, method, definition, cancellationToken, out var parameterAttributes))
+        { return null; }
         var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
         if (body.Size is <= 0 or > 65536 || body.MaxStack is < 0 or > 128 || !body.ExceptionRegions.IsEmpty)
         { return null; }
@@ -149,7 +151,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         }
         var instructions = Decode(body, reader, assembly, method.ContainingModule.Name, cancellationToken);
         return instructions.IsDefault ? null : new(method, authority.Sha256, authority.Name, locals,
-            body.LocalVariablesInitialized, body.MaxStack, instructions);
+            body.LocalVariablesInitialized, body.MaxStack, instructions, parameterAttributes, authority.Mvid);
     }
 
     private static bool SameSignature(IMethodSymbol expected, IMethodSymbol actual)
@@ -324,5 +326,204 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         { return SpecialType.None; }
         public SpecialType GetFunctionPointerType(MethodSignature<SpecialType> signature)
         { return SpecialType.None; }
+    }
+
+    private static bool TryCaptureClosedAttributes(CSharpCompilation compilation, MetadataReader reader,
+        IMethodSymbol method, MethodDefinition definition, CancellationToken cancellationToken,
+        out ImmutableArray<TotalIlClosedAttribute> attributes)
+    {
+        attributes = [];
+        var selections = ContractSelectionInventory.ForCompilation(compilation);
+        var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
+        var sequences = new HashSet<int>();
+        var remainingRows = 1024;
+        foreach (var parameterHandle in definition.GetParameters())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (--remainingRows < 0)
+            { return false; }
+            var parameter = reader.GetParameter(parameterHandle);
+            if (parameter.SequenceNumber == 0)
+            { continue; }
+            if (parameter.SequenceNumber > method.Parameters.Length || !sequences.Add(parameter.SequenceNumber))
+            { return false; }
+            foreach (var attributeHandle in parameter.GetCustomAttributes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (--remainingRows < 0)
+                { return false; }
+                var attribute = reader.GetCustomAttribute(attributeHandle);
+                EntityHandle typeHandle;
+                StringHandle constructorName;
+                BlobHandle constructorSignature;
+                if (attribute.Constructor.Kind == HandleKind.MemberReference)
+                {
+                    var constructor = reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor);
+                    typeHandle = constructor.Parent;
+                    constructorName = constructor.Name;
+                    constructorSignature = constructor.Signature;
+                }
+                else if (attribute.Constructor.Kind == HandleKind.MethodDefinition)
+                {
+                    var constructor = reader.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor);
+                    typeHandle = constructor.GetDeclaringType();
+                    constructorName = constructor.Name;
+                    constructorSignature = constructor.Signature;
+                }
+                else
+                { continue; }
+
+                string typeNamespace;
+                string typeName;
+                AssemblyIdentity? identity;
+                var assemblyReference = default(AssemblyReferenceHandle);
+                if (typeHandle.Kind == HandleKind.TypeReference)
+                {
+                    var type = reader.GetTypeReference((TypeReferenceHandle)typeHandle);
+                    typeNamespace = reader.GetString(type.Namespace);
+                    typeName = reader.GetString(type.Name);
+                    assemblyReference = type.ResolutionScope.Kind == HandleKind.AssemblyReference
+                        ? (AssemblyReferenceHandle)type.ResolutionScope : default;
+                    identity = null;
+                }
+                else if (typeHandle.Kind == HandleKind.TypeDefinition)
+                {
+                    var type = reader.GetTypeDefinition((TypeDefinitionHandle)typeHandle);
+                    typeNamespace = reader.GetString(type.Namespace);
+                    typeName = reader.GetString(type.Name);
+                    identity = method.ContainingAssembly.Identity;
+                }
+                else
+                { continue; }
+
+                if (typeNamespace != "SharpProof.Attributes" ||
+                    typeName is not ("PositiveAttribute" or "NotNullAttribute" or "InRangeAttribute"))
+                { continue; }
+                var expected = typeName switch
+                {
+                    "PositiveAttribute" => selections.Positive,
+                    "NotNullAttribute" => selections.NotNull,
+                    "InRangeAttribute" => selections.InRange,
+                    _ => null
+                };
+                if (typeHandle.Kind == HandleKind.TypeReference && expected != null)
+                {
+                    if (assemblyReference.IsNil || !TryReadAssemblyIdentity(reader, assemblyReference,
+                        expected.ContainingAssembly.Identity, out var resolvedIdentity))
+                    { return false; }
+                    identity = resolvedIdentity;
+                }
+                if (expected == null || identity == null || !identity.Equals(expected.ContainingAssembly.Identity) ||
+                    reader.GetString(constructorName) != ".ctor")
+                { return false; }
+                var inRange = typeName == "InRangeAttribute";
+                var signature = reader.GetBlobReader(constructorSignature);
+                if (signature.Length != (inRange ? 5 : 3) || signature.ReadByte() != 0x20 ||
+                    signature.ReadByte() != (inRange ? 2 : 0) || signature.ReadByte() != 1 ||
+                    inRange && (signature.ReadByte() != 0x0a || signature.ReadByte() != 0x0a) ||
+                    signature.RemainingBytes != 0)
+                { return false; }
+                var expectedConstructor = expected.InstanceConstructors.SingleOrDefault(candidate =>
+                    candidate.Parameters.Length == (inRange ? 2 : 0) &&
+                    candidate.Parameters.All(static parameter => parameter.RefKind == RefKind.None &&
+                        parameter.Type.SpecialType == SpecialType.System_Int64));
+                if (expectedConstructor == null ||
+                    attribute.Constructor.Kind == HandleKind.MethodDefinition &&
+                    (expectedConstructor.MetadataToken != MetadataTokens.GetToken(attribute.Constructor) ||
+                        expectedConstructor.ContainingModule.Name != method.ContainingModule.Name))
+                { return false; }
+                if (!TryReadClosedBlob(reader, attribute.Value, inRange, out var minimum, out var maximum))
+                { return false; }
+                result.Add(new(method.MetadataToken, parameter.SequenceNumber - 1, parameter.SequenceNumber,
+                    MetadataTokens.GetToken(parameterHandle), MetadataTokens.GetToken(attributeHandle),
+                    MetadataTokens.GetToken(attribute.Constructor), CompilerIdentityBridge.CreateSymbolDisplay(expected),
+                    CompilerIdentityBridge.CreateSymbolDisplay(expectedConstructor),
+                    inRange ? "InRange" : typeName == "PositiveAttribute" ? "Positive" : "NotNull",
+                    ImmutableArray.CreateRange(reader.GetBlobBytes(constructorSignature)),
+                    ImmutableArray.CreateRange(reader.GetBlobBytes(attribute.Value)), minimum, maximum));
+            }
+        }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken);
+        if (binding.Failure == ContractBindingFailure.ContractApiUnavailable && result.Count == 0)
+        { return true; }
+        return binding.IsSuccess && TryPairMetadataRequires(binding.Clauses, result.ToImmutable(),
+            cancellationToken, out attributes);
+    }
+
+    internal static bool TryPairMetadataRequires(ImmutableArray<BoundTotalMetadataRequires> clauses,
+        ImmutableArray<TotalIlClosedAttribute> evidence, CancellationToken cancellationToken,
+        out ImmutableArray<TotalIlClosedAttribute> paired)
+    {
+        paired = [];
+        if (clauses.IsDefault || evidence.IsDefault || clauses.Length != evidence.Length || clauses.Length > 1024)
+        { return false; }
+        var consumed = new HashSet<int>();
+        var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
+        foreach (var clause in clauses)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (clause.Attribute.AttributeClass == null || clause.Attribute.AttributeConstructor == null ||
+                !clause.Validation.IsValid)
+            { return false; }
+            var attributeIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeClass);
+            var constructorIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeConstructor);
+            var kind = clause.Validation.Kind.ToString();
+            var matches = evidence.Where(row => row.ParameterOrdinal == clause.ParameterOrdinal &&
+                row.AttributeIdentity == attributeIdentity && row.ConstructorIdentity == constructorIdentity &&
+                row.Kind == kind && row.Minimum == clause.Validation.Minimum && row.Maximum == clause.Validation.Maximum)
+                .Take(2).ToArray();
+            if (matches.Length != 1 || !consumed.Add(matches[0].AttributeToken))
+            { return false; }
+            result.Add(matches[0].WithClauseOrdinal(result.Count));
+        }
+        if (consumed.Count != evidence.Length)
+        { return false; }
+        paired = result.ToImmutable();
+        return true;
+    }
+
+    internal static bool TryReadAssemblyIdentity(MetadataReader reader, AssemblyReferenceHandle handle,
+        AssemblyIdentity expected, out AssemblyIdentity identity)
+    {
+        identity = null!;
+        var assembly = reader.GetAssemblyReference(handle);
+        const AssemblyFlags contentTypeMask = (AssemblyFlags)0x0e00;
+        const AssemblyFlags allowed = AssemblyFlags.PublicKey | AssemblyFlags.Retargetable | contentTypeMask;
+        var hasPublicKey = (assembly.Flags & AssemblyFlags.PublicKey) != 0;
+        var isRetargetable = (assembly.Flags & AssemblyFlags.Retargetable) != 0;
+        var contentType = (AssemblyContentType)(((int)assembly.Flags & (int)contentTypeMask) >> 9);
+        if ((assembly.Flags & ~allowed) != 0 || isRetargetable != expected.IsRetargetable ||
+            contentType != expected.ContentType)
+        { return false; }
+        var expectedKey = hasPublicKey ? expected.PublicKey : expected.PublicKeyToken;
+        var key = reader.GetBlobReader(assembly.PublicKeyOrToken);
+        // Reject oversized/unexpected keys before allocating a byte array.
+        if (key.Length != expectedKey.Length || hasPublicKey && expectedKey.IsEmpty)
+        { return false; }
+        var bytes = key.ReadBytes(key.Length);
+        if (!bytes.SequenceEqual(expectedKey))
+        { return false; }
+        identity = new(reader.GetString(assembly.Name), assembly.Version,
+            assembly.Culture.IsNil ? null : reader.GetString(assembly.Culture),
+            ImmutableArray.CreateRange(bytes), hasPublicKey, isRetargetable, contentType);
+        return true;
+    }
+    private static bool TryReadClosedBlob(MetadataReader reader, BlobHandle handle, bool inRange,
+        out long minimum, out long maximum)
+    {
+        minimum = 0;
+        maximum = 0;
+        var blob = reader.GetBlobReader(handle);
+        if (blob.Length != (inRange ? 20 : 4) || blob.ReadUInt16() != 1)
+        { return false; }
+        if (inRange)
+        {
+            minimum = blob.ReadInt64();
+            maximum = blob.ReadInt64();
+            if (minimum > maximum)
+            { return false; }
+        }
+        return blob.ReadUInt16() == 0 && blob.RemainingBytes == 0;
     }
 }

@@ -125,16 +125,22 @@ internal sealed class CompilerDecodedShadowBody
     internal CompilerTotalCallablePreparation Body { get; }
 
     internal static CompilerDecodedShadowBody Decode(string ownerId,
-        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
     {
-        return new(CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(ownerId, artifact, cancellationToken));
+        return new(CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(ownerId, artifact, cancellationToken, metadataReferences));
     }
 }
 
 internal sealed record CompilerTotalExceptionConstraint(string ClaimId, ImmutableArray<IrExceptionKind> AllowedKinds);
 
 internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction, string CalleeIdentity,
-    int ClauseOrdinal, OperationId ClauseSite, IrTerm Value, IrTerm Safe);
+    int ClauseOrdinal, OperationId ClauseSite, IrTerm Value, IrTerm Safe,
+    CompilerMetadataClauseOrigin? MetadataClause = null)
+{
+    internal ImmutableArray<CompilerShadowCallHop> Ancestry { get; init; } = [];
+}
+
+internal sealed record CompilerShadowCallHop(string CallerIdentity, string CalleeIdentity, IrSourceSpan Site);
 
 internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
 
@@ -156,8 +162,17 @@ internal sealed class CompilerTotalCallableArtifact
     public CompilerTotalCallPreconditionArtifact[] CallPreconditions { get; set; } = [];
 }
 
+internal sealed record CompilerMetadataClauseOrigin(string AssemblyIdentity, string ImageSha256,
+    string ModuleName, string ModuleMvid, int MethodToken, int ParameterOrdinal, int ParameterSequence,
+    int ParameterToken, int AttributeToken, int ConstructorToken, string AttributeIdentity,
+    string ConstructorIdentity, string Kind, long Minimum, long Maximum,
+    ImmutableArray<byte> ConstructorSignature, ImmutableArray<byte> ValueBlob);
+
 internal sealed class CompilerTotalCallPreconditionArtifact
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerMetadataClauseOrigin? MetadataClause { get; set; }
+
     public int InstructionIndex { get; set; } = -1;
     public string CalleeIdentity { get; set; } = string.Empty;
     public int ClauseOrdinal { get; set; } = -1;

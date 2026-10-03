@@ -1,0 +1,1 @@
+SP0027 Warning property-initializer-suppression-order.cs:15:26-15:39 Call to 'Need' violates precondition 'value > 0'

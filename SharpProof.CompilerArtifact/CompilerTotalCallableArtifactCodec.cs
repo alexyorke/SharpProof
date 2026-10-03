@@ -59,7 +59,7 @@ internal static class CompilerTotalCallableArtifactCodec
             CallPreconditions = [.. calls.Select((call, ordinal) => new CompilerTotalCallPreconditionArtifact
             {
                 InstructionIndex = encoded.InstructionIndices[call.Instruction], CalleeIdentity = call.CalleeIdentity,
-                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite],
+                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite], MetadataClause = call.MetadataClause,
                 ValueRoot = clauses.Length * 2 + ordinal * 2, SafeRoot = clauses.Length * 2 + ordinal * 2 + 1
             })]
         };
@@ -93,7 +93,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     internal static CompilerTotalCallablePreparation DecodeShadowBodyCore(string ownerId,
-        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(artifact, nameof(artifact));
@@ -103,7 +103,7 @@ internal static class CompilerTotalCallableArtifactCodec
             artifact.Clauses is { Length: 0 } && artifact.ValidEffectClaimIds is { Length: 0 } &&
             artifact.ExceptionConstraints is { Length: 0 },
             "A shadow body cannot carry own contracts, effects or abstraction.");
-        var decoded = DecodeCore(artifact, [], [], entryOnly: false, cancellationToken)!;
+        var decoded = DecodeCore(artifact, [], [], entryOnly: false, cancellationToken, metadataReferences)!;
         return new(ownerId, decoded.Program!, decoded.Parameters, decoded.Result, [])
         { CallPreconditions = decoded.CallPreconditions };
     }
@@ -114,7 +114,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         WorkerAssumptionEvidence[] assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
-        bool entryOnly, CancellationToken cancellationToken)
+        bool entryOnly, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
     {
         if (artifact == null)
         { return null; }
@@ -167,7 +167,9 @@ internal static class CompilerTotalCallableArtifactCodec
                 IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast && SupportedType(artifact.Graph, term.Type) &&
                 (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
-                (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer) &&
+                (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer ||
+                    artifact.Graph.Types[term.Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
+                    artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind is IrTypeKind.Reference or IrTypeKind.String) &&
                 (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
                     (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat),
                 "The Total graph contains unsupported term evidence.");
@@ -258,12 +260,12 @@ internal static class CompilerTotalCallableArtifactCodec
             artifact.ValidEffectClaimIds.All(id => !string.IsNullOrWhiteSpace(id) &&
                 effectOwners.Contains(id)),
             "Validated effect claims must be canonical and owned by this callable.");
-        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities, cancellationToken);
+        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities, metadataReferences, cancellationToken);
         return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints, callPreconditions);
     }
 
     private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,
-        DecodedPortableIrGraph decoded, HashSet<IrVarId> canonicalRoles, CancellationToken cancellationToken)
+        DecodedPortableIrGraph decoded, HashSet<IrVarId> canonicalRoles, CompilerReferenceSnapshot[]? metadataReferences, CancellationToken cancellationToken)
     {
         if (artifact.CallPreconditions.Length == 0)
         {
@@ -315,19 +317,115 @@ internal static class CompilerTotalCallableArtifactCodec
                 !canonicalRoles.Contains(marker.Target) && !reads.Contains(marker.Target) && writers[marker.Target] == 1 &&
                 marker.Value.Id == factory.Binary(IrBinaryOperator.AndAlso, safe, value).Id &&
                 factory.GetOperationInfo(marker.Operation).SourceSpan is { Length: > 0 } &&
-                factory.GetOperationInfo(clauseSite).SourceSpan is { Length: > 0 },
+                (row.MetadataClause == null ? factory.GetOperationInfo(clauseSite).SourceSpan is { Length: > 0 } :
+                    factory.GetOperationInfo(clauseSite).SourceSpan == null && ValidMetadataOrigin(row.MetadataClause) &&
+                    OwnsMetadataOrigin(row.MetadataClause, metadataReferences)),
                 "A Total call precondition must own a fresh, unread boolean assignment of its guarded predicate.");
-            Require(IrCallPreconditionMarker.TryCreateName(row.CalleeIdentity, row.ClauseOrdinal,
-                factory.GetOperationInfo(marker.Operation).SourceSpan,
-                factory.GetOperationInfo(clauseSite).SourceSpan, out var name) &&
+            string name;
+            var named = row.MetadataClause == null
+                ? IrCallPreconditionMarker.TryCreateName(row.CalleeIdentity, row.ClauseOrdinal,
+                    factory.GetOperationInfo(marker.Operation).SourceSpan,
+                    factory.GetOperationInfo(clauseSite).SourceSpan, out name)
+                : TryCreateMetadataMarkerName(row.CalleeIdentity, row.ClauseOrdinal,
+                    factory.GetOperationInfo(marker.Operation).SourceSpan, row.MetadataClause, out name);
+            Require(named &&
                 string.Equals(factory.GetString(factory.GetVariableInfo(marker.Target).Name), name, StringComparison.Ordinal),
                 "A Total call precondition must match its independently owned marker identity.");
-            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe));
+            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause));
         }
         Require(targets.SetEquals(decoded.Variables.Where(variable => IrCallPreconditionMarker.IsReservedName(
             decoded.Factory.GetString(decoded.Factory.GetVariableInfo(variable).Name)))),
             "Every reserved call-precondition marker must own exactly one obligation row.");
         return calls.MoveToImmutable();
+    }
+
+
+    internal static bool TryCreateSourceMarkerName(string calleeIdentity, int clauseOrdinal,
+        IrSourceSpan? callSite, IrSourceSpan? clauseSite, out string name)
+    { return IrCallPreconditionMarker.TryCreateName(calleeIdentity, clauseOrdinal, callSite, clauseSite, out name); }
+
+    internal static bool TryCreateMetadataMarkerName(string calleeIdentity, int clauseOrdinal,
+        IrSourceSpan? callSite, CompilerMetadataClauseOrigin origin, out string name)
+    {
+        name = string.Empty;
+        return TryGetMetadataEvidenceDigest(origin, out var digest) &&
+            IrCallPreconditionMarker.TryCreateMetadataName(calleeIdentity, clauseOrdinal, callSite, digest, out name);
+    }
+
+    internal static bool TryGetMetadataEvidenceDigest(CompilerMetadataClauseOrigin origin, out string digest)
+    {
+        digest = string.Empty;
+        if (!ValidMetadataOrigin(origin))
+        { return false; }
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(origin.AssemblyIdentity);
+            writer.Write(origin.ImageSha256);
+            writer.Write(origin.ModuleName);
+            writer.Write(origin.ModuleMvid);
+            writer.Write(origin.MethodToken);
+            writer.Write(origin.ParameterOrdinal);
+            writer.Write(origin.ParameterSequence);
+            writer.Write(origin.ParameterToken);
+            writer.Write(origin.AttributeToken);
+            writer.Write(origin.ConstructorToken);
+            writer.Write(origin.AttributeIdentity);
+            writer.Write(origin.ConstructorIdentity);
+            writer.Write(origin.Kind);
+            writer.Write(origin.Minimum);
+            writer.Write(origin.Maximum);
+            writer.Write(origin.ConstructorSignature.Length);
+            writer.Write(origin.ConstructorSignature.ToArray());
+            writer.Write(origin.ValueBlob.Length);
+            writer.Write(origin.ValueBlob.ToArray());
+        }
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        digest = string.Concat(sha.ComputeHash(stream.ToArray()).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
+        return true;
+    }
+
+    private static bool ValidMetadataOrigin(CompilerMetadataClauseOrigin? origin)
+    {
+        if (origin == null || new[] { origin.AssemblyIdentity, origin.ModuleName, origin.AttributeIdentity, origin.ConstructorIdentity }
+                .Any(static value => string.IsNullOrWhiteSpace(value) || value.Length > 4096) ||
+            origin.ImageSha256 is not { Length: 64 } ||
+            origin.ImageSha256.Any(static value => value is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')) ||
+            !Guid.TryParseExact(origin.ModuleMvid, "D", out var mvid) || mvid.ToString("D") != origin.ModuleMvid ||
+            !Token(origin.MethodToken, 0x06) || !Token(origin.ParameterToken, 0x08) || !Token(origin.AttributeToken, 0x0c) ||
+            !(Token(origin.ConstructorToken, 0x06) || Token(origin.ConstructorToken, 0x0a)) ||
+            origin.ParameterOrdinal is < 0 or >= 128 || origin.ParameterSequence != origin.ParameterOrdinal + 1 ||
+            origin.ConstructorSignature.IsDefault || origin.ValueBlob.IsDefault)
+        { return false; }
+        var range = origin.Kind == "InRange";
+        if (origin.Kind is not ("Positive" or "NotNull" or "InRange") ||
+            !origin.ConstructorSignature.SequenceEqual(range ? new byte[] { 0x20, 2, 1, 0x0a, 0x0a } : new byte[] { 0x20, 0, 1 }) ||
+            origin.ValueBlob.Length != (range ? 20 : 4) || origin.ValueBlob[0] != 1 || origin.ValueBlob[1] != 0 ||
+            origin.ValueBlob[origin.ValueBlob.Length - 2] != 0 || origin.ValueBlob[origin.ValueBlob.Length - 1] != 0)
+        { return false; }
+        if (!range)
+        { return origin.Minimum == 0 && origin.Maximum == 0; }
+        var bytes = origin.ValueBlob.ToArray();
+        return origin.Minimum <= origin.Maximum &&
+            ReadInt64(bytes, 2) == origin.Minimum && ReadInt64(bytes, 10) == origin.Maximum;
+
+        static bool Token(int value, int table)
+        { return (uint)value >> 24 == table && (value & 0x00ffffff) != 0; }
+        static long ReadInt64(byte[] bytes, int offset)
+        {
+            ulong result = 0;
+            for (var index = 0; index < 8; index++)
+            { result |= (ulong)bytes[offset + index] << (index * 8); }
+            return unchecked((long)result);
+        }
+    }
+
+    private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, CompilerReferenceSnapshot[]? references)
+    {
+        return references != null && references.Any(reference => reference != null && reference.Identity == origin.AssemblyIdentity &&
+            reference.Modules != null && reference.Modules.Any(module => module != null &&
+                module.Name == origin.ModuleName && module.Mvid == origin.ModuleMvid && module.Sha256 == origin.ImageSha256 &&
+                module.SizeBytes is > 0 and <= CompilerReferenceLimits.MaximumModuleBytes));
     }
 
     private static ImmutableArray<CompilerTotalExceptionConstraint> DecodeExceptionConstraints(

@@ -445,3 +445,59 @@ public sealed class ForwardDataflowAnalysisTests
         }
     }
 }
+
+[TestFixture]
+public sealed class AdvisoryDataflowOutcomeTests
+{
+    [Test]
+    public void SuccessfulAnalysisReturnsStatesAndNoFailure()
+    {
+        var graph = new DataflowGraph<NullnessValue>([new(0, value => value)], []);
+        var success = ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+            NullnessValue.Null, out var result, out var failure);
+        Assert.That(success, Is.True);
+        Assert.That(failure, Is.EqualTo(DataflowAnalysisFailure.None));
+        Assert.That(result!.GetOutputState(0), Is.EqualTo(NullnessValue.Null));
+    }
+
+    [Test]
+    public void NonmonotoneTransferReturnsTypedFailureWithoutPartialStates()
+    {
+        var visits = 0;
+        var graph = new DataflowGraph<NullnessValue>(
+            [new(0, _ => ++visits == 1 ? NullnessValue.MaybeNull : NullnessValue.Null)],
+            [new(0, 0)]);
+        var success = ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+            NullnessValue.Null, out var result, out var failure);
+        Assert.That(success, Is.False);
+        Assert.That(result, Is.Null);
+        Assert.That(failure, Is.EqualTo(DataflowAnalysisFailure.NonmonotoneTransfer));
+    }
+
+    [Test]
+    public void IterationLimitReturnsTypedFailureWithoutPartialStates()
+    {
+        var graph = new DataflowGraph<NullnessValue>([new(0, _ => NullnessValue.MaybeNull)], [new(0, 0)]);
+        var success = ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+            NullnessValue.Null, out var result, out var failure,
+            new ForwardDataflowAnalysisOptions(maxIterations: 1));
+        Assert.That(success, Is.False);
+        Assert.That(result, Is.Null);
+        Assert.That(failure, Is.EqualTo(DataflowAnalysisFailure.IterationLimit));
+    }
+
+    [Test]
+    public void CancellationFromTransferPropagates()
+    {
+        using var cancelled = new CancellationTokenSource();
+        var graph = new DataflowGraph<NullnessValue>([new(0, value =>
+        {
+            cancelled.Cancel();
+            cancelled.Token.ThrowIfCancellationRequested();
+            return value;
+        })], []);
+        Assert.Throws<OperationCanceledException>((Action)(() =>
+            ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+                NullnessValue.Null, out _, out _)));
+    }
+}

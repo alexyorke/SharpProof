@@ -9,7 +9,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
     CancellationToken cancellationToken,
     ControlFlowGraph? suppliedGraph = null,
     IOperation? suppliedOperationRoot = null,
-    IOperation? suppliedInitializerOperation = null)
+    IOperation? suppliedInitializerOperation = null,
+    bool collectCallRoles = false)
 {
     private readonly InvocationEmissionPolicy _invocationEmission =
         new(semanticModel.Compilation);
@@ -148,7 +149,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     }
 
                     sites.Add(new(ContractClauseInventoryBuilder.NormalizeCallable(owner),
-                        operation, operation.Syntax, PotentialRequiresCallOrigin.Operation, role,
+                        operation, operation.Syntax, PotentialRequiresCallOrigin.Operation, call.CanonicalRole < 0 ? role : call.CanonicalRole,
                         call.TargetMethod, target, call.Instance, call.Arguments,
                         call.ExplicitArguments, call.ImplicitIntegerArguments, call.CanReplay));
                 }
@@ -321,7 +322,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 ImmutableDictionary<int, long>.Empty,
                 CanReplay: true,
                 Flow: null,
-                ManagedFlowStatus.BudgetExceeded));
+                ManagedFlowStatus.BudgetExceeded)
+            {
+                OriginKind = collectCallRoles ? PotentialRequiresCallOrigin.ImplicitBaseConstructor : null,
+                CallRoleIndex = collectCallRoles ? 0 : -1
+            });
         }
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
@@ -359,6 +364,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     delegateTargets,
                     flowResult,
                     _disposeInterfaceMethodCache,
+                    collectCallRoles,
                     cancellationToken);
                 if (calls.IsDefaultOrEmpty ||
                     reachableInitializerSites != null &&
@@ -458,6 +464,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 delegateTargets,
                 flowResult,
                 _disposeInterfaceMethodCache,
+                collectCallRoles,
                 cancellationToken);
             if (calls.IsDefaultOrEmpty ||
                 requireCallerOwnership &&
@@ -516,7 +523,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                      .Where(property =>
                          CanCoalesceGetterComplete(property, operationFacts)))
         {
-            foreach (var call in GetPropertyCalls(property).Where(static call =>
+            var propertyCalls = GetPropertyCalls(property);
+            if (collectCallRoles)
+            {
+                propertyCalls = [.. propertyCalls.Select((call, role) => call with { CanonicalRole = role })];
+            }
+            foreach (var call in propertyCalls.Where(static call =>
                          call.TargetMethod.MethodKind == MethodKind.PropertySet))
             {
                 AddOrUpgrade(callSites, CreateCandidate(
@@ -552,6 +564,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                          delegateTargets,
                          flowResult,
                          _disposeInterfaceMethodCache,
+                         collectCallRoles,
                          cancellationToken))
             {
                 var candidate = CreateCandidate(
@@ -603,7 +616,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
             flow,
             flowStatus)
         {
-            ResolvedTargetMethod = resolvedTarget
+            ResolvedTargetMethod = resolvedTarget,
+            OriginKind = call.CanonicalRole >= 0 ? PotentialRequiresCallOrigin.Operation : null,
+            CallRoleIndex = call.CanonicalRole
         };
     }
 
@@ -628,9 +643,22 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             callSites.Add(candidate);
         }
-        else if (!callSites[existingIndex].CanReplay && candidate.CanReplay)
+        else if (candidate.OriginKind == null)
         {
-            callSites[existingIndex] = candidate;
+            if (!callSites[existingIndex].CanReplay && candidate.CanReplay)
+            {
+                callSites[existingIndex] = candidate;
+            }
+        }
+        else
+        {
+            var existing = callSites[existingIndex];
+            var merged = existing.MergedRoleCoverage || candidate.MergedRoleCoverage ||
+                existing.OriginKind != candidate.OriginKind || existing.CallRoleIndex != candidate.CallRoleIndex;
+            callSites[existingIndex] = (!existing.CanReplay && candidate.CanReplay ? candidate : existing) with
+            {
+                MergedRoleCoverage = merged
+            };
         }
     }
 
@@ -803,8 +831,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static bool IsRecordCopyConstructor(
         IMethodSymbol constructor)
     {
-        return constructor.ContainingType.IsRecord &&
+        return constructor.ContainingType.TypeKind == TypeKind.Class &&
+            constructor.ContainingType.IsRecord &&
             constructor.Parameters.Length == 1 &&
+            constructor.Parameters[0].RefKind == RefKind.None &&
             SymbolEqualityComparer.Default.Equals(
                 constructor.Parameters[0].Type,
                 constructor.ContainingType);
@@ -1608,7 +1638,17 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     break;
                 }
 
-                if (!operationFacts.CompletesNormally(child))
+                if (parent is ISimpleAssignmentOperation assignment &&
+                    ReferenceEquals(assignment.Target, child) &&
+                    child is IArrayElementReferenceOperation element)
+                {
+                    if (!operationFacts.CompletesNormally(element.ArrayReference) ||
+                        !element.Indices.All(index => operationFacts.CompletesNormally(index)))
+                    {
+                        return false;
+                    }
+                }
+                else if (!operationFacts.CompletesNormally(child))
                 {
                     return false;
                 }
@@ -1636,9 +1676,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
         Dictionary<bool,
             (INamedTypeSymbol? Interface, IMethodSymbol? Method)>?
             disposeInterfaceMethodCache = null,
+        bool collectCallRoles = false,
         CancellationToken cancellationToken = default)
     {
-        return operation switch
+        var calls = operation switch
         {
             IInvocationOperation invocation => GetInvocationCalls(
                 invocation,
@@ -1716,14 +1757,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 semanticModel?.Compilation,
                 operationFacts,
                 flowResult,
-                disposeInterfaceMethodCache),
+                disposeInterfaceMethodCache,
+                collectCallRoles),
             IUsingDeclarationOperation usingDeclaration => GetUsingCalls(
                 usingDeclaration.DeclarationGroup,
                 usingDeclaration.IsAsynchronous,
                 semanticModel?.Compilation,
                 operationFacts,
                 flowResult,
-                disposeInterfaceMethodCache),
+                disposeInterfaceMethodCache,
+                collectCallRoles),
             IRecursivePatternOperation
             {
                 DeconstructSymbol: IMethodSymbol deconstruct
@@ -1738,6 +1781,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 cancellationToken),
             _ => []
         };
+        if (!collectCallRoles)
+        {
+            return calls;
+        }
+        return [.. calls.Select((call, role) => call with { CanonicalRole = call.CanonicalRole < 0 ? role : call.CanonicalRole })];
     }
 
     private static ImmutableArray<RequiresCallTarget> GetInvocationCalls(
@@ -2153,7 +2201,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         ManagedFlowResult? flowResult,
         Dictionary<bool,
             (INamedTypeSymbol? Interface, IMethodSymbol? Method)>?
-            disposeInterfaceMethodCache)
+            disposeInterfaceMethodCache,
+        bool collectCallRoles)
     {
         if (compilation == null)
         {
@@ -2190,12 +2239,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
 
         var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
+        var role = 0;
         foreach (var item in acquired.AsEnumerable().Reverse())
         {
             if (DefiniteOperationFacts.IsDefinitelyNull(item.Resource) ||
-                flowResult?.ProvesNull(
-                    item.Origin,
-                    item.Resource) == true)
+                !collectCallRoles && flowResult?.ProvesNull(item.Origin, item.Resource) == true)
             {
                 continue;
             }
@@ -2206,13 +2254,21 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 disposeInterfaceMethodCache: disposeInterfaceMethodCache);
             if (method != null)
             {
+                var canonicalRole = collectCallRoles ? role++ : -1;
+                if (collectCallRoles && flowResult?.ProvesNull(item.Origin, item.Resource) == true)
+                {
+                    continue;
+                }
                 calls.Add(new RequiresCallTarget(
                     method,
                     item.Resource,
                     Arguments: [],
                     ImmutableDictionary<int, IOperation>.Empty,
                     ImmutableDictionary<int, long>.Empty,
-                    CanReplay: true));
+                    CanReplay: true)
+                {
+                    CanonicalRole = canonicalRole
+                });
             }
         }
         return calls.ToImmutable();
@@ -2561,11 +2617,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
     internal static ImmutableArray<RequiresCallSiteCandidate>
         CreateUnflowedCandidates(
             IOperation operation,
-            SemanticModel? semanticModel = null)
+            SemanticModel? semanticModel = null,
+        bool collectCallRoles = false)
     {
         return [.. GetCalls(
             operation,
-            semanticModel: semanticModel).Select(call =>
+            semanticModel: semanticModel,
+            collectCallRoles: collectCallRoles).Select(call =>
             new RequiresCallSiteCandidate(
                 operation,
                 operation.Syntax,
@@ -2576,7 +2634,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 call.ImplicitIntegerArguments,
                 call.CanReplay,
                 Flow: null,
-                ManagedFlowStatus.BudgetExceeded))];
+                ManagedFlowStatus.BudgetExceeded)
+            {
+                OriginKind = call.CanonicalRole >= 0 ? PotentialRequiresCallOrigin.Operation : null,
+                CallRoleIndex = call.CanonicalRole
+            })];
     }
 
     internal static IEnumerable<IOperation>

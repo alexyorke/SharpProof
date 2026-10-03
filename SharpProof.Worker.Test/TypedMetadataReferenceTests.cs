@@ -1,3 +1,9 @@
+using System.Collections.Immutable;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Contracts;
 using SharpProof.CompilerArtifact;
@@ -285,5 +291,257 @@ public sealed class TypedMetadataReferenceTests
         var refuted = await solver.VerifyEnsuresAsync(1);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total.Parameters.Select(parameter => parameter.Entry)));
+    }
+}
+
+[TestFixture]
+public sealed class MetadataClosedAttributeEvidenceTests
+{
+    [TestCase("positive", 1)]
+    [TestCase("range", 1)]
+    [TestCase("notnull", 1)]
+    [TestCase("duplicate", 0)]
+    [TestCase("truncated", 0)]
+    [TestCase("wrong-constructor", 0)]
+    [TestCase("lookalike", 0)]
+    [TestCase("reversed-range", 0)]
+    public void CapturesOwnedRowsFromAuthenticatedImage(string mode, int expectedCount)
+    {
+        using var directory = new TempDirectory("sharpproof-evidence-prototype-");
+        var bytes = CreateImage(mode);
+        var path = Path.Combine(directory.FullName, "MetadataTarget.dll");
+        File.WriteAllBytes(path, bytes);
+        var compilation = CSharpCompilation.Create("MetadataConsumer",
+            [CSharpSyntaxTree.ParseText("public static class Consumer { }")],
+            TestMetadataReferences.WithSharpProof.Add(MetadataReference.CreateFromFile(path)),
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("MetadataTarget")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
+        if (mode == "duplicate")
+        {
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method));
+            Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+            Assert.That(binding.Clauses, Is.Empty);
+        }
+        var body = new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None);
+        if (expectedCount == 0)
+        {
+            Assert.That(body, Is.Null);
+            return;
+        }
+        Assert.That(body, Is.Not.Null);
+        Assert.That(body!.ParameterAttributes, Has.Length.EqualTo(expectedCount));
+        Assert.That(body.ImageSha256.ToUpperInvariant(), Is.EqualTo(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))));
+        using var pe = new PEReader(new MemoryStream(bytes, writable: false));
+        var reader = pe.GetMetadataReader();
+        Assert.That(body.ModuleMvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D")));
+        Assert.That(body.ParameterAttributes.Select(static row => row.AttributeToken).Distinct().Count(), Is.EqualTo(expectedCount));
+        foreach (var row in body.ParameterAttributes)
+        {
+            Assert.That(row.MethodToken, Is.EqualTo(method.MetadataToken));
+            Assert.That(row.ParameterOrdinal, Is.EqualTo(1));
+            Assert.That(row.ParameterSequence, Is.EqualTo(2));
+            var attribute = reader.GetCustomAttribute((CustomAttributeHandle)MetadataTokens.Handle(row.AttributeToken));
+            Assert.That(MetadataTokens.GetToken(attribute.Parent), Is.EqualTo(row.ParameterToken));
+            Assert.That(MetadataTokens.GetToken(attribute.Constructor), Is.EqualTo(row.ConstructorToken));
+            Assert.That(row.ValueBlob, Is.EqualTo(reader.GetBlobBytes(attribute.Value)));
+            Assert.That(row.ConstructorIdentity, Does.Contain("SharpProof.Attributes"));
+            if (mode == "range")
+            {
+                Assert.That(row.Minimum, Is.EqualTo(1));
+                Assert.That(row.Maximum, Is.EqualTo(10));
+            }
+        }
+        Assert.That(reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.Handle(method.MetadataToken)).GetParameters().Count, Is.EqualTo(1), "The first argument has no Param row.");
+    }
+
+    internal static byte[] CreateImage(string mode)
+    {
+        var metadata = new MetadataBuilder();
+        metadata.AddModule(0, metadata.GetOrAddString("MetadataTarget.dll"), metadata.GetOrAddGuid(Guid.NewGuid()), default, default);
+        metadata.AddAssembly(metadata.GetOrAddString("MetadataTarget"), new Version(1, 0, 0, 0), default, default, (AssemblyFlags)0, System.Reflection.AssemblyHashAlgorithm.None);
+        var attributesName = typeof(SharpProof.Attributes.Contract).Assembly.GetName();
+        var attributes = metadata.AddAssemblyReference(metadata.GetOrAddString(mode == "lookalike" ? "Other.Attributes" : attributesName.Name!), attributesName.Version!, default, metadata.GetOrAddBlob(attributesName.GetPublicKeyToken() ?? []), (AssemblyFlags)0, default);
+        var coreName = typeof(object).Assembly.GetName();
+        var core = metadata.AddAssemblyReference(metadata.GetOrAddString(coreName.Name!), coreName.Version!, default, metadata.GetOrAddBlob(coreName.GetPublicKeyToken() ?? []), (AssemblyFlags)0, default);
+        var objectType = metadata.AddTypeReference(core, metadata.GetOrAddString("System"), metadata.GetOrAddString("Object"));
+        var inRange = mode is "range" or "reversed-range";
+        var typeName = inRange ? "InRangeAttribute" : mode == "notnull" ? "NotNullAttribute" : "PositiveAttribute";
+        var attributeType = metadata.AddTypeReference(attributes, metadata.GetOrAddString("SharpProof.Attributes"), metadata.GetOrAddString(typeName));
+        var constructorSignature = inRange ? new byte[] { 0x20, 2, 1, 0x0a, 0x0a } :
+            mode == "wrong-constructor" ? new byte[] { 0x20, 1, 1, 8 } : new byte[] { 0x20, 0, 1 };
+        var constructor = metadata.AddMemberReference(attributeType, metadata.GetOrAddString(".ctor"), metadata.GetOrAddBlob(constructorSignature));
+        var parameter = metadata.AddParameter(ParameterAttributes.None, metadata.GetOrAddString("value"), 2);
+        var attributeBlob = new BlobBuilder();
+        if (mode == "truncated")
+        {
+            attributeBlob.WriteByte(1);
+        }
+        else
+        {
+            attributeBlob.WriteUInt16(1);
+            if (inRange)
+            {
+                attributeBlob.WriteInt64(mode == "reversed-range" ? 10 : 1);
+                attributeBlob.WriteInt64(mode == "reversed-range" ? 1 : 10);
+            }
+            attributeBlob.WriteUInt16(0);
+        }
+        metadata.AddCustomAttribute(parameter, constructor, metadata.GetOrAddBlob(attributeBlob));
+        if (mode == "duplicate")
+        {
+            metadata.AddCustomAttribute(parameter, constructor, metadata.GetOrAddBlob(attributeBlob));
+        }
+        var signature = new byte[] { 0, 2, 8, 8, mode == "notnull" ? (byte)0x0e : (byte)8 };
+        metadata.AddMethodDefinition(MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, MethodImplAttributes.Managed, metadata.GetOrAddString("Read"), metadata.GetOrAddBlob(signature), 4, parameter);
+        metadata.AddTypeDefinition(TypeAttributes.NotPublic, default, metadata.GetOrAddString("<Module>"), default, MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
+        metadata.AddTypeDefinition(TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract, default, metadata.GetOrAddString("MetadataTarget"), objectType, MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
+        var il = new BlobBuilder();
+        il.WriteBytes(new byte[] { 0, 0, 0, 0, 0x0a, 0x02, 0x2a });
+        var image = new BlobBuilder();
+        new ManagedPEBuilder(new PEHeaderBuilder(imageCharacteristics: Characteristics.Dll), new MetadataRootBuilder(metadata), il, flags: CorFlags.ILOnly).Serialize(image);
+        return image.ToArray();
+    }
+}
+
+[TestFixture]
+public sealed class MetadataClosedAttributeEvidencePairingTests
+{
+    [TestCase(false)]
+    [TestCase(true)]
+    public void UnrelatedLocalAttributesRemainAdmitted(bool generic)
+    {
+        using var directory = new TempDirectory("sharpproof-evidence-pairing-");
+        var attribute = generic ? "Local<int>" : "Local";
+        var definition = generic ? "LocalAttribute<T>" : "LocalAttribute";
+        var (compilation, method, image) = CreateSubject(directory.FullName,
+            "using System; public sealed class " + definition + " : Attribute { } public static class Library { public static int Target([" + attribute + "] int value) => value; }");
+        using var readerImage = new PEReader(new MemoryStream(image, writable: false));
+        var reader = readerImage.GetMetadataReader();
+        var methodDefinition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.Handle(method.MetadataToken));
+        var parameter = reader.GetParameter(methodDefinition.GetParameters().Single());
+        var row = reader.GetCustomAttribute(parameter.GetCustomAttributes().Single());
+        Assert.That(row.Constructor.Kind, Is.EqualTo(generic ? HandleKind.MemberReference : HandleKind.MethodDefinition));
+        if (generic)
+        {
+            Assert.That(reader.GetMemberReference((MemberReferenceHandle)row.Constructor).Parent.Kind, Is.EqualTo(HandleKind.TypeSpecification));
+        }
+        var body = new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None);
+        Assert.That(body, Is.Not.Null);
+        Assert.That(body!.ParameterAttributes, Is.Empty);
+    }
+
+    [Test]
+    public void BoundClausesPairByIdentityWithDistinctTokensWhenOrderChanges()
+    {
+        using var directory = new TempDirectory("sharpproof-evidence-pairing-");
+        var (compilation, method, _) = CreateSubject(directory.FullName,
+            "using SharpProof.Attributes; public static class Library { public static int Target([InRange(1L, 10L), Positive] int value) => value; }");
+        var body = new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None);
+        Assert.That(body, Is.Not.Null);
+        Assert.That(body!.ParameterAttributes, Has.Length.EqualTo(2));
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method));
+        Assert.That(binding.IsSuccess, Is.True);
+        Assert.That(binding.Clauses, Has.Length.EqualTo(2));
+        var reversed = binding.Clauses.Reverse().ToImmutableArray();
+        Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(reversed, body.ParameterAttributes,
+            CancellationToken.None, out var paired), Is.True);
+        Assert.That(paired.Select(static row => row.AttributeToken).Distinct().Count(), Is.EqualTo(2));
+        for (var ordinal = 0; ordinal < reversed.Length; ordinal++)
+        {
+            Assert.That(paired[ordinal].ClauseOrdinal, Is.EqualTo(ordinal));
+            Assert.That(paired[ordinal].ParameterOrdinal, Is.EqualTo(reversed[ordinal].ParameterOrdinal));
+            Assert.That(paired[ordinal].AttributeIdentity, Is.EqualTo(CompilerIdentityBridge.CreateSymbolDisplay(reversed[ordinal].Attribute.AttributeClass)));
+            Assert.That(paired[ordinal].ConstructorIdentity, Is.EqualTo(CompilerIdentityBridge.CreateSymbolDisplay(reversed[ordinal].Attribute.AttributeConstructor)));
+            Assert.That(paired[ordinal].Kind, Is.EqualTo(reversed[ordinal].Validation.Kind.ToString()));
+            Assert.That(paired[ordinal].Minimum, Is.EqualTo(reversed[ordinal].Validation.Minimum));
+            Assert.That(paired[ordinal].Maximum, Is.EqualTo(reversed[ordinal].Validation.Maximum));
+            Assert.That(paired[ordinal].AttributeToken, Is.EqualTo(body.ParameterAttributes.Single(row => row.Kind == paired[ordinal].Kind).AttributeToken));
+        }
+        Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(
+            [binding.Clauses[0], binding.Clauses[0]], body.ParameterAttributes, CancellationToken.None, out _), Is.False, "A metadata token cannot be consumed twice.");
+        Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(
+            binding.Clauses, [body.ParameterAttributes[0]], CancellationToken.None, out _), Is.False, "Missing evidence cannot bind.");
+    }
+
+    [Test]
+    public void InvalidLaterAttributeDiscardsEarlierBindings()
+    {
+        using var directory = new TempDirectory("sharpproof-evidence-pairing-");
+        var (compilation, method, _) = CreateSubject(directory.FullName,
+            "using SharpProof.Attributes; public static class Library { public static int Target([Positive, InRange(10L, 1L)] int value) => value; }");
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method));
+        Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(binding.Clauses, Is.Empty);
+        Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None), Is.Null);
+    }
+
+    private static (CSharpCompilation Compilation, IMethodSymbol Method, byte[] Image) CreateSubject(string directory, string source)
+    {
+        var library = TestCompilation.Create("EvidencePairingLibrary", source);
+        using var image = new MemoryStream();
+        var emitted = library.Emit(image);
+        Assert.That(emitted.Success, Is.True);
+        var bytes = image.ToArray();
+        var path = Path.Combine(directory, "EvidencePairingLibrary.dll");
+        File.WriteAllBytes(path, bytes);
+        var compilation = CSharpCompilation.Create("EvidencePairingConsumer",
+            [CSharpSyntaxTree.ParseText("public static class Consumer { }")],
+            TestMetadataReferences.WithSharpProof.Add(MetadataReference.CreateFromFile(path)),
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        return (compilation, method, bytes);
+    }
+}
+
+[TestFixture]
+public sealed class MetadataClosedAttributeEvidenceIdentityTests
+{
+    [TestCase("normal", true)]
+    [TestCase("retargetable", false)]
+    [TestCase("winrt", false)]
+    [TestCase("reserved", false)]
+    [TestCase("token-budget", false)]
+    [TestCase("key-budget", false)]
+    [TestCase("empty-public-key", false)]
+    public void AssemblyReferenceFlagsAndKeyLengthsAreCheckedBeforeCopy(string mode, bool accepted)
+    {
+        var compilation = TestCompilation.Create("AssemblyIdentityProbe", "public static class Subject { }");
+        var expected = compilation.GetTypeByMetadataName("SharpProof.Attributes.PositiveAttribute")!.ContainingAssembly.Identity;
+        var metadata = new MetadataBuilder();
+        metadata.AddModule(0, metadata.GetOrAddString("IdentityProbe.dll"), metadata.GetOrAddGuid(Guid.NewGuid()), default, default);
+        metadata.AddAssembly(metadata.GetOrAddString("IdentityProbe"), new Version(1, 0, 0, 0), default, default, (AssemblyFlags)0, System.Reflection.AssemblyHashAlgorithm.None);
+        var flags = mode switch
+        {
+            "retargetable" => AssemblyFlags.Retargetable,
+            "winrt" => (AssemblyFlags)0x0200,
+            "reserved" => (AssemblyFlags)0x4000,
+            "key-budget" or "empty-public-key" => AssemblyFlags.PublicKey,
+            _ => (AssemblyFlags)0
+        };
+        var key = mode is "token-budget" or "key-budget" ? new byte[65_536] : [];
+        var handle = metadata.AddAssemblyReference(metadata.GetOrAddString(expected.Name), expected.Version,
+            string.IsNullOrEmpty(expected.CultureName) ? default : metadata.GetOrAddString(expected.CultureName),
+            metadata.GetOrAddBlob(key), flags, default);
+        var image = new BlobBuilder();
+        new ManagedPEBuilder(new PEHeaderBuilder(imageCharacteristics: Characteristics.Dll),
+            new MetadataRootBuilder(metadata), new BlobBuilder(), flags: CorFlags.ILOnly).Serialize(image);
+        using var pe = new PEReader(new MemoryStream(image.ToArray(), writable: false));
+        var reader = pe.GetMetadataReader();
+        Assert.That(CompilerTotalIlBodyProvider.TryReadAssemblyIdentity(reader, handle, expected, out var actual), Is.EqualTo(accepted));
+        if (accepted)
+        {
+            Assert.That(actual, Is.EqualTo(expected));
+            Assert.That(actual.IsRetargetable, Is.EqualTo(expected.IsRetargetable));
+            Assert.That(actual.ContentType, Is.EqualTo(expected.ContentType));
+        }
+        else
+        {
+            Assert.That(actual, Is.Null);
+        }
     }
 }

@@ -127,7 +127,9 @@ internal static class CompilerTotalCallableLowerer
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
             CallPreconditions = isBodyAbstraction ? [] : [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
                 .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe))]
+                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
+                MetadataOrigin(pair.Value.MetadataClause))
+                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
         };
     }
 
@@ -136,9 +138,11 @@ internal static class CompilerTotalCallableLowerer
     internal static CompilerShadowPreparationBatch PrepareShadowCallers(CSharpCompilation compilation,
         WorkerFeatureSet features, CompilerSyntaxTreeSnapshot[] capturedTrees,
         CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool enableMetadataRequires = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (enableMetadataRequires && capturedReferences == null)
+        { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
         if (compilation.References.Any(static reference => reference is CompilationReference))
         { return new([], [new(0, 0, 0, "UnsupportedSourceReference")]); }
         var trees = compilation.SyntaxTrees.ToArray();
@@ -161,7 +165,7 @@ internal static class CompilerTotalCallableLowerer
         }
         var builder = new ClaimManifestBuilder(compilation, features, cancellationToken);
         // Inventory guards every source tree before any selected-body binding.
-        var inventory = builder.BuildPotentialCallShadow();
+        var inventory = builder.BuildPotentialCallShadow(allowReferenceOwners: enableMetadataRequires);
         if (inventory.Owners.IsEmpty)
         { return new([], inventory.Gaps); }
         var discovery = builder.Build();
@@ -179,7 +183,7 @@ internal static class CompilerTotalCallableLowerer
             { continue; }
             var treeOrdinal = Array.IndexOf(trees, owner.Declaration.SyntaxTree);
             var body = PrepareShadow(compilation, owner, authoritativeTrees, capturedReferences,
-                specificationPackAuthority, initializationFree, cancellationToken, out var reason);
+                specificationPackAuthority, initializationFree, cancellationToken, out var reason, enableMetadataRequires);
             if (body == null)
             { gaps.Add(new(treeOrdinal, owner.Declaration.SpanStart, owner.Declaration.Span.Length, reason)); }
             else if (!body.CallPreconditions.IsEmpty)
@@ -193,7 +197,7 @@ internal static class CompilerTotalCallableLowerer
     private static CompilerTotalCallablePreparation? PrepareShadow(CSharpCompilation compilation,
         CompilerPotentialCallOwner owner, CompilerSyntaxTreeSnapshot[] capturedTrees,
         CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
-        Func<INamedTypeSymbol, bool> initializationFree, CancellationToken cancellationToken, out string reason)
+        Func<INamedTypeSymbol, bool> initializationFree, CancellationToken cancellationToken, out string reason, bool enableMetadataRequires = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         reason = "UnsupportedBody";
@@ -207,7 +211,7 @@ internal static class CompilerTotalCallableLowerer
         { reason = "UnsupportedEntryInitialization"; return null; }
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), owner.Method, tree => documents[tree]);
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), owner.Method, tree => documents[tree]) { CaptureShadowCallAncestry = true };
         var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || !binding.Clauses.IsEmpty)
@@ -219,7 +223,7 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         if (graph == null)
         { return null; }
-        var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken, initializationFree);
+        var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken, initializationFree, enableMetadataRequires);
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }
@@ -237,15 +241,18 @@ internal static class CompilerTotalCallableLowerer
         {
             CallPreconditions = [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
                 .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe))]
+                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
+                MetadataOrigin(pair.Value.MetadataClause))
+                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
         };
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
         ControlFlowGraph graph, TotalLoweringContext context, CompilerReferenceSnapshot[]? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
-        Func<INamedTypeSymbol, bool>? initializationFree = null)
+        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false)
     {
+        context.AllowObjectWidening = enableMetadataRequires;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
         var invocationEmission = new InvocationEmissionPolicy(compilation);
@@ -288,7 +295,8 @@ internal static class CompilerTotalCallableLowerer
             frame.DiscardSpecificationAssumptions();
             return true;
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
-            method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks));
+            method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks),
+            enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null);
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory,
@@ -405,5 +413,39 @@ internal static class CompilerTotalCallableLowerer
             constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));
         }
         return constraints.ToImmutable();
+    }
+
+    private static CompilerMetadataClauseOrigin? MetadataOrigin(TotalMetadataPrecondition? clause)
+    {
+        return clause == null ? null : MetadataOrigin(clause.Body, clause.Evidence);
+    }
+
+    private static CompilerMetadataClauseOrigin MetadataOrigin(TotalIlBody body, TotalIlClosedAttribute evidence)
+    {
+        return new(body.Method.ContainingAssembly.Identity.ToString(), body.ImageSha256, body.Module, body.ModuleMvid,
+            evidence.MethodToken, evidence.ParameterOrdinal, evidence.ParameterSequence, evidence.ParameterToken,
+            evidence.AttributeToken, evidence.ConstructorToken, evidence.AttributeIdentity, evidence.ConstructorIdentity,
+            evidence.Kind, evidence.Minimum, evidence.Maximum, evidence.ConstructorSignature, evidence.ValueBlob);
+    }
+
+    private static bool PrepareMetadataRequires(CSharpCompilation compilation, TotalLoweringContext frame,
+        TotalIlBody body, CancellationToken cancellationToken)
+    {
+        var binding = new ContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
+        if (!binding.IsSuccess || !CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
+            body.ParameterAttributes, cancellationToken, out var paired))
+        { return false; }
+        var clauses = ImmutableArray.CreateBuilder<TotalMetadataPrecondition>();
+        for (var ordinal = 0; ordinal < binding.Clauses.Length; ordinal++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!CompilerTotalCallableArtifactCodec.TryGetMetadataEvidenceDigest(MetadataOrigin(body, paired[ordinal]), out var digest))
+            { return false; }
+            var bound = binding.Clauses[ordinal];
+            clauses.Add(new(bound.Value, bound.SafeCondition, frame.Factory.CreateOperation("metadata Requires"),
+                body, paired[ordinal], digest));
+        }
+        frame.MetadataCallPreconditions = clauses.ToImmutable();
+        return true;
     }
 }

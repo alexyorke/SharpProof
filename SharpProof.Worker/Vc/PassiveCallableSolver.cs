@@ -55,6 +55,28 @@ internal sealed class PassiveCallableSolver : IDisposable
     internal Task<PassiveCallableCheckResult> VerifyPurityAsync(CancellationToken cancellationToken = default)
     { return VerifySitesAsync(allocations: false, cancellationToken); }
 
+    internal async Task<PassiveCallableCheckResult> VerifySynchronizationShadowAsync(bool permitted,
+        CancellationToken cancellationToken = default)
+    {
+        if (_plan.HasBodyAbstraction)
+        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
+        var proof = await VerifyAsync(_plan.SynchronizationShadowQuery(), null, cancellationToken).ConfigureAwait(false);
+        if (proof.Outcome is ProvenOutcome)
+        { return proof; }
+        if (permitted)
+        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
+        var search = _plan.LoopSearch ?? _plan;
+        var witness = _plan.LoopSearch == null ? proof : await VerifyAsync(search.SynchronizationShadowQuery(), null, cancellationToken, search).ConfigureAwait(false);
+        if (witness.Outcome is not RefutedOutcome)
+        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        OperationId? site = null;
+        _plan.ReplayEffects(witness.EntryModel, cancellationToken, lockPrefixObserver: (instruction, approximation) =>
+        { if (!approximation) { site ??= instruction.Operation; } });
+        cancellationToken.ThrowIfCancellationRequested();
+        return site != null ? witness with { LockWitness = site } :
+            new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
+    }
+
     private async Task<PassiveCallableCheckResult> VerifySitesAsync(bool allocations, CancellationToken cancellationToken)
     {
         if (_plan.HasBodyAbstraction || allocations && _plan.HasUnmodeledAllocations)

@@ -1,3 +1,4 @@
+using SharpProof.Advisory.Worker;
 using NUnit.Framework;
 using System.Collections.Immutable;
 using SharpProof.CompilerArtifact;

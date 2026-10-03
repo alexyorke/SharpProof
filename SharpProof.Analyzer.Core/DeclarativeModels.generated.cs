@@ -67,7 +67,8 @@ internal readonly record struct RequiresOwnerObservationGap(
 internal enum PotentialRequiresCallOrigin
 {
     Operation,
-    ImplicitBaseConstructor
+    ImplicitBaseConstructor,
+    ExplicitPrimaryBaseConstructor
 }
 
 internal sealed record PotentialRequiresCallSite(
@@ -113,7 +114,10 @@ internal sealed partial class RequiresCallSiteDiscovery
         ImmutableDictionary<int, IOperation> ExplicitArguments,
         ImmutableDictionary<int, long> ImplicitIntegerArguments,
         bool CanReplay
-    );
+    )
+    {
+        internal int CanonicalRole { get; init; } = -1;
+    }
 }
 
 internal static partial class RequiresCallSiteTreeAnalyzer

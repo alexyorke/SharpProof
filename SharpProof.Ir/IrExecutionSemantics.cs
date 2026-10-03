@@ -60,6 +60,29 @@ internal static class IrCallPreconditionMarker
         { return false; }
     }
 
+
+    internal static bool TryCreateMetadataName(string calleeIdentity, int clauseOrdinal,
+        IrSourceSpan? callSite, string evidenceSha256, out string name)
+    {
+        name = string.Empty;
+        if (string.IsNullOrWhiteSpace(calleeIdentity) || calleeIdentity.Length > 4096 ||
+            clauseOrdinal < 0 || clauseOrdinal >= 4096 || callSite is not { Length: > 0 } ||
+            callSite.Document.Length > 4096 || evidenceSha256 is not { Length: 64 } ||
+            evidenceSha256.Any(static value => value is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+        { return false; }
+        try
+        {
+            if (Encoding.GetByteCount(calleeIdentity) > 4096 || Encoding.GetByteCount(callSite.Document) > 4096)
+            { return false; }
+            name = Prefix + "v2:metadata:" + Convert.ToBase64String(Encoding.GetBytes(calleeIdentity)) + ":" +
+                Number(clauseOrdinal) + ":" + Convert.ToBase64String(Encoding.GetBytes(callSite.Document)) + ":" +
+                Number(callSite.Start) + ":" + Number(callSite.Length) + ":" + evidenceSha256;
+            return true;
+        }
+        catch (System.Text.EncoderFallbackException)
+        { return false; }
+    }
+
     private static string Number(int value)
     { return value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
 }

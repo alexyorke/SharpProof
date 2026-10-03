@@ -17,13 +17,22 @@ internal readonly struct TotalSourcePrecondition(IrTerm value, IrTerm safe, Oper
     internal OperationId ClauseSite { get; } = clauseSite;
 }
 
-internal readonly struct TotalCallPrecondition(string calleeIdentity, int clauseOrdinal, OperationId clauseSite, IrTerm value, IrTerm safe)
+internal sealed class TotalShadowCallHop(string callerIdentity, string calleeIdentity, IrSourceSpan site)
+{
+    internal string CallerIdentity { get; } = callerIdentity;
+    internal string CalleeIdentity { get; } = calleeIdentity;
+    internal IrSourceSpan Site { get; } = site;
+}
+
+internal readonly struct TotalCallPrecondition(string calleeIdentity, int clauseOrdinal, OperationId clauseSite, IrTerm value, IrTerm safe, TotalMetadataPrecondition? metadataClause = null, ImmutableArray<TotalShadowCallHop> ancestry = default)
 {
     internal string CalleeIdentity { get; } = calleeIdentity;
     internal int ClauseOrdinal { get; } = clauseOrdinal;
     internal OperationId ClauseSite { get; } = clauseSite;
     internal IrTerm Value { get; } = value;
     internal IrTerm Safe { get; } = safe;
+    internal ImmutableArray<TotalShadowCallHop> Ancestry { get; } = ancestry.IsDefault ? [] : ancestry;
+    internal TotalMetadataPrecondition? MetadataClause { get; } = metadataClause;
 }
 
 public sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, FrontendSubsetClassification classification)
@@ -82,16 +91,19 @@ public sealed class TotalLoweringContext
 
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
+    internal bool CaptureShadowCallAncestry { get; set; }
     internal object Origin { get; } = new();
+    internal bool AllowObjectWidening { get; set; }
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
-        return new(Factory, target, _document, 0, allowGenericContainer: true);
+        return new(Factory, target, _document, 0, allowGenericContainer: true) { AllowObjectWidening = AllowObjectWidening };
     }
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {
         return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
     }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
+    internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; }
     // The program's initialization reads Entry, so concrete replay must bind

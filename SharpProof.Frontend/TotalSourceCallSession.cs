@@ -16,12 +16,17 @@ internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArr
 // summaries or contract premises.
 internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
-    Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null)
+    Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
+    Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
 {
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool ConstructionLimitExceeded { get; private set; }
+
+    internal bool MetadataRequiresEnabled => prepareMetadata != null;
+    internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
+    { return prepareMetadata?.Invoke(frame, body) ?? true; }
 
     internal TotalScalarCallModel? PrepareScalarCall(IInvocationOperation invocation)
     {

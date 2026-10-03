@@ -128,6 +128,7 @@
         "paths": [
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalCallableLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerShadowCallAncestryQualification.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalIlBodyProvider.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerReachableSourceCollector.cs",
@@ -350,6 +351,9 @@
           "SharpProof.Analyzer.Core/EffectContractDiagnostics.cs",
           "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
           "SharpProof.Analyzer.Core/ManagedContractFacts.cs",
+          "SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs",
+          "SharpProof.Analyzer.Core/Advisory/AdvisoryCallConsumer.cs",
+          "SharpProof.Analyzer.Core/Advisory/AdvisoryScalarIntervalTransfer.cs",
           "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
           "SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs",
           "SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs",

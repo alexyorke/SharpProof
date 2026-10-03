@@ -500,6 +500,9 @@ public sealed class IrInterpreter(IrFactory factory)
                 "The interpreter has no runtime type relation for this cast.");
         }
 
+        if (cast.Type == _factory.ObjectType)
+        { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value.Reference)); }
+
         if (target.Kind == IrTypeKind.String)
         {
             return operand.Value.Reference is string value

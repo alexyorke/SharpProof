@@ -131,10 +131,12 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         });
     }
 
-    private BitVecExpr EncodeCast(IrCastTerm cast, SmtQueryResourceMeter meter)
+    private Expr EncodeCast(IrCastTerm cast, SmtQueryResourceMeter meter)
     {
         var source = factory.GetTypeInfo(cast.Operand.Type);
         var target = factory.GetTypeInfo(cast.Type);
+        if (cast.Type == factory.ObjectType && source.Kind is IrTypeKind.Reference or IrTypeKind.String)
+        { return Encode(cast.Operand, meter); }
         if (!IsInteger(source) || !IsInteger(target))
         {
             throw new UnsupportedIrEncodingException();

@@ -18,17 +18,24 @@ internal sealed partial class RoslynTotalProgramLowerer
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return null; }
-            arguments[parameter.Ordinal] = value.Value;
+            if (_calls?.MetadataRequiresEnabled == true)
+            {
+                var captured = _context.Temporary(value.Value.Type);
+                _builder.Assign(block, _context.Site(argument), captured, value.Value);
+                arguments[parameter.Ordinal] = _context.Factory.Variable(captured);
+            }
+            else
+            { arguments[parameter.Ordinal] = value.Value; }
         }
         var region = _regionGraph == null ? null : _regionSource.EnclosingRegion;
         var filter = region == null ? null : EnclosingRegionFilter(region);
         var anchor = _context.Site(invocation);
         return ExpandIl(body, arguments, block, anchor,
-            (kind, site) => ContinueSourceException(region, filter, kind, site, static target => target));
+            (kind, site) => ContinueSourceException(region, filter, kind, site, static target => target), sourceBoundary: true);
     }
 
     private TotalBodyValue ExpandIl(TotalIlBody body, IrTerm[] arguments, IrBlockId caller, OperationId anchor,
-        Func<IrExceptionKind, OperationId, IrBlockId> exceptionTarget)
+        Func<IrExceptionKind, OperationId, IrBlockId> exceptionTarget, bool sourceBoundary = false)
     {
         if (_calls == null || !_calls.EnterIl(body.Method))
         { throw new RegionIncompleteException(); }
@@ -39,6 +46,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             { throw new RegionIncompleteException(); }
             var factory = _context.Factory;
             var frame = _context.CreateFrame(body.Method);
+            if (_calls.MetadataRequiresEnabled)
+            {
+                if (!sourceBoundary && !body.ParameterAttributes.IsEmpty ||
+                    sourceBoundary && !_calls.PrepareMetadata(frame, body))
+                { throw new RegionIncompleteException(); }
+                if (sourceBoundary)
+                { RecordMetadataPreconditions(frame, arguments, caller, anchor); }
+            }
             var entry = _builder.CreateBlock("il:entry");
             var continued = _builder.CreateBlock("il:continued");
             var result = body.Method.ReturnsVoid ? (IrVarId?)null : _context.Temporary(frame.Type(body.Method.ReturnType));
@@ -283,5 +298,27 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (operation is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
         { return CSharpOperationSemantics.IntegerArithmetic(factory, operation, left, right, code.Contains("_ovf")); }
         return CSharpOperationSemantics.DivideOrRemainder(factory, operation, left, right);
+    }
+
+    private void RecordMetadataPreconditions(TotalLoweringContext frame, IrTerm[] arguments, IrBlockId block, OperationId site)
+    {
+        var replacements = frame.Parameters.ToDictionary(parameter => parameter.Entry,
+            parameter => arguments[parameter.Parameter.Ordinal]);
+        for (var ordinal = 0; ordinal < frame.MetadataCallPreconditions.Length; ordinal++)
+        {
+            SpendRegion();
+            if (!_calls!.Spend())
+            { throw new RegionIncompleteException(); }
+            var clause = frame.MetadataCallPreconditions[ordinal];
+            var value = IrSubstitution.Substitute(_context.Factory, clause.Value, replacements);
+            var safe = IrSubstitution.Substitute(_context.Factory, clause.Safe, replacements);
+            var identity = CompilerIdentityBridge.CreateSymbolDisplay(frame.Target);
+            if (!IrCallPreconditionMarker.TryCreateMetadataName(identity, ordinal,
+                _context.Factory.GetOperationInfo(site).SourceSpan, clause.EvidenceDigest, out var name))
+            { throw new RegionIncompleteException(); }
+            var marker = _builder.Assign(block, site, _context.Temporary(_context.Factory.BooleanType, name),
+                _context.Factory.Binary(IrBinaryOperator.AndAlso, safe, value));
+            _callPreconditions.Add(marker, new(identity, ordinal, clause.ClauseSite, value, safe, clause));
+        }
     }
 }

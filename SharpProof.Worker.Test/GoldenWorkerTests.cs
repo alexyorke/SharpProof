@@ -33,7 +33,9 @@ public sealed class GoldenWorkerTests
         var first = fixture.Source.Split('\n')[0];
         Assert.That(first, Does.StartWith(prefix));
         var scenario = first[prefix.Length..];
-        var actual = scenario == "native-infrastructure" ? await NativeInfrastructure()
+        var actual = scenario == "shadow-call-ancestry-tampered-predicate" ? await CompilerShadowCallAncestryQualificationTests.TamperedPredicateGolden(fixture)
+            : scenario == "synchronization-projection" ? await SynchronizationProjection(fixture)
+            : scenario == "native-infrastructure" ? await NativeInfrastructure()
             : scenario == "native-cancellation" ? await NativeCancellation()
             : scenario == "native-resource" ? await NativeResource()
             : scenario == "passive-vc" ? await PassiveVc(fixture.Source)
@@ -44,6 +46,7 @@ public sealed class GoldenWorkerTests
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
             : scenario == "vc-shadow-reference" ? await NativeVc(fixture.Source)
+            : scenario == "typed-il-call-requires" ? await TypedIlCallRequires(fixture.Source)
             : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => NativeVc(artifact))
             : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => TotalArtifact(artifact))
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
@@ -217,6 +220,84 @@ public sealed class GoldenWorkerTests
     {
         using var project = new ShadowTestProject(artifact, cacheEnabled: true);
         return await NativeVc(project);
+    }
+
+    private static async Task<string> TypedIlCallRequires(string source)
+    {
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        const string boundaryMarker = "// golden-library:";
+        var boundary = source.IndexOf(boundaryMarker, StringComparison.Ordinal);
+        Assert.That(boundary, Is.GreaterThan(0));
+        using var subject = new MetadataTestSubject(source[(boundary + boundaryMarker.Length)..], source[..boundary]);
+        var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+        Assert.That(batch.Gaps, Is.Empty);
+        var body = batch.Callers.Single().Body;
+        var encoded = CompilerTotalCallableArtifactCodec.Encode(body)!;
+        var detached = JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(encoded))!;
+        var decoded = CompilerDecodedShadowBody.Decode(body.CallableId, detached, CancellationToken.None, references);
+        var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var check = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That(check.Outcome, Is.InstanceOf<RefutedOutcome>());
+        Assert.That(plan!.ReplayCallPrecondition(0, check.EntryModel, CancellationToken.None), Is.EqualTo(check.CallPreconditionWitness));
+        var output = new StringBuilder();
+        output.AppendLine("shadow callers: " + batch.Callers.Length.ToString(CultureInfo.InvariantCulture));
+        output.AppendLine("preconditions: " + decoded.Body.CallPreconditions.Length.ToString(CultureInfo.InvariantCulture));
+        output.AppendLine("origin: metadata");
+        output.AppendLine("clause source span: none");
+        output.AppendLine("native: Refuted");
+        output.AppendLine("original replay witness: matched");
+        var original = decoded.Body;
+        var factory = original.Program.Factory;
+        var entry = original.Parameters.Single().Entry;
+        var nominalInputs = source.Contains("// golden-nominal-inputs", StringComparison.Ordinal);
+        var referenceInputs = nominalInputs || source.Contains("// golden-reference-inputs", StringComparison.Ordinal);
+        object?[] inputs = nominalInputs ? [null, Activator.CreateInstance(subject.RootMethod.GetParameters()[0].ParameterType)] :
+            referenceInputs ? [null, "hello"] : [0, 1];
+        foreach (var input in inputs)
+        {
+            var observations = new List<bool>();
+            var marker = original.CallPreconditions.Single().Instruction;
+            var replay = new IrProgramReplayOptions(static _ => null)
+            {
+                AssignmentObserver = (instruction, value, _) =>
+                { if (instruction.Id == marker) { observations.Add(value.Boolean); } }
+            };
+            var concrete = referenceInputs ? input == null ? factory.CreateNullValue(factory.GetVariableInfo(entry).Type) :
+                nominalInputs ? factory.CreateReferenceValue(factory.GetVariableInfo(entry).Type, input) : factory.CreateStringValue((string)input) : factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)(int)input!);
+            var execution = new IrProgramInterpreter(factory).Execute(original.Program,
+                new Dictionary<IrVarId, IrValue> { [entry] = concrete },
+                10000, replay);
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.ConsumedApproximation, Is.False);
+            if (referenceInputs)
+            {
+                if (nominalInputs)
+                {
+                    Assert.That(execution.ReturnValue!.Type, Is.EqualTo(factory.ObjectType));
+                    if (input == null)
+                    { Assert.That(execution.ReturnValue.Kind, Is.EqualTo(IrValueKind.Null)); }
+                    else
+                    { Assert.That(execution.ReturnValue.Reference, Is.SameAs(input)); }
+                }
+                else
+                { Assert.That(execution.ReturnValue, Is.SameAs(concrete)); }
+                Assert.That(subject.RootMethod.Invoke(null, [input]), Is.SameAs(input));
+            }
+            else
+            { Assert.That(subject.RootMethod.Invoke(null, [input]), Is.EqualTo((int)execution.ReturnValue!.IntegerNumericValue)); }
+            var renderedInput = nominalInputs ? input == null ? "null" : "token" : referenceInputs ? (string?)input ?? "null" : ((int)input!).ToString(CultureInfo.InvariantCulture);
+            var renderedReturn = nominalInputs ? execution.ReturnValue!.Kind == IrValueKind.Null ? "null" : "token" : referenceInputs ? execution.ReturnValue!.Kind == IrValueKind.Null ? "null" : execution.ReturnValue.String :
+                execution.ReturnValue!.IntegerNumericValue.ToString(CultureInfo.InvariantCulture);
+            output.AppendLine("input " + renderedInput + ": marker " +
+                (observations.Single() ? "true" : "false") + ", return " + renderedReturn);
+        }
+        return output.ToString();
     }
 
     private static async Task<string> TypedIlGolden(string source, Func<CompilerManifestArtifact, Task<string>> render)
@@ -536,6 +617,17 @@ public sealed class GoldenWorkerTests
         { cancellationObserved = true; }
         output.AppendLine("construction-canceled: " + cancellationObserved);
         return output.ToString();
+    }
+
+    private static async Task<string> SynchronizationProjection(GoldenCase fixture)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(fixture.Source);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        var preparation = preparations.Single();
+        var claim = preparation.EffectClaims.Single();
+        var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claim.ClaimId,
+            claim.Constraint.AllowedCapabilities, new WorkerBudgets());
+        return result.Outcome is ProvenOutcome ? "Proven" : result.Outcome is RefutedOutcome ? "Refuted" : "Unknown";
     }
 
     private static async Task<string> Verify(GoldenCase fixture, string scenario)

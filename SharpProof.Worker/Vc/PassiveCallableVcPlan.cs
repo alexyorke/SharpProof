@@ -139,6 +139,13 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
+    internal VerificationQuery SynchronizationShadowQuery()
+    {
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory,
+            EffectGoalBuilder.NoReachableSites(Factory, _locks.Select(site => site.Reach)),
+            ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+    }
+
     internal VerificationQuery AllocationQuery()
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,

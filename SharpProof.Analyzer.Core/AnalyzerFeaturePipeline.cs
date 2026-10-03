@@ -666,6 +666,12 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        if (symbol is IPropertySymbol &&
+            SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
+                symbol, session, context.ReportDiagnostic, context.CancellationToken))
+        {
+            return;
+        }
         var constructors = (isStatic
                 ? type.StaticConstructors
                 : type.InstanceConstructors)
@@ -684,6 +690,7 @@ internal static partial class AnalyzerFeaturePipeline
                         initializer.SyntaxTree,
                     context.Compilation,
                     context.CancellationToken) &&
+                !IsRecordCopyConstructor(item.Candidate) &&
                 !IsThisDelegatingConstructor(
                     item.Candidate,
                     context.CancellationToken))
@@ -693,8 +700,8 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        var root = context.SemanticModel.GetOperation(
-            initializer.Value, context.CancellationToken);
+        var root = GetMemberInitializerOperation(
+            initializer, context.SemanticModel, context.CancellationToken);
         if (root == null)
         {
             return;
@@ -764,6 +771,17 @@ internal static partial class AnalyzerFeaturePipeline
         TextSpan Span,
         string Message);
 
+    private static bool IsRecordCopyConstructor(IMethodSymbol constructor)
+    {
+        return constructor.ContainingType.TypeKind == TypeKind.Class &&
+            constructor.ContainingType.IsRecord &&
+            constructor.Parameters.Length == 1 &&
+            constructor.Parameters[0].RefKind == RefKind.None &&
+            SymbolEqualityComparer.Default.Equals(
+                constructor.Parameters[0].Type,
+                constructor.ContainingType);
+    }
+
     private static bool IsThisDelegatingConstructor(
         IMethodSymbol constructor,
         CancellationToken cancellationToken)
@@ -806,9 +824,8 @@ internal static partial class AnalyzerFeaturePipeline
                 : SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
                     semanticModel.Compilation,
                     initializer.SyntaxTree);
-            var operation = model.GetOperation(
-                initializer.Value,
-                cancellationToken);
+            var operation = GetMemberInitializerOperation(
+                initializer, model, cancellationToken);
             if (operation != null &&
                 !operationFacts.MayCompleteNormally(operation))
             {
@@ -816,6 +833,20 @@ internal static partial class AnalyzerFeaturePipeline
             }
         }
         return true;
+    }
+
+    private static IOperation? GetMemberInitializerOperation(
+        EqualsValueClauseSyntax initializer,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        ExpressionSyntax expression = initializer.Value;
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            expression = parenthesized.Expression;
+        }
+        return semanticModel.GetOperation(expression, cancellationToken);
     }
 
     private static EqualsValueClauseSyntax? GetMemberInitializer(

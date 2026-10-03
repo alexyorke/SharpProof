@@ -46,6 +46,8 @@ internal sealed class AnalyzerSession
     private readonly CancellationToken _cancellationToken;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
     private readonly IRequiresCallSiteObserver? _requiresObserver;
+    private readonly Action<IMethodSymbol, AdvisoryCallAnalysis>? _advisoryCallObserver;
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>? _advisoryCallAnalyses;
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _validatedAttributes = new();
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
@@ -76,7 +78,8 @@ internal sealed class AnalyzerSession
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken,
         Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null,
-        IRequiresCallSiteObserver? requiresObserver = null)
+        IRequiresCallSiteObserver? requiresObserver = null,
+        Action<IMethodSymbol, AdvisoryCallAnalysis>? advisoryCallObserver = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
@@ -84,6 +87,8 @@ internal sealed class AnalyzerSession
         _cancellationToken = cancellationToken;
         _outcomeObserver = outcomeObserver;
         _requiresObserver = requiresObserver;
+        _advisoryCallObserver = advisoryCallObserver;
+        _advisoryCallAnalyses = advisoryCallObserver == null ? null : new(SymbolEqualityComparer.Default);
         _attributes = CreateLazy(
             () => ContractSelectionInventory.ForCompilation(compilation));
         _contractClauses = CreateLazy(
@@ -208,6 +213,23 @@ internal sealed class AnalyzerSession
                     Attributes.IsRejectedClosedContract(attribute)));
     }
 
+    internal void ObserveAdvisoryCalls(IMethodSymbol owner, SyntaxNode declaration, CancellationToken cancellationToken)
+    {
+        if (_advisoryCallObserver == null)
+        {
+            return;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_advisoryCallAnalyses!.TryAdd(owner, 0))
+        {
+            return;
+        }
+        var analysis = Compilation is CSharpCompilation compilation && declaration is MethodDeclarationSyntax method
+            ? AdvisoryCallConsumer.Analyze(compilation, method, true, cancellationToken)
+            : new AdvisoryCallAnalysis([], ["UnsupportedOwner"], true);
+        cancellationToken.ThrowIfCancellationRequested();
+        _advisoryCallObserver(owner, analysis);
+    }
     internal bool TryBeginRequiresCallSiteAnalysis(
         IMethodSymbol method)
     {
