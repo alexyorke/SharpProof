@@ -209,8 +209,8 @@ public sealed class ProofKernel(ISmtBackend backend)
             var info = query.Factory.GetTypeInfo(type);
             if (info.Kind != IrTypeKind.Sequence || info.ElementType is not { } element)
             { return false; }
-            return element == query.Factory.BooleanType || element == query.Factory.ObjectType ||
-                element == query.Factory.StringType || query.Factory.GetTypeInfo(element).Kind == IrTypeKind.Integer;
+            return element == query.Factory.BooleanType || element == query.Factory.StringType ||
+                query.Factory.GetTypeInfo(element).Kind is IrTypeKind.Integer or IrTypeKind.Reference;
         }
     }
 

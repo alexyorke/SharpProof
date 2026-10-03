@@ -60,6 +60,7 @@ public sealed class NativeArrayElementTests
     // Non-scalar elements are approximations, but bounds stay exact.
     [TestCase("string")]
     [TestCase("object")]
+    [TestCase("T")]
     public async Task NonScalarElementReadsKeepExactBounds(string element)
     {
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static " + element +
