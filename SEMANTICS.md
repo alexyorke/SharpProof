@@ -577,7 +577,14 @@ Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on
 virtual and overriding methods verify the body as written; a postcondition on
-such a method stays unsupported, since it binds every override. A dispatched (virtual, abstract, override or interface) source call is also
+such a method stays unsupported, since it binds every override.
+Field increments and compound assignments on `this`, a parameter or a local
+read the field as an approximation (faulting on a null receiver) and write it
+back. Roslyn's flow captures of `this`, and of a field of `this` used as an
+assignment target, stand for that receiver and field. An instance field store
+is admitted when the type's static constructors are compiler-generated, and
+entry initialization is effect-free when such a constructor only stores scalar
+constants into readonly statics. A dispatched (virtual, abstract, override or interface) source call is also
 opaque. Non-scalar struct and enum values are an opaque domain like type
 parameters: only opaque calls read them, so a call that mutates a struct
 through `this` changes nothing the IR observes. Struct and type-parameter

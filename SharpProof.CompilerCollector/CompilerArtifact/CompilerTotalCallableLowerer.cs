@@ -430,7 +430,7 @@ internal static class CompilerTotalCallableLowerer
             {
                 if (types.Count >= CompilerPreparedBody.MaximumInstructions)
                 { return false; }
-                typeSafe = HasNoTypeEntryInitialization(type, cancellationToken);
+                typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
                 types.Add(type, typeSafe);
             }
             if (!typeSafe)
@@ -444,18 +444,40 @@ internal static class CompilerTotalCallableLowerer
     internal static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
         CancellationToken cancellationToken)
     {
-        return HasNoTypeEntryInitialization(type, cancellationToken) &&
+        return HasNoTypeEntryInitialization(compilation, type, cancellationToken) &&
             HasNoModuleEntryInitialization(compilation, cancellationToken);
     }
 
-    private static bool HasNoTypeEntryInitialization(INamedTypeSymbol type, CancellationToken cancellationToken)
+    // A compiler-generated static constructor that only stores scalar
+    // constants into readonly statics has no effect a body could observe.
+    private static bool HasNoTypeEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type, CancellationToken cancellationToken)
     {
         var remaining = CompilerPreparedBody.MaximumInstructions;
         for (var current = type; current != null; current = current.ContainingType)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (--remaining < 0 || current.StaticConstructors.Length != 0)
+            if (--remaining < 0 || current.StaticConstructors.Any(constructor => !constructor.IsImplicitlyDeclared))
             { return false; }
+            foreach (var member in current.GetMembers().Where(member => member.IsStatic && member is IFieldSymbol { IsConst: false } or IPropertySymbol))
+            {
+                foreach (var reference in member.DeclaringSyntaxReferences)
+                {
+                    if (--remaining < 0)
+                    { return false; }
+                    var syntax = reference.GetSyntax(cancellationToken);
+                    var value = syntax switch
+                    {
+                        VariableDeclaratorSyntax variable => variable.Initializer?.Value,
+                        PropertyDeclarationSyntax property => property.Initializer?.Value,
+                        _ => null
+                    };
+                    if (value != null && (member is IFieldSymbol { IsReadOnly: false } or IPropertySymbol { SetMethod: not null } ||
+                        !SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree)
+                            .GetConstantValue(value, cancellationToken).HasValue ||
+                        !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : ((IPropertySymbol)member).Type)))
+                    { return false; }
+                }
+            }
         }
         return true;
     }

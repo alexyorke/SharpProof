@@ -39,7 +39,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // `this` (or `base`) of a reference-type instance member is never null.
     internal bool IsImplicitThis(IOperation? instance)
     {
-        return instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+        return (instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } ||
+                instance is IFlowCaptureReferenceOperation capture && _context.IsThisCapture(capture.Id)) &&
             !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
     }
 
@@ -256,6 +257,23 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && AllowOpaqueCalls && operation is ICompoundAssignmentOperation { Target: IArrayElementReferenceOperation compounded } &&
             CSharpOperationSemantics.IsModeledElementAccess(compounded) && compounded.Type?.IsValueType == true)
         { return ElementAccess(compounded, operation, block, depth); }
+        // A captured `this` is only a receiver; as a value it stays closed.
+        if (operation is IFlowCaptureReferenceOperation thisReference && _context.IsThisCapture(thisReference.Id))
+        { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
+        if (depth < 256 && _context.CapturedField(operation) is { } capturedRead)
+        { return FieldRead(operation, capturedRead.Field, capturedRead.Instance, block, depth); }
+        if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false } capturedStore &&
+            _context.CapturedField(capturedStore.Target) is { } capturedTarget &&
+            CSharpOperationSemantics.IsSupportedFieldWrite(capturedTarget.Field, _context.Target.ContainingAssembly))
+        { return FieldWrite(capturedStore, capturedTarget, block, depth); }
+        if (depth < 256 && operation is IIncrementOrDecrementOperation incrementedField &&
+            (incrementedField.Target as IFieldReferenceOperation ?? _context.CapturedField(incrementedField.Target)) is { } incrementTarget &&
+            IsMutableField(incrementTarget))
+        { return FieldMutation(operation, incrementTarget, block, depth); }
+        if (depth < 256 && operation is ICompoundAssignmentOperation compoundedField &&
+            (compoundedField.Target as IFieldReferenceOperation ?? _context.CapturedField(compoundedField.Target)) is { } compoundTarget &&
+            IsMutableField(compoundTarget))
+        { return FieldMutation(operation, compoundTarget, block, depth); }
         if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
         {
             var tested = LowerBodyValue(typeTestOperand, block, depth + 1);
@@ -635,6 +653,54 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var value = _context.Temporary(_context.Type(field.Type));
         _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
+    }
+
+    // A field increment or compound assignment on `this`, a parameter or a
+    // local reads the field (faulting on a null receiver), computes from that
+    // approximated value, and writes it back.
+    private bool IsMutableField(IFieldReferenceOperation field)
+    {
+        return CSharpOperationSemantics.IsSupportedFieldRead(field.Field) &&
+            CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) &&
+            (IsImplicitThis(field.Instance) || field.Instance is IParameterReferenceOperation or ILocalReferenceOperation);
+    }
+
+    private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth)
+    {
+        var old = FieldRead(field, field.Field, field.Instance, block, depth);
+        if (!old.Classification.IsExact)
+        { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
+        TotalBodyValue next;
+        if (operation is IIncrementOrDecrementOperation increment)
+        {
+            var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
+            if (!rule.Classification.IsExact)
+            { return Approximate(operation, old.Continuation, rule.Classification.Abstention); }
+            next = ApplyRule(operation, rule, old.Continuation);
+        }
+        else
+        {
+            var compound = (ICompoundAssignmentOperation)operation;
+            var right = LowerBodyValue(compound.Value, old.Continuation, depth + 1);
+            if (!right.Classification.IsExact)
+            { return Approximate(operation, right.Continuation, right.Classification.Abstention); }
+            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value);
+            if (!rule.Classification.IsExact)
+            { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
+            next = ApplyRule(operation, rule, right.Continuation);
+        }
+        IrTerm? receiver = null;
+        if (!IsImplicitThis(field.Instance))
+        {
+            var instance = LowerBodyValue(field.Instance!, next.Continuation, depth + 1);
+            receiver = instance.Value;
+        }
+        var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
+        var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+        _builder!.Write(stored.Continuation, _context.Site(operation), region);
+        return operation is IIncrementOrDecrementOperation { IsPostfix: true }
+            ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
+            : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
     }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,

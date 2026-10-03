@@ -9,7 +9,10 @@ internal static partial class CSharpOperationSemantics
         return SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
             IsScalar(field.Type) && field.ContainingType.IsReferenceType &&
             !field.IsVolatile && !field.IsReadOnly && !field.IsConst &&
-            field.ContainingType.StaticConstructors.Length == 0;
+            // An instance store never runs type initialization; a compiler-
+            // generated static constructor only runs static field initializers.
+            (field.ContainingType.StaticConstructors.Length == 0 ||
+                !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared));
     }
 
     // An instance field read runs no code; its only fault is a null receiver.

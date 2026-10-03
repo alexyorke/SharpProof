@@ -71,6 +71,27 @@ public sealed class NativeFieldReadTests
         Assert.That(result.Reason, Is.EqualTo(reason));
     }
 
+    // An increment or compound assignment reads the field, faulting on a null
+    // receiver, and writes it back.
+    [TestCase("Contract.Requires(cell != null); cell.Value++; cell.Value += 2; return cell.Value;", typeof(ProvenOutcome))]
+    [TestCase("cell.Value *= 3; return 0;", typeof(RefutedOutcome))]
+    public async Task FieldMutationsFaultOnlyOnNull(string body, Type outcome)
+    {
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
+            body + " }"), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
+    }
+
+    [Test]
+    public async Task FieldMutationsAreImpure()
+    {
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare("[EnforcePure] public static int Target(Cell cell) { " +
+            "Contract.Requires(cell != null); return ++cell.Value; }"), new WorkerBudgets());
+        // The write is reached concretely, but its witness replay has read an
+        // approximated field first, so it is never a refutation.
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+    }
+
     private static CompilerCallablePreparation Prepare(string method)
     {
         return Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(

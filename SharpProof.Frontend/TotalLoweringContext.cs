@@ -171,6 +171,23 @@ public sealed class TotalLoweringContext
         { _concatenationOperands[capture] = operands; }
     }
 
+    // Roslyn captures `this` to keep evaluation order around a branching
+    // right-hand side; such a capture stands for the never-null receiver.
+    private readonly HashSet<CaptureId> _thisCaptures = [];
+    internal void RecordThisCapture(CaptureId capture)
+    { _thisCaptures.Add(capture); }
+    internal bool IsThisCapture(CaptureId capture)
+    { return _thisCaptures.Contains(capture); }
+
+    // Roslyn also captures a field of `this` used as an assignment target. A
+    // read through it is a fresh field read, which over-approximates the value
+    // at capture time since every field read is an approximation.
+    private readonly Dictionary<CaptureId, IFieldReferenceOperation> _fieldCaptures = [];
+    internal void RecordFieldCapture(CaptureId capture, IFieldReferenceOperation field)
+    { _fieldCaptures[capture] = field; }
+    internal IFieldReferenceOperation? CapturedField(IOperation operation)
+    { return operation is IFlowCaptureReferenceOperation reference && _fieldCaptures.TryGetValue(reference.Id, out var field) ? field : null; }
+
     internal IrVarId Capture(CaptureId capture, ITypeSymbol? type)
     {
         if (!_captures.TryGetValue(capture, out var variable))

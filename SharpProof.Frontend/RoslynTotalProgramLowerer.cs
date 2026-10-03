@@ -250,6 +250,14 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 return Value(invocation, block).Continuation;
             case ISimpleAssignmentOperation or IIncrementOrDecrementOperation or ICompoundAssignmentOperation:
                 return Value(operation, block).Continuation;
+            case IFlowCaptureOperation { Value: IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } } thisCapture
+                when _expressions.IsImplicitThis(thisCapture.Value):
+                _context.RecordThisCapture(thisCapture.Id);
+                return block;
+            case IFlowCaptureOperation { Value: IFieldReferenceOperation field } fieldCapture
+                when CSharpOperationSemantics.IsSupportedFieldRead(field.Field) && _expressions.IsImplicitThis(field.Instance):
+                _context.RecordFieldCapture(fieldCapture.Id, field);
+                return block;
             case IFlowCaptureOperation capture:
                 {
                     var value = Value(capture.Value, block);
