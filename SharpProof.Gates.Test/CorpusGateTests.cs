@@ -1091,3 +1091,125 @@ public sealed class CorpusGateTests
         }
     }
 }
+
+
+[TestFixture]
+public sealed class IndependentPinnedRequiresCensusTests
+{
+    private sealed record Row(string Owner, string Callee, int ClauseOrdinal, int CallStart, int CallLength,
+        int ClauseStart, int ClauseLength);
+
+    private static Row[] Census(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, out int declarations, out int declaredRequires)
+    {
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")!;
+        Assert.That(api, Is.Not.Null);
+        Assert.That(api.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(api.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(SharpProof.Attributes.Contract).Assembly.GetName().Name));
+        var clauses = new Dictionary<IMethodSymbol, List<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>>(SymbolEqualityComparer.Default);
+        var calls = new List<(IMethodSymbol Owner, IMethodSymbol Target, Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax Syntax)>();
+        declarations = 0;
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            var model = compilation.GetSemanticModel(tree);
+            var root = tree.GetRoot();
+            declarations += root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Count();
+            foreach (var invocation in root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>())
+            {
+                if (Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol is not IMethodSymbol target)
+                { continue; }
+                if (model.GetEnclosingSymbol(invocation.SpanStart) is not IMethodSymbol owner)
+                { continue; }
+                if (SymbolEqualityComparer.Default.Equals(target.ContainingType, api))
+                {
+                    if (target.Name == "Requires")
+                    {
+                        Assert.That(target.IsStatic && target.ReturnsVoid && target.Arity == 0 && target.Parameters.Length == 1 &&
+                            target.Parameters[0].Type.SpecialType == SpecialType.System_Boolean, Is.True);
+                        if (!clauses.TryGetValue(owner.OriginalDefinition, out var owned))
+                        { clauses.Add(owner.OriginalDefinition, owned = []); }
+                        owned.Add(invocation);
+                    }
+                    continue;
+                }
+                calls.Add((owner, target.OriginalDefinition, invocation));
+            }
+        }
+        declaredRequires = clauses.Values.Sum(static owned => owned.Count);
+        var rows = new List<Row>();
+        foreach (var call in calls)
+        {
+            if (!clauses.TryGetValue(call.Target, out var required))
+            { continue; }
+            var ordinal = 0;
+            foreach (var clause in required.OrderBy(static clause => clause.SpanStart))
+            {
+                rows.Add(new(call.Owner.GetDocumentationCommentId()!, call.Target.GetDocumentationCommentId()!, ordinal++,
+                    call.Syntax.SpanStart, call.Syntax.Span.Length, clause.SpanStart, clause.Span.Length));
+            }
+        }
+        return [.. rows];
+    }
+
+    [Test]
+    public async Task AllPinnedSourcesHaveAnIndependentDirectRequiresCensus()
+    {
+        var root = RepositoryLayout.FindRoot();
+        var synthetic = CorpusCatalog.CreateSyntheticCases();
+        Assert.That(synthetic, Has.Length.EqualTo(262));
+        var declarations = 0;
+        var obligations = 0;
+        var contractIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in synthetic)
+        {
+            var compilation = AnalyzerGateHost.CreateCompilation(item.Source, "Independent_" + item.SeedId);
+            var rows = Census(compilation, out var count, out var clauseDeclarations);
+            declarations += count;
+            Assert.That(clauseDeclarations, Is.EqualTo(item.Mode == "contracts" ? 1 : 0), item.Id);
+            Assert.That(rows, Has.Length.EqualTo(item.Mode == "contracts" ? 1 : 0), item.Id);
+            if (item.Mode != "contracts")
+            { continue; }
+            Assert.That(contractIds.Add(item.Id), Is.True);
+            obligations += rows.Length;
+            var row = rows.Single();
+            Assert.That(row.ClauseOrdinal, Is.Zero, item.Id);
+            var tree = compilation.SyntaxTrees.Single();
+            var model = compilation.GetSemanticModel(tree);
+            var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+                .Single(invocation => invocation.SpanStart == row.CallStart && invocation.Span.Length == row.CallLength);
+            var owner = (IMethodSymbol)model.GetEnclosingSymbol(syntax.SpanStart)!;
+            Assert.That(owner.IsStatic && owner.MethodKind == MethodKind.Ordinary && owner.DeclaredAccessibility == Accessibility.Public,
+                Is.True, item.Id);
+            Assert.That(syntax.Ancestors().Any(static node => node is Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax or
+                Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousFunctionExpressionSyntax), Is.False, item.Id);
+            var existing = CorpusGate.CensusContractCalls(compilation);
+            Assert.That(existing.PublicOwners, Is.EqualTo(1), item.Id);
+            Assert.That(existing.PotentialCalls, Is.EqualTo(rows.Length), item.Id);
+            Assert.That(existing.BoundRequires, Is.EqualTo(rows.Length), item.Id);
+            Assert.That(existing.Complete && existing.Unpublished && existing.ManifestUnchanged, Is.True, item.Id);
+            Assert.That(existing.Failures, Is.Empty, item.Id);
+            var managed = await CorpusGate.ObserveManagedContractClausesAsync(compilation, CancellationToken.None);
+            Assert.That(managed.Gaps, Is.Empty, item.Id);
+            Assert.That(managed.Clauses, Has.Length.EqualTo(rows.Length), item.Id);
+            var observed = managed.Clauses.Single();
+            Assert.That((observed.Key.Call.Start, observed.Key.Call.Length, observed.Key.ClauseOrdinal,
+                observed.Key.Clause.Start, observed.Key.Clause.Length),
+                Is.EqualTo((row.CallStart, row.CallLength, row.ClauseOrdinal, row.ClauseStart, row.ClauseLength)), item.Id);
+            Assert.That(observed.Outcome, Is.EqualTo(item.SeedId == "C06" ? "Unknown" :
+                item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted"), item.Id);
+        }
+        Assert.That(obligations, Is.EqualTo(100));
+        var snapshot = await File.ReadAllLinesAsync(Path.Combine(root, "SharpProof.Gates", "Corpus", "expected.canonical.snapshot"));
+        var pinnedContractIds = snapshot.Where(static line => line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal))
+            .Select(static line => line.Split('|')[0]).ToArray();
+        Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));
+        var document = OpenSourceCorpusCatalog.Load(root);
+        Assert.That(document.Methods, Has.Length.EqualTo(200));
+        var oss = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
+        var ossRows = Census(oss, out var ossDeclarations, out var ossDeclaredRequires);
+        Assert.That(ossRows, Is.Empty);
+        Assert.That(ossDeclaredRequires, Is.Zero);
+        await TestContext.Progress.WriteLineAsync($"independent-census synthetic={synthetic.Length} methodDeclarations={declarations} requiresObligations={obligations} " +
+            $"ossSelected={document.Methods.Length} ossTrees={oss.SyntaxTrees.Length} ossMethodDeclarations={ossDeclarations} ossRequiresObligations={ossRows.Length}");
+    }
+}

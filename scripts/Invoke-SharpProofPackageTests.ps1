@@ -858,7 +858,7 @@ try {
         if ($directVstest) {
             $arguments += '/TestCaseFilter:' + $shard.Filter
             $arguments += '/logger:console;verbosity=minimal'
-            $arguments += "/logger:trx;LogFileName=$($shard.Name).trx"
+            $arguments += "/logger:trx;LogFilePrefix=$($shard.Name)"
             $arguments += '/ResultsDirectory:' + (
                 Join-Path $results $shard.Name)
         }
@@ -866,7 +866,7 @@ try {
             $arguments += @(
                 '--filter', $shard.Filter,
                 '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFileName=$($shard.Name).trx",
+                '--logger', "trx;LogFilePrefix=$($shard.Name)",
                 '--results-directory', (Join-Path $results $shard.Name))
         }
         $arguments = Add-SharpProofCoverageArguments `
