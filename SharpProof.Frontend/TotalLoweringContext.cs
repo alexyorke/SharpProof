@@ -112,7 +112,8 @@ public sealed class TotalLoweringContext
 
     // A virtual or overriding body is lowered as written; callers dispatching
     // to it are a separate concern, so only a body-free method is excluded.
-    internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet &&
+    internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet or
+        MethodKind.PropertySet or MethodKind.Constructor or MethodKind.LocalFunction &&
         !Target.IsAbstract) &&
         !Target.IsAsync && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
@@ -210,13 +211,17 @@ public sealed class TotalLoweringContext
         return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart, Span(syntax));
     }
 
+    // A constructor whose body uses `this` only to read and write its fields
+    // initializes an object no caller can observe yet.
+    internal bool FreshReceiver { get; set; }
+
     // The compilation of the body being lowered; control flow graph
     // operations carry no semantic model.
     internal Compilation? Compilation { get; set; }
 
     internal OperationId FreshWriteSite(IOperation operation)
     {
-        return Factory.CreateOperation(IrWriteSites.FreshElementPrefix + operation.Syntax.SpanStart, Span(operation.Syntax));
+        return Factory.CreateOperation(IrWriteSites.FreshPrefix + operation.Syntax.SpanStart, Span(operation.Syntax));
     }
 
     // A static field read is a read of ambient state.

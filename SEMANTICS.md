@@ -436,9 +436,14 @@ elements of an array the body created, holds only in a local, and only
 indexes or measures is not observable. Reading the length or an element of a
 string or array the body did not create reads state, so an EffectContract
 must declare every read flag for it.
-Methods, operators, conversions, property and indexer accessors and
-expression-bodied properties are lowered for claims. An auto-property accessor
-reads or writes its backing field as an approximation. A static field read
+Methods, operators, conversions, property and indexer accessors,
+expression-bodied properties, local functions that capture nothing, and class
+constructors are lowered for claims. A constructor is lowered only when its
+class derives from object, has no instance member initializers or primary
+constructor, and the constructor chains to no other constructor; while `this`
+is used only for its fields, its field writes initialize an object no caller
+observes. Lambdas and other constructors stay Unknown. An auto-property
+accessor reads or writes its backing field as an approximation. A static field read
 runs no code when its type has no static initializer; the read value is an
 approximation.
 Claim lowering admits array element stores, increments and compound

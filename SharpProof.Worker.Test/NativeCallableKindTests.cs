@@ -98,6 +98,31 @@ public sealed class NativeCallableKindTests
         return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
     }
 
+    // A constructor that runs no member initializers or base constructor
+    // other than object's initializes an object no caller observes until
+    // `this` escapes.
+    [TestCase("int _x; [EnforcePure, DoesNotThrow, ZeroAllocations] public C(int x) { _x = x; }", "proven")]
+    [TestCase("int _x; [ZeroAllocations] public C() { var box = new object(); _x = 1; }", "refuted")]
+    [TestCase("int _x; int _y = 1; [EnforcePure] public C(int x) { _x = x; }", "unknown")]
+    [TestCase("int _x; [EnforcePure] public C(int x) { _x = x; Keep(this); } static void Keep(C c) { }", "unknown")]
+    // A local function that captures nothing runs from its parameters alone.
+    [TestCase("public static int Target(int x) { return Twice(x); [ZeroAllocations] static int Twice(int y) => y * 2; }", "proven")]
+    [TestCase("public static int Target(int x) { return Times(x); [ZeroAllocations] int Times(int y) => y * x; }", "unknown")]
+    public async Task ConstructorsAndLocalFunctionsAreLowered(string members, string expected)
+    {
+        var preparation = Prepare("public sealed class C { " + members + " }");
+        var outcome = preparation.EffectClaims.Any(static claim => claim.ContractKind == WorkerEffectContractKind.EnforcePure)
+            ? (await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome
+            : (await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome;
+        if (preparation.EffectClaims.Length > 1)
+        {
+            foreach (var result in new[] { await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets()),
+                await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets()) })
+            { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
+        }
+        Assert.That(outcome switch { ProvenOutcome => "proven", RefutedOutcome => "refuted", _ => "unknown" }, Is.EqualTo(expected));
+    }
+
     // A static read runs no code when the type has no initializer, but it reads
     // ambient state, which observable purity excludes.
     [Test]

@@ -75,10 +75,7 @@ internal static class CompilerTotalCallableLowerer
         { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
         else
         {
-            try
-            { graph = ControlFlowGraph.Create(declaration, target.SemanticModel, cancellationToken); }
-            catch (ArgumentException)
-            { return null; }
+            graph = TotalBodyLowering.CreateGraph(declaration, target.Method, target.SemanticModel, cancellationToken);
             lowering = graph == null ? null : LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority,
                 cancellationToken, opaqueCalls: true);
         }

@@ -217,6 +217,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             { _builder!.Lock(receiver.Continuation, _context.Site(operation), receiver.Value); }
             return new(_factory.Boolean(false), receiver.Continuation, receiver.Classification);
         }
+        // A constructor's call to object's constructor does nothing.
+        if (CSharpOperationSemantics.IsObjectConstructorCall(operation))
+        { return new(_factory.Boolean(false), block, FrontendSubsetClassification.Exact); }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
@@ -700,7 +703,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
         var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        _builder!.Write(stored.Continuation, _context.Site(operation), region);
+        _builder!.Write(stored.Continuation, ReceiverWriteSite(operation, field.Instance), region);
         return operation is IIncrementOrDecrementOperation { IsPostfix: true }
             ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
             : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
@@ -730,8 +733,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.FieldWrite(_factory, right.Value, receiver), right.Continuation);
         var region = field.Field.IsStatic ? IrWriteRegion.Static :
             field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        _builder!.Write(result.Continuation, _context.Site(assignment), region);
+        _builder!.Write(result.Continuation, ReceiverWriteSite(assignment, field.Instance), region);
         return result;
+    }
+
+    private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
+    {
+        return _context.FreshReceiver && IsImplicitThis(instance) ? _context.FreshWriteSite(operation) : _context.Site(operation);
     }
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)

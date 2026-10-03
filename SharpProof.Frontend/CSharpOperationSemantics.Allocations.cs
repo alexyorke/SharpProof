@@ -54,6 +54,15 @@ internal static partial class CSharpOperationSemantics
         return allocates;
     }
 
+    internal static bool IsObjectConstructorCall(IOperation? operation)
+    {
+        return operation is IInvocationOperation
+        {
+            TargetMethod: { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object },
+            Arguments.Length: 0
+        };
+    }
+
     internal static bool IsCoreObjectCreation(IObjectCreationOperation creation)
     {
         return creation is

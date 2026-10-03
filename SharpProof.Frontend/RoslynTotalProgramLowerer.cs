@@ -46,6 +46,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     {
         _cancellationToken.ThrowIfCancellationRequested();
         _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
+        _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
+            graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
+                .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+                    CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent));
         if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
         { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");

@@ -57,14 +57,8 @@ internal static class AdvisoryEffectSites
             var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
             if (!binding.IsSuccess)
             { return Gap("ContractBinding:" + binding.Failure); }
-            ControlFlowGraph? graph;
-            try
-            {
-                var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
-                graph = ControlFlowGraph.Create(declaration, model, cancellationToken);
-            }
-            catch (ArgumentException)
-            { return Gap("UnavailableFlow"); }
+            var graph = TotalBodyLowering.CreateGraph(declaration, method,
+                Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree), cancellationToken);
             lowering = graph == null ? null : TotalBodyLowering.Lower(compilation, graph, context, cancellationToken, opaqueCalls: true);
         }
         if (lowering == null)

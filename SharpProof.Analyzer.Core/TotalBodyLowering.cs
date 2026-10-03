@@ -10,11 +10,80 @@ internal static class TotalBodyLowering
     internal const int MaximumWork = 4096;
 
     // Declarations whose body the Total IR lowers: methods, operators,
-    // accessors and expression-bodied properties.
+    // accessors, expression-bodied properties, constructors and local
+    // functions.
     internal static bool IsBodyDeclaration(SyntaxNode? declaration)
     {
         return declaration is MethodDeclarationSyntax or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax or
-            AccessorDeclarationSyntax or ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax };
+            AccessorDeclarationSyntax or ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
+            ConstructorDeclarationSyntax or LocalFunctionStatementSyntax;
+    }
+
+    // The control flow graph of a body declaration, or null when its body
+    // does not run exactly as written: a constructor that also runs member
+    // initializers or a base constructor other than object's, and a local
+    // function that captures state.
+    internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            switch (declaration)
+            {
+                case ConstructorDeclarationSyntax constructor:
+                    return IsPlainConstructor(constructor, method, cancellationToken)
+                        ? ControlFlowGraph.Create(constructor, model, cancellationToken) : null;
+                case LocalFunctionStatementSyntax local:
+                    if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method))
+                    { return null; }
+                    var owner = local.Ancestors().FirstOrDefault(node => node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
+                        IsBodyDeclaration(node));
+                    var ownerSymbol = owner == null ? null : model.GetDeclaredSymbol(owner, cancellationToken) as IMethodSymbol ??
+                        (owner.Parent?.Parent is BasePropertyDeclarationSyntax property
+                            ? (model.GetDeclaredSymbol(property, cancellationToken) as IPropertySymbol)?.GetMethod : null);
+                    return owner is null or AnonymousFunctionExpressionSyntax || ownerSymbol == null ? null
+                        : CreateGraph(owner, ownerSymbol, model, cancellationToken)?.GetLocalFunctionControlFlowGraph(method, cancellationToken);
+                default:
+                    return ControlFlowGraph.Create(declaration, model, cancellationToken);
+            }
+        }
+        catch (ArgumentException)
+        { return null; }
+    }
+
+    private static bool IsPlainConstructor(ConstructorDeclarationSyntax constructor, IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        if (method.IsStatic || constructor.Initializer is { } initializer &&
+            (initializer.ThisOrBaseKeyword.IsKind(SyntaxKind.ThisKeyword) || initializer.ArgumentList.Arguments.Count != 0) ||
+            method.ContainingType is not { IsReferenceType: true, IsRecord: false, BaseType.SpecialType: SpecialType.System_Object } type)
+        { return false; }
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax declaration || declaration.ParameterList != null ||
+                declaration.Members.Any(member =>
+                    member is FieldDeclarationSyntax field && !field.Modifiers.Any(SyntaxKind.StaticKeyword) &&
+                        field.Declaration.Variables.Any(variable => variable.Initializer != null) ||
+                    member is PropertyDeclarationSyntax property && !property.Modifiers.Any(SyntaxKind.StaticKeyword) &&
+                        property.Initializer != null ||
+                    member is EventFieldDeclarationSyntax eventField && !eventField.Modifiers.Any(SyntaxKind.StaticKeyword) &&
+                        eventField.Declaration.Variables.Any(variable => variable.Initializer != null)))
+            { return false; }
+        }
+        return true;
+    }
+
+    // A local function that reads an enclosing local, parameter or `this`, or
+    // nests another function, does not run from its own parameters alone.
+    private static bool Captures(IOperation body, IMethodSymbol method)
+    {
+        return body.Descendants().Any(operation => operation switch
+        {
+            ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
+            IParameterReferenceOperation parameter => !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, method),
+            IInstanceReferenceOperation or ILocalFunctionOperation or IAnonymousFunctionOperation => true,
+            _ => false
+        });
     }
 
     internal static AccessorDeclarationSyntax? AutoAccessor(SyntaxNode declaration)
