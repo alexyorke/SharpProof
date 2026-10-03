@@ -4,6 +4,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
+using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.CompilerArtifact;
+using SharpProof.Contracts;
+using SharpProof.Frontend;
+using SharpProof.Ir;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -32,8 +37,37 @@ internal sealed record CorpusGateResult(
     ImmutableArray<string> AllowedDegradations,
     ImmutableArray<string> Failures);
 
+internal sealed record ContractCallCensus(int PublicOwners, int PotentialCalls, int BoundRequires,
+    bool Complete, bool Unpublished, bool ManifestUnchanged, ImmutableArray<string> Failures);
+
 internal static class CorpusGate
 {
+    internal static ContractCallCensus CensusContractCalls(CSharpCompilation compilation)
+    {
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true);
+        var inventory = shadow.PotentialCalls!;
+        var owners = inventory.Owners.Where(static owner =>
+            owner.Method.DeclaredAccessibility == Accessibility.Public).ToArray();
+        var calls = owners.SelectMany(static owner => owner.Calls).ToArray();
+        var failures = ImmutableArray.CreateBuilder<string>();
+        failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
+        var boundRequires = 0;
+        foreach (var call in calls)
+        {
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var context = new TotalLoweringContext(factory, call.Target);
+            var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+            if (!binding.IsSuccess)
+            { failures.Add(binding.Failure.ToString()); continue; }
+            boundRequires += binding.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires);
+        }
+        return new(owners.Length, calls.Length, boundRequires,
+            owners.All(static owner => owner.DiscoveryComplete),
+            owners.All(owner => !baseline.Manifest.Callables.Any(entry => entry.CallableId == owner.CallableId)),
+            JsonSerializer.Serialize(baseline.Manifest) == JsonSerializer.Serialize(shadow.Manifest), failures.ToImmutable());
+    }
+
     public static async Task<CorpusGateResult> RunAsync(
         string repositoryRoot,
         CancellationToken cancellationToken = default)

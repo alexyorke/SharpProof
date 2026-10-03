@@ -8,6 +8,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -16,12 +17,200 @@ namespace SharpProof.Worker.Test;
 public sealed class ClaimManifestBuilderTests
 {
     private static readonly int[] DenseOrdinals = [0, 1];
+    private static readonly int[] FailingShadowInputs = [0, 10];
     private static readonly string[] PotentialOwnerGapReasons =
         ["UnsupportedOwner", "UnsupportedSignature", "IncompleteCalls"];
     private static readonly WorkerClaimEvidence[] CompanionEvidence = [
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
     ];
+
+    [Test]
+    public void ShadowCallerPreparationRetainsDirectAndTransitiveRequiresWithoutPublishingCallers()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); Contract.Requires(value < 10); return value + 1; }
+                public static int Wrapper(int value) => Positive(value);
+                public static int Root(int value) => Wrapper(value);
+            }
+            """));
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Gaps, Is.Empty);
+        Assert.That(batch.Callers, Has.Length.EqualTo(2));
+        foreach (var caller in batch.Callers)
+        {
+            Assert.That(caller.OwnerId, Is.EqualTo(caller.Body.CallableId));
+            Assert.That(caller.Body.CallPreconditions, Has.Length.EqualTo(2));
+            Assert.That(caller.Body.CallPreconditions.Select(static call => call.ClauseOrdinal), Is.EqualTo(DenseOrdinals));
+            var factory = caller.Body.Program.Factory;
+            var entry = caller.Body.Parameters.Single().Entry;
+            foreach (var input in FailingShadowInputs)
+            {
+                var execution = new IrProgramInterpreter(factory).Execute(caller.Body.Program,
+                    new Dictionary<IrVarId, IrValue>
+                    { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)input) });
+                Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+                Assert.That(execution.ConsumedApproximation, Is.False);
+                Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));
+                var failed = caller.Body.CallPreconditions[input == 0 ? 0 : 1];
+                var marker = caller.Body.Program.Blocks.SelectMany(static block => block.Instructions)
+                    .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == failed.Instruction);
+                Assert.That(execution.GetCurrentValue(marker.Target)!.Boolean, Is.False);
+            }
+            Assert.That(caller.Body.Clauses, Is.Empty);
+            Assert.That(caller.Body.ValidEffectClaimIds, Is.Empty);
+            Assert.That(caller.Body.ExceptionConstraints, Is.Empty);
+            Assert.That(caller.Body.IsBodyAbstraction, Is.False);
+            Assert.That(baseline.Manifest.Callables.Any(entry => entry.CallableId == caller.OwnerId), Is.False);
+        }
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(new ClaimManifestBuilder(compilation).Build().Manifest),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
+    }
+
+    [TestCase("static Subject() { throw new System.InvalidOperationException(); }", "", "UnsupportedEntryInitialization")]
+    [TestCase("", "static Helper() { throw new System.InvalidOperationException(); }", "UnsupportedBody")]
+    [TestCase("", "static int State = 1;", "UnsupportedBody")]
+    [TestCase("", "", "UnsupportedEntryInitialization", true)]
+    public void ShadowCallerPreparationRejectsUnmodeledInitialization(string ownerInitialization,
+        string calleeInitialization, string expectedReason, bool moduleInitializer = false)
+    {
+        var module = moduleInitializer ? """
+            static class Bootstrap {
+                [System.Runtime.CompilerServices.ModuleInitializer]
+                public static void Initialize() => throw new System.InvalidOperationException();
+            }
+            """ : "";
+        var compilation = GetCompilation(("Subject.cs", $$"""
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Helper {
+                {{calleeInitialization}}
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+            }
+            public static class Subject {
+                {{ownerInitialization}}
+                public static int Root(int value) => Helper.Positive(value);
+            }
+            {{module}}
+            """));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo(expectedReason));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationGuardsSelectedDeepCalleeBeforeBinding()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "using SharpProof.Attributes; public static class Subject { public static bool Positive(bool value) { " +
+            "Contract.Requires(" + new string('!', 256) + "value); return value; } public static bool Root(bool value) => Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Deep.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsMismatchedSourceAndPropagatesCancellation()
+    {
+        var first = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var second = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 2; }"));
+        var trees = CompilerCompilationCapture.CaptureTrees(first, CancellationToken.None);
+        var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(second, WorkerFeatureSet.All,
+            trees, null, authority, CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            CompilerTotalCallableLowerer.PrepareShadowCallers(first, WorkerFeatureSet.All,
+                trees, null, authority, cancellation.Token)));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRetainsUnreachableMarkersWithoutExecutingThem()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                public static int Root() { if (false) return Positive(-1); return 0; }
+            }
+            """));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Gaps, Is.Empty);
+        var body = batch.Callers.Single().Body;
+        Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+        var execution = new IrProgramInterpreter(body.Program.Factory).Execute(body.Program);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        var marker = body.Program.Blocks.SelectMany(static block => block.Instructions)
+            .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == body.CallPreconditions.Single().Instruction);
+        Assert.That(execution.GetCurrentValue(marker.Target), Is.Null);
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsDeepAttributesBeforeSemanticInventoryConstruction()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "[System.Obsolete(" + new string('(', 256) + "\"message\"" + new string(')', 256) +
+            ")] public static class Subject { public static int Root() => 1; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "DeepAttribute.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsOwnContractsWhenFeaturesExcludePublicMembership()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                public static int Root([Positive] int value) => Positive(value);
+            }
+            """));
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.Effects,
+            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo("UnsupportedOwnContracts"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationBoundsSourceCommentsBeforeHashing()
+    {
+        var tree = CSharpSyntaxTree.ParseText("/*" + new string('x', 4_194_304) +
+            "*/ public static class Subject { public static int Root() => 1; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "WideComment.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        // Do not capture/hash this source before invoking the production guard.
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            [new CompilerSyntaxTreeSnapshot()], null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotBudget"));
+    }
+
+    private static CompilerShadowPreparationBatch PrepareShadowBatch(CSharpCompilation compilation)
+    {
+        return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+    }
 
     [Test]
     public void PotentialCallShadowFindsPlainSeparateFileCallersWithoutChangingManifest()

@@ -11,6 +11,87 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [Test]
+    public async Task NativeShadowCallersQualifyEveryContractCorpusVariantWithOriginalReplay()
+    {
+        SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var root = RepositoryLayout.FindRoot();
+        var snapshotPath = Path.Combine(root, "SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
+        var snapshotBefore = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
+        var frozen = (await File.ReadAllLinesAsync(snapshotPath)).Where(static line => line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal))
+            .ToDictionary(static line => line.Split('|')[0], StringComparer.Ordinal);
+        var cases = CorpusCatalog.CreateSyntheticCases().Where(static item => item.Mode == "contracts").ToArray();
+        Assert.That(cases, Has.Length.EqualTo(100));
+        Assert.That(cases.Select(static item => item.SeedId).Distinct().Count(), Is.EqualTo(10));
+        Assert.That(frozen.Keys, Is.EquivalentTo(cases.Select(static item => item.Id)));
+        foreach (var seed in cases.GroupBy(static item => item.SeedId, StringComparer.Ordinal))
+        {
+            Assert.That(seed.Select(static item => item.Variant), Is.EquivalentTo(Enum.GetValues<CorpusVariant>()), seed.Key);
+        }
+        var rows = new List<(string Seed, string Outcome, string Reason)>();
+        foreach (var item in cases)
+        {
+            var compilation = AnalyzerGateHost.CreateCompilation(item.Source, "ShadowCorpus_" + item.SeedId);
+            var census = CorpusGate.CensusContractCalls(compilation);
+            Assert.Multiple(new Action(() =>
+            {
+                Assert.That(census.PublicOwners, Is.EqualTo(1), item.Id);
+                Assert.That(census.PotentialCalls, Is.EqualTo(1), item.Id);
+                Assert.That(census.BoundRequires, Is.EqualTo(1), item.Id);
+                Assert.That(census.Complete, Is.True, item.Id);
+                Assert.That(census.Unpublished, Is.True, item.Id);
+                Assert.That(census.ManifestUnchanged, Is.True, item.Id);
+                Assert.That(census.Failures, Is.Empty, item.Id);
+            }));
+            var originalManifest = System.Text.Json.JsonSerializer.Serialize(
+                new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest);
+            var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+                SharpProof.Worker.Protocol.WorkerFeatureSet.All,
+                SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+                SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            Assert.That(System.Text.Json.JsonSerializer.Serialize(
+                new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest),
+                Is.EqualTo(originalManifest), item.Id);
+            Assert.That(batch.Gaps, Is.Empty, item.Id);
+            Assert.That(batch.Callers, Has.Length.EqualTo(1), item.Id);
+            var body = batch.Callers.Single().Body;
+            Assert.That(body.Clauses, Is.Empty, item.Id);
+            Assert.That(body.IsBodyAbstraction, Is.False, item.Id);
+            Assert.That(body.ValidEffectClaimIds, Is.Empty, item.Id);
+            Assert.That(body.ExceptionConstraints, Is.Empty, item.Id);
+            Assert.That(body.CallPreconditions, Has.Length.EqualTo(1), item.Id);
+            var candidate = new SharpProof.Worker.PassiveCallableCandidate(body.CallableId, body.Program,
+                [.. body.Parameters.Select(static parameter => new SharpProof.Worker.PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))],
+                body.Result, [], [], body.IsBodyAbstraction,
+                [.. body.CallPreconditions.Select(static clause => new SharpProof.Worker.PassiveCallPrecondition(clause.Instruction, clause.Value, clause.Safe))]);
+            Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
+            using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
+            var result = await solver.VerifyCallPreconditionAsync(0);
+            Assert.That(result.Reason, Is.EqualTo(SharpProof.Worker.Protocol.WorkerClaimReason.None), item.Id);
+            var outcome = result.Outcome switch
+            {
+                SharpProof.Verify.ProvenOutcome => "Proven",
+                SharpProof.Verify.RefutedOutcome => "Refuted",
+                _ => "Unknown"
+            };
+            rows.Add((item.SeedId, outcome, result.Reason.ToString()));
+            var expected = item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted";
+            Assert.That(outcome, Is.EqualTo(expected), item.Id + ":" + result.Reason);
+            if (outcome == "Refuted")
+            {
+                var replay = plan!.ReplayCallPrecondition(0, result.EntryModel, CancellationToken.None);
+                Assert.That(replay, Is.Not.Null, item.Id);
+                Assert.That(result.CallPreconditionWitness, Is.EqualTo(replay), item.Id);
+            }
+            var legacy = await CorpusGate.ObserveCaseAsync(item, CancellationToken.None);
+            Assert.That(legacy.ToCanonicalLine(), Is.EqualTo(frozen[item.Id]), item.Id + ": legacy changed");
+        }
+        Assert.That(rows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
+        Assert.That(rows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(70));
+        var snapshotAfter = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
+        Assert.That(snapshotAfter, Is.EqualTo(snapshotBefore));
+    }
+
     private const string CorpusSnapshotHeader = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
 
     [Test]

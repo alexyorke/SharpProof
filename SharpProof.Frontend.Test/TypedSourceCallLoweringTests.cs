@@ -6,6 +6,30 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedSourceCallLoweringTests
 {
+    [TestCase("int Target(int x) { _ = Helper(x++); return x; } static int Helper(int value) => value + 1;", 3, 4)]
+    [TestCase("int Target(int x) { try { _ = 10 / x; return 1; } catch (System.DivideByZeroException) { return 7; } }", 0, 7)]
+    [TestCase("int Target(int x) { _ = (_ = x++); return x; }", 3, 4)]
+    [TestCase("int Target(int x) { _ = new int[] { 1, 2 }; return x; }", 3, 3)]
+    [TestCase("int Target(int x) { int _ = 0; _ = Helper(x++); return _ + x; } static int Helper(int value) => value;", 3, 7)]
+    [TestCase("int Target(int x) { try { _ = Helper(x++); return 0; } catch (System.DivideByZeroException) { return x; } } static int Helper(int value) => 10 / (value - 3);", 3, 4)]
+    public void DiscardAssignmentsPreserveCompiledEvaluation(string members, int input, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(members);
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        var execution = subject.Execute(lowering, [input]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        if (members.Contains("new int[]", StringComparison.Ordinal))
+        {
+            Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions)
+                .OfType<IrAllocationInstruction>().Count(), Is.EqualTo(1));
+        }
+    }
+
     [TestCase("int Target(int x) => Helper(x); static int Helper(int x) => x + 1;", 1)]
     [TestCase("int Target(int x) => Target(x);", 1)]
     [TestCase("int Target(int x) => Helper(x); static int Helper(int x) => Target(x);", 1)]

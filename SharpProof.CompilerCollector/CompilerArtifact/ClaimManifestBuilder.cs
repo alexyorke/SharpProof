@@ -12,16 +12,30 @@ internal sealed partial class ClaimManifestBuilder(
         "M:Program.<Main>$(System.String[])";
 
     private readonly CSharpCompilation _compilation =
-        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-    private readonly ContractClauseInventoryBuilder _clauses =
-        ContractClauseInventoryBuilder.ForCompilation(compilation);
-    private readonly ContractSelectionInventory _attributes =
-        ContractSelectionInventory.ForCompilation(compilation);
-    private readonly ContractApiSymbols? _intrinsics = ContractApiSymbols.TryCreate(compilation);
-    private readonly EffectiveContractSourceResolver _contractSources =
-        EffectiveContractSourceResolver.ForCompilation(compilation);
-    private readonly AnalyzerSession _effectSession =
-        new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
+        InitializeCompilation(compilation, cancellationToken);
+    // Optional source guards must run before any semantic inventory is created.
+    private readonly Lazy<ContractClauseInventoryBuilder> _lazyClauses =
+        new(() => ContractClauseInventoryBuilder.ForCompilation(compilation));
+    private readonly Lazy<ContractSelectionInventory> _lazyAttributes =
+        new(() => ContractSelectionInventory.ForCompilation(compilation));
+    private readonly Lazy<ContractApiSymbols?> _lazyIntrinsics =
+        new(() => ContractApiSymbols.TryCreate(compilation));
+    private readonly Lazy<EffectiveContractSourceResolver> _lazyContractSources =
+        new(() => EffectiveContractSourceResolver.ForCompilation(compilation));
+    private readonly Lazy<AnalyzerSession> _lazyEffectSession =
+        new(() => new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken));
+    private ContractClauseInventoryBuilder _clauses => _lazyClauses.Value;
+    private ContractSelectionInventory _attributes => _lazyAttributes.Value;
+    private ContractApiSymbols? _intrinsics => _lazyIntrinsics.Value;
+    private EffectiveContractSourceResolver _contractSources => _lazyContractSources.Value;
+    private AnalyzerSession _effectSession => _lazyEffectSession.Value;
+
+    private static CSharpCompilation InitializeCompilation(CSharpCompilation compilation, CancellationToken cancellationToken)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        cancellationToken.ThrowIfCancellationRequested();
+        return compilation;
+    }
 
     internal ClaimManifestBuildResult Build(bool includePotentialCallShadow = false)
     {
@@ -53,6 +67,12 @@ internal sealed partial class ClaimManifestBuilder(
         return includePotentialCallShadow
             ? result with { PotentialCalls = DiscoverPotentialCallShadow(result.Targets) }
             : result;
+    }
+
+    internal CompilerPotentialCallInventory BuildPotentialCallShadow()
+    {
+        return DiscoverPotentialCallShadow(ImmutableDictionary.Create<IMethodSymbol, ManifestCallableTarget>(
+            SymbolEqualityComparer.Default));
     }
 
     // Separate source census: it must not change mandatory manifest membership

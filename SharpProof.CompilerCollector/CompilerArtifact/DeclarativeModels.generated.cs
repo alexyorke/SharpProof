@@ -31,6 +31,16 @@ internal sealed record CompilerPotentialCallOwner(
 internal sealed record CompilerPotentialCallGap(int TreeOrdinal, int Start, int Length, string Reason,
     string? ReferenceAssemblyName = null);
 
+// Compiler-owned preparation only; it cannot enter mandatory worker routing.
+internal sealed record CompilerShadowPreparation(CompilerTotalCallablePreparation Body)
+{
+    internal string OwnerId => Body.CallableId;
+}
+
+internal sealed record CompilerShadowPreparationBatch(
+    ImmutableArray<CompilerShadowPreparation> Callers,
+    ImmutableArray<CompilerPotentialCallGap> Gaps);
+
 internal sealed partial record ManifestCallableTarget(
     IMethodSymbol Method,
     SyntaxNode? Declaration,

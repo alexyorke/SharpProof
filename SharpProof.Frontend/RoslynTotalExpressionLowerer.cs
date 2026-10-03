@@ -176,6 +176,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         {
             case IParenthesizedOperation parenthesized:
                 return LowerBodyValue(parenthesized.Operand, block, depth + 1);
+            case ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment:
+                // A discard evaluates its RHS with all calls and faults intact.
+                // It contributes no storage write of its own.
+                return LowerBodyValue(assignment.Value, block, depth + 1);
             case ISimpleAssignmentOperation { IsRef: false } assignment when TryStorage(assignment.Target, out var target):
                 {
                     var right = LowerBodyValue(assignment.Value, block, depth + 1);
