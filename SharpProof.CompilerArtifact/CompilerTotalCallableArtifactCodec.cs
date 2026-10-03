@@ -500,7 +500,7 @@ internal static class CompilerTotalCallableArtifactCodec
             foreach (var instruction in block.Instructions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                Require(IsSourceInstruction(program, instruction, result, parameters),
+                Require(IsSourceInstruction(instruction, result, parameters),
                     "The Total source program contains unsupported executable evidence.");
                 // CFG lowering retains disconnected empty exit blocks. A
                 // value-bearing return still must match the canonical result.
@@ -553,13 +553,15 @@ internal static class CompilerTotalCallableArtifactCodec
         }
     }
 
-    private static bool IsSourceInstruction(IrProgram program, IrInstruction instruction, IrVarId? result,
+    private static bool IsSourceInstruction(IrInstruction instruction, IrVarId? result,
         IEnumerable<CompilerTotalParameter> parameters)
     {
         if (instruction is IrHavocInstruction havoc)
         {
+            // One approximated temporary: a delegate-emission choice or an
+            // unmodeled heap value. Parameters and result storage stay exact.
             return havoc.HavocKind == IrHavocKind.Variables && havoc.Origin == IrHavocOrigin.Approximation &&
-                havoc.Variables.Length == 1 && program.Factory.GetVariableInfo(havoc.Variables[0]).Type == program.Factory.BooleanType &&
+                havoc.Variables.Length == 1 &&
                 havoc.Variables[0] != result && !parameters.Any(parameter => havoc.Variables[0] == parameter.Entry ||
                     havoc.Variables[0] == parameter.Current || havoc.Variables[0] == parameter.Old);
         }
@@ -632,7 +634,7 @@ internal static class CompilerTotalCallableArtifactCodec
             foreach (var instruction in block.Instructions)
             {
                 Spend();
-                Require(IsSourceInstruction(program, instruction, result, parameters),
+                Require(IsSourceInstruction(instruction, result, parameters),
                     "The Total source program contains unsupported executable evidence.");
                 if (instruction is IrReturnInstruction returned)
                 { Require(returned.Value?.Type == resultType, "The Total return type disagrees with its canonical result."); }

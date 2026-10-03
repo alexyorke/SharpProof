@@ -173,6 +173,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
+        if (depth < 256 && operation is IFieldReferenceOperation fieldRead &&
+            CSharpOperationSemantics.IsSupportedFieldRead(fieldRead.Field))
+        { return FieldRead(operation, fieldRead.Field, fieldRead.Instance, block, depth); }
+        if (depth < 256 && operation is IPropertyReferenceOperation { Arguments.Length: 0 } propertyRead &&
+            CSharpOperationSemantics.GetterField(propertyRead.Property) is { } getterField)
+        { return FieldRead(operation, getterField, propertyRead.Instance, block, depth); }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -363,6 +369,28 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         _builder!.Write(result.Continuation, _context.Site(operation), region);
         return result;
     }
+    private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
+        IrBlockId block, int depth)
+    {
+        IrTerm? receiver = null;
+        var implicitThis = instance is IInstanceReferenceOperation
+        { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+        if (!implicitThis)
+        {
+            if (instance == null)
+            { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
+            var lowered = LowerBodyValue(instance, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+            receiver = lowered.Value;
+            block = lowered.Continuation;
+        }
+        var value = _context.Temporary(_context.Type(field.Type));
+        _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
+    }
+
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldReferenceOperation field, IrBlockId block, int depth)
     {

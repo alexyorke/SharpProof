@@ -12,6 +12,59 @@ internal static partial class CSharpOperationSemantics
             field.ContainingType.StaticConstructors.Length == 0;
     }
 
+    // An instance field read runs no code; its only fault is a null receiver.
+    // The heap is not modeled, so the value read is an approximation: it can
+    // support universal proofs but never a concrete refutation.
+    internal static bool IsSupportedFieldRead(IFieldSymbol field)
+    {
+        return !field.IsStatic && !field.IsVolatile && !field.HasConstantValue &&
+            field.ContainingType.IsReferenceType && IsValueDomain(field.Type);
+    }
+
+    internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
+    {
+        return FieldWrite(factory, value, receiver);
+    }
+
+    // The field a nonvirtual instance property getter returns directly: an
+    // auto-property's backing field, or a getter whose whole body returns one
+    // field of the same instance.
+    internal static IFieldSymbol? GetterField(IPropertySymbol property)
+    {
+        if (property.IsStatic || property.IsIndexer || property.IsVirtual || property.IsAbstract ||
+            property.IsOverride || property.GetMethod is not { } getter || !property.ContainingType.IsReferenceType)
+        { return null; }
+        var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+        if (backing != null)
+        { return IsSupportedFieldRead(backing) ? backing : null; }
+        if (getter.DeclaringSyntaxReferences.Length != 1)
+        { return null; }
+        var expression = getter.DeclaringSyntaxReferences[0].GetSyntax() switch
+        {
+            Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { ExpressionBody: { } arrow } => arrow.Expression,
+            Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body.Statements: { Count: 1 } statements } =>
+                (statements[0] as Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax)?.Expression,
+            Microsoft.CodeAnalysis.CSharp.Syntax.ArrowExpressionClauseSyntax arrow => arrow.Expression,
+            _ => null
+        };
+        while (expression is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax parenthesized)
+        { expression = parenthesized.Expression; }
+        var name = expression switch
+        {
+            Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax
+            {
+                Expression: Microsoft.CodeAnalysis.CSharp.Syntax.ThisExpressionSyntax,
+                Name: Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax member
+            } => member.Identifier.ValueText,
+            _ => null
+        };
+        var field = name == null ? null : property.ContainingType.GetMembers(name).OfType<IFieldSymbol>().SingleOrDefault();
+        return field != null && SymbolEqualityComparer.Default.Equals(field.Type, property.Type) &&
+            IsSupportedFieldRead(field) ? field : null;
+    }
+
     internal static TotalScalarRule FieldWrite(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
         return receiver == null ? Exact(value) : new(value,
