@@ -57,12 +57,9 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(context.Compilation, declaration.SyntaxTree);
-        var outcome = RequiresCallSiteTreeAnalyzer.Analyze(
+        var outcome = AdvisoryRequiresDiagnostics.Analyze(
             method,
             declaration,
-            semanticModel,
             session,
             context.ReportDiagnostic,
             context.CancellationToken);
@@ -211,7 +208,7 @@ internal static partial class AnalyzerFeaturePipeline
                 method,
                 context.CancellationToken),
             method.Name,
-            LanguageSubsetAbstentionReason.MissingOperationRoot);
+            "MissingOperationRoot");
         session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
     }
 
@@ -248,7 +245,7 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        method = AnalyzerSession.NormalizeMethod(method);
 
         if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
         {
@@ -313,76 +310,42 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
-            context.Compilation, declaration.SyntaxTree);
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
-        var subsetIncompleteReported = false;
-        var classifySubset = selection.Any;
-        var subset = classifySubset
-            ? LanguageSubsetGate.ClassifyEffects(
+        if (selection.Effects)
+        {
+            outcome = EffectContractDiagnostics.Analyze(
                 method,
                 declaration,
-                semanticModel,
-                context.OperationBlocks,
-                session.HasResolvedApiSpec,
-                context.CancellationToken)
-            : LanguageSubsetDecision.Supported;
-        if (!subset.IsSupported)
-        {
-            if (selection.Any)
-            {
-                ReportSelectedAnalysisIncomplete(
-                    context.ReportDiagnostic,
-                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
-                        declaration),
-                    method.Name,
-                    DescribeSubset(subset));
-                subsetIncompleteReported = true;
-            }
-
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome, AnalyzerSemanticOutcome.Abstained);
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken);
         }
-        else if (selection.Effects)
+        // A body the IR cannot lower leaves its postconditions unknown.
+        else if (selection.Contracts && !hasInvalidContractClauses &&
+            !method.IsAbstract && !method.IsExtern &&
+            context.Compilation is CSharpCompilation compilation &&
+            AdvisoryLowering.Lower(compilation, method, declaration, context.CancellationToken).Gap is { } gap)
         {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
-                EffectContractDiagnostics.Analyze(
-                    method,
-                    declaration,
-                    session,
-                    context.ReportDiagnostic,
-                    context.CancellationToken));
+            ReportSelectedAnalysisIncomplete(
+                context.ReportDiagnostic,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                    declaration),
+                method.Name,
+                "Advisory:" + gap);
+            outcome = AnalyzerSemanticOutcome.Abstained;
         }
 
         if (session.Configuration.ContractsEnabled &&
             !IsNestedCallable(method))
         {
-            var requiresOutcome =
-                RequiresCallSiteTreeAnalyzer.Analyze(
-                    method,
-                    declaration,
-                    semanticModel,
-                    session,
-                    context.ReportDiagnostic,
-                    context.CancellationToken);
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
-                requiresOutcome);
-            if (selection.Contracts &&
-                requiresOutcome == AnalyzerSemanticOutcome.Unknown &&
-                !subsetIncompleteReported &&
-                !hasInvalidContractClauses &&
-                !method.IsAbstract &&
-                !method.IsExtern)
-            {
-                ReportSelectedAnalysisIncomplete(
+                AdvisoryRequiresDiagnostics.Analyze(
+                    method,
+                    declaration,
+                    session,
                     context.ReportDiagnostic,
-                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
-                        declaration),
-                    method.Name,
-                    "RequiresCallSiteAnalysisUnknown");
-            }
+                    context.CancellationToken));
         }
 
         session.RecordSemanticOutcome(method, outcome);
@@ -488,27 +451,6 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        var subset = LanguageSubsetGate.ClassifyEffects(
-            method,
-            context.Node,
-            context.SemanticModel,
-            [body],
-            session.HasResolvedApiSpec,
-            context.CancellationToken);
-        if (!subset.IsSupported)
-        {
-            ReportSelectedAnalysisIncomplete(
-                context.ReportDiagnostic,
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
-                    context.Node),
-                method.Name,
-                DescribeSubset(subset));
-            session.RecordSemanticOutcome(
-                method,
-                AnalyzerSemanticOutcome.Abstained);
-            return;
-        }
-
         session.RecordSemanticOutcome(
             method,
             EffectContractDiagnostics.Analyze(
@@ -532,7 +474,7 @@ internal static partial class AnalyzerFeaturePipeline
                     method,
                     context.CancellationToken),
                 method.Name,
-                LanguageSubsetAbstentionReason.MissingOperationRoot);
+                "MissingOperationRoot");
             session.RecordSemanticOutcome(
                 method,
                 AnalyzerSemanticOutcome.Abstained);
@@ -611,7 +553,7 @@ internal static partial class AnalyzerFeaturePipeline
     {
         if (AnalyzerGeneratedCodePolicy.IsGenerated(constructor, declaration.SyntaxTree,
                 semanticModel.Compilation, cancellationToken) ||
-            !session.TryBeginRequiresCallSiteAnalysis(constructor))
+            !session.TryBeginExecutableAnalysis(constructor))
         {
             return null;
         }
@@ -623,243 +565,7 @@ internal static partial class AnalyzerFeaturePipeline
                 reportDiagnostic,
                 cancellationToken)
             ? AnalyzerSemanticOutcome.Suppressed
-            : RequiresCallSiteAnalyzer.AnalyzePrimaryConstructorInitializer(
-                constructor,
-                declaration,
-                semanticModel,
-                session,
-                reportDiagnostic,
-                cancellationToken);
-    }
-
-    internal static void AnalyzeMemberInitializer(
-        SyntaxNodeAnalysisContext context,
-        AnalyzerSession session)
-    {
-        context.CancellationToken.ThrowIfCancellationRequested();
-        if (context.Node is not EqualsValueClauseSyntax initializer ||
-            initializer.Parent is not VariableDeclaratorSyntax and not PropertyDeclarationSyntax)
-        {
-            return;
-        }
-        var symbol = initializer.Parent switch
-        {
-            VariableDeclaratorSyntax variable => context.SemanticModel.GetDeclaredSymbol(
-                variable, context.CancellationToken),
-            PropertyDeclarationSyntax property => context.SemanticModel.GetDeclaredSymbol(
-                property, context.CancellationToken),
-            _ => null
-        };
-        if (symbol is not IFieldSymbol and
-            not IPropertySymbol and
-            not IEventSymbol ||
-            symbol.ContainingType is not { } type)
-        {
-            return;
-        }
-        var isStatic = symbol.IsStatic;
-        if (AnalyzerGeneratedCodePolicy.IsGenerated(
-                symbol,
-                initializer.SyntaxTree,
-                context.Compilation,
-                context.CancellationToken))
-        {
-            return;
-        }
-        if (symbol is IPropertySymbol &&
-            SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
-                symbol, session, context.ReportDiagnostic, context.CancellationToken))
-        {
-            return;
-        }
-        var constructors = (isStatic
-                ? type.StaticConstructors
-                : type.InstanceConstructors)
-            .Select(static candidate =>
-            {
-                var reference = candidate.DeclaringSyntaxReferences.FirstOrDefault();
-                return (Candidate: candidate, Reference: reference);
-            })
-            .OrderBy(static item => item.Reference?.SyntaxTree.FilePath,
-                StringComparer.Ordinal)
-            .ThenBy(static item => item.Reference?.Span.Start ?? int.MaxValue)
-            .Where(item =>
-                !AnalyzerGeneratedCodePolicy.IsGenerated(
-                    item.Candidate,
-                    item.Reference?.SyntaxTree ??
-                        initializer.SyntaxTree,
-                    context.Compilation,
-                    context.CancellationToken) &&
-                !IsRecordCopyConstructor(item.Candidate) &&
-                !IsThisDelegatingConstructor(
-                    item.Candidate,
-                    context.CancellationToken))
-            .Select(static item => item.Candidate)
-            .ToArray();
-        if (constructors.Length == 0)
-        {
-            return;
-        }
-        var root = GetMemberInitializerOperation(
-            initializer, context.SemanticModel, context.CancellationToken);
-        if (root == null)
-        {
-            return;
-        }
-        var eligibleConstructors = ImmutableArray.CreateBuilder<IMethodSymbol>();
-        foreach (var candidate in constructors)
-        {
-            if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
-                    candidate,
-                    session,
-                    context.ReportDiagnostic,
-                    context.CancellationToken))
-            {
-                session.RecordSemanticOutcome(
-                    candidate,
-                    AnalyzerSemanticOutcome.Suppressed);
-                continue;
-            }
-            eligibleConstructors.Add(candidate);
-        }
-        if (eligibleConstructors.Count == 0)
-        {
-            return;
-        }
-        var operationFacts = new DefiniteOperationFacts(
-            context.Compilation,
-            context.CancellationToken);
-        if (!CanReachMemberInitializer(
-                initializer,
-                isStatic,
-                type,
-                context.SemanticModel,
-                operationFacts,
-                context.CancellationToken))
-        {
-            return;
-        }
-        var reportedDiagnostics = new HashSet<MemberInitializerDiagnosticKey>();
-        foreach (var constructor in eligibleConstructors)
-        {
-            var outcome = RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
-                constructor,
-                initializer,
-                root,
-                context.SemanticModel,
-                session,
-                diagnostic =>
-                {
-                    var key = new MemberInitializerDiagnosticKey(
-                        diagnostic.Id,
-                        diagnostic.Location.SourceTree,
-                        diagnostic.Location.SourceSpan,
-                        diagnostic.GetMessage(CultureInfo.InvariantCulture));
-                    if (reportedDiagnostics.Add(key))
-                    {
-                        context.ReportDiagnostic(diagnostic);
-                    }
-                },
-                context.CancellationToken);
-            session.RecordSemanticOutcome(constructor, outcome);
-        }
-    }
-
-    private readonly record struct MemberInitializerDiagnosticKey(
-        string Id,
-        SyntaxTree? Tree,
-        TextSpan Span,
-        string Message);
-
-    private static bool IsRecordCopyConstructor(IMethodSymbol constructor)
-    {
-        return constructor.ContainingType.TypeKind == TypeKind.Class &&
-            constructor.ContainingType.IsRecord &&
-            constructor.Parameters.Length == 1 &&
-            constructor.Parameters[0].RefKind == RefKind.None &&
-            SymbolEqualityComparer.Default.Equals(
-                constructor.Parameters[0].Type,
-                constructor.ContainingType);
-    }
-
-    private static bool IsThisDelegatingConstructor(
-        IMethodSymbol constructor,
-        CancellationToken cancellationToken)
-    {
-        return constructor.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<ConstructorDeclarationSyntax>()
-            .Any(static declaration =>
-                declaration.Initializer?.ThisOrBaseKeyword.IsKind(
-                    SyntaxKind.ThisKeyword) == true);
-    }
-
-    private static bool CanReachMemberInitializer(
-        EqualsValueClauseSyntax target,
-        bool isStatic,
-        INamedTypeSymbol type,
-        SemanticModel semanticModel,
-        DefiniteOperationFacts operationFacts,
-        CancellationToken cancellationToken)
-    {
-        foreach (var reference in EffectMethodNodeBuilder
-                     .GetMemberInitializerReferences(
-                         semanticModel.Compilation,
-                         type,
-                         isStatic))
-        {
-            var initializer = GetMemberInitializer(
-                reference.GetSyntax(cancellationToken));
-            if (initializer == null)
-            {
-                continue;
-            }
-            if (initializer.SyntaxTree == target.SyntaxTree &&
-                initializer.Span == target.Span)
-            {
-                return true;
-            }
-            var model = initializer.SyntaxTree == semanticModel.SyntaxTree
-                ? semanticModel
-                : SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
-                    semanticModel.Compilation,
-                    initializer.SyntaxTree);
-            var operation = GetMemberInitializerOperation(
-                initializer, model, cancellationToken);
-            if (operation != null &&
-                !operationFacts.MayCompleteNormally(operation))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static IOperation? GetMemberInitializerOperation(
-        EqualsValueClauseSyntax initializer,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        ExpressionSyntax expression = initializer.Value;
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            expression = parenthesized.Expression;
-        }
-        return semanticModel.GetOperation(expression, cancellationToken);
-    }
-
-    private static EqualsValueClauseSyntax? GetMemberInitializer(
-        SyntaxNode member)
-    {
-        return member switch
-        {
-            VariableDeclaratorSyntax { Initializer: { } initializer } =>
-                initializer,
-            PropertyDeclarationSyntax { Initializer: { } initializer } =>
-                initializer,
-            _ => null
-        };
+            : AnalyzerSemanticOutcome.NotApplicable;
     }
 
     private static bool ValidateContractClauses(
@@ -1042,13 +748,6 @@ internal static partial class AnalyzerFeaturePipeline
             location,
             methodName,
             reason));
-    }
-
-    private static string DescribeSubset(LanguageSubsetDecision subset)
-    {
-        return subset.OperationKind is { } operation
-            ? subset.Reason + " (" + operation + ")"
-            : subset.Reason.ToString();
     }
 
     private static SyntaxNode? FindDeclaration(

@@ -39,36 +39,10 @@ internal static class AdvisoryEffectSites
     internal static AdvisoryEffectAnalysis Analyze(CSharpCompilation compilation, IMethodSymbol method,
         SyntaxNode declaration, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!compilation.SyntaxTrees.Contains(declaration.SyntaxTree))
-        { return Gap("SourceOwnership"); }
-        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture)))
-            .ToArray();
-        var paths = documents.ToDictionary(item => item.Tree, item => item.Path);
-        var trees = documents.ToDictionary(item => item.Path, item => item.Tree, StringComparer.Ordinal);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method, tree => paths[tree]);
-        if (!TotalBodyLowering.IsBodyDeclaration(declaration))
-        { return Gap("UnsupportedCallable"); }
-        FrontendProgramLoweringResult? lowering;
-        if (TotalBodyLowering.AutoAccessor(declaration) is { } autoAccessor)
-        { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
-        else
-        {
-            var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
-            if (!binding.IsSuccess)
-            { return Gap("ContractBinding:" + binding.Failure); }
-            var graph = TotalBodyLowering.CreateGraph(declaration, method,
-                Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree), cancellationToken);
-            lowering = graph == null ? null : TotalBodyLowering.Lower(compilation, graph, context, cancellationToken, opaqueCalls: true);
-        }
-        if (lowering == null)
-        { return Gap("UnsupportedCallable"); }
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!lowering.IsExact)
-        { return Gap("Lowering:" + lowering.Classification.Abstention); }
-        var program = lowering.Program;
-        if (program.Blocks.Sum(block => block.Instructions.Length) > TotalBodyLowering.MaximumWork)
-        { return Gap("GraphBudget"); }
+        var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
+        if (body == null)
+        { return Gap(gap!); }
+        var program = body.Program;
         var reachable = Reachable(program, [program.Entry]);
         var escapes = Escaping(program);
         var factory = program.Factory;
@@ -79,7 +53,7 @@ internal static class AdvisoryEffectSites
             foreach (var instruction in block.Instructions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var location = Locate(factory, trees, instruction.Operation) ?? method.Locations.FirstOrDefault() ?? Location.None;
+                var location = body.Locate(instruction.Operation) ?? method.Locations.FirstOrDefault() ?? Location.None;
                 if (sequenceReaders.Contains(instruction.Id))
                 { sites.Add(new(AdvisoryEffectSiteKind.Read, location)); }
                 switch (instruction)
@@ -184,12 +158,4 @@ internal static class AdvisoryEffectSites
 
     private static string Describe(IrFactory factory, OperationId site)
     { return factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : ""; }
-
-    private static Location? Locate(IrFactory factory, Dictionary<string, SyntaxTree> trees, OperationId site)
-    {
-        return factory.GetOperationInfo(site).SourceSpan is { } span && span.Document is { } document &&
-            trees.TryGetValue(document, out var tree) && span.Start + span.Length <= tree.Length
-            ? Location.Create(tree, new TextSpan(span.Start, span.Length))
-            : null;
-    }
 }

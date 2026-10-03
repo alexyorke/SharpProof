@@ -182,8 +182,8 @@ internal static class CorpusCatalog
             "private static void MustBe(bool condition) { Contract.Requires(condition); }"),
         Contract(
             "C06",
-            CorpusVerdict.SilentUnknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "Positive(Unknown()); return $INPUT$;",
             PositiveMember + " private static int Unknown() => -1;"),
         Contract(

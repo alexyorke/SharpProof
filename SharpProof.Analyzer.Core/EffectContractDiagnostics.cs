@@ -38,10 +38,14 @@ internal static class EffectContractDiagnostics
     {
         var evaluations = Evaluate(
             method, AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
-            session, reportDiagnostic, cancellationToken);
+            session, reportDiagnostic, cancellationToken, out var abstained);
         if (evaluations.IsDefaultOrEmpty)
         {
             return AnalyzerSemanticOutcome.NotApplicable;
+        }
+        if (abstained)
+        {
+            return AnalyzerSemanticOutcome.Abstained;
         }
 
         var hasRefuted = false;
@@ -136,8 +140,9 @@ internal static class EffectContractDiagnostics
     // Z3 decides the claim in the build.
     internal static ImmutableArray<EffectClaimEvaluation> Evaluate(
         IMethodSymbol method, Location location, AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
+        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, out bool abstained)
     {
+        abstained = false;
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         _ = DecodeCapabilities(Select(attributes, session.Attributes.AllowedCapabilities), location, session, reportDiagnostic);
         _ = DecodeAllowedExceptions(Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session,
@@ -159,6 +164,7 @@ internal static class EffectContractDiagnostics
         {
             reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule, location,
                 method.Name, "Advisory:" + analysis.Gap));
+            abstained = true;
             return evaluations;
         }
         return [.. evaluations.Select(evaluation =>

@@ -24,6 +24,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
 
     internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; set; }
+    internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; set; }
     internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; set; }
 
     // Shadow skeletons record call edges only; they never take opaque calls.
@@ -147,6 +148,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
+        if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
+            SourceConstruction?.Invoke(sourceCreation, block, depth) is { } constructed)
+        { return constructed; }
         if (depth < 256 && operation is IObjectCreationOperation exceptionCreation &&
             CSharpOperationSemantics.IsCoreExceptionCreation(exceptionCreation))
         {
@@ -356,7 +360,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
     }
 
-    private TotalBodyValue AllocateValue(IOperation operation, IrBlockId block)
+    internal TotalBodyValue AllocateValue(IOperation operation, IrBlockId block)
     {
         var type = _context.Type(operation.Type);
         var target = _context.Temporary(type);
@@ -478,7 +482,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         var result = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, _factory.Integer(0), receiver), block);
         var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        _builder!.Write(result.Continuation, _context.Site(operation), region);
+        _builder!.Write(result.Continuation, ReceiverWriteSite(operation, field.Instance), region);
         return result;
     }
     // A metadata call, or a dispatched source call, that is neither inlined nor
@@ -569,7 +573,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = lowered.Continuation;
         }
         var site = _context.Site(mutation ?? access);
-        var writeSite = mutation != null && CSharpOperationSemantics.IsFreshArrayLocal(access, _context.Compilation)
+        var writeSite = mutation != null && access.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.ElementAccessExpressionSyntax element &&
+            CSharpOperationSemantics.IsFreshReceiver(element.Expression, _context.Compilation)
             ? _context.FreshWriteSite(mutation) : site;
         TotalBodyValue? stored = null;
         if (mutation is ISimpleAssignmentOperation assignment)
@@ -739,7 +744,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
     {
-        return _context.FreshReceiver && IsImplicitThis(instance) ? _context.FreshWriteSite(operation) : _context.Site(operation);
+        return _context.FreshReceiver && IsImplicitThis(instance) ||
+            instance != null && !IsImplicitThis(instance) && CSharpOperationSemantics.IsFreshReceiver(instance.Syntax, _context.Compilation)
+            ? _context.FreshWriteSite(operation) : _context.Site(operation);
     }
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)

@@ -105,6 +105,9 @@ public sealed class NativeCallableKindTests
     [TestCase("int _x; [ZeroAllocations] public C() { var box = new object(); _x = 1; }", "refuted")]
     [TestCase("int _x; int _y = 1; [EnforcePure] public C(int x) { _x = x; }", "unknown")]
     [TestCase("int _x; [EnforcePure] public C(int x) { _x = x; Keep(this); } static void Keep(C c) { }", "unknown")]
+    // `new C(...)` allocates, then runs a plain source constructor as written.
+    [TestCase("int _x; public C(int x) { _x = x; } [ZeroAllocations] public static int Make(int y) { var c = new C(y); return y; }", "refuted")]
+    [TestCase("int _x; public C(int x) { _x = 10 / x; } [EnforcePure] public static int Make(int y) { var c = new C(y); return y; }", "proven")]
     // A local function that captures nothing runs from its parameters alone.
     [TestCase("public static int Target(int x) { return Twice(x); [ZeroAllocations] static int Twice(int y) => y * 2; }", "proven")]
     [TestCase("public static int Target(int x) { return Times(x); [ZeroAllocations] int Times(int y) => y * x; }", "unknown")]

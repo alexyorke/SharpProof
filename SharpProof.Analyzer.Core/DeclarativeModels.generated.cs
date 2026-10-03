@@ -25,45 +25,6 @@ internal sealed partial record EffectClaimConstraint(
     ImmutableArray<INamedTypeSymbol> ExceptionTypes
 );
 
-internal readonly partial record struct LanguageSubsetDecision(
-    bool IsSupported,
-    LanguageSubsetAbstentionReason Reason,
-    OperationKind? OperationKind
-);
-
-internal readonly partial record struct RequiresCallSiteCandidate(
-    IOperation? Operation,
-    SyntaxNode Syntax,
-    IMethodSymbol TargetMethod,
-    IOperation? Instance,
-    ImmutableArray<IArgumentOperation> Arguments,
-    ImmutableDictionary<int, IOperation> ExplicitArguments,
-    ImmutableDictionary<int, long> ImplicitIntegerArguments,
-    bool CanReplay,
-    ManagedFlowResult? Flow,
-    ManagedFlowStatus FlowStatus
-);
-
-// Advisory observations retain compiler-owned clause and call identities.
-// Their outcomes do not authorize native claims or proof-cache evidence.
-internal readonly record struct RequiresClauseObservation(
-    IMethodSymbol Caller,
-    RequiresCallSiteCandidate Candidate,
-    IMethodSymbol ContractTarget,
-    BoundContractClause Clause,
-    int ClauseOrdinal,
-    AnalyzerSemanticOutcome Outcome);
-
-internal readonly record struct RequiresCallObservationGap(
-    IMethodSymbol Caller,
-    RequiresCallSiteCandidate Candidate,
-    string Reason);
-
-internal readonly record struct RequiresOwnerObservationGap(
-    IMethodSymbol Caller,
-    SyntaxNode Declaration,
-    string Reason);
-
 internal enum PotentialRequiresCallOrigin
 {
     Operation,
@@ -98,34 +59,4 @@ internal sealed partial class SharpProofAnalyzerEngine
 internal static partial class AnalyzerFeaturePipeline
 {
     private readonly partial record struct MethodSelection(ContractSelectionFeatures Features, bool IsSuppressed);
-}
-
-internal static partial class RequiresCallSiteAnalyzer
-{
-    private readonly partial record struct ClauseEvaluation(bool? Value, string DiagnosticText);
-}
-
-internal sealed partial class RequiresCallSiteDiscovery
-{
-    private readonly partial record struct RequiresCallTarget(
-        IMethodSymbol TargetMethod,
-        IOperation? Instance,
-        ImmutableArray<IArgumentOperation> Arguments,
-        ImmutableDictionary<int, IOperation> ExplicitArguments,
-        ImmutableDictionary<int, long> ImplicitIntegerArguments,
-        bool CanReplay
-    )
-    {
-        internal int CanonicalRole { get; init; } = -1;
-    }
-}
-
-internal static partial class RequiresCallSiteTreeAnalyzer
-{
-    private readonly partial record struct NestedCallable(
-        IMethodSymbol Method,
-        SyntaxNode Declaration,
-        IFlowAnonymousFunctionOperation? AnonymousFunction,
-        bool IsExpressionTree
-    );
 }

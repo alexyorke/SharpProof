@@ -317,7 +317,12 @@ inventories, companion resolution, API specifications, or effect analysis
 unless a target or selected callable demands them.
 
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
-by default. A concretely replayed false precondition is SP0027 at Warning.
+by default. SP0027, at Warning, reports a call whose callee precondition is
+false in every state the advisory interval interpreter reaches it with, over
+the same Total program the worker verifies (source callees, including plain
+constructors, run as written). It covers callable bodies and their local
+functions that the IR lowers; member initializers, constructor initializers
+and lambdas are not checked. It never proves a call site.
 Configuration, contract-usage, and compiler-artifact errors remain enabled at
 their declared warning/error severity. The removed
 `SharpProofMode`/`sharpproof_mode` and `all-experimental` compatibility inputs
@@ -329,34 +334,16 @@ unexplained canonical snapshot change, and all soundness and performance gates
 green. Promotion changes reporting severity only; it cannot enlarge the
 supported subset or proof semantics.
 
-The current effect subset accepts non-generic ordinary methods, explicit
-constructors, and accessors using locals, primitive expressions, assignments,
-direct calls, object and array creation, `if`, `for`, `while`, `do`, constant
-`switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and
-ordinary interpolation.
+Selected callables are verified when the worker can lower them: a body the IR
+cannot lower produces SP0047 and stays Unknown. The callable's shape is checked
+first: async, generic, by-reference, pointer, function-pointer, delegate,
+dynamic, ref-like and unsafe callables are unsupported.
 
 Effect exception flow evaluates catches in source order. A selected handler
 can consume an exception or let a rethrow escape, but an exception thrown or
 rethrown from that handler is never offered to later sibling catches.
 Nonconstant filters and uncertain runtime subtypes retain every feasible
 escape path.
-
-It rejects async and iterator bodies, `foreach`, closures, local functions,
-delegates, ref parameters or locals, ref returns, ref-like types, open type
-parameters, dynamic binding, unsafe and pointer constructs, function pointers,
-patterns, deconstruction, queries, `with`, ranges, implicit indexers, custom
-interpolated-string handlers, inline arrays, collection expressions and spread,
-and primary constructors. A closed constructed generic API call is accepted only
-when a specification resolves for that exact call. Every Roslyn `OperationKind`
-is classified by a checked-in decision table; an unknown future kind is rejected.
-
-That rejection defines selected effect admission, not whether the contracts
-feature can inspect a call site. Call-site precondition analysis recursively
-follows Roslyn child CFGs for executable local functions, lambdas, and anonymous
-methods. Each callable is analyzed once under its own entry and flow state, and
-its outcome is not combined with the containing callable. Unavailable captured
-facts remain unknown. An expression-tree lambda is quoted code and is not
-treated as an executing call site.
 
 The packaged verifier consumes compiler artifact schema version 28 produced
 from the final post-generator compilation. The artifact contains the sealed

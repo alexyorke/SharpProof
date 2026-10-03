@@ -72,16 +72,23 @@ internal static partial class CSharpOperationSemantics
              new(IrExceptionKind.IndexOutOfRange, outside)], FrontendSubsetClassification.Exact);
     }
 
-    // A local that only ever holds arrays this body creates, and is only
-    // indexed, measured or reassigned a new array, never lets its array escape.
-    // The control flow graph may capture the array and carries no semantic
-    // model, so the local is found from the access syntax.
-    internal static bool IsFreshArrayLocal(IArrayElementReferenceOperation access, Compilation? compilation)
+    // Whether the receiver of a field or element store is state this body
+    // created and still holds alone: a new object or array, or a local that
+    // only ever holds them and is only dereferenced. A constructor that lets
+    // `this` escape makes its object observable. The control flow graph may
+    // capture the receiver and carries no semantic model, so the receiver is
+    // found from its syntax.
+    internal static bool IsFreshReceiver(SyntaxNode receiver, Compilation? compilation)
     {
-        if (access.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ElementAccessExpressionSyntax
-            { Expression: Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax name } ||
-            compilation == null || !compilation.SyntaxTrees.Contains(name.SyntaxTree) ||
-            Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, name.SyntaxTree) is not { } model ||
+        while (receiver is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax parenthesized)
+        { receiver = parenthesized.Expression; }
+        if (compilation == null || !compilation.SyntaxTrees.Contains(receiver.SyntaxTree))
+        { return false; }
+        var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, receiver.SyntaxTree);
+        if (receiver is Microsoft.CodeAnalysis.CSharp.Syntax.BaseObjectCreationExpressionSyntax or
+            Microsoft.CodeAnalysis.CSharp.Syntax.ArrayCreationExpressionSyntax)
+        { return IsFreshCreation(model.GetOperation(receiver), model); }
+        if (receiver is not Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax name ||
             model.GetSymbolInfo(name).Symbol is not ILocalSymbol { RefKind: RefKind.None } local ||
             local.ContainingSymbol is not IMethodSymbol owner ||
             owner.DeclaringSyntaxReferences.Length != 1 ||
@@ -92,24 +99,25 @@ internal static partial class CSharpOperationSemantics
             switch (operation)
             {
                 case IVariableDeclaratorOperation declarator when SymbolEqualityComparer.Default.Equals(declarator.Symbol, local):
-                    if (declarator.Initializer != null && declarator.Initializer.Value is not IArrayCreationOperation)
+                    if (declarator.Initializer != null && !IsFreshCreation(declarator.Initializer.Value, model))
                     { return false; }
                     break;
                 case ILocalReferenceOperation use when SymbolEqualityComparer.Default.Equals(use.Local, local):
-                    if (!IsContainedUse(use) || InNestedFunction(use, root))
+                    if (!IsContainedUse(use, model) || InNestedFunction(use, root))
                     { return false; }
                     break;
             }
         }
         return true;
 
-        static bool IsContainedUse(ILocalReferenceOperation use)
+        static bool IsContainedUse(ILocalReferenceOperation use, SemanticModel model)
         {
             return use.Parent switch
             {
                 IArrayElementReferenceOperation element => element.ArrayReference == use,
+                IFieldReferenceOperation field => field.Instance == use,
                 IPropertyReferenceOperation { Property.Name: "Length" } length => length.Instance == use,
-                ISimpleAssignmentOperation assignment => assignment.Target == use && assignment.Value is IArrayCreationOperation,
+                ISimpleAssignmentOperation assignment => assignment.Target == use && IsFreshCreation(assignment.Value, model),
                 _ => false
             };
         }
@@ -123,5 +131,21 @@ internal static partial class CSharpOperationSemantics
             }
             return false;
         }
+    }
+
+    private static bool IsFreshCreation(IOperation? value, SemanticModel model)
+    {
+        return value switch
+        {
+            IArrayCreationOperation => true,
+            IObjectCreationOperation { Constructor: { } constructor } => constructor.IsImplicitlyDeclared ||
+                constructor.DeclaringSyntaxReferences.Length == 1 &&
+                constructor.DeclaringSyntaxReferences[0].SyntaxTree == model.SyntaxTree &&
+                model.GetOperation(constructor.DeclaringSyntaxReferences[0].GetSyntax()) is { } body &&
+                body.Descendants().OfType<IInstanceReferenceOperation>().All(static receiver =>
+                    receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+                    IsObjectConstructorCall(receiver.Parent)),
+            _ => false
+        };
     }
 }

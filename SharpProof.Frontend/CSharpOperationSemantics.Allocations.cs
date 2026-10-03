@@ -54,6 +54,46 @@ internal static partial class CSharpOperationSemantics
         return allocates;
     }
 
+    // A class constructor that runs exactly its own body: the class derives
+    // from object, has no instance member initializers or primary
+    // constructor, and the constructor chains to no other constructor.
+    internal static bool IsPlainConstructor(IMethodSymbol constructor, CancellationToken cancellationToken)
+    {
+        if (constructor is not { MethodKind: MethodKind.Constructor, IsStatic: false } ||
+            constructor.ContainingType is not
+            {
+                TypeKind: TypeKind.Class, IsRecord: false, BaseType.SpecialType: SpecialType.System_Object
+            } type)
+        { return false; }
+        foreach (var reference in constructor.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax syntax ||
+                syntax.Initializer is { } initializer &&
+                (initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword) ||
+                    initializer.ArgumentList.Arguments.Count != 0))
+            { return false; }
+        }
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration ||
+                declaration.ParameterList != null || declaration.Members.Any(static member => member switch
+                {
+                    Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field => !IsStatic(field.Modifiers) &&
+                        field.Declaration.Variables.Any(static variable => variable.Initializer != null),
+                    Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax property => !IsStatic(property.Modifiers) &&
+                        property.Initializer != null,
+                    Microsoft.CodeAnalysis.CSharp.Syntax.EventFieldDeclarationSyntax eventField => !IsStatic(eventField.Modifiers) &&
+                        eventField.Declaration.Variables.Any(static variable => variable.Initializer != null),
+                    _ => false
+                }))
+            { return false; }
+        }
+        return true;
+
+        static bool IsStatic(SyntaxTokenList modifiers)
+        { return modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)); }
+    }
+
     internal static bool IsObjectConstructorCall(IOperation? operation)
     {
         return operation is IInvocationOperation

@@ -173,19 +173,8 @@ internal sealed partial class ClaimManifestBuilder(
                     gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingBody"));
                     continue;
                 }
-                var calls = new RequiresCallSiteDiscovery(method, declaration, model, cancellationToken,
-                    suppliedOperationRoot: operation).GetPotentialCalls(_effectSession.HasPotentialCallPreconditions,
-                    out var complete);
-                var owned = calls ?? [];
-                if (!calls.HasValue || owned.Any(call => !SymbolEqualityComparer.Default.Equals(call.Owner, method)))
-                {
-                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "IncompleteOwnership"));
-                    complete = false;
-                }
-                else if (!complete)
-                {
-                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "IncompleteCalls"));
-                }
+                var owned = PotentialCalls(method, operation, _effectSession.HasPotentialCallPreconditions);
+                const bool complete = true;
                 var id = published.TryGetValue(method, out var selected)
                     ? selected.Entry.CallableId : SemanticClaimIdentity.CreateCallableId(method);
                 owners.Add(new(method, declaration, model, id, owned, complete));
@@ -193,6 +182,30 @@ internal sealed partial class ClaimManifestBuilder(
             treeOrdinal++;
         }
         return new(owners.ToImmutable(), gaps.ToImmutable());
+    }
+
+    // The explicit calls and constructions whose target may have a
+    // precondition, in source order.
+    private static ImmutableArray<PotentialRequiresCallSite> PotentialCalls(IMethodSymbol owner, IOperation body,
+        Func<IMethodSymbol, bool> hasPreconditions)
+    {
+        var calls = ImmutableArray.CreateBuilder<PotentialRequiresCallSite>();
+        foreach (var operation in body.Descendants().OrderBy(static operation => operation.Syntax.SpanStart))
+        {
+            var (target, instance, arguments) = operation switch
+            {
+                IInvocationOperation invocation => (invocation.TargetMethod, invocation.Instance, invocation.Arguments),
+                IObjectCreationOperation { Constructor: { } constructor } creation => (constructor, null, creation.Arguments),
+                _ => ((IMethodSymbol?)null, (IOperation?)null, ImmutableArray<IArgumentOperation>.Empty)
+            };
+            if (target != null && hasPreconditions(target))
+            {
+                calls.Add(new(owner, operation, operation.Syntax, PotentialRequiresCallOrigin.Operation, 0, target,
+                    target.ReducedFrom ?? target, instance, arguments, ImmutableDictionary<int, IOperation>.Empty,
+                    ImmutableDictionary<int, long>.Empty, true));
+            }
+        }
+        return calls.ToImmutable();
     }
 
     private static bool SupportedShadowOwnerType(ITypeSymbol type, bool allowReferenceOwners)
@@ -338,14 +351,13 @@ internal sealed partial class ClaimManifestBuilder(
             EffectsEnabled &&
             (analyzerSelection &
              ContractSelectionFeatures.Effects) != 0;
-        var selectedSubset =
-            analyzerContractsSelected ||
-            analyzerEffectsSelected
-            ? ClassifySelectedSubset(
-                seed,
-                analyzerContractsSelected,
-                analyzerEffectsSelected)
-            : LanguageSubsetDecision.Supported;
+        // The worker decides whether a body is supported; here only the
+        // callable's shape is classified. A trusted bodyless contract needs
+        // no body.
+        var selectedSubset = !(analyzerContractsSelected || analyzerEffectsSelected) ||
+            (seed.Method.IsAbstract || seed.Method.IsExtern) && analyzerEffectsSelected && !analyzerContractsSelected &&
+                _effectSession.ResolveEffectContract(seed.Method).Kind == EffectContractResolutionKind.Valid ||
+            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration);
         var supported =
             seed.Declaration is
                 MethodDeclarationSyntax or
@@ -354,7 +366,7 @@ internal sealed partial class ClaimManifestBuilder(
                 MethodKind.Ordinary or
                 MethodKind.Constructor or
                 MethodKind.ExplicitInterfaceImplementation &&
-            selectedSubset.IsSupported;
+            selectedSubset;
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
             ? CreateEffectClaims(
@@ -397,35 +409,6 @@ internal sealed partial class ClaimManifestBuilder(
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);
-    }
-
-    private LanguageSubsetDecision ClassifySelectedSubset(
-        CallableSeed seed,
-        bool contractsSelected,
-        bool effectsSelected)
-    {
-        if ((seed.Method.IsAbstract || seed.Method.IsExtern) &&
-            effectsSelected &&
-            !contractsSelected &&
-            _effectSession.ResolveEffectContract(seed.Method).Kind ==
-            EffectContractResolutionKind.Valid)
-        {
-            return LanguageSubsetDecision.Supported;
-        }
-
-        if (seed.Declaration == null || seed.Model == null)
-        {
-            return LanguageSubsetDecision.Abstain(
-                LanguageSubsetAbstentionReason.UnsupportedCallable);
-        }
-
-        return LanguageSubsetGate.ClassifyEffects(
-            seed.Method,
-            seed.Declaration,
-            seed.Model,
-            [],
-            _effectSession.HasResolvedApiSpec,
-            cancellationToken);
     }
 
     private ImmutableArray<ManifestClaim> CreatePostconditions(

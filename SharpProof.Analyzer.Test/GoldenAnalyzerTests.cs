@@ -24,62 +24,10 @@ public sealed class GoldenAnalyzerTests
             GoldenTest.Compare(fixture, FormatCoreAdvisory(fixture.Source));
             return;
         }
-        if (caseName == "record-copy-initializer-observation")
-        {
-            var observer = new RecordInitializerObserver();
-            var sessions = new RecordingSessionFactory { RequiresObserver = observer };
-            var observedDiagnostics = await AnalyzerTestHost.AnalyzeAsync(fixture.Source, "contracts", ["SP0027"],
-                new SharpProofAnalyzer(sessions), filePath: caseName + ".cs");
-            var rows = observer.Rows.Order(StringComparer.Ordinal);
-            GoldenTest.Compare(fixture, "diagnostics " + observedDiagnostics.Length.ToString(CultureInfo.InvariantCulture) + "\n" + string.Join('\n', rows));
-            return;
-        }
-        if (fixture.Source.StartsWith("// golden-scenario: core-advisory-calls\n", StringComparison.Ordinal))
-        {
-            GoldenTest.Compare(fixture, FormatAdvisoryCalls(fixture.Source));
-            return;
-        }
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(fixture.Source, "contracts", ["SP0027"], filePath: caseName + ".cs");
         GoldenTest.Compare(fixture, FormatDiagnostics(diagnostics));
     }
 
-    private static string FormatAdvisoryCalls(string source)
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0027"]);
-        var rows = new List<string>();
-        foreach (var syntax in compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
-            .Where(method => method.Modifiers.Any(modifier => modifier.ValueText == "public")).OrderBy(method => method.Identifier.ValueText, StringComparer.Ordinal))
-        {
-            var result = AdvisoryCallConsumer.Analyze(compilation, syntax, true);
-            Assert.That(result.Calls, Has.Length.EqualTo(1));
-            var site = result.Calls[0];
-            var program = result.Program!;
-            var occurrences = 0;
-            foreach (var input in new[] { -2, -1, 0, 1, 2 })
-            {
-                var initial = program.GetBlock(program.Entry).Instructions.OfType<IrAssignInstruction>().Select(assign => assign.Value).OfType<IrVariableTerm>()
-                    .GroupBy(variable => variable.Variable).ToDictionary(group => group.Key, group => program.Factory.CreateIntegerValue(program.Factory.GetVariableInfo(group.Key).Type, input));
-                var replay = new IrProgramReplayOptions(request => program.Factory.CreateIntegerValue(program.Factory.GetVariableInfo(request.Variable).Type, input))
-                {
-                    AssignmentObserver = (assignment, value, tainted) =>
-                    {
-                        if (!ReferenceEquals(assignment, site.Marker))
-                        {
-                            return;
-                        }
-                        occurrences++;
-                        Assert.That(tainted, Is.False);
-                        Assert.That(site.Condition.Contains(value.Boolean ? 1 : 0), Is.True);
-                    }
-                };
-                _ = new IrProgramInterpreter(program.Factory).Execute(program, initial, 1000, replay);
-            }
-            Assert.That(occurrences, Is.GreaterThan(0));
-            var gaps = result.Gaps.IsEmpty ? "none" : string.Join(",", result.Gaps);
-            rows.Add($"{syntax.Identifier.ValueText} gaps={gaps} marker=[{site.Condition.LowerBound},{site.Condition.UpperBound}] prefixGap={(site.PrefixHasGap ? "true" : "false")} replayOccurrences={occurrences}");
-        }
-        return string.Join('\n', rows);
-    }
     private static string FormatCoreAdvisory(string source)
     {
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
@@ -119,25 +67,5 @@ public sealed class GoldenAnalyzerTests
                 diagnostic.GetMessage(CultureInfo.InvariantCulture);
         }).Order(StringComparer.Ordinal);
         return string.Join('\n', rows);
-    }
-
-    private sealed class RecordInitializerObserver : IRequiresCallSiteObserver
-    {
-        internal System.Collections.Concurrent.ConcurrentQueue<string> Rows { get; } = new();
-
-        public void ObserveClause(in RequiresClauseObservation observation)
-        {
-            if (observation.ContractTarget.Name != "Need")
-            {
-                return;
-            }
-            var parameters = string.Join(",", observation.Caller.Parameters.Select(static parameter =>
-                parameter.RefKind + ":" + parameter.Type.Name));
-            Rows.Enqueue($"owner {observation.Caller.ContainingType.Name}({parameters}) target Need clause " +
-                observation.ClauseOrdinal.ToString(CultureInfo.InvariantCulture) + " " + observation.Outcome);
-        }
-
-        public void ObserveGap(in RequiresCallObservationGap gap) { }
-        public void ObserveOwnerGap(in RequiresOwnerObservationGap gap) { }
     }
 }

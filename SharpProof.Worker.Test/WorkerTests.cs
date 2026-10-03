@@ -2536,7 +2536,7 @@ public sealed class WorkerTests
         var record = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedCallable);
+            WorkerClaimReason.UnsupportedBody);
         Assert.That(record.ProofCore, Is.Empty);
     }
 
@@ -4116,8 +4116,8 @@ public sealed class WorkerTests
             """
             using SharpProof.Attributes;
             public static class Subject {
-                private sealed class Reader {
-                    internal long Read(long value) => value;
+                private class Reader {
+                    internal virtual long Read(long value) => value;
                 }
                 public static long Unsupported(long value) {
                     Contract.Ensures(Contract.Result<long>() == value);

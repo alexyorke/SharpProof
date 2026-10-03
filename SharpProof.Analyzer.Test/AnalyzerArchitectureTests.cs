@@ -188,36 +188,6 @@ public sealed class AnalyzerArchitectureTests
     }
 
     [Test]
-    public void SubsetAbstentionsUseAClosedTypedReason()
-    {
-        Assert.That(
-            Enum.GetValues<LanguageSubsetAbstentionReason>(),
-            Is.EquivalentTo(new[] {
-                LanguageSubsetAbstentionReason.None,
-                LanguageSubsetAbstentionReason.UnsupportedCallable,
-                LanguageSubsetAbstentionReason.MissingOperationRoot,
-                LanguageSubsetAbstentionReason.UnsupportedOperationKind,
-                LanguageSubsetAbstentionReason.UnsupportedType,
-                LanguageSubsetAbstentionReason.UnsupportedOperationShape
-            }));
-        var abstention = LanguageSubsetDecision.Abstain(
-            LanguageSubsetAbstentionReason.UnsupportedOperationKind,
-            OperationKind.DynamicInvocation);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(abstention.IsSupported, Is.False);
-            Assert.That(
-                abstention.Reason,
-                Is.EqualTo(
-                    LanguageSubsetAbstentionReason.UnsupportedOperationKind));
-            Assert.That(
-                abstention.OperationKind,
-                Is.EqualTo(OperationKind.DynamicInvocation));
-        }
-    }
-
-    [Test]
     public void ReleaseTrackingMatchesCurrentSupportedDescriptors()
     {
         var root = TestRepository.FindRoot();

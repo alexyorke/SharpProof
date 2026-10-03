@@ -129,9 +129,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         frame = null;
         graph = null;
         if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) ||
-            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet) ||
+            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
-            method.IsStatic != (instance == null) ||
+            (method.MethodKind == MethodKind.Constructor
+                ? instance != null || !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)
+                : method.IsStatic != (instance == null)) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
             method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
             method.Arity != 0 || method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
@@ -162,7 +164,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var reference = method.DeclaringSyntaxReferences[0];
         var declaration = reference.GetSyntax(cancellationToken);
         if (!compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
-            declaration is not (MethodDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or AccessorDeclarationSyntax { ExpressionBody: not null }))
+            declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or
+                AccessorDeclarationSyntax { ExpressionBody: not null }))
         { return false; }
         foreach (var node in declaration.DescendantNodesAndSelf())
         {

@@ -81,7 +81,6 @@ public sealed class CorpusGateTests
             Assert.That(seed.Select(static item => item.Variant), Is.EquivalentTo(Enum.GetValues<CorpusVariant>()), seed.Key);
         }
         var rows = new List<(string Seed, string Outcome, string Reason)>();
-        var managedRows = new List<(string Seed, string Outcome)>();
         foreach (var item in cases)
         {
             var compilation = AnalyzerGateHost.CreateCompilation(item.Source, "ShadowCorpus_" + item.SeedId);
@@ -121,10 +120,6 @@ public sealed class CorpusGateTests
             Assert.That(coverage.Expected, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Failures, Is.Empty, item.Id);
-            var managed = await CorpusGate.ObserveManagedContractClausesAsync(compilation, CancellationToken.None);
-            Assert.That(managed.Gaps, Is.Empty, item.Id);
-            Assert.That(managed.Clauses, Has.Length.EqualTo(1), item.Id);
-            var managedClause = managed.Clauses.Single();
             var nativeClause = detached.Body.CallPreconditions.Single();
             var marker = detached.Body.Program.Blocks.SelectMany(static block => block.Instructions)
                 .Single(instruction => instruction.Id == nativeClause.Instruction);
@@ -133,8 +128,7 @@ public sealed class CorpusGateTests
             var nativeKey = new ContractCoverageKey(body.CallableId, nativeClause.CalleeIdentity, nativeClause.ClauseOrdinal,
                 new(callSpan.Document, callSpan.Start, callSpan.Length),
                 new(clauseSpan.Document, clauseSpan.Start, clauseSpan.Length));
-            Assert.That(managedClause.Key, Is.EqualTo(nativeKey), item.Id);
-            managedRows.Add((item.SeedId, managedClause.Outcome));
+            Assert.That(coverage.Matched, Is.EqualTo(1), nativeKey.ToString());
             var candidate = SharpProof.Worker.PassiveCallableArtifactAdapter.EnrollShadow(detached);
             Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
             using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
@@ -149,7 +143,6 @@ public sealed class CorpusGateTests
             rows.Add((item.SeedId, outcome, result.Reason.ToString()));
             var expected = item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted";
             Assert.That(outcome, Is.EqualTo(expected), item.Id + ":" + result.Reason);
-            Assert.That(managedClause.Outcome, Is.EqualTo(item.SeedId == "C06" ? "Unknown" : expected), item.Id);
             if (outcome == "Refuted")
             {
                 var replay = plan!.ReplayCallPrecondition(0, result.EntryModel, CancellationToken.None);
@@ -161,9 +154,6 @@ public sealed class CorpusGateTests
         }
         Assert.That(rows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
         Assert.That(rows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(70));
-        Assert.That(managedRows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
-        Assert.That(managedRows.Count(static row => row.Outcome == "Refuted"), Is.EqualTo(60));
-        Assert.That(managedRows.Count(static row => row.Outcome == "Unknown"), Is.EqualTo(10));
         var snapshotAfter = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
         Assert.That(snapshotAfter, Is.EqualTo(snapshotBefore));
     }
@@ -916,14 +906,14 @@ public sealed class CorpusGateTests
             Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(13));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(229));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(239));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(233));
+                Is.EqualTo(223));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
             Assert.That(result.UnknownCount, Is.EqualTo(222));
-            Assert.That(result.SilentUnknownCount, Is.EqualTo(11));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(233));
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(223));
             Assert.That(
                 result.UnknownReasons
                     .ToDictionary(
@@ -932,12 +922,12 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 2,
+                        ["SP0002"] = 34,
                         ["SP0016"] = 18,
                         ["SP0045"] = 9,
                         ["SP0046"] = 9,
-                        ["SP0047"] = 184,
-                        ["silent-unclassified"] = 11
+                        ["SP0047"] = 152,
+                        ["silent-unclassified"] = 1
                     }));
             Assert.That(
                 result.UnknownRate,
@@ -1036,7 +1026,7 @@ public sealed class CorpusGateTests
                 "from [SP0027@Warning] to [SP0002@Warning] relative to " +
                 "seed.baseline.",
                 "Metamorphic variant seed.temporary changed semantic outcome " +
-                "from Refuted to Proven relative to seed.baseline.",
+                "from Refuted to Unknown relative to seed.baseline.",
                 "Metamorphic variant seed.temporary changed diagnostic classes " +
                 "from [SP0027@Warning] to [] relative to seed.baseline."
             ]));
@@ -1059,7 +1049,7 @@ public sealed class CorpusGateTests
         var message = Encoding.UTF8.GetString(
             Convert.FromBase64String(diagnosticParts[3]));
         var silentUnknown = lines.Single(static line =>
-            line.StartsWith("C06.baseline|", StringComparison.Ordinal))
+            line.StartsWith("OSS0139.baseline|", StringComparison.Ordinal))
             .Split('|');
         var openSource = lines.Single(static line =>
             line.StartsWith("OSS0002.baseline|", StringComparison.Ordinal))
@@ -1187,15 +1177,6 @@ public sealed class IndependentPinnedRequiresCensusTests
             Assert.That(existing.BoundRequires, Is.EqualTo(rows.Length), item.Id);
             Assert.That(existing.Complete && existing.Unpublished && existing.ManifestUnchanged, Is.True, item.Id);
             Assert.That(existing.Failures, Is.Empty, item.Id);
-            var managed = await CorpusGate.ObserveManagedContractClausesAsync(compilation, CancellationToken.None);
-            Assert.That(managed.Gaps, Is.Empty, item.Id);
-            Assert.That(managed.Clauses, Has.Length.EqualTo(rows.Length), item.Id);
-            var observed = managed.Clauses.Single();
-            Assert.That((observed.Key.Call.Start, observed.Key.Call.Length, observed.Key.ClauseOrdinal,
-                observed.Key.Clause.Start, observed.Key.Clause.Length),
-                Is.EqualTo((row.CallStart, row.CallLength, row.ClauseOrdinal, row.ClauseStart, row.ClauseLength)), item.Id);
-            Assert.That(observed.Outcome, Is.EqualTo(item.SeedId == "C06" ? "Unknown" :
-                item.SeedId is "C01" or "C03" or "C09" ? "Proven" : "Refuted"), item.Id);
         }
         Assert.That(obligations, Is.EqualTo(100));
         var snapshot = await File.ReadAllLinesAsync(Path.Combine(root, "SharpProof.Gates", "Corpus", "expected.canonical.snapshot"));

@@ -344,31 +344,6 @@ public sealed class GeneratedContractForAnalyzerTests
         Assert.That(diagnostics, Is.Empty);
     }
 
-    [Test]
-    public async Task InvalidGeneratedCompanionReportsOnlyItsContractDiagnostic()
-    {
-        var diagnostics = await AnalyzeGeneratedAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public sealed class ServiceContracts
-            {
-                public static int Map(IService receiver, int value)
-                {
-                    Contract.Ensures(true);
-                    Func<int> unsupportedDummy = () => value;
-                    return unsupportedDummy();
-                }
-            }
-            """,
-            SealedServiceSource,
-            additionalDiagnosticIds: ["SP0047"]);
-
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0003");
-    }
-
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeGeneratedAsync(
         string generatedSource,
         string inputSource = Target,

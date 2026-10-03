@@ -31,7 +31,7 @@ internal static class TotalBodyLowering
             switch (declaration)
             {
                 case ConstructorDeclarationSyntax constructor:
-                    return IsPlainConstructor(constructor, method, cancellationToken)
+                    return CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)
                         ? ControlFlowGraph.Create(constructor, model, cancellationToken) : null;
                 case LocalFunctionStatementSyntax local:
                     if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method))
@@ -49,28 +49,6 @@ internal static class TotalBodyLowering
         }
         catch (ArgumentException)
         { return null; }
-    }
-
-    private static bool IsPlainConstructor(ConstructorDeclarationSyntax constructor, IMethodSymbol method,
-        CancellationToken cancellationToken)
-    {
-        if (method.IsStatic || constructor.Initializer is { } initializer &&
-            (initializer.ThisOrBaseKeyword.IsKind(SyntaxKind.ThisKeyword) || initializer.ArgumentList.Arguments.Count != 0) ||
-            method.ContainingType is not { IsReferenceType: true, IsRecord: false, BaseType.SpecialType: SpecialType.System_Object } type)
-        { return false; }
-        foreach (var reference in type.DeclaringSyntaxReferences)
-        {
-            if (reference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax declaration || declaration.ParameterList != null ||
-                declaration.Members.Any(member =>
-                    member is FieldDeclarationSyntax field && !field.Modifiers.Any(SyntaxKind.StaticKeyword) &&
-                        field.Declaration.Variables.Any(variable => variable.Initializer != null) ||
-                    member is PropertyDeclarationSyntax property && !property.Modifiers.Any(SyntaxKind.StaticKeyword) &&
-                        property.Initializer != null ||
-                    member is EventFieldDeclarationSyntax eventField && !eventField.Modifiers.Any(SyntaxKind.StaticKeyword) &&
-                        eventField.Declaration.Variables.Any(variable => variable.Initializer != null)))
-            { return false; }
-        }
-        return true;
     }
 
     // A local function that reads an enclosing local, parameter or `this`, or

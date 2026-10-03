@@ -8,13 +8,6 @@ internal interface IAnalyzerSessionFactory
         CancellationToken cancellationToken);
 }
 
-internal interface IRequiresCallSiteObserver
-{
-    void ObserveClause(in RequiresClauseObservation observation);
-    void ObserveGap(in RequiresCallObservationGap gap);
-    void ObserveOwnerGap(in RequiresOwnerObservationGap gap);
-}
-
 internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 {
     internal static DefaultAnalyzerSessionFactory Instance { get; } = new();
@@ -34,20 +27,15 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 
 internal sealed class AnalyzerSession
 {
-    private readonly Lazy<EffectAnalysisSession> _effects;
+    private readonly Lazy<ExternalEffectResolver> _effectContracts;
     private readonly Lazy<ContractSelectionInventory> _attributes;
     private readonly Lazy<ContractClauseInventoryBuilder> _contractClauses;
     private readonly Lazy<EffectiveContractSourceResolver> _contractSources;
     private readonly Lazy<ContractBinder> _contractBinder;
     private readonly Lazy<ContractIntrinsicValidator> _contractIntrinsics;
     private readonly Lazy<ResolvedApiSpecTable> _apiSpecs;
-    private readonly Lazy<ConservativeEffectCallPreconditionPolicy>
-        _callPreconditions;
     private readonly CancellationToken _cancellationToken;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
-    private readonly IRequiresCallSiteObserver? _requiresObserver;
-    private readonly Action<IMethodSymbol, AdvisoryCallAnalysis>? _advisoryCallObserver;
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>? _advisoryCallAnalyses;
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _validatedAttributes = new();
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
@@ -57,9 +45,6 @@ internal sealed class AnalyzerSession
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _reportedRejectedControlAttributes = new();
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
-        _requiresCallSiteAnalyses =
-            new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _executableAnalyses =
             new(SymbolEqualityComparer.Default);
@@ -77,18 +62,13 @@ internal sealed class AnalyzerSession
         Compilation compilation,
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken,
-        Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null,
-        IRequiresCallSiteObserver? requiresObserver = null,
-        Action<IMethodSymbol, AdvisoryCallAnalysis>? advisoryCallObserver = null)
+        Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         Configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
         _cancellationToken = cancellationToken;
         _outcomeObserver = outcomeObserver;
-        _requiresObserver = requiresObserver;
-        _advisoryCallObserver = advisoryCallObserver;
-        _advisoryCallAnalyses = advisoryCallObserver == null ? null : new(SymbolEqualityComparer.Default);
         _attributes = CreateLazy(
             () => ContractSelectionInventory.ForCompilation(compilation));
         _contractClauses = CreateLazy(
@@ -108,23 +88,8 @@ internal sealed class AnalyzerSession
         _apiSpecs = CreateLazy(
             () => new ApiSpecResolver(ApiSpecTable.Default).Resolve(
                 compilation));
-        _callPreconditions = CreateLazy(
-            () => new ConservativeEffectCallPreconditionPolicy(
-                compilation,
-                cancellationToken: cancellationToken));
-        _effects = CreateLazy(
-            () => new EffectAnalysisSession(
-                compilation,
-                GetValue(_apiSpecs),
-                new AnalyzerEffectCallPreconditionPolicy(
-                    GetValue(_contractBinder),
-                    GetValue(_contractClauses),
-                    IrFactory,
-                    new ConservativeEffectCallPreconditionPolicy(
-                        compilation,
-                        includeSourceCompanions: false,
-                        cancellationToken: cancellationToken),
-                    cancellationToken)));
+        _effectContracts = CreateLazy(
+            () => new ExternalEffectResolver(compilation, GetValue(_apiSpecs)));
     }
 
     internal Compilation Compilation
@@ -139,12 +104,14 @@ internal sealed class AnalyzerSession
         GetValue(_attributes);
     internal IrFactory IrFactory { get; } = new();
     internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
-    internal bool EffectAnalysisUsesResolvedApiSpecs =>
-        _effects.IsValueCreated &&
-        ReferenceEquals(_effects.Value.ApiSpecs, _apiSpecs.Value);
     internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
-    internal bool HasCreatedEffectAnalysis => _effects.IsValueCreated;
-    internal IRequiresCallSiteObserver? RequiresObserver => _requiresObserver;
+
+    // One identity for a callable however it is referenced.
+    internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
+    {
+        var normalized = method.ReducedFrom ?? method;
+        return (normalized.PartialImplementationPart ?? normalized).OriginalDefinition;
+    }
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {
@@ -179,20 +146,14 @@ internal sealed class AnalyzerSession
             _cancellationToken);
     }
 
+    // Whether a call to the method may have to establish a precondition: a
+    // Requires clause, a closed parameter contract, or one that cannot bind.
     internal bool HasPotentialCallPreconditions(
         IMethodSymbol method)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
-        if (method is
-        { ContainingType: { StaticConstructors.Length: > 0 } } and
-            ({ IsStatic: true } or { MethodKind: MethodKind.Constructor }))
-        {
-            return true;
-        }
-
-        if (GetValue(_callPreconditions).HasPotentialPreconditions(method) ||
-            ResolveEffectContract(method) is
-            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })
+        method = NormalizeMethod(method);
+        if (method.Parameters.Any(parameter => parameter.GetAttributes().Any(attribute =>
+                Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))
         {
             return true;
         }
@@ -206,43 +167,17 @@ internal sealed class AnalyzerSession
 
     internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        method = NormalizeMethod(method);
         return method.DeclaringSyntaxReferences.IsEmpty &&
             method.Parameters.Any(parameter =>
                 parameter.GetAttributes().Any(attribute =>
                     Attributes.IsRejectedClosedContract(attribute)));
     }
 
-    internal void ObserveAdvisoryCalls(IMethodSymbol owner, SyntaxNode declaration, CancellationToken cancellationToken)
-    {
-        if (_advisoryCallObserver == null)
-        {
-            return;
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!_advisoryCallAnalyses!.TryAdd(owner, 0))
-        {
-            return;
-        }
-        var analysis = Compilation is CSharpCompilation compilation && declaration is MethodDeclarationSyntax method
-            ? AdvisoryCallConsumer.Analyze(compilation, method, true, cancellationToken)
-            : new AdvisoryCallAnalysis([], ["UnsupportedOwner"], true);
-        cancellationToken.ThrowIfCancellationRequested();
-        _advisoryCallObserver(owner, analysis);
-    }
-    internal bool TryBeginRequiresCallSiteAnalysis(
-        IMethodSymbol method)
-    {
-        return _requiresCallSiteAnalyses.TryAdd(
-            ContractClauseInventoryBuilder.NormalizeCallable(
-                method),
-            0);
-    }
-
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
         return _executableAnalyses.TryAdd(
-            EffectAnalysisSession.NormalizeMethod(method),
+            NormalizeMethod(method),
             0);
     }
 
@@ -265,22 +200,7 @@ internal sealed class AnalyzerSession
 
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
-        return GetValue(_effects).ResolveExternalContract(method);
-    }
-
-    internal EffectMethodResult AnalyzeEffects(
-        IMethodSymbol method,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        _cancellationToken.ThrowIfCancellationRequested();
-        if (!Configuration.EffectsEnabled)
-        {
-            throw new InvalidOperationException(
-                "Effect analysis was not enabled for this compilation.");
-        }
-
-        return GetValue(_effects).Analyze(method, cancellationToken);
+        return GetValue(_effectContracts).ResolveContract(method);
     }
 
     internal bool HasResolvedApiSpec(IMethodSymbol method)
@@ -297,7 +217,7 @@ internal sealed class AnalyzerSession
         IMethodSymbol method,
         AnalyzerSemanticOutcome outcome)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        method = NormalizeMethod(method);
         _semanticOutcomes.TryAdd(method, 0);
         _outcomeObserver?.Invoke(method, outcome);
     }
@@ -305,7 +225,7 @@ internal sealed class AnalyzerSession
     internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
     {
         _selectedSemicolonAccessors.TryAdd(
-            EffectAnalysisSession.NormalizeMethod(method),
+            NormalizeMethod(method),
             0);
     }
 

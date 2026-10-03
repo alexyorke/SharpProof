@@ -19,7 +19,7 @@ public sealed class ClaimManifestBuilderTests
     private static readonly int[] DenseOrdinals = [0, 1];
     private static readonly int[] FailingShadowInputs = [0, 10];
     private static readonly string[] PotentialOwnerGapReasons =
-        ["UnsupportedOwner", "UnsupportedSignature", "IncompleteCalls"];
+        ["UnsupportedOwner", "UnsupportedSignature"];
     private static readonly WorkerClaimEvidence[] CompanionEvidence = [
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
@@ -252,7 +252,7 @@ public sealed class ClaimManifestBuilderTests
         Assert.That(shadow.Gaps.Select(static gap => gap.Reason),
             Is.EquivalentTo(PotentialOwnerGapReasons));
         Assert.That(shadow.Owners.Single().Method.Name, Is.EqualTo("Incomplete"));
-        Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.False);
+        Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.True);
     }
 
     [Test]

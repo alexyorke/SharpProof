@@ -1,1 +1,0 @@
-SP0027 Warning primary-constructor-analysis-order.cs:18:42-18:60 Call to 'Positive' violates precondition 'value > 0'

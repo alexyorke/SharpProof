@@ -33,8 +33,7 @@ public sealed class GoldenWorkerTests
         var first = fixture.Source.Split('\n')[0];
         Assert.That(first, Does.StartWith(prefix));
         var scenario = first[prefix.Length..];
-        var actual = scenario == "shadow-call-ancestry-tampered-predicate" ? await CompilerShadowCallAncestryQualificationTests.TamperedPredicateGolden(fixture)
-            : scenario == "synchronization-projection" ? await SynchronizationProjection(fixture)
+        var actual = scenario == "synchronization-projection" ? await SynchronizationProjection(fixture)
             : scenario == "native-infrastructure" ? await NativeInfrastructure()
             : scenario == "native-cancellation" ? await NativeCancellation()
             : scenario == "native-resource" ? await NativeResource()

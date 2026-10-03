@@ -399,26 +399,6 @@ public sealed class CoreIrAdvisoryResourceTests
 [TestFixture]
 public sealed class CoreIrAdvisoryExceptionalAdmissionTests
 {
-    [Test]
-    public void ThrowToHandlerDoesNotExposeFalseUnreachableState()
-    {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var value = factory.CreateVariable("value", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock();
-        var handler = builder.CreateBlock();
-        builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.Overflow, handler);
-        builder.Assign(handler, factory.CreateOperation(), value, factory.Integer(7));
-        builder.Return(handler, factory.CreateOperation(), factory.Variable(value));
-        var program = builder.Build();
-        var concrete = new IrProgramInterpreter(factory).Execute(program);
-        Assert.That(concrete.ReturnValue!.Integer, Is.EqualTo(7));
-        var result = new CoreIrAdvisoryInterpreter(program, [value]).Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
-        Assert.That(result.Accepted, Is.False);
-        Assert.That(result.Gaps, Does.Contain("unsupported exceptional control flow"));
-        Assert.That(result.Outputs, Is.Empty);
-        Assert.That(result.TryGetOutput(handler.Value, out _), Is.False);
-    }
 }
 [TestFixture]
 public sealed class CoreIrAdvisoryInitialFactTests
@@ -527,19 +507,5 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         {
             loadContext.Unload();
         }
-    }
-
-    [Test]
-    public void ReachableExceptionalExitStillRejectsTheGraph()
-    {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock();
-        builder.ExceptionalExit(entry, factory.CreateOperation());
-        var result = new CoreIrAdvisoryInterpreter(builder.Build(), []).Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
-        Assert.That(result.Accepted, Is.False);
-        Assert.That(result.Gaps, Does.Contain("unsupported exceptional control flow"));
-        Assert.That(result.TryGetOutput(0, out _), Is.False);
-        Assert.That(result.Outputs, Is.Empty);
     }
 }

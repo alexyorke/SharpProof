@@ -46,71 +46,9 @@ internal readonly record struct ContractPhysicalSpan(string Document, int Start,
 internal readonly record struct ContractCoverageKey(string OwnerId, string CalleeIdentity, int ClauseOrdinal,
     ContractPhysicalSpan Call, ContractPhysicalSpan Clause);
 internal sealed record ContractCoverageMatch(int Expected, int Matched, ImmutableArray<string> Failures);
-internal sealed record ManagedContractClauseRow(ContractCoverageKey Key, string Outcome, string FlowStatus);
-internal sealed record ManagedContractClauseCensus(ImmutableArray<ManagedContractClauseRow> Clauses,
-    ImmutableArray<string> Gaps);
 
 internal static class CorpusGate
 {
-    internal static async Task<ManagedContractClauseCensus> ObserveManagedContractClausesAsync(
-        CSharpCompilation compilation, CancellationToken cancellationToken)
-    {
-        var observer = new ManagedContractClauseRecorder(compilation, cancellationToken);
-        _ = await AnalyzerGateHost.AnalyzeAsync(compilation, new SharpProofAnalyzer(observer), "contracts",
-            concurrentAnalysis: true, cancellationToken).ConfigureAwait(false);
-        return new([.. observer.Clauses], [.. observer.Gaps]);
-    }
-
-    private sealed class ManagedContractClauseRecorder : IAnalyzerSessionFactory, IRequiresCallSiteObserver
-    {
-        private readonly Dictionary<SyntaxTree, string> _documents;
-        internal readonly ConcurrentQueue<ManagedContractClauseRow> Clauses = new();
-        internal readonly ConcurrentQueue<string> Gaps = new();
-
-        internal ManagedContractClauseRecorder(CSharpCompilation compilation, CancellationToken cancellationToken)
-        {
-            var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken);
-            _documents = compilation.SyntaxTrees.Select((tree, index) => (Tree: tree, Path: snapshots[index].Path))
-                .ToDictionary(static row => row.Tree, static row => row.Path);
-        }
-
-        public AnalyzerSession Create(Compilation compilation, SharpProof.Analyzer.Configuration.AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken)
-        { return new(compilation, configuration, cancellationToken, requiresObserver: this); }
-
-        public void ObserveClause(in RequiresClauseObservation observation)
-        {
-            if (observation.Caller.DeclaredAccessibility != Accessibility.Public)
-            { return; }
-            // This differential slice covers direct invocation syntax. Hidden
-            // call roles need separate identities before their rows can match.
-            if (observation.Candidate.Operation is not Microsoft.CodeAnalysis.Operations.IInvocationOperation)
-            { Gaps.Enqueue("UnsupportedManagedCallOrigin"); return; }
-            var syntax = observation.Clause.SourceSyntax;
-            if (syntax == null || !_documents.TryGetValue(syntax.SyntaxTree, out var clauseDocument) ||
-                !_documents.TryGetValue(observation.Candidate.Syntax.SyntaxTree, out var callDocument))
-            { Gaps.Enqueue("ManagedClauseSourceUnavailable"); return; }
-            var call = observation.Candidate.Syntax.Span;
-            var clause = syntax.Span;
-            var key = new ContractCoverageKey(SemanticClaimIdentity.CreateCallableId(observation.Caller),
-                CompilerIdentityBridge.CreateSymbolDisplay(observation.ContractTarget), observation.ClauseOrdinal,
-                new(callDocument, call.Start, call.Length), new(clauseDocument, clause.Start, clause.Length));
-            Clauses.Enqueue(new(key, observation.Outcome.ToString(), observation.Candidate.FlowStatus.ToString()));
-        }
-
-        public void ObserveGap(in RequiresCallObservationGap gap)
-        {
-            if (gap.Caller.DeclaredAccessibility == Accessibility.Public && gap.Reason != "NoBoundRequires")
-            { Gaps.Enqueue(gap.Reason); }
-        }
-
-        public void ObserveOwnerGap(in RequiresOwnerObservationGap gap)
-        {
-            if (gap.Caller.DeclaredAccessibility == Accessibility.Public)
-            { Gaps.Enqueue(gap.Reason); }
-        }
-    }
-
     internal static ContractCallCensus CensusContractCalls(CSharpCompilation compilation)
     {
         var baseline = new ClaimManifestBuilder(compilation).Build();

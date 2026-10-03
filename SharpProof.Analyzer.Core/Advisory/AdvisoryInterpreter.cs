@@ -214,7 +214,8 @@ internal sealed class CoreIrAdvisoryInterpreter
         {
             _token.ThrowIfCancellationRequested();
             if (reachable.Contains(block.Id) &&
-                block.Terminator is not (IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or IrWriteInstruction { Region: IrWriteRegion.Local }))
+                block.Terminator is not (IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or IrThrowInstruction or
+                    IrExceptionalExitInstruction or IrWriteInstruction { Region: IrWriteRegion.Local }))
             {
                 return Incomplete("unsupported exceptional control flow");
             }
@@ -306,7 +307,12 @@ internal sealed class CoreIrAdvisoryInterpreter
                     edges.Add(new(edgeId, ids[target]));
                 }
             }
-            else if (reachable.Contains(block.Id) && last is not IrReturnInstruction)
+            // An exception carries the state at its throw to its handler.
+            else if (last is IrThrowInstruction thrown)
+            {
+                edges.Add(new(from, ids[thrown.Target]));
+            }
+            else if (reachable.Contains(block.Id) && last is not (IrReturnInstruction or IrExceptionalExitInstruction))
             {
                 AddGap("unsupported terminator");
             }
@@ -445,7 +451,9 @@ internal sealed class CoreIrAdvisoryInterpreter
             }
             else if (instruction is IrLoadInstruction load)
             { AddGap("unsupported load"); state = Forget(state, load.Target); }
-            else if (instruction is not (IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or IrWriteInstruction { Region: IrWriteRegion.Local }))
+            // Effect sites and exits change no scalar.
+            else if (instruction is not (IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or IrWriteInstruction or
+                IrLockInstruction or IrThrowInstruction or IrExceptionalExitInstruction))
             { AddGap("unsupported instruction"); state = _domain.Top; }
             state = state with { HasGap = state.HasGap || _activeTransferHasGap };
             if (!state.Reachable)

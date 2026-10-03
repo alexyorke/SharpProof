@@ -158,6 +158,16 @@ public sealed class NativePurityEffectTests
         { Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>()); }
     }
 
+    // Writing a field of an object the body created is not observable.
+    [TestCase("new Cell().State++; return x;")]
+    [TestCase("var cell = new Cell(); cell.State = x; cell.State += 1; return cell.State;")]
+    public async Task FreshObjectWritesArePure(string body)
+    {
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
+            Source(body, "public sealed class Cell { public int State; }"))), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+    }
+
     // A static field of a type without an initializer is read without running code.
     [TestCase("State = x; return x;")]
     [TestCase("State = x; return State;")]
@@ -498,7 +508,6 @@ public sealed class NativePurityEffectTests
     [TestCase("public static int State; static C() { State = 1; }", "State++; return x;")]
     [TestCase("public static int State = 1;", "State++; return x;")]
     [TestCase("public static byte State;", "State++; return x;")]
-    [TestCase("public sealed class Cell { public int State; }", "new Cell().State++; return x;")]
     [TestCase("public static int State;", "int _ = 0; _ = State++; return x;")]
     [TestCase("public static int State;", "long _ = 0; _ = (long)State++; return x;")]
     [TestCase("public static int State;", "_ = checked((byte)unchecked(State++)); return x;")]

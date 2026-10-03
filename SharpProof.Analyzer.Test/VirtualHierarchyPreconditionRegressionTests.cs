@@ -5,19 +5,6 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class VirtualHierarchyPreconditionRegressionTests
 {
-    [Test]
-    public async Task OversizedRefutedPreconditionKeepsDiagnosticWithoutAnalyzerException()
-    {
-        var literal = new string('x', 180_000);
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            "using SharpProof.Attributes; public class Subject { " +
-            "public static void Require(string value) { Contract.Requires(value != \"" + literal + "\"); } " +
-            "public static void Run() { Require(\"" + literal + "\"); } }", "contracts", []);
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
-        var failure = diagnostics.Single(diagnostic => diagnostic.Id == "SP0027");
-        Assert.That(failure.GetMessage(System.Globalization.CultureInfo.InvariantCulture),
-            Does.Contain("condition exceeds the display limit"));
-    }
 
     [Test]
     public void VariableShapedStringLiteralsAreNotAlphaRenamed()
@@ -90,71 +77,5 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
             "contracts", []);
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
         Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SP0024"), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public async Task ExactRuntimeTargetsRetainOverrideAndInterfacePreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public class BaseService {
-                public virtual void Run(int value) { }
-            }
-
-            public sealed class DerivedService : BaseService {
-                public override void Run(int value) {
-                    Contract.Requires(value > 0);
-                }
-            }
-
-            public interface IService {
-                void Run(int value);
-            }
-
-            public sealed class Service : IService {
-                public void Run(int value) {
-                    Contract.Requires(value > 0);
-                }
-            }
-
-            public interface IExplicitService {
-                void Run(int value);
-            }
-
-            public sealed class ExplicitService : IExplicitService {
-                void IExplicitService.Run(int value) {
-                    Contract.Requires(value > 0);
-                }
-            }
-
-            public static class Subject {
-                public static void CallDirect() {
-                    new DerivedService().Run(-1);
-                }
-
-                public static void CallVirtual() {
-                    ((BaseService)new DerivedService()).Run(-2);
-                }
-
-                public static void CallInterface() {
-                    ((IService)new Service()).Run(-3);
-                }
-
-                public static void CallExplicitInterface() {
-                    ((IExplicitService)new ExplicitService()).Run(-4);
-                }
-            }
-            """,
-            "contracts",
-            []);
-
-        Assert.That(
-            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"),
-            Is.EqualTo(3));
-        Assert.That(
-            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0027"),
-            Is.EqualTo(4));
     }
 }

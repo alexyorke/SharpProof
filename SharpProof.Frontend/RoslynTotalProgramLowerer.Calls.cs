@@ -85,6 +85,39 @@ internal sealed partial class RoslynTotalProgramLowerer
         return InlineSourceMember(invocation, invocation.TargetMethod, invocation.Instance, invocation.Arguments, block, depth);
     }
 
+    // `new C(arguments)` evaluates the arguments, allocates the object and
+    // runs the constructor, which a plain constructor does exactly as written.
+    private TotalBodyValue? InlineSourceConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
+    {
+        if (_preserveSourceCall != null || creation.Initializer != null || creation.Constructor is not { } constructor ||
+            !CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken))
+        { return null; }
+        IrTerm? created = null;
+        IrBlockId Allocate(IrBlockId current)
+        {
+            var allocated = _expressions.AllocateValue(creation, current);
+            created = allocated.Value;
+            return allocated.Continuation;
+        }
+        if (constructor.IsImplicitlyDeclared)
+        {
+            if (!creation.Arguments.IsEmpty || _calls == null)
+            { return null; }
+            block = Allocate(block);
+            return new(created!, block, FrontendSubsetClassification.Exact);
+        }
+        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate) is not { } body)
+        { return null; }
+        if (created == null)
+        {
+            // The constructor abstained before allocating; its value is unknown.
+            var unknown = _context.Temporary(_context.Type(creation.Type));
+            _builder.Havoc(body.Continuation, _context.Site(creation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+            created = _context.Factory.Variable(unknown);
+        }
+        return new(created, body.Continuation, body.Classification);
+    }
+
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         return _preserveSourceCall != null || property.Property.GetMethod is not { } getter ? null
@@ -100,7 +133,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
 
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
-        ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null)
+        ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
+        Func<IrBlockId, IrBlockId>? prelude = null)
     {
         if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null))
         { return null; }
@@ -161,6 +195,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         if (receiver != null)
         { block = _expressions.CheckReceiver(invocation, receiver, block); }
+        if (prelude != null)
+        { block = prelude(block); }
         ImmutableArray<TotalShadowCallHop> callAncestry = [];
         if (_captureShadowCallAncestry)
         {

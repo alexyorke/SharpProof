@@ -21,7 +21,8 @@ public sealed class NativeEffectContractTests
     [TestCase(Reads, "Contract.Requires(cell != null); return cell.Value;", typeof(ProvenOutcome))]
     [TestCase("SharpProofEffect.None", "Contract.Requires(cell != null); cell.Value = value; return 0;", typeof(RefutedOutcome))]
     [TestCase("SharpProofEffect.WritesArgumentState", "Contract.Requires(cell != null); cell.Value = value; return 0;", typeof(ProvenOutcome))]
-    [TestCase(Writes, "var other = new Cell(); other.Value = value; return 0;", null)]
+    // Creating the object allocates, which the summary does not declare.
+    [TestCase(Writes, "var other = new Cell(); other.Value = value; return 0;", typeof(RefutedOutcome))]
     [TestCase("SharpProofEffect.None", "var box = new object(); return 0;", typeof(RefutedOutcome))]
     [TestCase("SharpProofEffect.Allocates", "var box = new object(); return 0;", typeof(ProvenOutcome))]
     public async Task SummariesBoundReadsWritesAndAllocations(string effects, string body, Type? outcome)

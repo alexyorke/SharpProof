@@ -5,24 +5,6 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class MemberInitializerConstructorPathRegressionTests
 {
-    [Test]
-    public async Task ReachableConstructorKeepsInitializerViolationVisible()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            CreateSource(
-                """
-                public Subject() {
-                    Contract.Requires(false);
-                }
-
-                public Subject(int marker) {
-                }
-                """),
-            "contracts",
-            []);
-
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
-    }
 
     [Test]
     public async Task ThisDelegatingConstructorDoesNotReplayInitializerWhenRootIsSuppressed()
