@@ -10,12 +10,13 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeSynchronizationProjectionTests
 {
+    // A permitted lock is no violation; a forbidden one refutes when reached.
     [TestCase("reachable", false, "Refuted")]
     [TestCase("unreachable", false, "Proven")]
-    [TestCase("reachable", true, "Unknown")]
+    [TestCase("reachable", true, "Proven")]
     [TestCase("approximation", false, "Unknown")]
     [TestCase("loop", false, "Refuted")]
-    [TestCase("loop", true, "Unknown")]
+    [TestCase("loop", true, "Proven")]
     public async Task SyntheticPrefix(string shape, bool permitted, string expected)
     {
         Install();

@@ -82,6 +82,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             SourceCall = InlineSourceCall,
             SourceGetter = InlineSourceGetter,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
+            OpaqueEffects = _calls?.OpaqueEffects,
             ExceptionTarget = _frame == null ? null : (kind, site) => _frame.Search(kind, site, static target => target)
         };
         _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);

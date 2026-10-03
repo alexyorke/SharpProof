@@ -16,7 +16,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
-    private readonly ImmutableArray<IrTerm> _opaqueCalls;
+    private readonly ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
@@ -151,19 +151,25 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
-    internal VerificationQuery SynchronizationShadowQuery()
+    // No reachable site uses a disallowed capability: a lock synchronizes, and
+    // an opaque call uses its specified capabilities.
+    internal VerificationQuery CapabilityQuery(bool synchronizationAllowed, Func<IrOpaqueCallEffects, bool> callViolates)
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
-            EffectGoalBuilder.NoReachableSites(Factory, _locks.Select(site => site.Reach).Concat(_opaqueCalls)),
+            EffectGoalBuilder.NoReachableSites(Factory, (synchronizationAllowed ? [] : _locks.Select(site => site.Reach))
+                .Concat(OpaqueCalls(callViolates))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
+
+    private IEnumerable<IrTerm> OpaqueCalls(Func<IrOpaqueCallEffects, bool> selected)
+    { return _opaqueCalls.Where(call => selected(call.Effects)).Select(call => call.Reach); }
 
     internal VerificationQuery AllocationQuery()
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, _allocations.Select(allocation => allocation.Reach)
                 .Concat(_potentialExceptionAllocations).Concat(_locks.Select(synchronization => synchronization.Reach))
-                .Concat(_opaqueCalls)),
+                .Concat(OpaqueCalls(effects => (effects & IrOpaqueCallEffects.Allocates) != 0))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
@@ -171,7 +177,8 @@ internal sealed class PassiveCallableVcPlan
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => write.Region != IrWriteRegion.Local).Select(write => write.Reach)
-                .Concat(_locks.Select(synchronization => synchronization.Reach)).Concat(_opaqueCalls)),
+                .Concat(_locks.Select(synchronization => synchronization.Reach))
+                .Concat(OpaqueCalls(effects => (effects & (IrOpaqueCallEffects.Writes | IrOpaqueCallEffects.Synchronizes)) != 0))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 

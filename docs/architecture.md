@@ -454,7 +454,11 @@ NativeEffectClaims publishes these results: Z3 proofs and replayed native
 refutations decide exception, allocation and purity claims, a replayed compiler
 violation is kept only where Z3 stays Unknown, and other effect contracts still
 use the compiler effect assembler. Explicit throws carry per-site exception
-codes so AllowedExceptions goals compare each site's static type.
+codes so AllowedExceptions goals compare each site's static type. The collector
+classifies opaque calls from ApiSpec facets into IrOpaqueCallEffects, recorded in
+the call site's description; allocation, purity and capability goals use only the
+calls whose effects matter to them. `SharpProof.Gates capability-shadow` measures
+native AllowedCapabilities retention before that contract changes authority.
 The `SharpProof.Gates exception-shadow` command separately instruments the pinned
 200-method OSS corpus with DoesNotThrow. It compares raw legacy analyzer
 outcomes, published compiler evidence, and native results after production

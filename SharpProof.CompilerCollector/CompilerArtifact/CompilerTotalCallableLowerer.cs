@@ -250,6 +250,35 @@ internal static class CompilerTotalCallableLowerer
         };
     }
 
+    // An API specification's facets bound what an opaque call to it may do.
+    private static IrOpaqueCallEffects? OpaqueEffects(ResolvedApiSpecTable specs, IMethodSymbol method)
+    {
+        if (!specs.TryGet(method, out var spec))
+        { return null; }
+        var facets = spec.Template.Facets;
+        var declared = facets.Effects.Effects;
+        if ((declared & SpecEffect.Unknown) != 0)
+        { return IrOpaqueCallEffects.All; }
+        var effects = IrOpaqueCallEffects.None;
+        if (facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow)
+        { effects |= IrOpaqueCallEffects.Throws; }
+        if (facets.Allocation.Behavior != SpecAllocationBehavior.None)
+        { effects |= IrOpaqueCallEffects.Allocates; }
+        if ((declared & (SpecEffect.WritesReceiverState | SpecEffect.WritesArgumentState | SpecEffect.WritesAmbientState | SpecEffect.InputOutput)) != 0)
+        { effects |= IrOpaqueCallEffects.Writes; }
+        if ((declared & SpecEffect.Synchronization) != 0)
+        { effects |= IrOpaqueCallEffects.Synchronizes; }
+        if ((declared & SpecEffect.InputOutput) != 0)
+        { effects |= IrOpaqueCallEffects.InputOutput; }
+        if ((declared & SpecEffect.NativeCode) != 0)
+        { effects |= IrOpaqueCallEffects.NativeCode; }
+        if ((declared & SpecEffect.Reflection) != 0)
+        { effects |= IrOpaqueCallEffects.Reflection; }
+        if ((declared & SpecEffect.Nondeterminism) != 0)
+        { effects |= IrOpaqueCallEffects.Nondeterminism; }
+        return effects;
+    }
+
     // The IR reads an array element as a pure function of the reference, which
     // holds while no lowered code writes elements. An opaque call may write any
     // array, so a body with one keeps no array element reads.
@@ -344,7 +373,7 @@ internal static class CompilerTotalCallableLowerer
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
             method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks),
             enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null,
-            opaqueCalls);
+            opaqueCalls, method => OpaqueEffects(apiSpecs, method));
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory,

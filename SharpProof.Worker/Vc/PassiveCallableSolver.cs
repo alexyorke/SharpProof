@@ -57,18 +57,21 @@ internal sealed class PassiveCallableSolver : IDisposable
     internal Task<PassiveCallableCheckResult> VerifyPurityAsync(CancellationToken cancellationToken = default)
     { return VerifySitesAsync(allocations: false, cancellationToken); }
 
-    internal async Task<PassiveCallableCheckResult> VerifySynchronizationShadowAsync(bool permitted,
-        CancellationToken cancellationToken = default)
+    // Only a concretely reached lock refutes a capability claim; a call's
+    // specified capabilities are may-effects.
+    internal async Task<PassiveCallableCheckResult> VerifyCapabilitiesAsync(bool synchronizationAllowed,
+        Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
     {
         if (_plan.HasBodyAbstraction)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
-        var proof = await VerifyAsync(_plan.SynchronizationShadowQuery(), null, cancellationToken).ConfigureAwait(false);
+        var proof = await VerifyAsync(_plan.CapabilityQuery(synchronizationAllowed, callViolates), null, cancellationToken).ConfigureAwait(false);
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
-        if (permitted)
+        if (synchronizationAllowed)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
         var search = _plan.LoopSearch ?? _plan;
-        var witness = _plan.LoopSearch == null ? proof : await VerifyAsync(search.SynchronizationShadowQuery(), null, cancellationToken, search).ConfigureAwait(false);
+        var witness = _plan.LoopSearch == null ? proof
+            : await VerifyAsync(search.CapabilityQuery(synchronizationAllowed, callViolates), null, cancellationToken, search).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
         OperationId? site = null;

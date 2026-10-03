@@ -206,6 +206,9 @@ public sealed class TotalLoweringContext
         return Factory.CreateOperation("explicit-throw:" + (exact ? "exact:" : "") + string.Join(";", hierarchy), Span(thrown.Syntax));
     }
 
+    internal OperationId OpaqueCallSite(IOperation call, IrOpaqueCallEffects effects, string member)
+    { return Factory.CreateOperation(IrOpaqueCallSite.Describe(effects, member), Span(call.Syntax)); }
+
     private IrSourceSpan Span(SyntaxNode syntax)
     {
         var position = syntax.SyntaxTree.GetLineSpan(syntax.Span).StartLinePosition;

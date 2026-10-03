@@ -459,6 +459,13 @@ explicit throw site carries its own exception code: an AllowedExceptions claim
 admits a site whose static type derives from an allowed type, and refutes only
 at a site that creates an exception of a disallowed type. DoesNotThrow is
 refuted by any explicit throw.
+An API specification narrows a non-dispatched opaque call to its facets: it
+throws, allocates, writes or synchronizes only when the specification says so,
+and uses only the capabilities it declares. A call without a specification may
+do all of these. Native AllowedCapabilities forbids reachable locks and calls
+whose capabilities fall outside the allowed set; only a reached lock refutes.
+Compiler evidence still decides AllowedCapabilities until `SharpProof.Gates
+capability-shadow` retains its proofs.
 Uncaught exits retain guarded exception kinds across joins; allowed kinds are
 checked at the exit rather than inferred from absence of a normal return.
 The compiler normalizes each declared DoesNotThrow or AllowedExceptions

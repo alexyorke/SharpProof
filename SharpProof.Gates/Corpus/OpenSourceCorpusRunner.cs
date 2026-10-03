@@ -134,11 +134,13 @@ internal static class OpenSourceCorpusRunner
     }
 
     internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
-        bool allocations = false, bool purity = false)
+        bool allocations = false, bool purity = false, bool capabilities = false)
     {
-        return Prepare(document, purity ? "global::SharpProof.Attributes.EnforcePure" : allocations
+        return Prepare(document, capabilities
+            ? "global::SharpProof.Attributes.AllowedCapabilities(global::SharpProof.Attributes.SharpProofCapability.None)"
+            : purity ? "global::SharpProof.Attributes.EnforcePure" : allocations
             ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken,
-            includeExternalEffectsFixture: purity).Compilation;
+            includeExternalEffectsFixture: purity || capabilities).Compilation;
     }
 
     internal static string? CorpusMethodId(SyntaxNode? declaration)
@@ -278,11 +280,19 @@ internal static class OpenSourceCorpusRunner
                     0,
                     SyntaxFactory.AttributeList(
                         SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Attribute(
-                                SyntaxFactory.ParseName(
-                                    effectAttribute))))))
+                            Attribute(effectAttribute)))))
             .WithAdditionalAnnotations(
                 new SyntaxAnnotation(AnnotationKind, id));
+    }
+
+    // "Name" or "Name(argument)".
+    private static AttributeSyntax Attribute(string text)
+    {
+        var open = text.IndexOf('(', StringComparison.Ordinal);
+        return open < 0 ? SyntaxFactory.Attribute(SyntaxFactory.ParseName(text))
+            : SyntaxFactory.Attribute(SyntaxFactory.ParseName(text[..open]), SyntaxFactory.AttributeArgumentList(
+                SyntaxFactory.SingletonSeparatedList(SyntaxFactory.AttributeArgument(
+                    SyntaxFactory.ParseName(text[(open + 1)..^1])))));
     }
 
     private readonly record struct TargetKey(

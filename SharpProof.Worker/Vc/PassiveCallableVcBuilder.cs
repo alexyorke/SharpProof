@@ -27,7 +27,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly Dictionary<IrInstructionId, int> _callMarkers;
     private readonly List<IrTerm> _potentialExceptionAllocations = [];
     // Opaque calls: each may allocate, write and synchronize.
-    private readonly List<IrTerm> _opaqueCalls = [];
+    private readonly List<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls = [];
     private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
@@ -52,7 +52,7 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> CallPreconditions =>
         [.. _callPreconditions];
     internal ImmutableArray<IrTerm> PotentialExceptionAllocations => [.. _potentialExceptionAllocations];
-    internal ImmutableArray<IrTerm> OpaqueCalls => [.. _opaqueCalls];
+    internal ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> OpaqueCalls => [.. _opaqueCalls];
     internal bool HasUnmodeledAllocations => _hasUnmodeledStringAllocations;
     internal ImmutableArray<Assumption> Facts => [.. _facts];
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
@@ -257,7 +257,7 @@ internal sealed class PassiveCallableVcBuilder
                             if (!TryRewrite(argument, state, out _))
                             { return null; }
                         }
-                        _opaqueCalls.Add(reach);
+                        _opaqueCalls.Add((reach, IrOpaqueCallSite.Effects(_factory, call.Operation)));
                         break;
                     case IrAssignInstruction assign:
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||

@@ -28,6 +28,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowOpaqueCalls { get; set; }
 
+    // An API specification narrows what an opaque call may do.
+    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
+
     // `this` (or `base`) of a reference-type instance member is never null.
     internal bool IsImplicitThis(IOperation? instance)
     {
@@ -476,15 +479,22 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { block = CheckReceiver(operation, receiver, block); }
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
+        var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
         var member = _factory.GetOrCreateMember(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
-            "opaque-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
-            [.. values.Select(value => value.Type)]);
+            "opaque-call:" + display, resultType, true, [.. values.Select(value => value.Type)]);
         // The call itself is only an effect site; its result and whether it
         // throws are approximation havocs, so no refutation may depend on them.
-        _builder!.Call(block, site, null, member, null, values);
-        var throws = _context.Temporary(_factory.BooleanType);
-        _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
+        // A dispatched call may run an override the specification does not describe.
+        var effects = (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All;
+        _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
+        ImmutableArray<TotalThrow> faults = [];
+        if ((effects & IrOpaqueCallEffects.Throws) != 0)
+        {
+            var throws = _context.Temporary(_factory.BooleanType);
+            _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
+            faults = [new(IrExceptionKind.Unknown, _factory.Variable(throws))];
+        }
         IrTerm result = _factory.Boolean(false);
         if (!method.ReturnsVoid)
         {
@@ -492,8 +502,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
             result = _factory.Variable(target);
         }
-        return ApplyRule(operation, new TotalScalarRule(result,
-            [new(IrExceptionKind.Unknown, _factory.Variable(throws))], FrontendSubsetClassification.Exact), block);
+        return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
     }
 
     // Contract and attribute APIs are specifications, never opaque calls.
