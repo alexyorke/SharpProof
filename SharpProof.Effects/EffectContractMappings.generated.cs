@@ -148,24 +148,6 @@ public enum EffectRegionKind
     Unknown = 6
 }
 
-internal readonly record struct EffectCallSite(
-    IMethodSymbol Target,
-    EffectRegionSet Receiver,
-    EffectRegionSet WriteReceiver,
-    ImmutableArray<EffectRegionSet> Arguments,
-    IOperation Origin,
-    bool IsDivergingDispose = false
-);
-
-internal readonly record struct EffectCallPreconditionContext(
-    IMethodSymbol Caller,
-    IMethodSymbol Target,
-    IOperation? Receiver,
-    ImmutableArray<IOperation?> Arguments,
-    ManagedFlowResult? Flow,
-    IOperation Origin
-);
-
 internal readonly record struct EffectContractInvalidAttribute(
     AttributeData Attribute,
     string Reason
@@ -175,12 +157,6 @@ internal readonly record struct EffectContractResolution(
     EffectContractResolutionKind Kind,
     EffectSummary Summary,
     ImmutableArray<EffectContractInvalidAttribute> InvalidAttributes = default
-);
-
-internal readonly record struct EffectMethodNode(
-    EffectSummary LocalSummary,
-    ImmutableArray<EffectCallSite> Calls,
-    ImmutableArray<EffectDirectWitness> DirectWitnesses
 );
 
 public readonly record struct EffectProjection(

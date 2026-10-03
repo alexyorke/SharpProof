@@ -244,35 +244,15 @@ The exact typed outcome and effect-certainty authority follows.
 | `Unknown` | `*` | `Unavailable` |
 <!-- END SHARPPROOF TYPED EFFECT RESULTS -->
 
-A may-effect summary is suitable for proving the absence of a disallowed
-effect, but the presence of a may-effect is not itself a concrete trace.
-Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 21 carries
-unconditional definite managed object/array allocation, exact framework
-explicit-throw, empty-`lock`, and exact-`Monitor` events for independent worker
-replay. The artifact boundary validates event order, types, locations, and
-selected constraints once. The worker derives effects, capabilities, and exact
-exception hierarchy from the replay events and checks the resulting violation
-against the witness and all three constraint dimensions. Source discovery,
-analysis, and event lowering remain trusted. Fresh allocation remains
+Z3 decides effect claims over the callable's Total program. A proof shows that
+no violating site is reachable; a refutation names a violating site reached by
+concrete replay of the original program. A reachable site that cannot be
+replayed, such as an opaque call whose effects are only possible, leaves the
+claim `Unknown(CounterexampleNotReplayable)`, and a body the IR cannot lower
+leaves it `Unknown(UnsupportedBody)`. The compiler only declares effect claims;
+a trusted complete boundary on a bodyless declaration is published as declared.
+Valid complete effect responses are cacheable. Fresh allocation remains
 compatible with observable `EnforcePure`.
-
-Definite receiver-field, user-constructed exception,
-static-initialization-sensitive allocation, and other unsupported direct
-candidates become `Unknown(CounterexampleNotReplayable)`.
-Conditional/path-dependent and may-only conflicts without a definite replay
-candidate remain `Unknown(EffectContractNotEstablished)`. Invalid replay
-structure is malformed compiler evidence and fails as
-`CompilerManifestMismatch`; a structurally valid replay that disagrees
-semantically becomes the fatal
-`Unknown(CounterexampleReplayFailed)`. Valid complete effect responses are cacheable.
-Analyzer evidence preserves the more specific
-`ManagedAbstractFlow:BlockBudgetExceeded`,
-or `ManagedAbstractFlow:OperationBudgetExceeded` detail through JSON, SARIF,
-and cache records even when the closed claim reason is projected to
-`ResourceLimit`. Cyclic scalar flow disables scalar refinement, but does not
-make an effect claim incomplete: the effect engine can still prove the claim
-from its conservative scan of every compiler-reachable block.
 
 Proven postconditions additionally carry `WorkerVacuityKind`: `None`,
 `ContradictoryPreconditions`, or `NoModeledNormalReturn`. The last two make

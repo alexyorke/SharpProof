@@ -41,31 +41,26 @@ Not active as 1.0 preview product features:
 - arbitrary loops, recursion, reference equality, sequence elements, or broad
   SMT theories.
 
-## Analyzer language gate
+## Callable and body admission
 
-The exact decision table is `SharpProof.Analyzer.Core/LanguageSubsetGate.cs`. The
-following matrix summarizes that checked table.
+`SharpProof.Analyzer.Core/CallableSubset.cs` admits a callable's shape:
+synchronous, non-generic, by-value signatures over managed types, outside
+unsafe code. Async, generic, by-reference, pointer, function-pointer, delegate,
+dynamic and ref-like signatures are unsupported. Whether a body is supported is
+decided by lowering it to the Total IR: `CSharpOperationSemantics` decides each
+operation, and an operation it does not model makes the body abstain. A selected
+callable whose body abstains is reported as SP0047 by the analyzer and stays
+Unknown in the worker.
 
-| Category | Admitted | Rejected |
-|---|---|---|
-| Callable kinds | Non-generic ordinary methods, instance and static constructors, property getters/setters, and explicit interface implementations | Event add/remove accessors, async methods, generic source methods, ref returns, ref parameters, declarations without an operation root, and unsupported method kinds |
-| Types | Primitive and admitted named/reference types, strings, and arrays whose element type is admitted | Open type parameters, delegates, dynamic, pointers, function pointers, ref-like types, and admitted containers whose nested type is unsupported |
-| Statements and flow | Blocks, locals, assignments, return/throw, `if`, `for`, `while`, `do`, constant-clause `switch`, `try`/`catch`/`finally`, `using`, `lock`, labels/branches, object and array initialization | `foreach`, async/iterator flow, local functions, closures, event raising, queries, deconstruction, switch expressions, patterns, `with`, ranges, inline arrays, collection expressions, and spread |
-| Expressions | Literals, locals/parameters/instance, fields/properties, array access, built-in unary/binary/conversion operations, conditional/coalesce, `is` type, `typeof`, `nameof`, ordinary interpolation, object/array creation, and direct calls that pass shape checks | User-defined operators or conversions, delegates, dynamic operations, function pointers, anonymous objects, tuples, unsafe/address operations, custom interpolated-string handlers, implicit indexers, and future unknown Roslyn operation kinds |
-| Calls | Direct non-delegate calls without ref arguments; closed constructed generic calls only when an exact `ApiSpec` resolves | Local/delegate/function-pointer calls, ref arguments, open generic shapes, and closed generic calls with no exact resolved spec |
+Methods, operators, conversions, accessors (including auto-property accessors),
+expression-bodied properties, capture-free local functions and plain class
+constructors are lowered. Lambdas, constructors that run member initializers or
+a base constructor other than object's, and records stay Unknown.
 
-The frontend has a second, expression-level exactness classifier. For example,
-an operation kind can pass the analyzer gate while a lifted operator, narrowing
-conversion, unsupported member access, or unsupported invocation form still
-causes frontend abstention. The effect scanner can likewise return an
-incomplete summary for admitted syntax.
-
-The table describes selected effect and verifier-body admission. The separate
-call-site precondition pass traverses Roslyn child CFGs for executable local
-functions, lambdas, and anonymous methods without admitting those callable
-forms to effect or postcondition verification. Nested outcomes remain attached
-to their owner and are not folded into the containing method. Expression-tree
-lambdas remain quoted, non-executing code for this pass.
+The analyzer's effect and SP0027 feedback is advisory over the same Total
+program: it never proves a claim, and SP0027 covers the callable bodies and
+local functions the IR lowers, not member initializers, constructor
+initializers or lambdas.
 
 The verifier body subset is narrower than the analyzer gate: compiler artifact
 lowering and the worker executor accept only acyclic, bounded instructions they
