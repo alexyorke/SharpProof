@@ -12,7 +12,7 @@ internal sealed record PassiveCallableFeasibility(PassiveCallableFeasibilityKind
     PassiveCallableCheckResult Evidence, PassiveCallableCheckResult EntryEvidence);
 
 // One session per owned plan; the existing method meter reads the actual solver
-// consumption. Exception checks remain shadow evidence during effect migration.
+// consumption.
 internal sealed class PassiveCallableSolver : IDisposable
 {
     private readonly PassiveCallableVcPlan _plan;
@@ -117,10 +117,14 @@ internal sealed class PassiveCallableSolver : IDisposable
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }
 
+    // An explicit throw site is allowed when its static type derives from an
+    // allowed type. Its exception refutes the claim when the claim allows no
+    // exception, or when the site creates an exception of a disallowed type.
     internal async Task<PassiveCallableCheckResult> VerifyExceptionsAsync(ImmutableHashSet<IrExceptionKind> allowed,
+        bool allowsNoException = false, Func<OperationId, bool>? allowedSite = null, Func<OperationId, bool>? exactSite = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _plan.ExceptionQuery(allowed);
+        var query = _plan.ExceptionQuery(allowed, allowedSite);
         // Postcondition call abstractions do not yet encode all callee effects.
         if (_plan.HasBodyAbstraction)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
@@ -129,14 +133,16 @@ internal sealed class PassiveCallableSolver : IDisposable
         { return proof; }
         var encoding = _plan.LoopSearch ?? _plan;
         var witness = _plan.LoopSearch == null ? proof
-            : await VerifyAsync(encoding.ExceptionQuery(allowed), null, cancellationToken, encoding).ConfigureAwait(false);
+            : await VerifyAsync(encoding.ExceptionQuery(allowed, allowedSite), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
         if (!_plan.HasBodyAbstraction)
         {
             var replay = _plan.ReplayException(witness.EntryModel, cancellationToken);
             if (replay.Status == IrProgramExecutionStatus.Exception && !replay.ConsumedApproximation &&
-                replay.Instruction is IrThrowInstruction && replay.Exception is { } exception && !allowed.Contains(exception.Kind))
+                replay.Instruction is IrThrowInstruction && replay.Exception is { } exception && !allowed.Contains(exception.Kind) &&
+                (exception.Kind != IrExceptionKind.Explicit || allowsNoException ||
+                    exception.Site is { } site && exactSite?.Invoke(site) == true && allowedSite?.Invoke(site) != true))
             { return witness with { ExceptionWitness = exception }; }
         }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);

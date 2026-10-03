@@ -9,7 +9,8 @@ public enum IrExecutionSemantics
 
 public sealed class IrSourceSpan
 {
-    public IrSourceSpan(string document, int start, int length)
+    // Line and column are one-based display positions; zero means unknown.
+    public IrSourceSpan(string document, int start, int length, int line = 0, int column = 0)
     {
         if (string.IsNullOrWhiteSpace(document))
         {
@@ -19,12 +20,18 @@ public sealed class IrSourceSpan
         {
             throw new ArgumentOutOfRangeException(nameof(start), "The UTF-16 source span is invalid.");
         }
-        (Document, Start, Length) = (document, start, length);
+        if (line < 0 || column < 0 || (line == 0) != (column == 0))
+        {
+            throw new ArgumentOutOfRangeException(nameof(line), "The source position is invalid.");
+        }
+        (Document, Start, Length, Line, Column) = (document, start, length, line, column);
     }
 
     public string Document { get; }
     public int Start { get; }
     public int Length { get; }
+    public int Line { get; }
+    public int Column { get; }
 }
 
 internal static class IrCallPreconditionMarker

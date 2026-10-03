@@ -1,6 +1,7 @@
 namespace SharpProof.Worker;
 
-// Shadow qualification only; compiler evidence still controls publication.
+// Native allocation and purity evidence; NativeEffectClaims publishes it. The
+// synchronization projection below remains shadow-only.
 internal static class NativeEffectSiteVerifier
 {
     internal static Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,

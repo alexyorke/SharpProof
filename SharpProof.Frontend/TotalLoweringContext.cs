@@ -188,15 +188,29 @@ public sealed class TotalLoweringContext
     internal OperationId Site(IOperation operation)
     {
         var syntax = operation.Syntax;
-        return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart,
-            new IrSourceSpan(_document(syntax.SyntaxTree),
-                syntax.SpanStart, syntax.Span.Length));
+        return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart, Span(syntax));
     }
 
     internal OperationId AttributeSite(SyntaxNode syntax)
     {
-        return Factory.CreateOperation("closed-attribute",
-            new IrSourceSpan(_document(syntax.SyntaxTree), syntax.SpanStart, syntax.Span.Length));
+        return Factory.CreateOperation("closed-attribute", Span(syntax));
+    }
+
+    // The description names the thrown static type and its base classes, most
+    // derived first; "exact:" marks a freshly created exception.
+    internal OperationId ThrowSite(IOperation thrown, INamedTypeSymbol type, bool exact)
+    {
+        var hierarchy = new List<string>();
+        for (var current = type; current != null && current.SpecialType != SpecialType.System_Object; current = current.BaseType)
+        { hierarchy.Add(CompilerIdentityBridge.CreateTypeDisplay(current)); }
+        return Factory.CreateOperation("explicit-throw:" + (exact ? "exact:" : "") + string.Join(";", hierarchy), Span(thrown.Syntax));
+    }
+
+    private IrSourceSpan Span(SyntaxNode syntax)
+    {
+        var position = syntax.SyntaxTree.GetLineSpan(syntax.Span).StartLinePosition;
+        return new(_document(syntax.SyntaxTree), syntax.SpanStart, syntax.Span.Length,
+            position.Line + 1, position.Character + 1);
     }
 
     internal void ExcludeSpecificationCall(IInvocationOperation invocation)

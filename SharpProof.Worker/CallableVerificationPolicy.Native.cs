@@ -16,6 +16,7 @@ internal static partial class CallableVerificationPolicy
         var effects = target.EffectClaims.ToDictionary(evidence => evidence.ClaimId, StringComparer.Ordinal);
         var hasPostconditions = target.Entry.ClaimIds.Any(id => !effects.ContainsKey(id));
         var entryPublished = false;
+        var entryFeasibility = CallableEntryFeasibility.Feasible;
         try
         {
             var resourceBudget = new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
@@ -37,6 +38,8 @@ internal static partial class CallableVerificationPolicy
                     : CallableEntryFeasibility.Feasible;
                 PublishEntry(entry);
             }
+            foreach (var result in await NativeEffectClaims.VerifyAsync(target, entryFeasibility, budgets, methodBoundary.Token).ConfigureAwait(false))
+            { completed[result.ClaimId] = result; }
             var records = Fill(target.IsSuccess ? WorkerClaimReason.UnsupportedBody : target.FailureReason);
             return Result(target, WorkerResultAssembler.ProjectCallableReasons(records).Reason, records);
         }
@@ -61,7 +64,8 @@ internal static partial class CallableVerificationPolicy
         void PublishEntry(CallableEntryFeasibility entry)
         {
             entryPublished = true;
-            foreach (var evidence in target.EffectClaims)
+            entryFeasibility = entry;
+            foreach (var evidence in target.EffectClaims.Where(evidence => !NativeEffectClaims.IsNative(evidence.ContractKind)))
             {
                 var result = EffectClaimResultAssembler.Assemble(target, evidence, entry, methodBoundary.Token);
                 completed[result.ClaimId] = result;

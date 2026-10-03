@@ -445,8 +445,20 @@ verifier. Entry feasibility uses body-independent predicates, and completed
 claim results survive a later interruption. Bounded loop search can establish
 a refutation only through original-body replay; a bounded UNSAT result cannot
 prove a cyclic program. Unsupported async and iterator callables abstain.
-Compiler-produced effect evidence remains authoritative for effect claims.
-Native exception-effect qualification uses the same passive SSA body facts.
+Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
+claims over the Total program: a proof is a complete may-effect summary and a
+refutation names a replayed violating site. Compiler effect evidence never
+supplies a proof for these contracts; where Z3 stays Unknown, a compiler
+violation is published only if it replays. Other effect contracts keep
+compiler evidence. Native exception checks use the same passive SSA body facts.
+`throw e` raises an explicit exception of e's static type, or
+NullReferenceException when e is null; core-library exception constructors
+taking strings and inner exceptions only allocate. Handlers match the thrown
+static type, and lowering abstains when a handler's type derives from it. Each
+explicit throw site carries its own exception code: an AllowedExceptions claim
+admits a site whose static type derives from an allowed type, and refutes only
+at a site that creates an exception of a disallowed type. DoesNotThrow is
+refuted by any explicit throw.
 Uncaught exits retain guarded exception kinds across joins; allowed kinds are
 checked at the exit rather than inferred from absence of a normal return.
 The compiler normalizes each declared DoesNotThrow or AllowedExceptions
@@ -515,8 +527,7 @@ reads. A proof excludes all represented allocation and throw sites, including
 caught faults that can allocate runtime exceptions. Unmodeled string allocation,
 call abstractions and source static/module initialization abstain. Validated
 claim ownership and complete entry initialization must survive decoding before
-entry infeasibility can establish a vacuous result. This qualification remains
-separate from authoritative compiler effect results.
+entry infeasibility can establish a vacuous result.
 
 Write events classify Local, Parameter, Field, Static, Element and Unknown
 regions. Native purity forbids reachable nonlocal events and permits allocation.
@@ -553,8 +564,8 @@ opaque values pass through to opaque callees, whose possible allocation covers
 the box. Contract APIs, nonvirtual source callees, `ref` arguments and shadow
 or metadata-Requires lowering never take opaque calls.
 Static and volatile reads, dispatched properties, array stores, external
-fields, other unsupported calls and incomplete initialization abstain; this shadow does not change compiler
-effect authority. Refutation requires an original-program write-site witness
+fields, other unsupported calls and incomplete initialization abstain.
+Refutation requires an original-program write-site witness
 without approximation reads. Bounded loop search never establishes a proof.
 
 Lock events denote synchronization attempts, including Monitor.Enter/Exit and

@@ -92,7 +92,10 @@ public enum IrExceptionKind
     Argument = 5,
     // Any exception of an unknown type, raised by an opaque call. Only a
     // catch of System.Exception or System.Object is known to catch it.
-    Unknown = 6
+    Unknown = 6,
+    // A `throw` statement's exception. Lowering dispatches it to handlers by
+    // its static type; the site's description names that type.
+    Explicit = 7
 }
 
 public enum IrProgramExecutionStatus

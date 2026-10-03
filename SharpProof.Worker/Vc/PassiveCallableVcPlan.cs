@@ -10,6 +10,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<IrTerm> _goals;
     private readonly IrTerm _normalCompletion;
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
+    private readonly ImmutableArray<OperationId> _explicitSites;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
@@ -28,6 +29,7 @@ internal sealed class PassiveCallableVcPlan
         _goals = builder.Goals;
         _normalCompletion = builder.NormalCompletion;
         _exceptions = builder.Exceptions;
+        _explicitSites = builder.ExplicitSites;
         _allocations = builder.Allocations;
         _writes = builder.Writes;
         _locks = builder.Locks;
@@ -123,7 +125,7 @@ internal sealed class PassiveCallableVcPlan
         return CreateReplay(Factory.Boolean(false), Factory.Boolean(true));
     }
 
-    internal VerificationQuery ExceptionQuery(ImmutableHashSet<IrExceptionKind> allowed)
+    internal VerificationQuery ExceptionQuery(ImmutableHashSet<IrExceptionKind> allowed, Func<OperationId, bool>? allowedSite = null)
     {
         ArgumentNullGuard.NotNull(allowed, nameof(allowed));
         if (allowed.Any(kind => !Enum.IsDefined(kind)))
@@ -134,6 +136,14 @@ internal sealed class PassiveCallableVcPlan
             IrTerm admitted = Factory.Boolean(false);
             foreach (var kind in allowed.OrderBy(kind => kind))
             { admitted = Factory.Binary(IrBinaryOperator.OrElse, admitted, Factory.Binary(IrBinaryOperator.Equal, exit.Kind, Factory.Integer((int)kind))); }
+            for (var ordinal = 0; ordinal < _explicitSites.Length; ordinal++)
+            {
+                if (allowed.Contains(IrExceptionKind.Explicit) || allowedSite?.Invoke(_explicitSites[ordinal]) == true)
+                {
+                    admitted = Factory.Binary(IrBinaryOperator.OrElse, admitted, Factory.Binary(IrBinaryOperator.Equal, exit.Kind,
+                        Factory.Integer(PassiveCallableVcBuilder.ExplicitSiteCode + ordinal)));
+                }
+            }
             goal = Factory.Binary(IrBinaryOperator.AndAlso, goal,
                 Factory.Binary(IrBinaryOperator.OrElse, Factory.Unary(IrUnaryOperator.Not, exit.Reach), admitted));
         }

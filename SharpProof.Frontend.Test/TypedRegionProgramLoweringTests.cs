@@ -93,8 +93,13 @@ public sealed class TypedRegionProgramLoweringTests
         using var subject = TypedProgramSubject.Create(
             "int Target(int x) { try { return 10 / x; } catch (System.DivideByZeroException) { return 7; } }",
             "namespace System { public sealed class DivideByZeroException : Exception { } }");
+        // The source type is not the runtime fault's type, so it never catches it.
         Assert.That(subject.Invoke([0]), Is.TypeOf<DivideByZeroException>());
-        Assert.That(subject.Lower().IsExact, Is.False);
+        var lowered = subject.Lower();
+        Assert.That(lowered.IsExact, Is.True);
+        var execution = subject.Execute(lowered, [0]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
     }
 
     [TestCase(false, 2)]
@@ -128,7 +133,6 @@ public sealed class TypedRegionProgramLoweringTests
     }
 
     [TestCase("int Target(int x) { try { return 10 / x; } catch (System.Exception e) { return 0; } }")]
-    [TestCase("int Target(int x) { try { throw new System.DivideByZeroException(); } catch (System.Exception) { return 0; } }")]
     [TestCase("int Target(int x) { try { return System.Math.Abs(x); } catch (System.Exception) { return 0; } }")]
     [TestCase("int Target(int x) { ref int r = ref x; try { r++; return x; } finally { x = 7; } }")]
     public void IncompleteRegionFormsStayClosed(string members)

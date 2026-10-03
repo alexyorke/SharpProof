@@ -86,6 +86,8 @@ internal sealed class PortableIrSourceSpan
     public int Start { get; set; }
     [System.Text.Json.Serialization.JsonRequired]
     public int Length { get; set; }
+    public int Line { get; set; }
+    public int Column { get; set; }
 }
 
 internal sealed class PortableIrTerm(
@@ -228,7 +230,7 @@ internal static class PortableIrWireCatalog
     internal static readonly ImmutableArray<IrExceptionKind> ExceptionKinds = [
         IrExceptionKind.DivideByZero, IrExceptionKind.Overflow, IrExceptionKind.NullReference,
         IrExceptionKind.IndexOutOfRange, IrExceptionKind.InvalidCast, IrExceptionKind.Argument,
-        IrExceptionKind.Unknown
+        IrExceptionKind.Unknown, IrExceptionKind.Explicit
     ];
 }
 
@@ -327,7 +329,9 @@ internal static partial class PortableIrGraphCodec
                 {
                     Document = span.Document,
                     Start = span.Start,
-                    Length = span.Length
+                    Length = span.Length,
+                    Line = span.Line,
+                    Column = span.Column
                 } : null
             };
         }

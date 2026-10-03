@@ -1,7 +1,7 @@
 namespace SharpProof.Worker;
 
-// Qualification entry point for declared native exception evidence. Compiler effect
-// publication remains authoritative until the complete effect universe qualifies.
+// Native exception evidence for DoesNotThrow and AllowedExceptions claims;
+// NativeEffectClaims publishes it.
 internal static class NativeExceptionEffectVerifier
 {
     internal static async Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
@@ -47,7 +47,15 @@ internal static class NativeExceptionEffectVerifier
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!results.ContainsKey(claim.ClaimId))
-            { results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(constraints[claim.ClaimId].AllowedKinds.ToImmutableHashSet(), cancellationToken).ConfigureAwait(false)); }
+            {
+                var allowed = constraints[claim.ClaimId].AllowedKinds.ToImmutableHashSet();
+                var anyThrowViolates = claim.ContractKind == WorkerEffectContractKind.DoesNotThrow;
+                var allowedTypes = claim.Constraint.AllowedExceptionTypes.ToHashSet(StringComparer.Ordinal);
+                var factory = candidate.Program.Factory;
+                results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, anyThrowViolates,
+                    site => ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
+                    site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false));
+            }
         }
         return results.ToImmutable();
 

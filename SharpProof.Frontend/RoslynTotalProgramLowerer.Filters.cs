@@ -87,7 +87,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 SpendRegion();
                 var caught = handler.Kind == ControlFlowRegionKind.FilterAndHandler
                     ? handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch) : handler;
-                if (caught.Kind != ControlFlowRegionKind.Catch || !Catches(caught, token.Kind))
+                if (caught.Kind != ControlFlowRegionKind.Catch || !Catches(caught, token))
                 { continue; }
                 RegionFilter? filter = handler.Kind == ControlFlowRegionKind.FilterAndHandler
                     ? _regionFilters[handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Filter)] : null;

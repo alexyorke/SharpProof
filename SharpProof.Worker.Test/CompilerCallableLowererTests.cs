@@ -472,7 +472,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public async Task MixedEffectAndRequiresUnsupportedBodyPreservesEffectEvidence()
+    public async Task MixedEffectAndRequiresUnsupportedBodyProvesNatively()
     {
         var preparation = Prepare(
             """
@@ -520,10 +520,7 @@ public sealed class CompilerCallableLowererTests
                     WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
             Assert.That(
                 verification.Claims[0].ProofCore,
-                Is.EqualTo([
-                    "compiler-effect:" + preparation.EffectClaims.Single()
-                        .EvidenceSha256
-                ]));
+                Is.EqualTo(["native-effect:" + preparation.EffectClaims.Single().ClaimId]));
         }
     }
 

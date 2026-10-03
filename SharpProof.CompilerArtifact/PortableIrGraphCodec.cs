@@ -979,7 +979,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             RequireCanonicalOptionalText(row.Description, "operation description");
             return _factory.CreateOperation(row.Description, row.SourceSpan is { } span
-                ? new IrSourceSpan(span.Document, span.Start, span.Length) : null);
+                ? new IrSourceSpan(span.Document, span.Start, span.Length, span.Line, span.Column) : null);
         }
 
         private static void RequireCanonicalOptionalText(string? value, string kind)

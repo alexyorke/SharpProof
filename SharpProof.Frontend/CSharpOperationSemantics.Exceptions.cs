@@ -13,7 +13,7 @@ internal static partial class CSharpOperationSemantics
             IrExceptionKind.InvalidCast => "System.InvalidCastException",
             IrExceptionKind.Argument => "System.ArgumentException",
             // Its hierarchy is just Exception and Object, so only those catch it.
-            IrExceptionKind.Unknown => "System.Exception",
+            IrExceptionKind.Unknown or IrExceptionKind.Explicit => "System.Exception",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
@@ -24,15 +24,9 @@ internal static partial class CSharpOperationSemantics
         out ImmutableArray<IrExceptionKind> kinds)
     {
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
-        var supported = new[]
-        {
-            // Roslyn represents a bare catch with the canonical System.Object.
-            "System.Object", "System.Exception", "System.SystemException", "System.ArithmeticException",
-            "System.DivideByZeroException", "System.OverflowException", "System.NullReferenceException",
-            "System.IndexOutOfRangeException", "System.InvalidCastException", "System.ArgumentException"
-        };
-        if (catchType != null && !supported.Any(name =>
-                SymbolEqualityComparer.Default.Equals(core.GetTypeByMetadataName(name), catchType)))
+        // Roslyn represents a bare catch with the canonical System.Object.
+        if (catchType != null && catchType.SpecialType != SpecialType.System_Object &&
+            !DerivesFrom(catchType, core.GetTypeByMetadataName("System.Exception")))
         {
             kinds = default;
             return false;
@@ -57,6 +51,61 @@ internal static partial class CSharpOperationSemantics
         }
         kinds = matched.ToImmutable();
         return true;
+    }
+
+    internal static bool DerivesFrom(ITypeSymbol? type, ITypeSymbol? ancestor)
+    {
+        for (var current = type; current != null && ancestor != null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, ancestor))
+            { return true; }
+        }
+        return false;
+    }
+
+    // The thrown expression below any implicit conversion to System.Exception,
+    // which keeps the reference.
+    internal static IOperation ThrownOperand(IOperation thrown)
+    {
+        while (thrown is IConversionOperation { IsImplicit: true, OperatorMethod: null, Conversion.IsReference: true } conversion)
+        { thrown = conversion.Operand; }
+        return thrown;
+    }
+
+    internal static INamedTypeSymbol? ThrownType(Compilation compilation, IOperation operand)
+    {
+        return operand.Type is INamedTypeSymbol { TypeKind: TypeKind.Class } type &&
+            DerivesFrom(type, compilation.GetTypeByMetadataName("System.Exception")) ? type : null;
+    }
+
+    // Core-library exception constructors taking only strings and inner
+    // exceptions store their arguments and run no other code.
+    internal static bool IsCoreExceptionCreation(IObjectCreationOperation creation)
+    {
+        var exception = CoreException(creation.Type);
+        return creation is { Initializer: null, Constructor: { } constructor } && exception != null &&
+            SymbolEqualityComparer.Default.Equals(constructor.ContainingAssembly, exception.ContainingAssembly) &&
+            constructor.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
+                (parameter.Type.SpecialType == SpecialType.System_String || SymbolEqualityComparer.Default.Equals(parameter.Type, exception))) &&
+            creation.Arguments.All(argument => argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue);
+    }
+
+    // The core library's System.Exception among type's base classes, found
+    // through System.Object's assembly.
+    private static INamedTypeSymbol? CoreException(ITypeSymbol? type)
+    {
+        INamedTypeSymbol? exception = null;
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            if (current.SpecialType == SpecialType.System_Object)
+            {
+                return exception != null && SymbolEqualityComparer.Default.Equals(exception.ContainingAssembly, current.ContainingAssembly)
+                    ? exception : null;
+            }
+            if (current is { Name: "Exception", Arity: 0, ContainingType: null, ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } })
+            { exception = current; }
+        }
+        return null;
     }
 
     internal static bool IsNullThrow(IOperation? expression)

@@ -450,7 +450,11 @@ ownership even when nominal display names match.
 Exception kinds use predecessor-guarded phi facts. Refutations require original
 IR replay and are compared with compiled C# execution in artifact qualification
 tests. Bounded loop UNSAT and call abstractions cannot establish effect proofs.
-The compiler effect assembler remains authoritative during this rollout.
+NativeEffectClaims publishes these results: Z3 proofs and replayed native
+refutations decide exception, allocation and purity claims, a replayed compiler
+violation is kept only where Z3 stays Unknown, and other effect contracts still
+use the compiler effect assembler. Explicit throws carry per-site exception
+codes so AllowedExceptions goals compare each site's static type.
 The `SharpProof.Gates exception-shadow` command separately instruments the pinned
 200-method OSS corpus with DoesNotThrow. It compares raw legacy analyzer
 outcomes, published compiler evidence, and native results after production
@@ -551,8 +555,7 @@ purity shadow forbids reachable nonlocal events; allocation remains compatible
 with purity. The allocation and purity routes share claim admission, entry
 feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.
 `SharpProof.Gates purity-shadow` compares every pinned method against raw legacy
-purity results; independent mutation oracles remain explicit gaps. Compiler
-effect authority remains in place.
+purity results; independent mutation oracles remain explicit gaps.
 Typed Lock instructions record validated Monitor.Enter/Exit attempts, including
 C# lock statements and source-helper frames. Concrete replay observes the
 attempt and stops before synchronization. Native purity excludes reachable

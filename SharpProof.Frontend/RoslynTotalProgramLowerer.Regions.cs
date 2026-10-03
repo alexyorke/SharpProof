@@ -24,6 +24,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private readonly Dictionary<ControlFlowRegion, IrVarId> _regionCaught = [];
     private readonly Dictionary<(ControlFlowRegion Catch, int Token), IrBlockId> _regionCatchEntries = [];
     private readonly Dictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken> _regionTokens = [];
+    private readonly Dictionary<OperationId, INamedTypeSymbol> _explicitThrowTypes = [];
     private readonly List<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)> _regionRethrows = [];
     private readonly List<ILocalSymbol> _regionLocals = [];
     private ControlFlowGraph _regionGraph = null!;
@@ -246,9 +247,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         else if (branch?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (!CSharpOperationSemantics.IsNullThrow(source.BranchValue))
-            { throw new RegionIncompleteException(); }
-            _builder.Throw(block, site, IrExceptionKind.NullReference,
-                RegionExceptionTarget(source.EnclosingRegion, Token(IrExceptionKind.NullReference, site)));
+            { ExplicitThrow(source.BranchValue, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
+            else
+            {
+                _builder.Throw(block, site, IrExceptionKind.NullReference,
+                    RegionExceptionTarget(source.EnclosingRegion, Token(IrExceptionKind.NullReference, site)));
+            }
         }
         else if (branch?.Semantics == ControlFlowBranchSemantics.Rethrow)
         {
@@ -331,7 +335,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (parent.Kind == ControlFlowRegionKind.TryAndCatch)
                 {
                     var handler = parent.NestedRegions.FirstOrDefault(candidate =>
-                        candidate.Kind == ControlFlowRegionKind.Catch && Catches(candidate, token.Kind));
+                        candidate.Kind == ControlFlowRegionKind.Catch && Catches(candidate, token));
                     if (handler != null)
                     {
                         target = RegionCatchEntry(handler, token);
@@ -346,14 +350,52 @@ internal sealed partial class RoslynTotalProgramLowerer
             preserveResult: HasEnclosingRegionFinally(source));
     }
 
+    // `throw e`: a null `e` throws NullReferenceException instead. The thrown
+    // exception's static type selects handlers.
+    private void ExplicitThrow(IOperation? thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
+    {
+        if (thrown == null || _regionGraph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
+        { throw new RegionIncompleteException(); }
+        thrown = CSharpOperationSemantics.ThrownOperand(thrown);
+        if (CSharpOperationSemantics.ThrownType(compilation, thrown) is not { } type)
+        { throw new RegionIncompleteException(); }
+        // A thrown `new X(...)` has exact runtime type X and is never null.
+        var exact = thrown is IObjectCreationOperation;
+        var value = Value(thrown, block);
+        block = value.Continuation;
+        var site = _context.ThrowSite(thrown, type, exact);
+        _explicitThrowTypes[site] = type;
+        if (!exact)
+        {
+            var isNull = _context.Factory.Binary(IrBinaryOperator.Equal, value.Value, _context.Factory.Null(value.Value.Type));
+            var nullThrow = RegionBlock("throw:null");
+            var thrownBlock = RegionBlock("throw:explicit");
+            _builder.Branch(block, site, isNull, nullThrow, thrownBlock);
+            _builder.Throw(nullThrow, site, IrExceptionKind.NullReference, target(Token(IrExceptionKind.NullReference, site)));
+            block = thrownBlock;
+        }
+        _builder.Throw(block, site, IrExceptionKind.Explicit, target(Token(IrExceptionKind.Explicit, site)));
+    }
+
     // An Unknown exception is caught by Exception/Object handlers; whether a
-    // narrower handler would catch it is not known, so lowering abstains.
-    private bool Catches(ControlFlowRegion handler, IrExceptionKind kind)
+    // narrower handler would catch it is not known, so lowering abstains. An
+    // explicit exception of static type S is caught by a handler for T when
+    // S derives from T, and lowering abstains when T derives from S.
+    private bool Catches(ControlFlowRegion handler, RegionExceptionToken token)
     {
         var kinds = _regionCatchKinds[handler];
-        if (kind == IrExceptionKind.Unknown && !kinds.Contains(IrExceptionKind.Unknown))
+        if (token.Kind == IrExceptionKind.Explicit && _explicitThrowTypes.TryGetValue(token.Site, out var thrown))
+        {
+            var caught = handler.ExceptionType;
+            if (caught == null || caught.SpecialType == SpecialType.System_Object || CSharpOperationSemantics.DerivesFrom(thrown, caught))
+            { return true; }
+            if (CSharpOperationSemantics.DerivesFrom(caught, thrown))
+            { throw new RegionIncompleteException(); }
+            return false;
+        }
+        if (token.Kind is IrExceptionKind.Unknown or IrExceptionKind.Explicit && !kinds.Contains(IrExceptionKind.Unknown))
         { throw new RegionIncompleteException(); }
-        return kinds.Contains(kind);
+        return kinds.Contains(token.Kind);
     }
 
     private IrBlockId RegionCatchEntry(ControlFlowRegion caught, RegionExceptionToken token)
@@ -407,7 +449,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             foreach (var token in tokens)
             {
                 SpendRegion();
-                if (Catches(request.Catch, token.Kind))
+                if (Catches(request.Catch, token))
                 {
                     selected.Add(token);
                 }

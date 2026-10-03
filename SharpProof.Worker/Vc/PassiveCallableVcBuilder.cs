@@ -41,6 +41,11 @@ internal sealed class PassiveCallableVcBuilder
     internal ImmutableArray<IrTerm> Goals { get; private set; }
     internal IrTerm NormalCompletion { get; private set; } = null!;
     internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => [.. _exceptions];
+    // Each explicit throw site carries its own exception code, so a claim can
+    // admit the sites whose static type it allows.
+    internal const int ExplicitSiteCode = 1024;
+    private readonly List<OperationId> _explicitSites = [];
+    internal ImmutableArray<OperationId> ExplicitSites => [.. _explicitSites];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
     internal ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> Writes => [.. _writes];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
@@ -326,7 +331,14 @@ internal sealed class PassiveCallableVcBuilder
                         // Constructing a runtime fault can allocate even when
                         // a handler prevents it from escaping the callable.
                         _potentialExceptionAllocations.Add(reach);
-                        AddEdge(thrown.Target, reach, state, _factory.Integer((int)thrown.ExceptionKind), thrown.Operation);
+                        var code = (int)thrown.ExceptionKind;
+                        if (thrown.ExceptionKind == IrExceptionKind.Explicit)
+                        {
+                            if (!_explicitSites.Contains(thrown.Operation))
+                            { _explicitSites.Add(thrown.Operation); }
+                            code = ExplicitSiteCode + _explicitSites.IndexOf(thrown.Operation);
+                        }
+                        AddEdge(thrown.Target, reach, state, _factory.Integer(code), thrown.Operation);
                         break;
                     case IrExceptionalExitInstruction:
                         // Never assume validity to delete an executable naked

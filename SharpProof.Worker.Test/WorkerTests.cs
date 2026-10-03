@@ -637,7 +637,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task AllowedExceptionsRetainCompilerProofWithSupportedNominalRequires()
+    public async Task AllowedExceptionsAreDecidedNatively()
     {
         using var project = TestProject.Create(
             """
@@ -676,47 +676,15 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                maybeNull.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                maybeNull.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.EffectContractNotEstablished));
-            Assert.That(
-                maybeNull.EffectCertainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
-            Assert.That(maybeNull.EffectWitness, Is.Null);
-            Assert.That(
-                requiredNonNull.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                requiredNonNull.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                requiredNonNull.EffectCertainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
-            Assert.That(
-                requiredNonNull.ProofCore,
-                Has.One.StartsWith("compiler-effect:"));
-            Assert.That(
-                response.CallableResults.Single(result =>
-                    result.CallableId.Contains(
-                        ".MaybeNull(",
-                        StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
-            Assert.That(
-                response.CallableResults.Single(result =>
-                    result.CallableId.Contains(
-                        ".RequiredNonNull(",
-                        StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Complete));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
-            Assert.That(
-                WorkerProtocolJson.Validate(response).IsValid,
-                Is.True);
+            // `throw null` raises NullReferenceException, which is not allowed.
+            Assert.That(maybeNull.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(maybeNull.EffectCertainty, Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(maybeNull.EffectWitness?.Detail, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(requiredNonNull.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(requiredNonNull.EffectCertainty, Is.EqualTo(WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(requiredNonNull.ProofCore, Has.One.StartsWith("native-effect:"));
+            Assert.That(response.CallableResults.Select(static result => result.Coverage), Is.All.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
@@ -775,7 +743,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task ConditionalEffectViolationRemainsTypedUnknown()
+    public async Task ConditionalThrowRefutesWithAConcreteEntry()
     {
         var response = await RunAsync(
             """
@@ -792,19 +760,15 @@ public sealed class WorkerTests
             cacheEnabled: false);
         var result = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.EffectContractNotEstablished);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                result.EffectCertainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
-            Assert.That(result.EffectWitness, Is.Null);
-            Assert.That(
-                response.CallableResults.Single().Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(result.EffectCertainty, Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(result.EffectWitness?.Kind, Is.EqualTo("explicit-throw"));
+            Assert.That(result.EffectWitness?.Detail, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(response.CallableResults.Single().Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -858,7 +822,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task DirectWriteAndCapabilityClaimsFailClosedWithoutReplayTraces()
+    public async Task DirectWritesRefuteNativelyAndCapabilitiesReplay()
     {
         var response = await RunAsync(
             """
@@ -884,51 +848,19 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                results.Select(static result => result.Outcome),
-                Is.EqualTo(new[]
-                {
-                    WorkerClaimOutcome.Unknown,
-                    WorkerClaimOutcome.Refuted
-                }),
-                responseJson);
-            Assert.That(
-                results.Select(static result => result.EffectCertainty),
-                Is.EqualTo(new[]
-                {
-                    WorkerEffectEvidenceCertainty.Unavailable,
-                    WorkerEffectEvidenceCertainty.DefiniteViolation
-                }));
-            Assert.That(
-                results.Select(static result => result.Reason),
-                Is.EqualTo(new[]
-                {
-                    WorkerClaimReason.CounterexampleNotReplayable,
-                    WorkerClaimReason.None
-                }));
-            Assert.That(results[0].EffectWitness, Is.Null);
-            Assert.That(
-                results[1].EffectWitness?.Kind,
-                Is.EqualTo("synchronization-lock"));
-            Assert.That(
-                results[1].EffectWitness?.Capabilities,
-                Is.EqualTo(
-                    WorkerEffectCapabilitySet.Synchronization));
-            Assert.That(
-                response.CallableResults.Single(result =>
-                    result.CallableId.Contains(
-                        ".Synchronize",
-                        StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Complete));
-            Assert.That(
-                response.CallableResults.Single(result =>
-                    result.CallableId.Contains(
-                        ".Write",
-                        StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
-            Assert.That(
-                response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Complete));
+            // Z3 refutes purity at the field store; the capability claim keeps
+            // its replayed compiler violation.
+            Assert.That(results.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Refuted), responseJson);
+            Assert.That(results.Select(static result => result.EffectCertainty),
+                Is.All.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(results[0].EffectWitness?.Kind, Is.EqualTo("nonlocal-write"));
+            Assert.That(results[0].EffectWitness?.Effects, Is.EqualTo(WorkerEffectSet.WritesReceiverState));
+            Assert.That(results[1].EffectWitness?.Kind, Is.EqualTo("synchronization-lock"));
+            Assert.That(results[1].EffectWitness?.Capabilities, Is.EqualTo(WorkerEffectCapabilitySet.Synchronization));
+            Assert.That(response.CallableResults.Select(static result => result.Coverage),
+                Is.All.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -1098,7 +1030,7 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 ClaimFor(laterAllocation, "AllocationAfterFirstStatement").Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
         }
     }
 
@@ -1332,7 +1264,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task UnsupportedSelectedEffectCallablesRemainTypedUnknown()
+    public async Task NativeAllocationClaimsCoverGenericAndDelegateCallables()
     {
         var response = await RunAsync(
             WorkerTestSources.UnsupportedEffectCallables,
@@ -1340,44 +1272,18 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
+            // Async bodies stay unsupported; the others allocate `new object()`.
             Assert.That(response.ClaimResults, Has.Length.EqualTo(3));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                response.ClaimResults.Select(result => result.Reason),
-                Is.EqualTo(response.ClaimResults.Select(result =>
-                    GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal)
-                        ? WorkerClaimReason.UnsupportedCallable : WorkerClaimReason.UnsupportedContract)));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.EffectCertainty),
-                Is.All.EqualTo(
-                    WorkerEffectEvidenceCertainty.Unavailable));
-            Assert.That(
-                response.ClaimResults.Select(static result =>
-                    result.EffectWitness),
-                Is.All.Null);
-            Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Coverage),
-                Is.All.EqualTo(
-                    WorkerCallableCoverage.Incomplete));
-            Assert.That(
-                response.CallableResults.Select(result => result.Reason),
-                Is.EqualTo(response.CallableResults.Select(result =>
-                    result.CallableId.Contains(".Async", StringComparison.Ordinal)
-                        ? WorkerCallableCoverageReason.UnsupportedCallable : WorkerCallableCoverageReason.UnsupportedContract)));
-            Assert.That(
-                response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(
-                WorkerProtocolJson.Validate(response).IsValid,
-                Is.True);
+            foreach (var result in response.ClaimResults)
+            {
+                var asynchronous = GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal);
+                Assert.That(result.Outcome, Is.EqualTo(asynchronous ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Refuted));
+                Assert.That(result.Reason, Is.EqualTo(asynchronous ? WorkerClaimReason.UnsupportedCallable : WorkerClaimReason.None));
+                Assert.That(result.EffectWitness?.Kind, Is.EqualTo(asynchronous ? null : "managed-allocation"));
+            }
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
@@ -1402,7 +1308,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task CompilerEffectWitnessTamperingCannotBypassReplay()
+    public async Task TamperedCompilerWitnessesCannotOverrideNativeEvidence()
     {
         using var project = TestProject.Create(AllocationSubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
@@ -1429,24 +1335,12 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Failed));
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(
-                    WorkerRunFailureReason.CounterexampleReplayFailed));
-            Assert.That(
-                result.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleReplayFailed));
-            Assert.That(result.EffectWitness, Is.Null);
-            Assert.That(
-                response.Summary.CacheStatus,
-                Is.Not.EqualTo(WorkerCacheStatus.Written));
+            // Z3 decides allocation claims; the tampered compiler witness is
+            // never read.
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(result.EffectWitness?.Effects, Is.EqualTo(WorkerEffectSet.Allocates));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 

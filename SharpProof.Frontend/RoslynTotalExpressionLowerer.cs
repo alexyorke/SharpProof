@@ -138,6 +138,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
+        if (depth < 256 && operation is IObjectCreationOperation exceptionCreation &&
+            CSharpOperationSemantics.IsCoreExceptionCreation(exceptionCreation))
+        {
+            foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
+            {
+                var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+                if (!lowered.Classification.IsExact)
+                { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+                block = lowered.Continuation;
+            }
+            return AllocateValue(operation, block);
+        }
         if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
             CSharpOperationSemantics.IsExplicitDelegateCreation(delegateCreation))
         {
