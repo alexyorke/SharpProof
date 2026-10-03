@@ -2,8 +2,7 @@ namespace SharpProof.Worker;
 
 // Z3 decides every effect claim over the Total program.
 // A proof is a complete may-effect summary; a refutation names the first
-// replayed violating site. Compiler effect evidence never supplies a proof;
-// where Z3 stays Unknown, only a compiler violation that replays is kept.
+// replayed violating site.
 internal static class NativeEffectClaims
 {
     internal static bool IsNative(WorkerEffectContractKind kind)
@@ -53,11 +52,7 @@ internal static class NativeEffectClaims
                 WorkerEffectContractKind.EffectContract => await NativeEffectSiteVerifier.VerifyEffectContractAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 _ => exceptions[claim.ClaimId]
             };
-            var result = Project(target, claim.ClaimId, check);
-            if (result.Outcome == WorkerClaimOutcome.Unknown && claim.Outcome == WorkerClaimOutcome.Refuted &&
-                EffectClaimResultAssembler.Assemble(target, claim, entry, cancellationToken) is { Outcome: WorkerClaimOutcome.Refuted } replayed)
-            { result = replayed; }
-            results.Add(result);
+            results.Add(Project(target, claim.ClaimId, check));
         }
         return results.MoveToImmutable();
     }

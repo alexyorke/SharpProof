@@ -76,6 +76,52 @@ internal static class EffectContractDiagnostics
             : AnalyzerSemanticOutcome.Unknown;
     }
 
+    // The effect claims a callable declares, without analyzing its body: Z3
+    // decides them in the worker. A complete EffectContract on a bodyless
+    // declaration is a trusted boundary and is established as declared.
+    internal static ImmutableArray<EffectClaimEvaluation> Declare(
+        IMethodSymbol method, Location location, AnalyzerSession session, CancellationToken cancellationToken)
+    {
+        var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
+        var summaryContracts = Select(attributes, session.Attributes.EffectContract);
+        var capabilitiesAttributes = Select(attributes, session.Attributes.AllowedCapabilities);
+        var allowedExceptions = Select(attributes, session.Attributes.AllowedExceptions);
+        var capabilities = DecodeCapabilities(capabilitiesAttributes, location, session, static _ => { });
+        var exceptions = DecodeAllowedExceptions(allowedExceptions, session.Compilation, location, session, static _ => { });
+        cancellationToken.ThrowIfCancellationRequested();
+        var contract = summaryContracts.IsDefaultOrEmpty
+            ? new EffectContractResolution(EffectContractResolutionKind.Missing, EffectSummary.Bottom)
+            : session.ResolveEffectContract(method);
+        var declared = summaryContracts.IsDefaultOrEmpty ? default : EffectSummaryProjector.Project(contract.Summary);
+        var bodyless = method is { IsAbstract: true } or { IsExtern: true };
+        var trusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid && declared.IsComplete;
+        var evaluations = ImmutableArray.CreateBuilder<EffectClaimEvaluation>(6);
+        Add(Select(attributes, session.Attributes.EnforcePure), EffectEvaluationContractKind.EnforcePure, EffectClaimConstraint.Empty);
+        Add(Select(attributes, session.Attributes.ZeroAllocations), EffectEvaluationContractKind.ZeroAllocations, EffectClaimConstraint.Empty);
+        Add(capabilitiesAttributes, EffectEvaluationContractKind.AllowedCapabilities,
+            new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []), capabilities.IsValid);
+        Add(Select(attributes, session.Attributes.DoesNotThrow), EffectEvaluationContractKind.DoesNotThrow, EffectClaimConstraint.Empty);
+        Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
+            new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid);
+        Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
+            new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
+            contract.Kind != EffectContractResolutionKind.Invalid, trusted);
+        return evaluations.ToImmutable();
+
+        void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
+            bool valid = true, bool established = false)
+        {
+            if (selected.IsDefaultOrEmpty)
+            { return; }
+            var projected = EffectEvaluationProjections.Classify(
+                established, false, valid, established, established, EffectEvaluationReason.EffectSummaryIncomplete);
+            var (outcome, reason, certainty) = EffectEvaluationProducerTupleCatalog.Require(
+                projected.Outcome, projected.Reason, projected.Certainty);
+            evaluations.Add(new EffectClaimEvaluation(kind, selected, outcome, reason, certainty,
+                established ? "trusted-boundary" : "native", null, constraint, null, Location.None, []));
+        }
+    }
+
     internal static ImmutableArray<EffectClaimEvaluation> Evaluate(
         IMethodSymbol method, Location location, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken,

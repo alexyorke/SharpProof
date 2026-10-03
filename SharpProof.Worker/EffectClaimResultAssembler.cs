@@ -40,14 +40,11 @@ internal static class EffectClaimResultAssembler
                 evidence.Certainty);
         }
 
-        // A compiler effect summary remains useful when entry-feasibility
-        // lowering cannot represent a precondition. Preserve
-        // non-violation evidence in that case; replaying a compiler refutation
-        // still requires a proven reachable entry and stays unknown below.
+        // A trusted boundary needs no entry witness when entry-feasibility
+        // lowering cannot represent a precondition.
         var preserveCompilerEvidence =
             entryFeasibility.IsUnknown &&
-            entryFeasibility.Reason == WorkerClaimReason.UnsupportedExpression &&
-            evidence.Outcome != WorkerClaimOutcome.Refuted;
+            entryFeasibility.Reason == WorkerClaimReason.UnsupportedExpression;
         if (entryFeasibility.IsUnknown && !preserveCompilerEvidence)
         {
             return CreateResult(
@@ -64,28 +61,6 @@ internal static class EffectClaimResultAssembler
                 WorkerEffectEvidenceCertainty.VacuousEntry,
                 entryFeasibility.ProofCore,
                 entryFeasibility.UsedAssumptionIds);
-        }
-
-        if (evidence.Outcome == WorkerClaimOutcome.Refuted)
-        {
-            var replayed = EffectCounterexampleReplayer.Replay(
-                target,
-                evidence,
-                cancellationToken);
-            if (replayed == null)
-            {
-                return CreateResult(
-                    WorkerClaimOutcome.Unknown,
-                    WorkerClaimReason.CounterexampleReplayFailed,
-                    WorkerEffectEvidenceCertainty.Unavailable);
-            }
-
-            var refuted = CreateResult(
-                WorkerClaimOutcome.Refuted,
-                WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.DefiniteViolation);
-            refuted.EffectWitness = replayed;
-            return refuted;
         }
 
         var result = CreateResult(

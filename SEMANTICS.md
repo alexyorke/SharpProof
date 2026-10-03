@@ -65,12 +65,9 @@ unioned and emitted as one combined claim at the callable location, with all
 occurrences contributing to its stable identity and evidence.
 Z3 decides every effect claim over the callable's Total program: a proof is a
 complete may-effect summary, and a refutation names a violating site reached by
-concrete replay. Compiler effect evidence never supplies a proof. Where Z3
-stays Unknown, a compiler violation is published only if its independently
-replayable event trace (a definite allocation, an exact framework explicit
-throw, an empty `lock`, or an exact `Monitor` call) replays; the worker
-derives that event's effects, capabilities and exception hierarchy itself. A
-trusted complete boundary on a bodyless declaration is published as declared.
+concrete replay. The compiler only declares each effect claim and its
+constraint; it runs no effect analysis of its own. A trusted complete boundary
+on a bodyless declaration is published as declared.
 Allocation can refute `ZeroAllocations` or an `EffectContract` that excludes
 `Allocates`; a write or lock can refute `EnforcePure`, `AllowedCapabilities` or
 `EffectContract`; and a throw can refute `DoesNotThrow`, `AllowedExceptions` or
@@ -82,15 +79,9 @@ reads and writes of fields and elements need every state flag of their kind
 `Synchronizes` and the Synchronization capability, and opaque calls need their
 specified effects and capabilities.
 
-Other direct candidates, including receiver-field access, user-constructed
-exception types, static-initialization-sensitive allocation, and other
-non-replayable definite operations, become
-`Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and other
-may-only conflicts remain `Unknown(EffectContractNotEstablished)`; incomplete
-evidence is `Unknown(EffectSummaryIncomplete)`. Other certainty values
-distinguish a complete or incomplete may-effect summary, a trusted complete
-boundary, and unavailable evidence. Effect claim results are never stored in
-or reused from the semantic cache.
+A violation whose replay reads an approximation is
+`Unknown(CounterexampleNotReplayable)`. Effect claim results are never stored
+in or reused from the semantic cache.
 
 Exception constraints and exact witness hierarchies use the type-reference
 documentation ID qualified by the full compiler assembly identity: name,

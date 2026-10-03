@@ -36,7 +36,7 @@ public sealed class NativeExceptionConstraintTests
     }
 
     [TestCase("public static class C { [DoesNotThrow] public static bool Target<T>(Node<T> node) => node == null; } public class Node<T> {}", WorkerClaimReason.UnsupportedContract)]
-    [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => x; }", WorkerClaimReason.None)]
+    [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => x; }", WorkerClaimReason.EffectSummaryIncomplete)]
     public async Task GenericDeclarationsWithSupportedValueDomainsRetainNativeExceptionConstraints(string declaration, WorkerClaimReason compilerReason)
     {
         var preparation = RoundTrip("using SharpProof.Attributes; " + declaration);

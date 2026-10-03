@@ -358,9 +358,7 @@ internal sealed partial class ClaimManifestBuilder(
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
             ? CreateEffectClaims(
-                EffectContractDiagnostics.Evaluate(
-                    target, location, _effectSession, static _ => { }, cancellationToken,
-                    includeDiagnosticPayload: false),
+                EffectContractDiagnostics.Declare(target, location, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported)
             : [];
         var features = new HashSet<WorkerSelectedFeature>(selected);
@@ -690,7 +688,7 @@ internal sealed partial class ClaimManifestBuilder(
         return new ManifestEffectClaim(entry, evidence, evaluation.Reason != EffectEvaluationReason.UnsupportedContract);
     }
 
-    private CompilerEffectClaimArtifact CreateEffectEvidence(
+    private static CompilerEffectClaimArtifact CreateEffectEvidence(
         string claimId,
         EffectClaimEvaluation evaluation,
         bool isSupported)
@@ -723,56 +721,11 @@ internal sealed partial class ClaimManifestBuilder(
         };
         if (!isSupported)
         {
-            MarkUnavailable(evidence, WorkerClaimReason.UnsupportedContract);
-            return evidence;
+            evidence.Outcome = WorkerClaimOutcome.Unknown;
+            evidence.Reason = WorkerClaimReason.UnsupportedContract;
+            evidence.Certainty = WorkerEffectEvidenceCertainty.Unavailable;
         }
-
-        if (evidence.Outcome != WorkerClaimOutcome.Refuted)
-        {
-            return evidence;
-        }
-
-        if (evidence.Reason != WorkerClaimReason.None ||
-            evidence.Certainty !=
-            WorkerEffectEvidenceCertainty.DefiniteViolation ||
-            evaluation.Witness is not { } witness ||
-            !CompilerEffectReplayLowerer.TryCreate(
-                _compilation,
-                _effectSession.ApiSpecs,
-                witness,
-                ToSourceLocation(witness.Origin.Syntax.GetLocation()),
-                cancellationToken,
-            out var replay,
-            out var witnessDetail))
-        {
-            MarkUnavailable(evidence, WorkerClaimReason.CounterexampleNotReplayable);
-            return evidence;
-        }
-
-        evidence.Witness = new WorkerEffectViolationWitness
-        {
-            Kind = witness.Kind,
-            Detail = witnessDetail,
-            Effects = ToWorkerEffects(witness.Effects),
-            Capabilities =
-                ToWorkerCapabilities(witness.Capabilities),
-            ExactExceptionTypeHierarchy =
-                [.. replay!.Events[0].ExactExceptionTypeHierarchy],
-            Location = replay!.Events[0].Location
-        };
-        evidence.Replay = replay;
         return evidence;
-    }
-
-    private static void MarkUnavailable(
-        CompilerEffectClaimArtifact evidence,
-        WorkerClaimReason reason)
-    {
-        evidence.Outcome = WorkerClaimOutcome.Unknown;
-        evidence.Reason = reason;
-        evidence.Certainty = WorkerEffectEvidenceCertainty.Unavailable;
-        evidence.Witness = null;
-        evidence.Replay = null;
     }
 
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(

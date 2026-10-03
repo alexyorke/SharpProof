@@ -81,32 +81,6 @@ public sealed class CompilerReportingTests
     }
 
     [Test]
-    public void EffectReplayRequiresAnObservedViolationOfTheSelectedConstraint()
-    {
-        var evidence = new CompilerEffectClaimArtifact
-        {
-            ContractKind = WorkerEffectContractKind.AllowedExceptions,
-            Constraint = new CompilerEffectConstraintArtifact { AllowedExceptionTypes = ["System.Exception"] }
-        };
-        var observed = new WorkerEffectViolationWitness
-        {
-            Effects = WorkerEffectSet.Throws,
-            ExactExceptionTypeHierarchy = ["System.ArgumentException", "System.Exception"]
-        };
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(CompilerEffectViolation.IsViolation(evidence, null), Is.False);
-            Assert.That(CompilerEffectViolation.IsViolation(evidence, observed), Is.False);
-            evidence.Constraint.AllowedExceptionTypes = ["System.InvalidOperationException"];
-            Assert.That(CompilerEffectViolation.IsViolation(evidence, observed), Is.True);
-            observed.Effects = WorkerEffectSet.None;
-            Assert.That(CompilerEffectViolation.IsViolation(evidence, observed), Is.False);
-            evidence.ContractKind = (WorkerEffectContractKind)int.MaxValue;
-            Assert.That(CompilerEffectViolation.IsViolation(evidence, observed), Is.False);
-        }
-    }
-
-    [Test]
     public void SharedMappedLocationsRetainTheirPhysicalTreeIdentity()
     {
         var first = Tree("first.cs");

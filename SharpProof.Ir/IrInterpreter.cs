@@ -494,6 +494,11 @@ public sealed class IrInterpreter(IrFactory factory)
                 operand.Value.String));
         }
 
+        // A Total array widened to object keeps the array as its identity.
+        if (cast.Type == _factory.ObjectType && operand.Value.Kind == IrValueKind.Sequence &&
+            _factory.Semantics == IrExecutionSemantics.Total)
+        { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value)); }
+
         if (operand.Value.Kind != IrValueKind.Reference)
         {
             return Unsupported(IrUnsupportedReason.UnsupportedCast,

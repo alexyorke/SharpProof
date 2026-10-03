@@ -500,7 +500,7 @@ public sealed class CompilerCallableLowererTests
             Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
             Assert.That(
                 preparation.EffectClaims.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 verification.Callable.Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));

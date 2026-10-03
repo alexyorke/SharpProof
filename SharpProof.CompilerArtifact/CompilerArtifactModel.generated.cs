@@ -315,8 +315,6 @@ internal sealed class CompilerEffectClaimArtifact
     public WorkerClaimReason Reason { get; set; }
     public WorkerEffectEvidenceCertainty Certainty { get; set; }
     public CompilerEffectConstraintArtifact Constraint { get; set; } = new();
-    public WorkerEffectViolationWitness? Witness { get; set; }
-    public CompilerEffectReplayArtifact? Replay { get; set; }
     public string Evidence { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
 }
@@ -326,68 +324,6 @@ internal sealed class CompilerEffectConstraintArtifact
     public WorkerEffectSet AllowedEffects { get; set; }
     public WorkerEffectCapabilitySet AllowedCapabilities { get; set; }
     public string[] AllowedExceptionTypes { get; set; } = [];
-}
-
-internal enum CompilerEffectReplayPathKind
-{
-    Unspecified = 0,
-    Unconditional = 1
-}
-
-internal enum CompilerEffectReplayEventKind
-{
-    Unspecified = 0,
-    ManagedObjectAllocation = 1,
-    ManagedArrayAllocation = 2,
-    ExplicitThrow = 3,
-    ReceiverFieldRead = 4,
-    ReceiverFieldWrite = 5,
-    MonitorCall = 6,
-    EmptyLock = 7
-}
-
-internal sealed class CompilerEffectReplayArtifact
-{
-    public CompilerEffectReplayPathKind PathKind { get; set; }
-    [JsonIgnore]
-    public string ConstraintSha256 { get; set; } = string.Empty;
-    public CompilerEffectReplayEventArtifact[] Events { get; set; } = [];
-}
-
-internal sealed class CompilerEffectReplayEventArtifact
-{
-    public int Ordinal { get; set; } = -1;
-    public CompilerEffectReplayEventKind Kind { get; set; }
-    [JsonIgnore]
-    public int SyntaxTreeOrdinal { get; set; } = -1;
-    [JsonIgnore]
-    public string SyntaxTreeSha256 { get; set; } = string.Empty;
-    [JsonIgnore]
-    public string SyntaxTreeSnapshotSha256 { get; set; } = string.Empty;
-    [JsonIgnore]
-    public string SyntaxTreeLineMapSha256 { get; set; } = string.Empty;
-    [JsonIgnore]
-    public int SyntaxStart { get; set; } = -1;
-    [JsonIgnore]
-    public int SyntaxLength { get; set; } = -1;
-    [JsonIgnore]
-    public string OperationIdentitySha256 { get; set; } = string.Empty;
-    public string MemberIdentity { get; set; } = string.Empty;
-    public string? MemberDocumentationId { get; set; }
-    public string TypeIdentity { get; set; } = string.Empty;
-    public string? TypeDocumentationId { get; set; }
-    public string? SpecWitnessIdentifier { get; set; }
-    public long[] ScalarOperands { get; set; } = [];
-    public string[] ExactExceptionTypeHierarchy { get; set; } = [];
-    public WorkerSourceLocation Location { get; set; } = new();
-    [JsonIgnore]
-    public int SourceTreeOrdinal { get; set; } = -1;
-    [JsonIgnore]
-    public string SourceTreePath { get; set; } = string.Empty;
-    [JsonIgnore]
-    public string SourceTreeSha256 { get; set; } = string.Empty;
-    [JsonIgnore]
-    public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerClauseArtifact
@@ -606,15 +542,8 @@ internal readonly struct CompilerEffectConstraintRule(
 
 internal static class CompilerEffectEvidenceCatalog
 {
-    internal const string ConstraintDomain = "SharpProof.CompilerEffectReplayConstraint";
-    internal const int ConstraintVersion = 1;
-    internal const string OperationDomain = "SharpProof.CompilerEffectReplayOperation";
-    internal const int OperationVersion = 1;
     internal const string EvidenceDomain = "SharpProof.CompilerEffectClaimEvidence";
-    internal const int EvidenceVersion = 9;
-    internal const int MaximumReplayEvents = 256;
-    internal const CompilerEffectReplayPathKind ReplayPathKind =
-        CompilerEffectReplayPathKind.Unconditional;
+    internal const int EvidenceVersion = 10;
     internal static readonly ImmutableArray<WorkerClaimReason> UnknownReasons = [
         WorkerClaimReason.UnsupportedContract,
         WorkerClaimReason.CounterexampleNotReplayable,
@@ -628,7 +557,6 @@ internal static class CompilerEffectEvidenceCatalog
         (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
         (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
         (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry),
-        (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation),
         (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable),
         (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable),
         (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
@@ -663,13 +591,6 @@ internal static class CompilerEffectEvidenceCatalog
         new(WorkerEffectContractKind.DoesNotThrow, true, true, true),
         new(WorkerEffectContractKind.AllowedExceptions, true, true, false),
         new(WorkerEffectContractKind.EffectContract, false, false, false),
-    ];
-    internal static readonly ImmutableArray<CompilerEffectReplayEventKind> SupportedReplayEventKinds = [
-        CompilerEffectReplayEventKind.ManagedObjectAllocation,
-        CompilerEffectReplayEventKind.ManagedArrayAllocation,
-        CompilerEffectReplayEventKind.ExplicitThrow,
-        CompilerEffectReplayEventKind.MonitorCall,
-        CompilerEffectReplayEventKind.EmptyLock,
     ];
 }
 

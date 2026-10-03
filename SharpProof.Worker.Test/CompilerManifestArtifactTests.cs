@@ -29,25 +29,6 @@ public sealed class CompilerManifestArtifactTests
         }
         """;
 
-    private const string ZeroAllocationInlineSource =
-        """
-        using SharpProof.Attributes;
-        internal static class Subject {
-            [ZeroAllocations]
-            internal static object Allocate() => new object();
-        }
-        """;
-
-    private const string ZeroAllocationSplitSource =
-        """
-        using SharpProof.Attributes;
-        internal static class Subject {
-            [ZeroAllocations]
-            internal static object Allocate() =>
-                new object();
-        }
-        """;
-
     private const string NonNegativeIdentitySource =
         """
         using SharpProof.Attributes;
@@ -492,9 +473,6 @@ public sealed class CompilerManifestArtifactTests
             CompilerManifestArtifactJson.Deserialize(withoutCatalogVersion)));
     }
 
-
-
-
     [Test]
     [Platform("Linux")]
     public void AdditionalFilesPermitCaseDistinctPaths()
@@ -560,30 +538,6 @@ public sealed class CompilerManifestArtifactTests
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
     }
-
-
-
-
-
-
-
-    [Test]
-    public void HonestEffectAuthorityPreservesWorkerResultClassification()
-    {
-        var artifact = CreateContractArtifact(ZeroAllocationInlineSource);
-        var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
-        var result = EffectClaimResultAssembler.Assemble(
-            target, target.EffectClaims.Single(),
-            CallableEntryFeasibility.Feasible, CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(result.EffectWitness, Is.Not.Null);
-        }
-    }
-
 
     [Test]
     public void MalformedSuccessfulCallableFailsAtWireAndHydrationBoundaries()
@@ -857,10 +811,11 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(claim.EffectContractKind,
                 Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
             Assert.That(evidence.ClaimId, Is.EqualTo(claim.ClaimId));
-            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            // The compiler only declares the claim; Z3 decides it.
+            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(evidence.Certainty,
                 Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
             Assert.That(CompilerManifestArtifactJson.DecodeCallables(valid).Single()
                 .EffectClaims, Has.Length.EqualTo(1));
         }
@@ -873,7 +828,7 @@ public sealed class CompilerManifestArtifactTests
                 WorkerEffectContractKind.ZeroAllocations,
             value => value.EffectClaims[0].Outcome = WorkerClaimOutcome.Refuted,
             value => value.EffectClaims[0].Certainty =
-                WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary
         ];
         foreach (var corrupt in corruptions)
         {
@@ -883,274 +838,6 @@ public sealed class CompilerManifestArtifactTests
                 CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
     }
-
-
-
-    [Test]
-    public void ResourceLimitedEffectEvidenceHydratesAsTypedUnknown()
-    {
-        var artifact = CreateEffectArtifact();
-        var evidence = artifact.Callables.Single().EffectClaims.Single();
-        evidence.Outcome = WorkerClaimOutcome.Unknown;
-        evidence.Reason = WorkerClaimReason.ResourceLimit;
-        evidence.Certainty =
-            WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary;
-        evidence.Witness = null;
-        evidence.Replay = null;
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
-
-        var target = CompilerManifestArtifactJson.DecodeCallables(artifact)
-            .Single();
-        var hydrated = target.EffectClaims.Single();
-        var result = EffectClaimResultAssembler.Assemble(
-            target, hydrated, CallableEntryFeasibility.Feasible,
-            CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(hydrated.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(hydrated.Reason,
-                Is.EqualTo(WorkerClaimReason.ResourceLimit));
-            Assert.That(hydrated.Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(result.Reason,
-                Is.EqualTo(WorkerClaimReason.ResourceLimit));
-            Assert.That(result.EffectCertainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
-        }
-    }
-
-    [Test]
-    public void EffectEvidenceRejectsInvalidReasonCertaintyCrossProducts()
-    {
-        var invalidTuples = new[]
-        {
-            (WorkerClaimReason.ResourceLimit,
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
-            (WorkerClaimReason.ResourceLimit,
-                WorkerEffectEvidenceCertainty.DefiniteViolation),
-            (WorkerClaimReason.UnsupportedBody,
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
-        };
-        var valid = CreateEffectArtifact();
-
-        foreach (var (reason, certainty) in invalidTuples)
-        {
-            var artifact = CloneArtifact(valid);
-            var evidence = artifact.Callables.Single().EffectClaims.Single();
-            evidence.Outcome = WorkerClaimOutcome.Unknown;
-            evidence.Reason = reason;
-            evidence.Certainty = certainty;
-            evidence.Witness = null;
-            evidence.Replay = null;
-            CompilerEffectClaimArtifactCodec.Seal(evidence);
-
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)),
-                $"{reason}/{certainty} must remain invalid.");
-        }
-    }
-
-    [Test]
-    public void UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay()
-    {
-        const string source =
-            """
-            using System;
-            using System.Collections.Generic;
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static IEnumerable<int> Values() {
-                    yield return 1;
-                    throw new InvalidOperationException();
-                }
-            }
-            """;
-        CompilerManifestArtifact? artifact = null;
-        try
-        {
-            artifact = CreateContractArtifact(source);
-        }
-        catch (JsonException)
-        {
-            // Unsupported bodies must still produce a valid, unavailable claim.
-        }
-        Assert.That(artifact, Is.Not.Null,
-            "Unsupported effect evidence must remain a valid compiler artifact.");
-        var evidence = artifact!.Callables.Single().EffectClaims.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(evidence.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
-            Assert.That(evidence.Certainty, Is.EqualTo(WorkerEffectEvidenceCertainty.Unavailable));
-            Assert.That(evidence.Witness, Is.Null);
-            Assert.That(evidence.Replay, Is.Null);
-        }
-    }
-
-    [Test]
-    public void SupportedExplicitThrowIncludesReplayEvidence()
-    {
-        var artifact = CreateContractArtifact(
-            """
-            using System;
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static void Throw() =>
-                    throw new InvalidOperationException();
-            }
-            """);
-        var evidence = artifact.Callables.Single().EffectClaims.Single();
-
-        Assert.That(
-            evidence.Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Refuted));
-        Assert.That(
-            evidence.Reason,
-            Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(
-            evidence.Certainty,
-            Is.EqualTo(
-                WorkerEffectEvidenceCertainty.DefiniteViolation));
-        Assert.That(
-            evidence.Witness?.Kind,
-            Is.EqualTo("explicit-throw"));
-        Assert.That(
-            evidence.Witness?.Effects,
-            Is.EqualTo(WorkerEffectSet.Throws));
-        Assert.That(
-            evidence.Witness?.ExactExceptionTypeHierarchy,
-            Is.Not.Empty);
-        Assert.That(
-            evidence.Replay?.Events.Single().Kind,
-            Is.EqualTo(CompilerEffectReplayEventKind.ExplicitThrow));
-        Assert.That(
-            CompilerManifestArtifactJson.DecodeCallables(artifact)
-                .Single().EffectClaims.Single().Reason,
-            Is.EqualTo(WorkerClaimReason.None));
-    }
-
-    [Test]
-    public void AllocationEffectReplayRoundTripsCompilerEvidence()
-    {
-        const string expression = "new object()";
-        const string source = ZeroAllocationSplitSource;
-        var artifact = CreateContractArtifact(source);
-        var json = CompilerManifestArtifactJson.Serialize(artifact);
-        var roundTrip =
-            CompilerManifestArtifactJson.Deserialize(json);
-        var decodedTarget = CompilerManifestArtifactJson
-            .DecodeCallables(roundTrip)
-            .Single();
-        var evidence = decodedTarget.EffectClaims.Single();
-        var replay = evidence.Replay;
-        var @event = replay?.Events.Single();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                evidence.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                evidence.Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty
-                        .DefiniteViolation));
-            Assert.That(evidence.Witness, Is.Not.Null);
-            Assert.That(
-                decodedTarget.Compilation,
-                Is.SameAs(roundTrip.Compilation));
-            Assert.That(replay, Is.Not.Null);
-            Assert.That(
-                replay?.PathKind,
-                Is.EqualTo(
-                    CompilerEffectReplayPathKind.Unconditional));
-            Assert.That(replay?.Events, Has.Length.EqualTo(1));
-            Assert.That(
-                @event?.Kind,
-                Is.EqualTo(
-                    CompilerEffectReplayEventKind
-                        .ManagedObjectAllocation));
-            Assert.That(@event?.Ordinal, Is.Zero);
-            Assert.That(@event?.MemberIdentity, Is.Not.Empty);
-            Assert.That(
-                @event?.MemberDocumentationId,
-                Is.Not.Null.And.Not.Empty);
-            Assert.That(@event?.TypeIdentity, Is.Not.Empty);
-            Assert.That(
-                @event?.TypeDocumentationId,
-                Is.Not.Null.And.Not.Empty);
-            Assert.That(@event?.ScalarOperands, Is.Empty);
-            Assert.That(
-                @event?.ExactExceptionTypeHierarchy,
-                Is.Empty);
-            Assert.That(
-                evidence.Witness?.Detail,
-                Is.EqualTo(@event?.MemberDocumentationId));
-            Assert.That(json, Does.Not.Contain(expression));
-        }
-    }
-
-
-
-
-
-    [Test]
-    public void UnmodeledExceptionConstructorCannotFabricateAReplayWitness()
-    {
-        var artifact = CreateContractArtifact(
-            """
-            using System;
-            using System.Collections.Generic;
-            using SharpProof.Attributes;
-
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static AggregateException Create() =>
-                    new AggregateException(
-                        (IEnumerable<Exception>)null!);
-            }
-            """);
-        var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
-        var evidence = target.EffectClaims.Single();
-        var result = EffectClaimResultAssembler.Assemble(
-            target, evidence, CallableEntryFeasibility.Feasible,
-            CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence.Reason,
-                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
-            Assert.That(
-                evidence.Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
-            Assert.That(evidence.Evidence, Does.Contain("UnmodeledCall"));
-            Assert.That(evidence.Witness, Is.Null);
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
-            Assert.That(result.EffectWitness, Is.Null);
-            Assert.That(result.Model, Is.Empty);
-        }
-    }
-
-
-
-
 
     [Test]
     public void ProgramEntryIsCanonicalAndLegacyInstructionOffsetIsRejected()
@@ -1454,7 +1141,6 @@ public sealed class CompilerManifestArtifactTests
             CancellationToken.None,
             specificationPacks: specificationPacks);
     }
-
 
     private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
     {

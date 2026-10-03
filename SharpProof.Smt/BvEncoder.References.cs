@@ -104,7 +104,12 @@ internal sealed partial class BvEncoder
             { emptyStringToken = token; }
         }
         var observations = DecodeArrayObservations(model, meter);
-        foreach (var variable in query.ModelVariables)
+        // Strings and arrays decode first, so a reference that shares a token
+        // with one (an object-typed view of it) keeps it as its identity, as
+        // a Total cast to object does.
+        var shared = new Dictionary<string, object>(StringComparer.Ordinal);
+        foreach (var variable in query.ModelVariables.OrderBy(variable =>
+            factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind == IrTypeKind.Reference))
         {
             meter.Consume();
             var type = factory.GetVariableInfo(variable).Type;
@@ -129,7 +134,7 @@ internal sealed partial class BvEncoder
                     if (info.Kind == IrTypeKind.Reference)
                     {
                         if (!identities.TryGetValue(token, out var identity))
-                        { identities.Add(token, identity = new object()); }
+                        { identities.Add(token, identity = shared.TryGetValue(token, out var view) ? view : new object()); }
                         value = factory.CreateReferenceValue(type, identity);
                     }
                     else
@@ -153,6 +158,8 @@ internal sealed partial class BvEncoder
                             : DecodeArrayWitness(type, count, token, observations);
                     }
                     aliases.Add((type, token), value);
+                    if (info.Kind != IrTypeKind.Reference && !shared.ContainsKey(token))
+                    { shared.Add(token, info.Kind == IrTypeKind.String ? value.String : value); }
                 }
             }
             if (value == null)
