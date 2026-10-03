@@ -32,13 +32,17 @@ internal static class CompilerTotalCallableLowerer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (target.Declaration is not MethodDeclarationSyntax declaration || target.SemanticModel == null ||
+        if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }
+        var declaration = target.Declaration!;
+        var autoAccessor = TotalBodyLowering.AutoAccessor(declaration);
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
-        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
+        // An auto-property accessor has no body to carry contract clauses.
+        var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
+            : new ContractBinder(compilation, context.Factory).BindTotal(context);
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions)
         { return null; }
@@ -65,31 +69,31 @@ internal static class CompilerTotalCallableLowerer
                 documents[syntax.SyntaxTree] != span.Document)
             { return null; }
         }
-        ControlFlowGraph? graph;
-        try
-        { graph = ControlFlowGraph.Create(declaration, target.SemanticModel, cancellationToken); }
-        catch (ArgumentException)
-        { return null; }
-        if (graph == null)
-        { return null; }
-        var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken,
-            opaqueCalls: true);
-        // A body that writes elements reads them as approximations.
-        if (lowering.IsExact && MutatesElements(lowering.Program) && ReadsElements(context.Factory, BodyTerms(lowering.Program)))
+        ControlFlowGraph? graph = null;
+        FrontendProgramLoweringResult? lowering;
+        if (autoAccessor != null)
+        { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
+        else
         {
-            lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken,
-                opaqueCalls: true, approximateElementReads: true);
+            try
+            { graph = ControlFlowGraph.Create(declaration, target.SemanticModel, cancellationToken); }
+            catch (ArgumentException)
+            { return null; }
+            lowering = graph == null ? null : LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority,
+                cancellationToken, opaqueCalls: true);
         }
+        if (lowering == null)
+        { return null; }
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
-            MutatesElements(lowering.Program) && ReadsElements(context.Factory, BodyTerms(lowering.Program)
+            TotalBodyLowering.MutatesElements(lowering.Program) && TotalBodyLowering.ReadsElements(context.Factory, TotalBodyLowering.BodyTerms(lowering.Program)
                 .Concat(binding.Clauses.Where(clause => clause.Kind != BoundContractKind.Requires)
                     .SelectMany(clause => new[] { clause.Value, clause.SafeCondition }))
                 .Concat(lowering.CallPreconditions.Values.SelectMany(clause => new[] { clause.Value, clause.Safe }))))
         {
-            if (lowering.ConstructionLimitExceeded || graph.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
+            if (lowering.ConstructionLimitExceeded || graph == null || graph.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
                 graph.Blocks.Sum(block => block.Operations.Length) > CompilerPreparedBody.MaximumInstructions ||
                 binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume) ||
                 context.Parameters.Any(parameter => !Primitive(parameter.Entry)) ||
@@ -262,160 +266,16 @@ internal static class CompilerTotalCallableLowerer
         };
     }
 
-    // An API specification's facets bound what an opaque call to it may do.
-    private static IrOpaqueCallEffects? OpaqueEffects(ResolvedApiSpecTable specs, IMethodSymbol method)
-    {
-        if (!specs.TryGet(method, out var spec))
-        { return null; }
-        var facets = spec.Template.Facets;
-        var declared = facets.Effects.Effects;
-        if ((declared & SpecEffect.Unknown) != 0)
-        { return IrOpaqueCallEffects.All; }
-        var effects = IrOpaqueCallEffects.None;
-        if (facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow)
-        { effects |= IrOpaqueCallEffects.Throws; }
-        if (facets.Allocation.Behavior != SpecAllocationBehavior.None)
-        { effects |= IrOpaqueCallEffects.Allocates; }
-        if ((declared & (SpecEffect.WritesReceiverState | SpecEffect.WritesArgumentState | SpecEffect.WritesAmbientState | SpecEffect.InputOutput)) != 0)
-        { effects |= IrOpaqueCallEffects.Writes; }
-        if ((declared & SpecEffect.Synchronization) != 0)
-        { effects |= IrOpaqueCallEffects.Synchronizes; }
-        if ((declared & (SpecEffect.ReadsReceiverState | SpecEffect.ReadsArgumentState | SpecEffect.ReadsAmbientState | SpecEffect.InputOutput)) != 0)
-        { effects |= IrOpaqueCallEffects.Reads; }
-        if ((declared & SpecEffect.InputOutput) != 0)
-        { effects |= IrOpaqueCallEffects.InputOutput; }
-        if ((declared & SpecEffect.NativeCode) != 0)
-        { effects |= IrOpaqueCallEffects.NativeCode; }
-        if ((declared & SpecEffect.Reflection) != 0)
-        { effects |= IrOpaqueCallEffects.Reflection; }
-        if ((declared & SpecEffect.Nondeterminism) != 0)
-        { effects |= IrOpaqueCallEffects.Nondeterminism; }
-        return effects;
-    }
-
-    // The IR reads an array element as a pure function of the reference, which
-    // holds only while nothing writes elements: neither an element store nor an
-    // opaque call, which may write any array. Entry preconditions see the
-    // initial arrays; every other read must then be an approximation.
-    private static bool MutatesElements(IrProgram program)
-    {
-        return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-            instruction is IrCallInstruction { Receiver: null, Target: null } or IrWriteInstruction { Region: IrWriteRegion.Element });
-    }
-
-    private static IEnumerable<IrTerm> BodyTerms(IrProgram program)
-    { return program.Blocks.SelectMany(block => block.Instructions).SelectMany(IrInstructionFacts.ReadTerms); }
-
-    private static bool ReadsElements(IrFactory factory, IEnumerable<IrTerm> terms)
-    {
-        var pending = new Stack<IrTerm>(terms);
-        while (pending.Count != 0)
-        {
-            switch (pending.Pop())
-            {
-                case IrSequenceAccessTerm access:
-                    if (factory.GetTypeInfo(access.Sequence.Type).Kind != IrTypeKind.String)
-                    { return true; }
-                    pending.Push(access.Sequence);
-                    pending.Push(access.Index);
-                    break;
-                case IrOpaqueTerm:
-                    return true;
-                case IrUnaryTerm unary:
-                    pending.Push(unary.Operand);
-                    break;
-                case IrBinaryTerm binary:
-                    pending.Push(binary.Left);
-                    pending.Push(binary.Right);
-                    break;
-                case IrConditionalTerm conditional:
-                    pending.Push(conditional.Condition);
-                    pending.Push(conditional.WhenTrue);
-                    pending.Push(conditional.WhenFalse);
-                    break;
-                case IrCastTerm cast:
-                    pending.Push(cast.Operand);
-                    break;
-                case IrLengthTerm length:
-                    pending.Push(length.Value);
-                    break;
-            }
-        }
-        return false;
-    }
-
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
         ControlFlowGraph graph, TotalLoweringContext context, CompilerReferenceSnapshot[]? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
-        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false,
-        bool approximateElementReads = false)
+        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
     {
-        context.AllowObjectWidening = enableMetadataRequires;
-        var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
-        var invocationEmission = new InvocationEmissionPolicy(compilation);
-        return new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (initializationFree != null && !initializationFree(frame.Target.ContainingType))
-            { return false; }
-            var contracts = new ContractBinder(compilation, context.Factory).BindTotalRequires(frame);
-            if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
-            { return false; }
-            frame.SourceCallPreconditions = [.. contracts.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires)
-                .Select(clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
-            var syntax = frame.Target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
-            var operation = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree)
-                .GetOperation(syntax, cancellationToken);
-            if (operation == null)
-            { return false; }
-            var pending = new Stack<IOperation>();
-            pending.Push(operation);
-            var remaining = CompilerPreparedBody.MaximumInstructions;
-            while (pending.Count != 0)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (--remaining < 0)
-                { return false; }
-                var current = pending.Pop();
-                if (current is IInvocationOperation invocation && frame.IsSpecificationOperation(current))
-                {
-                    if (!invocationEmission.IsElided(current))
-                    { frame.RestoreSpecificationCall(invocation); }
-                    // Emitted calls and their arguments use ordinary body
-                    // lowering. Elided arguments do not execute. Neither case
-                    // imports callee proof assumptions into the caller.
-                    continue;
-                }
-                foreach (var child in current.ChildOperations)
-                { pending.Push(child); }
-            }
-            frame.DiscardSpecificationAssumptions();
-            return true;
-        }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
-            method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks),
-            enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null,
-            opaqueCalls, method => OpaqueEffects(apiSpecs, method), approximateElementReads);
-    }
-
-    internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory,
-        ResolvedApiSpecTable apiSpecs, CompilerSpecificationPackProvider specificationPacks)
-    {
-        if (apiSpecs.TryGet(method, out var spec))
-        {
-            switch (spec.Template.Target.DocumentationCommentId)
-            {
-                case "M:System.Math.Abs(System.Int32)":
-                    return new TotalScalarCallModel(1, arguments => CSharpOperationSemantics.Int32MathAbs(factory, arguments[0]));
-                case "M:System.Array.Empty``1" when CSharpOperationSemantics.IsReferenceDomain(method.ReturnType):
-                    return new TotalScalarCallModel(0, _ => CSharpOperationSemantics.ArrayEmpty(factory,
-                        new RoslynTypeMapper(factory).GetTypeId(method.ReturnType)));
-                case "M:System.String.Concat(System.String,System.String)":
-                    return new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(factory,
-                        arguments[0], arguments[1]), stringConcatenation: true);
-            }
-        }
-        return specificationPacks.ResolveTotal(method);
+        return TotalBodyLowering.Lower(compilation, graph, context, cancellationToken,
+            new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, specificationPacks.ResolveTotal,
+            initializationFree, enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null,
+            opaqueCalls);
     }
 
     private static Func<INamedTypeSymbol, bool> CreateShadowInitializationPredicate(

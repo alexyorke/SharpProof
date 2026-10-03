@@ -251,52 +251,19 @@ one-time execution is not modeled there, the summary is `Unknown`.
 Metadata static-field access has no callable summary that can cover type
 initialization and therefore fails closed.
 
-The analyzer's general effect summary is a conservative two-phase may analysis.
-A bounded acyclic CFG pass first refines scalar reachability; effect analysis
-then joins summaries across the remaining branches. Impossible refined
-branches do not contribute effects, while a reachable cycle or exhausted block
-or operation budget makes selected effect claims `Unknown`. A possible
-allocation, disallowed capability, observable access, or disallowed exception
-therefore makes the corresponding contract `Unknown`; a may-effect alone cannot
-produce `Refuted`. Separately, the compiler recognizes a narrow set of simple
-unconditional direct operations: managed object/array allocation, explicit
-throw, receiver-field access, empty `lock`, and exact `Monitor` calls. It
-records a source-located structured candidate.
-
-The compiler currently lowers unconditional definite managed object/array
-allocation, exact framework explicit throw, empty `lock`, and exact `Monitor`
-call candidates to compiler-neutral replay events. Operand evaluation must
-already be known to complete, object allocation must not depend on unmodeled
-static initialization, and explicit-throw construction must have an approved
-nonthrowing, terminating specification. The worker independently validates
-event order, compiler-tree identity and span, semantic operation identity,
-selected constraints, and the sealed witness. It derives effects,
-capabilities, and exact exception hierarchy from the event before deciding
-whether the selected contract is violated. Fresh allocation remains compatible
-with `EnforcePure`. Other direct candidates, including
-static-initialization-sensitive allocation, receiver-field access, and
-user-constructed exact exception types, become
-`Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and
-may-only conflicts without a definite candidate remain
-`Unknown(EffectContractNotEstablished)`.
-The semantic-operation hash checks canonical agreement among compiler-produced
-event fields; it does not independently rebind the source. Discovery, effect
-analysis, and event lowering therefore remain inside the trusted computing
-base.
-The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
-reserved; direct violations are accountable through worker claim results and
-SARIF.
-
-An imported callee effect summary is complete only when the call has no entry
-preconditions or every compiler-bound `Requires` and closed parameter
-precondition is established at that call site. An unproven or invalidly placed
-callee precondition produces
-`Unknown(EffectSummaryIncomplete)` with
-`CallPreconditionNotProven` evidence. Standalone effect analysis uses a
-conservative contract-intent check and therefore also fails closed.
-Mutation-bearing value arguments are not recomputed from post-mutation state,
-and expanded `params` calls are incomplete until the synthesized array and its
-allocation are represented explicitly.
+The analyzer's effect feedback is advisory. It lowers the same Total program
+the worker verifies and, by graph reachability alone, finds the first site that
+could violate each declared claim: an allocation, a non-local write, a lock, a
+state read, an opaque call's effects, or a throw from which the exceptional exit
+is reachable. It names that site in the claim's not-verified diagnostic
+(SP0002, SP0016, SP0045, SP0046 or SP0052), and reports SP0047 when the body
+cannot be lowered. It never proves a claim: its semantic outcome is `Unknown`
+except for a trusted complete boundary, and only the worker decides. The
+analyzer's definitive SP0013, SP0015 and SP0030 diagnostics remain reserved;
+direct violations are accountable through worker claim results and SARIF.
+Source callees are inlined as written, so an effect claim does not depend on a
+callee's precondition being established; the callee's `Requires` clauses are
+separate call-site obligations.
 
 At source call sites, a direct call to an `async` method returning the exact
 BCL `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>` type does not import the
@@ -452,14 +419,28 @@ explicit throw site carries its own exception code: an AllowedExceptions claim
 admits a site whose static type derives from an allowed type, and refutes only
 at a site that creates an exception of a disallowed type. DoesNotThrow is
 refuted by any explicit throw.
-An API specification narrows a non-dispatched opaque call to its facets: it
-throws, allocates, writes or synchronizes only when the specification says so,
-and uses only the capabilities it declares. A call without a specification may
-do all of these. Native AllowedCapabilities forbids reachable locks and calls
-whose capabilities fall outside the allowed set; only a reached lock refutes.
-Z3 decides AllowedCapabilities and EffectContract as well, after
-`SharpProof.Gates capability-shadow` and `effectcontract-shadow` retained
-every legacy proof.
+A trusted complete effect contract on a metadata callee is its boundary: the
+callee's IL is not inlined, and the call has exactly the declared effects and
+capabilities. Otherwise an API specification narrows a non-dispatched opaque
+call to its facets: it throws, allocates, writes or synchronizes only when the
+specification says so, and uses only the capabilities it declares. A call
+with neither may do all of these. Native AllowedCapabilities forbids reachable
+locks and calls whose capabilities fall outside the allowed set; only a
+reached lock refutes. Z3 decides AllowedCapabilities and EffectContract as
+well. A trusted complete contract on a bodyless declaration also establishes
+every other effect claim on that declaration that the contract satisfies.
+Observable purity excludes non-local writes, locks, static field reads, and
+calls that may write, synchronize, read ambient state, perform I/O, run native
+code, reflect, behave nondeterministically or use any capability. Writing the
+elements of an array the body created, holds only in a local, and only
+indexes or measures is not observable. Reading the length or an element of a
+string or array the body did not create reads state, so an EffectContract
+must declare every read flag for it.
+Methods, operators, conversions, property and indexer accessors and
+expression-bodied properties are lowered for claims. An auto-property accessor
+reads or writes its backing field as an approximation. A static field read
+runs no code when its type has no static initializer; the read value is an
+approximation.
 Claim lowering admits array element stores, increments and compound
 assignments. The array and indexes evaluate first; a store then evaluates its
 value, and the null and bounds checks follow (an increment or compound

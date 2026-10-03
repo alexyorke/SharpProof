@@ -45,6 +45,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private void LowerCore(ControlFlowGraph graph)
     {
         _cancellationToken.ThrowIfCancellationRequested();
+        _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
         if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
         { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");

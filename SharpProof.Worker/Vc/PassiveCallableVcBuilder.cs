@@ -31,6 +31,11 @@ internal sealed class PassiveCallableVcBuilder
     // Approximated field and element reads.
     private readonly List<IrTerm> _reads = [];
     internal ImmutableArray<IrTerm> Reads => [.. _reads];
+    private readonly HashSet<IrInstructionId> _sequenceReaders;
+    // Static field reads, which observable purity excludes.
+    private readonly List<IrTerm> _ambientReads = [];
+    internal ImmutableArray<IrTerm> AmbientReads => [.. _ambientReads];
+    private const string StaticReadPrefix = "StaticFieldReference@";
     private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
@@ -68,6 +73,7 @@ internal sealed class PassiveCallableVcBuilder
         _candidate = candidate;
         _factory = candidate.Factory;
         _program = encoding?.Program ?? candidate.Program;
+        _sequenceReaders = IrSequenceReads.Readers(_program);
         _stops = encoding?.Stops ?? [];
         var originalMarkers = candidate.CallPreconditions.Select((clause, ordinal) => (clause.Marker, Ordinal: ordinal))
             .ToDictionary(row => row.Marker, row => row.Ordinal);
@@ -204,6 +210,8 @@ internal sealed class PassiveCallableVcBuilder
             foreach (var instruction in block.Instructions)
             {
                 Spend();
+                if (_sequenceReaders.Contains(instruction.Id))
+                { _reads.Add(reach); }
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
@@ -250,7 +258,7 @@ internal sealed class PassiveCallableVcBuilder
                         _locks.Add((reach, synchronization.Operation));
                         break;
                     case IrWriteInstruction write:
-                        _writes.Add((reach, write.Operation, write.Region));
+                        _writes.Add((reach, write.Operation, IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local));
                         break;
                     case IrCallInstruction call:
                         if (call.Receiver != null || call.Target != null)
@@ -297,7 +305,11 @@ internal sealed class PassiveCallableVcBuilder
                             havoc.Origin is not (IrHavocOrigin.Input or IrHavocOrigin.Approximation))
                         { return null; }
                         if (havoc.Origin == IrHavocOrigin.Approximation && ReadsState(havoc.Operation))
-                        { _reads.Add(reach); }
+                        {
+                            _reads.Add(reach);
+                            if (Describe(havoc.Operation).StartsWith(StaticReadPrefix, StringComparison.Ordinal))
+                            { _ambientReads.Add(reach); }
+                        }
                         foreach (var variable in havoc.Variables)
                         {
                             Spend();
@@ -497,10 +509,14 @@ internal sealed class PassiveCallableVcBuilder
     }
     // Field and element reads, including the read inside an increment or a
     // compound assignment, are approximations at these sites.
+    private string Describe(OperationId site)
+    { return _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : ""; }
+
     private bool ReadsState(OperationId site)
     {
-        var description = _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : "";
+        var description = Describe(site);
         return description.StartsWith("FieldReference@", StringComparison.Ordinal) ||
+            description.StartsWith(StaticReadPrefix, StringComparison.Ordinal) ||
             description.StartsWith("PropertyReference@", StringComparison.Ordinal) ||
             description.StartsWith("ArrayElementReference@", StringComparison.Ordinal) ||
             description.StartsWith("Increment@", StringComparison.Ordinal) ||

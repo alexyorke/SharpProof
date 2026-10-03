@@ -566,6 +566,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = lowered.Continuation;
         }
         var site = _context.Site(mutation ?? access);
+        var writeSite = mutation != null && CSharpOperationSemantics.IsFreshArrayLocal(access, _context.Compilation)
+            ? _context.FreshWriteSite(mutation) : site;
         TotalBodyValue? stored = null;
         if (mutation is ISimpleAssignmentOperation assignment)
         {
@@ -596,7 +598,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
                     [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
             }
-            _builder!.Write(block, site, IrWriteRegion.Element);
+            _builder!.Write(block, writeSite, IrWriteRegion.Element);
             return new(value.Value, block, FrontendSubsetClassification.Exact);
         }
         var current = _context.Temporary(_context.Type(elementType));
@@ -623,7 +625,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             { return Approximate(mutation, right.Continuation, rule.Classification.Abstention); }
             next = ApplyRule(mutation, rule, right.Continuation);
         }
-        _builder.Write(next.Continuation, site, IrWriteRegion.Element);
+        _builder.Write(next.Continuation, writeSite, IrWriteRegion.Element);
         return mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
     }
 
@@ -640,7 +642,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(instance);
-        if (!implicitThis)
+        if (!implicitThis && !field.IsStatic)
         {
             if (instance == null)
             { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
@@ -651,7 +653,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = lowered.Continuation;
         }
         var value = _context.Temporary(_context.Type(field.Type));
-        _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        _builder!.Havoc(block, field.IsStatic ? _context.StaticReadSite(operation) : _context.Site(operation),
+            IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
     }
 

@@ -10,6 +10,7 @@ using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
 using SharpProof.Frontend;
 using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -610,7 +611,34 @@ internal static class CorpusGate
                 item.Mode,
                 cancellationToken)
             .ConfigureAwait(false);
-        return Observe(item, analysis);
+        return Observe(item, analysis, await NativeOutcomeAsync(item, cancellationToken).ConfigureAwait(false));
+    }
+
+    private static async Task<CorpusObservation> ReplayCaseAsync(
+        CorpusCase item,
+        WorkerClaimOutcome? nativeOutcome,
+        CancellationToken cancellationToken)
+    {
+        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
+                item.Source,
+                item.Mode,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return Observe(item, analysis, nativeOutcome);
+    }
+
+    // The worker's verdict on the case's public callable, or null when it
+    // declares no claim the worker decides.
+    private static async Task<WorkerClaimOutcome?> NativeOutcomeAsync(CorpusCase item, CancellationToken cancellationToken)
+    {
+        var verdicts = (await NativeCorpusVerifier.VerifyAsync(AnalyzerGateHost.CreateCompilation(item.Source), cancellationToken)
+            .ConfigureAwait(false)).Where(static verdict => verdict.Method.DeclaredAccessibility == Accessibility.Public).ToArray();
+        return verdicts.Length switch
+        {
+            0 => null,
+            1 => verdicts[0].Outcome,
+            _ => throw new InvalidOperationException($"Corpus case {item.Id} has {verdicts.Length} public verified callables.")
+        };
     }
 
     private static async Task<ImmutableArray<CorpusObservation>> ObserveAllAsync(
@@ -638,7 +666,8 @@ internal static class CorpusGate
 
     private static CorpusObservation Observe(
         CorpusCase item,
-        AnalyzerGateAnalysis analysis)
+        AnalyzerGateAnalysis analysis,
+        WorkerClaimOutcome? nativeOutcome)
     {
         var targets = analysis.SemanticOutcomes
             .Where(static outcome =>
@@ -660,12 +689,14 @@ internal static class CorpusGate
         var semanticOutcome = targets[0].Outcome;
         var verdict = ToVerdict(
             semanticOutcome,
+            nativeOutcome,
             diagnostics.IsDefaultOrEmpty);
         return new CorpusObservation(
             item.Id,
             verdict,
             semanticOutcome,
-            diagnostics);
+            diagnostics)
+        { NativeOutcome = nativeOutcome };
     }
 
     private static bool Matches(
@@ -695,6 +726,7 @@ internal static class CorpusGate
             var compilation = AnalyzerGateHost.CreateCompilation(
                 item.Source,
                 $"CacheReplay_{item.SeedId}");
+            var nativeOutcome = byId[item.Id].NativeOutcome;
             var first = Observe(
                 item,
                 await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
@@ -702,7 +734,8 @@ internal static class CorpusGate
                         item.Mode,
                         concurrentAnalysis: true,
                         cancellationToken)
-                    .ConfigureAwait(false));
+                    .ConfigureAwait(false),
+                nativeOutcome);
             var second = Observe(
                 item,
                 await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
@@ -710,7 +743,8 @@ internal static class CorpusGate
                         item.Mode,
                         concurrentAnalysis: true,
                         cancellationToken)
-                    .ConfigureAwait(false));
+                    .ConfigureAwait(false),
+                nativeOutcome);
             if (!Matches(byId[item.Id], first) ||
                 !Matches(byId[item.Id], second))
             {
@@ -731,7 +765,7 @@ internal static class CorpusGate
             static observation => observation.CaseId,
             StringComparer.Ordinal);
         var observations = await Task.WhenAll(
-            selected.Select(item => ObserveCaseAsync(item, cancellationToken)))
+            selected.Select(item => ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken)))
             .ConfigureAwait(false);
         return [.. observations
             .Where(observation => !Matches(expected[observation.CaseId], observation))
@@ -759,14 +793,17 @@ internal static class CorpusGate
         return result.ToImmutable();
     }
 
+    // The worker decides every claim it verifies; the analyzer decides only
+    // call-site preconditions and trusted boundaries.
     internal static CorpusVerdict ToVerdict(
         AnalyzerSemanticOutcome semanticOutcome,
+        WorkerClaimOutcome? nativeOutcome,
         bool hasNoDiagnostics)
     {
-        return semanticOutcome switch
+        return (semanticOutcome, nativeOutcome) switch
         {
-            AnalyzerSemanticOutcome.Proven => CorpusVerdict.Proven,
-            AnalyzerSemanticOutcome.Refuted => CorpusVerdict.Refuted,
+            (AnalyzerSemanticOutcome.Refuted, _) or (_, WorkerClaimOutcome.Refuted) => CorpusVerdict.Refuted,
+            (_, WorkerClaimOutcome.Proven) or (AnalyzerSemanticOutcome.Proven, null) => CorpusVerdict.Proven,
             _ when hasNoDiagnostics => CorpusVerdict.SilentUnknown,
             _ => CorpusVerdict.Unknown
         };

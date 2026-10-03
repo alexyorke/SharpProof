@@ -1066,6 +1066,40 @@ public sealed class WorkerTests
         }
     }
 
+    // A trusted complete boundary establishes every other effect claim its
+    // contract satisfies; one it does not satisfy stays unknown.
+    [TestCase("SharpProofEffect.None", WorkerClaimOutcome.Proven)]
+    [TestCase("SharpProofEffect.Throws | SharpProofEffect.Allocates, ThrownExceptions = new[] { typeof(System.InvalidOperationException) }",
+        WorkerClaimOutcome.Unknown)]
+    public async Task TrustedCompleteExternContractDecidesOtherEffectClaims(string effects, WorkerClaimOutcome outcome)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class NativeSubject {
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(
+            """ + effects + """
+            , Complete = true)]
+                [DoesNotThrow, ZeroAllocations]
+                public static extern int Read();
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+        var response = await worker.VerifyAsync(request);
+        var effectClaims = response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.Effect)
+            .Select(claim => response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId)).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(effectClaims, Has.Length.EqualTo(3));
+            Assert.That(effectClaims.Count(static result => result.Outcome == WorkerClaimOutcome.Proven),
+                Is.EqualTo(outcome == WorkerClaimOutcome.Proven ? 3 : 1));
+            Assert.That(effectClaims.Select(static result => result.EffectCertainty),
+                Has.All.EqualTo(WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
+        }
+    }
+
     [Test]
     public async Task MixedPostconditionAndEffectClaimsAreReturnedInManifestOrder()
     {

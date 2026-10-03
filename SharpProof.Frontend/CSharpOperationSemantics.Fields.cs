@@ -16,12 +16,13 @@ internal static partial class CSharpOperationSemantics
     }
 
     // An instance field read runs no code; its only fault is a null receiver.
+    // A static field read runs no code when its type has no initializer.
     // The heap is not modeled, so the value read is an approximation: it can
     // support universal proofs but never a concrete refutation.
     internal static bool IsSupportedFieldRead(IFieldSymbol field)
     {
-        return !field.IsStatic && !field.IsVolatile && !field.HasConstantValue &&
-            field.ContainingType.IsReferenceType && IsValueDomain(field.Type);
+        return !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
+            (field.IsStatic ? field.ContainingType.StaticConstructors.Length == 0 : field.ContainingType.IsReferenceType);
     }
 
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
@@ -29,9 +30,9 @@ internal static partial class CSharpOperationSemantics
         return FieldWrite(factory, value, receiver);
     }
 
-    // The field a nonvirtual instance property getter returns directly: an
+    // The field a nonvirtual property getter returns directly: an
     // auto-property's backing field, or a getter whose whole body returns one
-    // field of the same instance.
+    // field of the same instance or type.
     // `base.Property` calls the getter without virtual dispatch.
     internal static bool IsBaseAccess(IOperation? instance)
     {
@@ -40,8 +41,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
     {
-        if (property.IsStatic || property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||
-            property.IsAbstract || property.GetMethod is not { } getter || !property.ContainingType.IsReferenceType)
+        if (property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||
+            property.IsAbstract || property.GetMethod is not { } getter || !property.IsStatic && !property.ContainingType.IsReferenceType)
         { return null; }
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
@@ -70,7 +71,7 @@ internal static partial class CSharpOperationSemantics
             _ => null
         };
         var field = name == null ? null : property.ContainingType.GetMembers(name).OfType<IFieldSymbol>().SingleOrDefault();
-        return field != null && SymbolEqualityComparer.Default.Equals(field.Type, property.Type) &&
+        return field != null && field.IsStatic == property.IsStatic && SymbolEqualityComparer.Default.Equals(field.Type, property.Type) &&
             IsSupportedFieldRead(field) ? field : null;
     }
 

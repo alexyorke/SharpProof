@@ -2,8 +2,6 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using Microsoft.CodeAnalysis.CSharp;
-using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
 using SharpProof.Verify;
@@ -12,9 +10,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Gates.Corpus;
 
-internal sealed record NativeExceptionShadowRow(string MethodId, string CallableId,
-    WorkerClaimOutcome LegacyOutcome, WorkerClaimReason LegacyReason,
-    WorkerClaimOutcome CompilerOutcome, WorkerClaimReason CompilerReason,
+internal sealed record NativeEffectOracleRow(string MethodId, string CallableId,
     WorkerClaimOutcome NativeOutcome, WorkerClaimReason NativeReason,
     bool HasTotalBody, bool HasBodyAbstraction, string? ExceptionKind, string RuntimeOracle)
 {
@@ -23,12 +19,11 @@ internal sealed record NativeExceptionShadowRow(string MethodId, string Callable
     public long? AllocatedBytes { get; init; }
 }
 
-internal sealed record NativeExceptionShadowReport(string UniverseSha256, int UniverseMethodCount,
-    int CheckedMethodCount, bool Exhaustive, int LegacyProven, int RetainedProven,
-    double RetainedPercent, bool RetentionGatePassed, int DisagreementCount,
+internal sealed record NativeEffectOracleReport(string UniverseSha256, int UniverseMethodCount,
+    int CheckedMethodCount, bool Exhaustive, int NativeProven, int NativeRefuted,
     int RuntimeWitnesses, int RuntimeContradictions, double WallSeconds,
-    ImmutableArray<NativeExceptionShadowRow> Rows,
-    ImmutableDictionary<string, int> NativeUnknownReasons, bool ComparisonPassed)
+    ImmutableArray<NativeEffectOracleRow> Rows,
+    ImmutableDictionary<string, int> NativeUnknownReasons, bool Passed)
 {
     public string ContractKind { get; init; } = "DoesNotThrow";
     public int ReachableSourceBodyCount { get; init; }
@@ -36,10 +31,12 @@ internal sealed record NativeExceptionShadowReport(string UniverseSha256, int Un
     public int ReachableSourceUnknownEffectCount { get; init; }
 }
 
-// This report measures the replacement; it never publishes worker authority.
-internal static class NativeExceptionShadow
+// Checks the worker's effect verdicts on the pinned open-source methods
+// against independent oracles: compiled IL, and the compiled method run on
+// each refutation's witness. It never publishes worker authority.
+internal static class NativeEffectOracleGate
 {
-    internal static async Task<NativeExceptionShadowReport> RunAsync(string root, int maximumMethods = 0,
+    internal static async Task<NativeEffectOracleReport> RunAsync(string root, int maximumMethods = 0,
         bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false,
         CancellationToken cancellationToken = default)
     {
@@ -60,17 +57,17 @@ internal static class NativeExceptionShadow
         return report with { WallSeconds = wall.Elapsed.TotalSeconds };
     }
 
-    internal static async Task<NativeExceptionShadowReport> ObserveAsync(CSharpCompilation compilation,
+    internal static async Task<NativeEffectOracleReport> ObserveAsync(CSharpCompilation compilation,
         ImmutableArray<string> methodIds, string root, string universeSha256, int universeMethodCount,
         bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false,
         CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
         if (new[] { allocations, purity, capabilities, summary }.Count(selected => selected) > 1)
-        { throw new ArgumentException("A shadow run must select exactly one effect contract.", nameof(purity)); }
+        { throw new ArgumentException("An oracle run must select exactly one effect contract.", nameof(purity)); }
         if (methodIds.IsDefaultOrEmpty || methodIds.Any(string.IsNullOrWhiteSpace) || methodIds.Distinct(StringComparer.Ordinal).Count() != methodIds.Length ||
             methodIds.Length > universeMethodCount)
-        { throw new ArgumentException("A shadow universe must have unique, nonempty method identities.", nameof(methodIds)); }
+        { throw new ArgumentException("An oracle universe must have unique, nonempty method identities.", nameof(methodIds)); }
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var targets = discovery.Targets.Values.Where(target => OpenSourceCorpusRunner.CorpusMethodId(target.Declaration) != null)
             .ToDictionary(target => OpenSourceCorpusRunner.CorpusMethodId(target.Declaration)!, StringComparer.Ordinal);
@@ -85,20 +82,13 @@ internal static class NativeExceptionShadow
             : ImmutableSortedDictionary<string, SourceEffectSummary>.Empty;
         var owned = preparations.ToDictionary(preparation => preparation.Entry.CallableId, StringComparer.Ordinal);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var legacy = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
         using var oracle = new NativeExceptionWitnessOracle(compilation);
         using var allocationOracle = new NativeAllocationWitnessOracle(compilation);
-        var rows = ImmutableArray.CreateBuilder<NativeExceptionShadowRow>(methodIds.Length);
+        var rows = ImmutableArray.CreateBuilder<NativeEffectOracleRow>(methodIds.Length);
         foreach (var id in methodIds.OrderBy(id => id, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var target = targets[id];
-            var evaluation = EffectContractDiagnostics.Evaluate(target.Method, target.Method.Locations[0], legacy,
-                static _ => { }, cancellationToken, includeDiagnosticPayload: false)
-                .Single(evaluation => evaluation.Kind == (summary ? EffectEvaluationContractKind.EffectContract
-                    : capabilities ? EffectEvaluationContractKind.AllowedCapabilities
-                    : purity ? EffectEvaluationContractKind.EnforcePure : allocations
-                    ? EffectEvaluationContractKind.ZeroAllocations : EffectEvaluationContractKind.DoesNotThrow));
             var preparation = owned[target.Entry.CallableId];
             var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == (summary ? WorkerEffectContractKind.EffectContract
                 : capabilities ? WorkerEffectContractKind.AllowedCapabilities
@@ -127,8 +117,7 @@ internal static class NativeExceptionShadow
             var runtime = capabilities ? "CapabilityOracleNotRun" : purity ? "PurityOracleNotRun" : allocations ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
                 ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
                 : "NotRun";
-            rows.Add(new(id, preparation.Entry.CallableId, CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Outcome),
-                CompilerEffectEvaluationWireMappings.ToWorker(evaluation.Reason), claim.Outcome, claim.Reason, outcome, evidence.Reason,
+            rows.Add(new(id, preparation.Entry.CallableId, outcome, evidence.Reason,
                 preparation.Total != null, preparation.Total?.IsBodyAbstraction == true,
                 evidence.ExceptionWitness?.Kind.ToString(), runtime)
             {
@@ -147,24 +136,18 @@ internal static class NativeExceptionShadow
         };
     }
 
-    internal static NativeExceptionShadowReport Summarize(string universeSha256, int universeMethodCount,
-        ImmutableArray<NativeExceptionShadowRow> rows, double wallSeconds)
+    internal static NativeEffectOracleReport Summarize(string universeSha256, int universeMethodCount,
+        ImmutableArray<NativeEffectOracleRow> rows, double wallSeconds)
     {
         if (rows.IsDefaultOrEmpty || rows.Length > universeMethodCount || rows.Any(row => string.IsNullOrWhiteSpace(row.MethodId)) ||
             rows.Select(row => row.MethodId).Distinct(StringComparer.Ordinal).Count() != rows.Length)
-        { throw new ArgumentException("Shadow rows do not define a unique covered universe.", nameof(rows)); }
-        var proven = rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven);
-        var retained = rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven && row.NativeOutcome == WorkerClaimOutcome.Proven);
-        var disagreements = rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven && row.NativeOutcome == WorkerClaimOutcome.Refuted ||
-            row.LegacyOutcome == WorkerClaimOutcome.Refuted && row.NativeOutcome == WorkerClaimOutcome.Proven);
+        { throw new ArgumentException("Oracle rows do not define a unique covered universe.", nameof(rows)); }
         var runtimeContradictions = rows.Count(row => row.RuntimeOracle == "Contradiction");
-        var exhaustive = rows.Length == universeMethodCount;
-        return new(universeSha256, universeMethodCount, rows.Length, exhaustive, proven, retained,
-            proven == 0 ? 0 : Math.Round(100d * retained / proven, 2),
-            exhaustive && proven > 0 && retained * 100L >= proven * 95L,
-            disagreements, rows.Count(row => row.RuntimeOracle == "Confirmed"), runtimeContradictions, wallSeconds, rows,
+        return new(universeSha256, universeMethodCount, rows.Length, rows.Length == universeMethodCount,
+            rows.Count(row => row.NativeOutcome == WorkerClaimOutcome.Proven), rows.Count(row => row.NativeOutcome == WorkerClaimOutcome.Refuted),
+            rows.Count(row => row.RuntimeOracle == "Confirmed"), runtimeContradictions, wallSeconds, rows,
             rows.Where(row => row.NativeOutcome == WorkerClaimOutcome.Unknown).GroupBy(row => row.NativeReason.ToString(), StringComparer.Ordinal)
                 .ToImmutableDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
-            disagreements == 0 && runtimeContradictions == 0);
+            runtimeContradictions == 0);
     }
 }

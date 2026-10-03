@@ -65,6 +65,10 @@ internal sealed record CorpusObservation(
     AnalyzerSemanticOutcome SemanticOutcome,
     ImmutableArray<string> Diagnostics)
 {
+    // The worker's verdict, folded into Verdict; replays reuse it so they
+    // compare only the analyzer.
+    internal SharpProof.Worker.Protocol.WorkerClaimOutcome? NativeOutcome { get; init; }
+
     public string ToCanonicalLine()
     {
         return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";

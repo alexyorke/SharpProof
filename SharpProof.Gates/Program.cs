@@ -25,16 +25,17 @@ internal static class Program
         {
             var root = RepositoryLayout.FindRoot();
             var command = args.Length == 0 ? "corpus" : args[0];
-            if (command is "exception-shadow" or "allocation-shadow" or "purity-shadow" or "capability-shadow" or "effectcontract-shadow")
+            if (command is "exception-oracle" or "allocation-oracle" or "purity-oracle" or "capability-oracle" or "effectcontract-oracle")
             {
                 var maximumMethods = args.Length == 1 ? 0 : args.Length == 3 && args[1] == "--limit"
                     ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)
-                    : throw new ArgumentException("Use exception-shadow, allocation-shadow, purity-shadow or capability-shadow [--limit <method-count>].", nameof(args));
-                var result = await NativeExceptionShadow.RunAsync(root, maximumMethods, allocations: command == "allocation-shadow",
-                    purity: command == "purity-shadow", capabilities: command == "capability-shadow",
-                    summary: command == "effectcontract-shadow").ConfigureAwait(false);
+                    : throw new ArgumentException("Use exception-oracle, allocation-oracle, purity-oracle, capability-oracle or " +
+                        "effectcontract-oracle [--limit <method-count>].", nameof(args));
+                var result = await NativeEffectOracleGate.RunAsync(root, maximumMethods, allocations: command == "allocation-oracle",
+                    purity: command == "purity-oracle", capabilities: command == "capability-oracle",
+                    summary: command == "effectcontract-oracle").ConfigureAwait(false);
                 Console.WriteLine(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
-                return result.ComparisonPassed ? 0 : 1;
+                return result.Passed ? 0 : 1;
             }
             if (command == "corpus")
             {
@@ -52,7 +53,8 @@ internal static class Program
                 Console.WriteLine("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-shadow|allocation-shadow|purity-shadow|capability-shadow] [--limit <method-count>]");
+            Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
+                "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
             return 2;
         }
         catch (Exception exception)

@@ -18,6 +18,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
     private readonly ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls;
     private readonly ImmutableArray<IrTerm> _reads;
+    private readonly ImmutableArray<IrTerm> _ambientReads;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
@@ -38,6 +39,7 @@ internal sealed class PassiveCallableVcPlan
         _potentialExceptionAllocations = builder.PotentialExceptionAllocations;
         _opaqueCalls = builder.OpaqueCalls;
         _reads = builder.Reads;
+        _ambientReads = builder.AmbientReads;
         HasUnmodeledAllocations = builder.HasUnmodeledAllocations;
         _model = builder.Model;
         _labels = builder.Labels;
@@ -192,8 +194,8 @@ internal sealed class PassiveCallableVcPlan
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => write.Region != IrWriteRegion.Local).Select(write => write.Reach)
-                .Concat(_locks.Select(synchronization => synchronization.Reach))
-                .Concat(OpaqueCalls(effects => (effects & (IrOpaqueCallEffects.Writes | IrOpaqueCallEffects.Synchronizes)) != 0))),
+                .Concat(_locks.Select(synchronization => synchronization.Reach)).Concat(_ambientReads)
+                .Concat(OpaqueCalls(IrOpaqueCallSite.IsObservablyImpure))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 

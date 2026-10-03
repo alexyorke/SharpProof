@@ -61,10 +61,13 @@ internal static class NativeEffectSiteVerifier
             effects => (Capabilities(effects) & ~allowed) != 0, cancellationToken).ConfigureAwait(false);
     }
 
-    // An unspecified call may use any capability. Specified effects map as the
-    // compiler maps them: input/output to IO and nondeterminism to Randomness.
+    // A trusted contract declares a call's capabilities; an unspecified call
+    // may use any. Specified effects map as the compiler maps them:
+    // input/output to IO and nondeterminism to Randomness.
     internal static WorkerEffectCapabilitySet Capabilities(IrOpaqueCallEffects effects)
     {
+        if (IrOpaqueCallSite.Capabilities(effects) is { } declared)
+        { return (WorkerEffectCapabilitySet)declared; }
         if (effects == IrOpaqueCallEffects.All)
         { return WorkerEffectCapabilitySet.AllKnown; }
         var capabilities = WorkerEffectCapabilitySet.None;

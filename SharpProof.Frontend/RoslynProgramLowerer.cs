@@ -26,6 +26,47 @@ public sealed class RoslynProgramLowerer(
         return new RoslynTotalProgramLowerer(context, cancellationToken).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
     }
 
+    // An auto-property accessor only reads or writes its backing field. The
+    // read is an approximation: the IR does not model the field's value.
+    internal FrontendProgramLoweringResult? LowerAutoAccessor(TotalLoweringContext context, AccessorDeclarationSyntax declaration)
+    {
+        ArgumentNullGuard.NotNull(context, nameof(context));
+        if (!ReferenceEquals(_factory, context.Factory))
+        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
+        if (declaration.Body != null || declaration.ExpressionBody != null || !context.HasScalarSignature ||
+            context.Target.AssociatedSymbol is not IPropertySymbol property ||
+            !property.ContainingType.GetMembers().OfType<IFieldSymbol>().Any(field =>
+                SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)))
+        { return null; }
+        var getter = context.Target.MethodKind == MethodKind.PropertyGet;
+        if (getter != (context.Result != null))
+        { return null; }
+        var builder = new IrProgramBuilder(_factory);
+        var block = builder.CreateBlock("entry");
+        builder.SetEntry(block);
+        var site = context.SyntaxSite(getter ? OperationKind.FieldReference : OperationKind.SimpleAssignment, declaration);
+        var structural = _factory.CreateOperation("candidate:auto-accessor");
+        foreach (var binding in context.Parameters)
+        {
+            builder.Assign(block, structural, binding.Current, _factory.Variable(binding.Entry));
+            builder.Assign(block, structural, binding.PreState, _factory.Variable(binding.Entry));
+        }
+        if (getter)
+        {
+            var result = context.Result!.Value;
+            var value = context.Temporary(_factory.GetVariableInfo(result).Type);
+            builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+            builder.Assign(block, site, result, _factory.Variable(value));
+            builder.Return(block, site, _factory.Variable(result));
+        }
+        else
+        {
+            builder.Write(block, site, property.IsStatic ? IrWriteRegion.Static : IrWriteRegion.Field);
+            builder.Return(block, site);
+        }
+        return new(builder.Build(), FrontendSubsetClassification.Exact, context.Variables, context.Captures, [], context.Origin);
+    }
+
     internal FrontendProgramLoweringResult LowerShadowSourceBody(ControlFlowGraph graph, TotalLoweringContext context,
         Func<IMethodSymbol, bool> preserveSourceCall, CancellationToken cancellationToken,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null)

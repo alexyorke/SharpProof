@@ -49,8 +49,8 @@ internal static class CorpusCatalog
             "return $INPUT$ + 1;"),
         Effect(
             "E02",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[EnforcePure]",
             "State = $INPUT$; return $INPUT$;",
             "private static int State;"),
@@ -68,14 +68,14 @@ internal static class CorpusCatalog
             "return $INPUT$ * 2;"),
         Effect(
             "E05",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[ZeroAllocations]",
             "_ = new object(); return $INPUT$;"),
         Effect(
             "E06",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[ZeroAllocations]",
             "_ = new int[1]; return $INPUT$;"),
         Effect(
@@ -92,8 +92,8 @@ internal static class CorpusCatalog
             "return $INPUT$ + 1;"),
         Effect(
             "E09",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[DoesNotThrow]",
             "return 1 / $INPUT$;"),
         Effect(
@@ -134,8 +134,8 @@ internal static class CorpusCatalog
             "return 1 / $INPUT$;"),
         Effect(
             "E16",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[AllowedExceptions(typeof(InvalidOperationException))]",
             "return 1 / $INPUT$;"),
         Effect(
@@ -146,8 +146,8 @@ internal static class CorpusCatalog
             "return $INPUT$ + 1;"),
         Effect(
             "E18",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[ZeroAllocations] [DoesNotThrow]",
             "_ = new object(); return 1 / $INPUT$;"),
         Contract(

@@ -104,7 +104,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         _plan.ReplayEffects(witness.EntryModel, cancellationToken,
             writePrefixObserver: (instruction, approximation) =>
             {
-                if (!approximation && writeViolates(instruction.Region))
+                if (!approximation && IrWriteSites.IsObservable(_plan.Factory, instruction) && writeViolates(instruction.Region))
                 { write ??= instruction.Operation; }
             },
             lockPrefixObserver: locksViolate ? (instruction, approximation) =>
@@ -142,7 +142,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         : null,
             writePrefixObserver: allocations ? null : (write, approximation) =>
         {
-            if (!approximation && write.Region != IrWriteRegion.Local)
+            if (!approximation && IrWriteSites.IsObservable(_plan.Factory, write))
             { site ??= write.Operation; }
         }, lockPrefixObserver: allocations ? null : (synchronization, approximation) =>
         {

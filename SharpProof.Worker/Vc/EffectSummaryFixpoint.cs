@@ -137,7 +137,7 @@ internal static class EffectSummaryFixpoint
             summary = instruction switch
             {
                 IrAllocationInstruction => summary with { MayEffects = summary.MayEffects | SourceMayEffect.Allocation },
-                IrWriteInstruction write when write.Region != IrWriteRegion.Local =>
+                IrWriteInstruction write when IrWriteSites.IsObservable(decoded.Factory, write) =>
                     summary with { MayEffects = summary.MayEffects | SourceMayEffect.NonlocalWrite },
                 IrLockInstruction => summary with { MayEffects = summary.MayEffects | SourceMayEffect.Synchronization },
                 IrThrowInstruction thrown => summary with

@@ -35,6 +35,9 @@ internal static class OpenSourceCorpusRunner
                 cancellationToken)
             .ConfigureAwait(false);
         var outcomes = factory.GetOutcomes();
+        var nativeOutcomes = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken).ConfigureAwait(false))
+            .Where(static verdict => CorpusMethodId(verdict.Declaration) != null)
+            .ToDictionary(static verdict => CorpusMethodId(verdict.Declaration)!, static verdict => verdict.Outcome, StringComparer.Ordinal);
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
         var diagnosticAssignments = new int[diagnostics.Length];
@@ -91,6 +94,7 @@ internal static class OpenSourceCorpusRunner
                     $"{method.Id}.baseline",
                     CorpusGate.ToVerdict(
                         semanticOutcome,
+                        nativeOutcomes.TryGetValue(method.Id, out var nativeOutcome) ? nativeOutcome : null,
                         canonicalDiagnostics.IsDefaultOrEmpty),
                     semanticOutcome,
                     canonicalDiagnostics));

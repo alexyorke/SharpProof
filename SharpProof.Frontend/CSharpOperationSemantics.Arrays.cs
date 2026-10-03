@@ -71,4 +71,57 @@ internal static partial class CSharpOperationSemantics
             [new(IrExceptionKind.NullReference, factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type))),
              new(IrExceptionKind.IndexOutOfRange, outside)], FrontendSubsetClassification.Exact);
     }
+
+    // A local that only ever holds arrays this body creates, and is only
+    // indexed, measured or reassigned a new array, never lets its array escape.
+    // The control flow graph may capture the array and carries no semantic
+    // model, so the local is found from the access syntax.
+    internal static bool IsFreshArrayLocal(IArrayElementReferenceOperation access, Compilation? compilation)
+    {
+        if (access.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ElementAccessExpressionSyntax
+            { Expression: Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax name } ||
+            compilation == null || !compilation.SyntaxTrees.Contains(name.SyntaxTree) ||
+            Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, name.SyntaxTree) is not { } model ||
+            model.GetSymbolInfo(name).Symbol is not ILocalSymbol { RefKind: RefKind.None } local ||
+            local.ContainingSymbol is not IMethodSymbol owner ||
+            owner.DeclaringSyntaxReferences.Length != 1 ||
+            model.GetOperation(owner.DeclaringSyntaxReferences[0].GetSyntax()) is not { } root)
+        { return false; }
+        foreach (var operation in root.DescendantsAndSelf())
+        {
+            switch (operation)
+            {
+                case IVariableDeclaratorOperation declarator when SymbolEqualityComparer.Default.Equals(declarator.Symbol, local):
+                    if (declarator.Initializer != null && declarator.Initializer.Value is not IArrayCreationOperation)
+                    { return false; }
+                    break;
+                case ILocalReferenceOperation use when SymbolEqualityComparer.Default.Equals(use.Local, local):
+                    if (!IsContainedUse(use) || InNestedFunction(use, root))
+                    { return false; }
+                    break;
+            }
+        }
+        return true;
+
+        static bool IsContainedUse(ILocalReferenceOperation use)
+        {
+            return use.Parent switch
+            {
+                IArrayElementReferenceOperation element => element.ArrayReference == use,
+                IPropertyReferenceOperation { Property.Name: "Length" } length => length.Instance == use,
+                ISimpleAssignmentOperation assignment => assignment.Target == use && assignment.Value is IArrayCreationOperation,
+                _ => false
+            };
+        }
+
+        static bool InNestedFunction(IOperation use, IOperation root)
+        {
+            for (var current = use.Parent; current != null && current != root; current = current.Parent)
+            {
+                if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
+                { return true; }
+            }
+            return false;
+        }
+    }
 }

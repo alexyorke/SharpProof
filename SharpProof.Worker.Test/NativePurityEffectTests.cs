@@ -131,7 +131,6 @@ public sealed class NativePurityEffectTests
     }
 
     [TestCase("public static volatile int State;", "State = x; return x;")]
-    [TestCase("public static int State;", "State = x; return State;")]
     [TestCase("public static int State = 1;", "State = x; return x;")]
     [TestCase("", "return (int)(object)x;")]
     [TestCase("public static object State = new object();", "return x;")]
@@ -143,11 +142,29 @@ public sealed class NativePurityEffectTests
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
-    [Test]
-    public async Task SourceStaticFieldStoreRefutesPurity()
+    // Writing the elements of an array the body created and keeps is not
+    // observable; writing one that escapes, or a parameter's, is.
+    [TestCase("var buffer = new int[1]; buffer[0] = x; return buffer[0];", true)]
+    [TestCase("var buffer = new int[2]; buffer[1] += x; return buffer.Length;", true)]
+    [TestCase("var buffer = new int[1]; buffer[0] = x; Keep = buffer; return x;", false)]
+    public async Task FreshArrayWritesArePure(string body, bool pure)
     {
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
-            Source("State = x; return x;", "public static int State;")));
+            Source(body, "public static int[]? Keep;")));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        if (pure)
+        { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
+        else
+        { Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>()); }
+    }
+
+    // A static field of a type without an initializer is read without running code.
+    [TestCase("State = x; return x;")]
+    [TestCase("State = x; return State;")]
+    public async Task SourceStaticFieldStoreRefutesPurity(string body)
+    {
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
+            Source(body, "public static int State;")));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);

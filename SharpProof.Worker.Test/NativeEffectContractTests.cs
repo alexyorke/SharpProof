@@ -49,6 +49,23 @@ public sealed class NativeEffectContractTests
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
     }
 
+    // Reading the length or an element of an argument's sequence reads
+    // argument state; reading a sequence the body created does not.
+    [TestCase("SharpProofEffect.None", "return values.Length;", false)]
+    [TestCase("SharpProofEffect.None", "return text.Length > 0 ? text[0] : 0;", false)]
+    [TestCase(Reads, "return values.Length;", true)]
+    [TestCase("SharpProofEffect.Allocates", "var local = new int[3]; return local.Length + local[0];", true)]
+    [TestCase("SharpProofEffect.None", "return \"abc\".Length;", true)]
+    public async Task SequenceReadsNeedReadEffects(string effects, string body, bool proven)
+    {
+        var result = await VerifyAsync("[EffectContract(" + effects + ", Complete = true)] public int Target(" +
+            "[NotNull] int[] values, [NotNull] string text) { " + body + " }");
+        if (proven)
+        { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
+        else
+        { Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>()); }
+    }
+
     private static async Task<PassiveCallableCheckResult> VerifyAsync(string method)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(

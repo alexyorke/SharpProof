@@ -105,7 +105,7 @@ internal static class CompilerReachableSourceCollector
                         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
                         var lowered = new RoslynProgramLowerer(context.Factory).LowerShadowSourceBody(graph, context,
                             callee => Enqueue(callee) != null, cancellationToken,
-                            method => CompilerTotalCallableLowerer.ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks));
+                            method => TotalBodyLowering.ResolveScalarModel(method, context.Factory, apiSpecs) ?? specificationPacks.ResolveTotal(method));
                         if (lowered.Classification.IsExact && body.CallsComplete)
                         {
                             var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], cancellationToken: cancellationToken);

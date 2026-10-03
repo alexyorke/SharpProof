@@ -137,6 +137,13 @@ clauses cannot refine a call into a complete effect proof. Both policies and
 their summary-incompleteness propagation are declared parts of the
 `effectAnalysis` trusted computing base.
 
+`SharpProof.Analyzer.Core/TotalBodyLowering` is the one claim-body lowering:
+the compiler collector adds IL bodies and specification packs to it, and the
+analyzer's advisory effect pass (`AdvisoryEffectSites`, `AdvisoryEffectClaims`)
+uses it directly. The advisory pass finds, by graph reachability over the same
+Total program, the first site that could violate each effect claim and reports
+it; it never proves a claim.
+
 ## Contracts and modular verification
 
 `Contract.Requires`, `Ensures`, `Assume`, `Result`, and `Old` bind as normal C#
@@ -457,23 +464,22 @@ use the compiler effect assembler. Explicit throws carry per-site exception
 codes so AllowedExceptions goals compare each site's static type. The collector
 classifies opaque calls from ApiSpec facets into IrOpaqueCallEffects, recorded in
 the call site's description; allocation, purity and capability goals use only the
-calls whose effects matter to them. `SharpProof.Gates capability-shadow` measures
-native AllowedCapabilities retention before that contract changes authority.
+calls whose effects matter to them. A trusted complete effect contract on a
+metadata callee replaces its IL: the call carries the contract's effects and,
+above bit 16 of IrOpaqueCallEffects, its declared capabilities.
 The collector lowers a callable once and, if the program writes elements (an
 Element write or an opaque call) while reading them through SequenceAccess,
 lowers it again with element reads approximated.
-The `SharpProof.Gates exception-shadow` command separately instruments the pinned
-200-method OSS corpus with DoesNotThrow. It compares raw legacy analyzer
-outcomes, published compiler evidence, and native results after production
-artifact serialization and decoding. Every selected method remains in the
-coverage and old-proof denominator, including unsupported bodies. `--limit 10`
-runs a sorted sample; samples cannot satisfy the exhaustive retention gate.
-Concrete native refutations are independently compiled and invoked when their
-static, nongeneric scalar/string/null inputs can be represented. Unsupported
-invocation shapes remain explicit oracle gaps. Runtime confirmations concern
-counterexamples only; they do not establish universal proofs. The report
-separates comparison success from the 95% old-proof retention gate and does not
-qualify allocation, write, lock, capability, or call-precondition effects.
+The `SharpProof.Gates exception-oracle` command separately instruments the pinned
+200-method OSS corpus with DoesNotThrow and checks native results, after
+production artifact serialization and decoding, against independent oracles.
+`--limit 10` runs a sorted sample. Concrete native refutations are
+independently compiled and invoked when their static, nongeneric
+scalar/string/null inputs can be represented. Unsupported invocation shapes
+remain explicit oracle gaps. Runtime confirmations concern counterexamples
+only; they do not establish universal proofs. A runtime contradiction fails the
+gate. The `allocation-oracle`, `purity-oracle`, `capability-oracle` and
+`effectcontract-oracle` commands report the other contracts the same way.
 Typed `Allocate` instructions capture core `new object()` expressions and
 scalar boxing to `object`. An optional reference target receives a fresh nonnull
 identity, with guarded freshness facts against tracked references of the same
@@ -522,16 +528,15 @@ Validated effect claim IDs are captured before legacy language admission and
 decoded as a canonical owned set. Missing admission data abstains even at a
 contradictory entry. Compiled C# tests independently measure thread allocation
 bytes on concrete paths after delegate construction and JIT warmup.
-`SharpProof.Gates allocation-shadow` measures this replacement on the same
-pinned universe with ZeroAllocations annotations. Concrete feasible entries
+`SharpProof.Gates allocation-oracle` checks native ZeroAllocations results on the
+same pinned universe. Concrete feasible entries
 are replayed before invoking independently compiled source through a direct
 delegate. Arguments and warmup are outside thread-allocation measurements.
 Generic methods use bounded int and string representative closures; unsupported
 inputs and incomplete executions remain explicit gaps. Independent conservative
 IL reachability checks allocation, throw and call sites, including filter handlers.
 A potential IL site remains a gap when preconditions may exclude its edge.
-Runtime observations do not establish a universal proof. This command does not
-qualify an authority switch or complete the implicit-allocation table.
+Runtime observations do not establish a universal proof.
 Typed Write events carry Local, Parameter, Field, Static, Element or
 Unknown regions and owned operation sites through artifacts, loop transformation,
 passive SSA and original-program replay. Source local assignments, increments
@@ -541,7 +546,10 @@ capturing receivers before the RHS and checking null after RHS evaluation.
 Volatile, readonly, external and initialization-sensitive stores abstain; array
 stores remain incomplete. Nonvolatile instance field reads, auto-properties and
 getters that only return one field of the same instance lower to a null-receiver
-fault plus an approximated value; static reads and dispatched properties abstain.
+fault plus an approximated value. A static field or static auto-property of a
+type without a static initializer reads as an approximation at a
+`StaticFieldReference` site, a read of ambient state; dispatched properties
+abstain.
 Type-parameter values are an opaque domain: data flow and type tests only, with
 an approximated Boolean result and no allocation (the JIT folds the test's box).
 Claim lowering (`TotalSourceCallSession.OpaqueCalls`) turns unmodeled metadata
@@ -557,12 +565,16 @@ getters: the caller null-checks the receiver after the arguments, and callee
 field reads through `this` stay approximations. Reference casts between class
 types are identity on the reference sort, which bridges generic container
 types and carries explicit downcasts behind an approximated InvalidCast guard.
-The native
-purity shadow forbids reachable nonlocal events; allocation remains compatible
-with purity. The allocation and purity routes share claim admission, entry
-feasibility, solver budgets and witness replay in NativeEffectSiteVerifier.
-`SharpProof.Gates purity-shadow` compares every pinned method against raw legacy
-purity results; independent mutation oracles remain explicit gaps.
+Native
+purity forbids reachable nonlocal writes, locks, static reads and calls that
+`IrOpaqueCallSite.IsObservablyImpure` names; allocation remains compatible with
+purity. An element write through a local that only ever holds arrays the body
+created, and is only indexed or measured, carries a `FreshElementWrite` site
+and is not observable (`IrWriteSites`). `IrSequenceReads` finds instructions
+that read the length or an element of a sequence the body did not create; an
+EffectContract needs every read flag for them. The allocation and purity routes
+share claim admission, entry feasibility, solver budgets and witness replay in
+NativeEffectSiteVerifier. Independent mutation oracles remain explicit gaps.
 Typed Lock instructions record validated Monitor.Enter/Exit attempts, including
 C# lock statements and source-helper frames. Concrete replay observes the
 attempt and stops before synchronization. Native purity excludes reachable
@@ -859,8 +871,11 @@ path. The worker is isolated in
 `SharpProof.Verifier`; the portable `SharpProof` package contains only
 analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
 package has a portable-PDB symbol package with SourceLink, and the package
-workflow records exact package identities. The corpus reports explicit, silent, and total
-semantic Unknown rates. A `Supported` case producing `Unknown` or
+workflow records exact package identities. A corpus case's verdict comes from
+the worker, run in process on the case's compiler artifact, for every claim the
+worker decides; the analyzer's semantic outcome decides only call-site
+preconditions and is recorded beside its canonical diagnostics. The corpus
+reports explicit, silent, and total semantic Unknown rates. A `Supported` case producing `Unknown` or
 `SilentUnknown` fails with zero tolerance. The supported-case and supported
 OSS-method floors cannot decrease, while total and per-reason Unknown counts
 for `IntentionallyUnsupported` cases cannot exceed the checked-in ratchet.

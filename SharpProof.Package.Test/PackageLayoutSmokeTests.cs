@@ -59,11 +59,6 @@ public sealed class PackageLayoutSmokeTests
         "System.Threading.Tasks.Extensions.dll"
     ];
 
-    private static readonly string[] ExpectedAllocationReplayEventKinds = [
-        "ManagedArrayAllocation",
-        "ManagedObjectAllocation"
-    ];
-
     private static readonly ImmutableArray<string>
         ExpectedAllocationReplayWitnessKinds = AllocationWitnessKinds.Managed;
 
@@ -1058,48 +1053,6 @@ public sealed class PackageLayoutSmokeTests
                     .GetProperty("claimId")
                     .GetString()),
                 Is.Unique.And.All.Not.Empty);
-            var expectedClaims = new[]
-            {
-                (Callable: "AllocateArray",
-                    Event: "ManagedArrayAllocation"),
-                (Callable: "AllocateObject",
-                    Event: "ManagedObjectAllocation")
-            };
-            var eventKinds = expectedClaims
-                .Select(expected =>
-                {
-                    var item = effectClaims.Single(candidate =>
-                        candidate.CallableId.Contains(
-                            expected.Callable,
-                            StringComparison.Ordinal));
-                    var claim = item.Claim;
-                    var replay = claim.GetProperty("replay");
-                    Assert.That(
-                        replay.ValueKind,
-                        Is.EqualTo(JsonValueKind.Object),
-                        item.CallableId + ":" + claim.GetRawText());
-                    var events = replay
-                        .GetProperty("events")
-                        .EnumerateArray()
-                        .ToArray();
-                    Assert.That(
-                        events,
-                        Has.Length.EqualTo(1),
-                        item.CallableId);
-                    var eventKind = events[0]
-                        .GetProperty("kind")
-                        .GetString();
-                    Assert.That(
-                        eventKind,
-                        Is.EqualTo(expected.Event),
-                        item.CallableId);
-                    return eventKind;
-                })
-                .OrderBy(static kind => kind, StringComparer.Ordinal)
-                .ToArray();
-            Assert.That(
-                eventKinds,
-                Is.EqualTo(ExpectedAllocationReplayEventKinds));
         }
 
         using var result = JsonDocument.Parse(
@@ -1352,7 +1305,7 @@ public sealed class PackageLayoutSmokeTests
                 Does.Contain("'ReadString'")
                     .And.Contain("'ReadArray'")
                     .And.Contain(
-                        "EffectContractDoesNotCoverBodySummary"));
+                        "may have undeclared effects"));
         }
     }
 

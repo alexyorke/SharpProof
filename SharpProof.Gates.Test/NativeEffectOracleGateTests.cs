@@ -11,7 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Gates.Test;
 
 [TestFixture]
-public sealed class NativeExceptionShadowTests
+public sealed class NativeEffectOracleGateTests
 {
     [Test]
     public async Task RecursiveSourceSummariesAreObservedWithoutPublishingProofs()
@@ -23,7 +23,7 @@ public sealed class NativeExceptionShadowTests
             }
             """);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
-        var report = await NativeExceptionShadow.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
         Assert.That(report.ReachableSourceBodyCount, Is.EqualTo(2));
         Assert.That(report.ReachableSourceMayDivergeCount, Is.EqualTo(2));
         Assert.That(report.ReachableSourceUnknownEffectCount, Is.EqualTo(2));
@@ -39,7 +39,7 @@ public sealed class NativeExceptionShadowTests
     {
         var document = Document("public static class C { public static int Target(" + parameter + ") { " + body + " } }");
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
-        var report = await NativeExceptionShadow.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(report.RuntimeWitnesses, Is.EqualTo(1));
@@ -53,7 +53,7 @@ public sealed class NativeExceptionShadowTests
         var source = escapes
             ? "public static class C { public static System.Func<string> Target(int x) { return new System.Func<string>(((string)null).Trim); } }"
             : "public static class C { public static int Target(int x) { System.Func<string> action = new System.Func<string>(((string)null).Trim); return x; } }";
-        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), CancellationToken.None),
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), CancellationToken.None),
             ["sample"], RepositoryLayout.FindRoot(), "test", 1);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(escapes ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(escapes ? "Confirmed" : "NotRun"));
@@ -64,29 +64,27 @@ public sealed class NativeExceptionShadowTests
     public async Task PinnedUniverseIsExhaustivelyComparedWithoutOracleContradictions()
     {
         var root = RepositoryLayout.FindRoot();
-        var report = await NativeExceptionShadow.RunAsync(root);
+        var report = await NativeEffectOracleGate.RunAsync(root);
         Assert.That(report.UniverseMethodCount, Is.EqualTo(200));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.UniverseSha256, Is.EqualTo("BD29688EDA47BA7EEB68093E4151D6A786901C4E41D8CE1A32DDA8CF8FA6F7ED"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("A35CBCBDE4CF956E35790BC55A9E381913CBDFDABF725BAF7ED99706028D29C3"));
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.RuntimeContradictions, Is.Zero);
-        Assert.That(report.DisagreementCount, Is.Zero);
-        Assert.That(report.ComparisonPassed, Is.True);
+        Assert.That(report.Passed, Is.True);
         Assert.That(report.Rows.Single(row => row.MethodId == "OSS0199").NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        await TestContext.Progress.WriteLineAsync($"Exception shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; " +
-            $"{report.RetainedProven} retained; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
+        await TestContext.Progress.WriteLineAsync($"Exception oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; " +
+            $"{report.NativeRefuted} refuted; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
     }
 
     [Test]
-    public async Task SimpleSourceProofIsRetainedAfterArtifactRoundTrip()
+    public async Task SimpleSourceProofSurvivesArtifactRoundTrip()
     {
         var document = Document("public static class C { public static int Target(int x) { return x; } }");
-        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None),
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None),
             ["sample"], RepositoryLayout.FindRoot(), "test", 1);
-        Assert.That(report.Rows.Single().LegacyOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(report.RetentionGatePassed, Is.True);
+        Assert.That(report.NativeProven, Is.EqualTo(1));
         Assert.That(report.RuntimeWitnesses, Is.Zero);
     }
 
@@ -94,7 +92,7 @@ public sealed class NativeExceptionShadowTests
     public async Task UnknownBodiesAreCountedInsteadOfExcludedFromCoverage()
     {
         var document = Document("public static class C { public static int Target(int x) { System.Console.WriteLine(x); return x; } }");
-        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None),
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None),
             ["sample"], RepositoryLayout.FindRoot(), "test", 1);
         Assert.That(report.CheckedMethodCount, Is.EqualTo(1));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -103,53 +101,20 @@ public sealed class NativeExceptionShadowTests
     }
 
     [Test]
-    public void SamplingCannotPassTheFullRetentionGate()
-    {
-        var row = Row("one", WorkerClaimOutcome.Proven);
-        var report = NativeExceptionShadow.Summarize("test", 2, [row], 0);
-        Assert.That(report.Exhaustive, Is.False);
-        Assert.That(report.RetainedPercent, Is.EqualTo(100));
-        Assert.That(report.RetentionGatePassed, Is.False);
-    }
-
-    [Test]
-    public void MissingNativeProofsRemainInTheRetentionDenominator()
-    {
-        var report = NativeExceptionShadow.Summarize("test", 2,
-            [Row("one", WorkerClaimOutcome.Proven), Row("two", WorkerClaimOutcome.Unknown)], 0);
-        Assert.That(report.LegacyProven, Is.EqualTo(2));
-        Assert.That(report.RetainedProven, Is.EqualTo(1));
-        Assert.That(report.RetainedPercent, Is.EqualTo(50));
-        Assert.That(report.RetentionGatePassed, Is.False);
-        Assert.That(report.NativeUnknownReasons[WorkerClaimReason.UnsupportedBody.ToString()], Is.EqualTo(1));
-    }
-
-    [Test]
-    public void CompilerAdmissionCannotRemoveLegacyProofsFromTheDenominator()
-    {
-        var row = Row("one", WorkerClaimOutcome.Unknown) with
-        { CompilerOutcome = WorkerClaimOutcome.Unknown, CompilerReason = WorkerClaimReason.UnsupportedContract };
-        var report = NativeExceptionShadow.Summarize("test", 1, [row], 0);
-        Assert.That(report.LegacyProven, Is.EqualTo(1));
-        Assert.That(report.RetainedProven, Is.Zero);
-        Assert.That(report.RetentionGatePassed, Is.False);
-    }
-
-    [Test]
     public void DuplicateCoverageAndOracleContradictionsCannotPass()
     {
         var row = Row("one", WorkerClaimOutcome.Proven);
-        Assert.Throws<ArgumentException>(new Action(() => NativeExceptionShadow.Summarize("test", 2, [row, row], 0)));
-        var report = NativeExceptionShadow.Summarize("test", 1,
+        Assert.Throws<ArgumentException>(new Action(() => NativeEffectOracleGate.Summarize("test", 2, [row, row], 0)));
+        var report = NativeEffectOracleGate.Summarize("test", 1,
             [row with { NativeOutcome = WorkerClaimOutcome.Refuted, RuntimeOracle = "Contradiction" }], 0);
-        Assert.That(report.ComparisonPassed, Is.False);
-        Assert.That(report.DisagreementCount, Is.EqualTo(1));
+        Assert.That(report.Passed, Is.False);
+        Assert.That(report.NativeRefuted, Is.EqualTo(1));
         Assert.That(report.RuntimeContradictions, Is.EqualTo(1));
     }
 
-    private static NativeExceptionShadowRow Row(string id, WorkerClaimOutcome native)
+    private static NativeEffectOracleRow Row(string id, WorkerClaimOutcome native)
     {
-        return new(id, id, WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerClaimOutcome.Proven, WorkerClaimReason.None, native,
+        return new(id, id, native,
             native == WorkerClaimOutcome.Unknown ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None,
             native != WorkerClaimOutcome.Unknown, false, null, "NotRun");
     }
@@ -180,12 +145,12 @@ public sealed class NativeExceptionShadowTests
     [TestCase("return string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length;", WorkerClaimOutcome.Proven, "PotentialAllocationOpcode")]
     [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", WorkerClaimOutcome.Refuted)]
     [TestCase("return (\"\" + (x == 0 ? \"a\" : \"b\")).Length;", WorkerClaimOutcome.Proven, "PotentialAllocationOpcode")]
-    public async Task AllocationShadowMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome,
+    public async Task AllocationOracleMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome,
         string allocationIlOracle = "NoReachableAllocationOpcode")
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
-        var report = await NativeExceptionShadow.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(outcome));
         var row = report.Rows.Single();
@@ -208,21 +173,20 @@ public sealed class NativeExceptionShadowTests
     public async Task PinnedAllocationUniverseIsExhaustivelyMeasured()
     {
         var root = RepositoryLayout.FindRoot();
-        var report = await NativeExceptionShadow.RunAsync(root, allocations: true);
+        var report = await NativeEffectOracleGate.RunAsync(root, allocations: true);
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.UniverseSha256, Is.EqualTo("BD29688EDA47BA7EEB68093E4151D6A786901C4E41D8CE1A32DDA8CF8FA6F7ED"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("A35CBCBDE4CF956E35790BC55A9E381913CBDFDABF725BAF7ED99706028D29C3"));
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
-        Assert.That(report.ComparisonPassed, Is.True);
-        Assert.That(report.DisagreementCount, Is.Zero);
+        Assert.That(report.Passed, Is.True);
         var retained = report.Rows.Single(row => row.MethodId == "OSS0199");
         Assert.That(retained.RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(retained.RuntimeChecks, Is.EqualTo(2));
         Assert.That(retained.AllocatedBytes, Is.Zero);
         Assert.That(report.RuntimeContradictions, Is.Zero);
-        await TestContext.Progress.WriteLineAsync($"Allocation shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; " +
-            $"{report.RetainedProven} retained; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
+        await TestContext.Progress.WriteLineAsync($"Allocation oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; " +
+            $"{report.NativeRefuted} refuted; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
     }
 
     [TestCase("public static class C", "", "", "Confirmed", 1)]
@@ -233,7 +197,7 @@ public sealed class NativeExceptionShadowTests
         string expected, int checks)
     {
         var document = Document(owner + " { public static int Target" + generic + "() { " + requires + " return 1; } }");
-        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
             CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expected));
@@ -244,7 +208,7 @@ public sealed class NativeExceptionShadowTests
     [TestCase(nameof(FilteredHandlerAllocation), true)]
     public void IlOracleIncludesExceptionFilterHandlers(string name, bool expected)
     {
-        var method = typeof(NativeExceptionShadowTests).GetMethod(name,
+        var method = typeof(NativeEffectOracleGateTests).GetMethod(name,
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
         Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.EqualTo(expected));
     }
@@ -265,7 +229,7 @@ public sealed class NativeExceptionShadowTests
     public async Task AllocationOracleInvokesExactScalarArgumentTypesWithoutHarnessAllocations(string type)
     {
         var document = Document("public static class C { public static " + type + " Target(" + type + " x) { return x; } }");
-        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
             CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(report.Rows.Single().AllocatedBytes, Is.Zero);
@@ -312,10 +276,10 @@ public sealed class NativeExceptionShadowTests
     [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Proven)]
     [TestCase("return string.Concat(x == 0 ? \"a\" : \"b\", \"c\").Length;", WorkerClaimOutcome.Proven)]
     [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", WorkerClaimOutcome.Proven)]
-    public async Task PurityShadowUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
+    public async Task PurityOracleUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
-        var report = await NativeExceptionShadow.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
             CancellationToken.None, purity: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, purity: true);
         Assert.That(report.ContractKind, Is.EqualTo("EnforcePure"));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(expected));
@@ -323,16 +287,15 @@ public sealed class NativeExceptionShadowTests
     }
 
     [Test]
-    public async Task PinnedPurityUniverseIncludesEveryMethodAndEveryLegacyProof()
+    public async Task PinnedPurityUniverseIncludesEveryMethod()
     {
         var root = RepositoryLayout.FindRoot();
-        var report = await NativeExceptionShadow.RunAsync(root, purity: true);
+        var report = await NativeEffectOracleGate.RunAsync(root, purity: true);
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
-        Assert.That(report.UniverseSha256, Is.EqualTo("BD29688EDA47BA7EEB68093E4151D6A786901C4E41D8CE1A32DDA8CF8FA6F7ED"));
-        Assert.That(report.LegacyProven, Is.EqualTo(report.Rows.Count(row => row.LegacyOutcome == WorkerClaimOutcome.Proven)));
-        Assert.That(report.DisagreementCount, Is.Zero);
-        await TestContext.Progress.WriteLineAsync($"Purity shadow: {report.CheckedMethodCount} methods; {report.LegacyProven} legacy proofs; {report.RetainedProven} retained.");
+        Assert.That(report.UniverseSha256, Is.EqualTo("A35CBCBDE4CF956E35790BC55A9E381913CBDFDABF725BAF7ED99706028D29C3"));
+        Assert.That(report.Passed, Is.True);
+        await TestContext.Progress.WriteLineAsync($"Purity oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; {report.NativeRefuted} refuted.");
     }
 }

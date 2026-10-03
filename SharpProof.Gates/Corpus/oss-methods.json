@@ -622,8 +622,8 @@
       "declarationSha256": "aca20ae713d4817d9c0472dc52e2002d7a6ad5076833c89eec178a9eacb2bd02",
       "methodName": "IsNumber",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0002",
@@ -1186,8 +1186,8 @@
       "declarationSha256": "8ee5a3d714ebd76bb8f67119e1bb28bf6e8ddbcc0556434405e4a8d35eea2fde",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0049",
@@ -1234,8 +1234,8 @@
       "declarationSha256": "be6faacc23494d6ad6a4b06237602b0f376fffba664c9a7e294434612d37c6c0",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0053",
@@ -1318,8 +1318,8 @@
       "declarationSha256": "120be84f96cfe1020d349327224d389a55216b2ca80471fe670b36340f811608",
       "methodName": "PeekAtHighestPriority",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0060",
@@ -2194,8 +2194,8 @@
       "declarationSha256": "d258de7e6eafc9a821454067d154873d1b3c260ed09ccb355f0a75aa78bd187b",
       "methodName": "_getEdgeWeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0133",
@@ -2242,8 +2242,8 @@
       "declarationSha256": "5420b6cb1ae0028a0244bd500019dda0e5e1bf57f4cdae21269da88db05d3800",
       "methodName": "_getEdgeWeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0137",
@@ -2278,7 +2278,7 @@
       "declarationSha256": "77a82eff93da43f16a31fbdc0aa03b37d669415c280bc58dd8e08ba0a891ef27",
       "methodName": "UniversalHash",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
+      "expectedVerdict": "SilentUnknown",
       "support": "IntentionallyUnsupported"
     },
     {
@@ -2338,8 +2338,8 @@
       "declarationSha256": "eb58281c7d80513688d258e261290006ced7b7100f5fdf699dfe322ef8f8cfe6",
       "methodName": "PeekAtMinPriority",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0145",
@@ -2410,8 +2410,8 @@
       "declarationSha256": "4ef378c4943908b0cd1c212d818279a3aa882f8b390e3694732ba16beee5a149",
       "methodName": "IsEmpty",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0151",
@@ -2542,8 +2542,8 @@
       "declarationSha256": "12b6e20916dd88af2f4533af495cccc764a5a0b302abad8daa7de3b65cb3c27f",
       "methodName": "_safeGetParent",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0162",
@@ -2674,8 +2674,8 @@
       "declarationSha256": "1de100e65be56a67633c65fc19785b9f1332c19de345cf79c2b5047842393d4e",
       "methodName": "IsBipartite",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0173",
@@ -2782,8 +2782,8 @@
       "declarationSha256": "3c3255be13acbad285e4b62979b8febf1839bf8cb466bf0997817a6e103535f0",
       "methodName": "Reset",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0182",
@@ -2998,8 +2998,8 @@
       "declarationSha256": "27c2b7fb8c031634f212d11d63ba10485de8409c6a6d93808cdf7337b652be69",
       "methodName": "HandleNullCases",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0200",

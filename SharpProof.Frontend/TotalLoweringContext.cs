@@ -210,6 +210,26 @@ public sealed class TotalLoweringContext
         return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart, Span(syntax));
     }
 
+    // The compilation of the body being lowered; control flow graph
+    // operations carry no semantic model.
+    internal Compilation? Compilation { get; set; }
+
+    internal OperationId FreshWriteSite(IOperation operation)
+    {
+        return Factory.CreateOperation(IrWriteSites.FreshElementPrefix + operation.Syntax.SpanStart, Span(operation.Syntax));
+    }
+
+    // A static field read is a read of ambient state.
+    internal OperationId StaticReadSite(IOperation operation)
+    {
+        return Factory.CreateOperation("StaticFieldReference@" + operation.Syntax.SpanStart, Span(operation.Syntax));
+    }
+
+    internal OperationId SyntaxSite(OperationKind kind, SyntaxNode syntax)
+    {
+        return Factory.CreateOperation(kind + "@" + syntax.SpanStart, Span(syntax));
+    }
+
     internal OperationId AttributeSite(SyntaxNode syntax)
     {
         return Factory.CreateOperation("closed-attribute", Span(syntax));

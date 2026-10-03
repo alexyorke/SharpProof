@@ -879,7 +879,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 document.Methods.Count(static method =>
                     method.Support == CorpusSupport.Supported),
-                Is.EqualTo(1));
+                Is.EqualTo(13));
             Assert.That(
                 document.Methods.Select(static method => method.Support),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
@@ -913,17 +913,17 @@ public sealed class CorpusGateTests
             Assert.That(result.CaseCount, Is.EqualTo(462));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
-            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(1));
+            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(13));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(163));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(229));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(299));
+                Is.EqualTo(233));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(289));
-            Assert.That(result.SilentUnknownCount, Is.EqualTo(10));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(299));
+            Assert.That(result.UnknownCount, Is.EqualTo(222));
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(11));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(233));
             Assert.That(
                 result.UnknownReasons
                     .ToDictionary(
@@ -932,13 +932,12 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 27,
+                        ["SP0002"] = 2,
                         ["SP0016"] = 18,
-                        ["SP0045"] = 27,
-                        ["SP0045+SP0046"] = 9,
-                        ["SP0046"] = 27,
-                        ["SP0047"] = 181,
-                        ["silent-unclassified"] = 10
+                        ["SP0045"] = 9,
+                        ["SP0046"] = 9,
+                        ["SP0047"] = 184,
+                        ["silent-unclassified"] = 11
                     }));
             Assert.That(
                 result.UnknownRate,
@@ -1063,7 +1062,7 @@ public sealed class CorpusGateTests
             line.StartsWith("C06.baseline|", StringComparison.Ordinal))
             .Split('|');
         var openSource = lines.Single(static line =>
-            line.StartsWith("OSS0001.baseline|", StringComparison.Ordinal))
+            line.StartsWith("OSS0002.baseline|", StringComparison.Ordinal))
             .Split('|');
 
         using (Assert.EnterMultipleScope())
