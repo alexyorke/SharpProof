@@ -211,6 +211,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.GetterField(opaqueProperty.Property, CSharpOperationSemantics.IsBaseAccess(opaqueProperty.Instance)) == null &&
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         { return read; }
+        if (depth < 256 && operation.ConstantValue.HasValue && CSharpOperationSemantics.IsOpaqueDomain(operation.Type))
+        {
+            // An enum or floating-point constant reaches only opaque consumers.
+            var constant = _context.Temporary(_context.Type(operation.Type));
+            _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, constant);
+            return new(_factory.Variable(constant), block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
         {
             var tested = LowerBodyValue(typeTestOperand, block, depth + 1);
@@ -415,19 +422,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         _builder!.Write(result.Continuation, _context.Site(operation), region);
         return result;
     }
-    // A metadata call that is neither inlined nor modeled. Its result is
-    // unknown, it may throw an exception of unknown type, and its effects are
-    // unknown; the worker treats its site as a possible allocation, write and
-    // lock. Only by-value calls on static or reference receivers qualify: a
-    // struct receiver could mutate the caller's local through `this`. Source
-    // callees stay with inlining and the effect fixpoint.
+    // A metadata call, or a dispatched source call, that is neither inlined nor
+    // modeled. Its result is unknown, it may throw an exception of unknown
+    // type, and its effects are unknown; the worker treats its site as a
+    // possible allocation, write and lock. Arguments pass by value. A class
+    // receiver is null-checked; a struct or type-parameter receiver is an
+    // opaque value, so a mutation through `this` is unobservable. Nonvirtual
+    // source callees stay with inlining.
     private TotalBodyValue? OpaqueCall(IOperation operation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, IrBlockId block, int depth)
     {
-        if (!AllowOpaqueCalls || !method.DeclaringSyntaxReferences.IsEmpty ||
+        var dispatched = method.IsVirtual || method.IsAbstract || method.IsOverride || method.ContainingType.TypeKind == TypeKind.Interface;
+        if (!AllowOpaqueCalls || !method.DeclaringSyntaxReferences.IsEmpty && !dispatched ||
             IsSharpProofApi(method.ContainingNamespace) ||
             method.ReturnsByRef || method.ReturnsByRefReadonly || method.IsStatic != (instance == null) ||
-            instance != null && instance.Type?.IsReferenceType != true ||
+            instance != null && !CSharpOperationSemantics.IsValueDomain(instance.Type) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
             arguments.Any(argument => argument.Parameter == null ||
@@ -445,20 +454,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var values = new IrTerm[arguments.Length];
         foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
-            var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+            var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
             values[arguments.IndexOf(argument)] = lowered.Value;
             block = lowered.Continuation;
         }
-        if (receiver != null)
+        if (receiver != null && instance!.Type!.IsReferenceType)
         { block = CheckReceiver(operation, receiver, block); }
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
         var member = _factory.GetOrCreateMember(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
             "opaque-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
-            [.. arguments.Select(argument => _context.Type(argument.Value.Type))]);
+            [.. values.Select(value => value.Type)]);
         // The call itself is only an effect site; its result and whether it
         // throws are approximation havocs, so no refutation may depend on them.
         _builder!.Call(block, site, null, member, null, values);
@@ -480,7 +489,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         while (space is { IsGlobalNamespace: false, ContainingNamespace.IsGlobalNamespace: false })
         { space = space.ContainingNamespace; }
-        return space is not { IsGlobalNamespace: false } || space.Name == "SharpProof";
+        return space is { IsGlobalNamespace: false, Name: "SharpProof" };
     }
 
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
@@ -692,7 +701,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private bool TryLeaf(IOperation operation, TotalParameterState state, out IrTerm? value)
     {
-        value = operation switch
+        // Opaque constants have no literal; LowerBodyValue approximates them.
+        value = operation.ConstantValue.HasValue && CSharpOperationSemantics.IsOpaqueDomain(operation.Type) ? null : operation switch
         {
             ILiteralOperation literal => CSharpOperationSemantics.Literal(_factory, literal.Type!, literal.ConstantValue.Value),
             IDefaultValueOperation when !CSharpOperationSemantics.IsOpaqueDomain(operation.Type) =>

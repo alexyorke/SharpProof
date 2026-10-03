@@ -214,7 +214,8 @@ public sealed class TypedMetadataReferenceTests
     {
         using var subject = new MetadataTestSubject($"public static class Library {{ public static {result} Target({parameter} value) {{ {body} }} }}",
             $"using SharpProof.Attributes; public static class Subject {{ public static {result} Target({parameter} value) {{ Contract.Ensures(true); return Library.Target(value); }} }}");
-        Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Null);
+        var total = subject.CreateArtifact().Callables.Single().Total;
+        Assert.That(total == null || CompilerTotalCallableArtifactTests.IsAbstractOrOpaque(total), Is.True);
     }
 
     [TestCase("object", true)]

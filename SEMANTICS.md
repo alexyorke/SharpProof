@@ -543,8 +543,15 @@ never null. `base.Property` reads a virtual auto-property's backing field
 without dispatch. An explicit reference downcast keeps the reference and
 throws InvalidCastException for a non-null value whose type test, an
 approximation, fails. A generic container's declared class, interface and
-type-parameter types bridge to the caller's by reference casts. Contract APIs, source callees, struct receivers, `ref`
-arguments and shadow or metadata-Requires lowering never take opaque calls.
+type-parameter types bridge to the caller's by reference casts. A dispatched (virtual, abstract, override or interface) source call is also
+opaque. Non-scalar struct and enum values are an opaque domain like type
+parameters: only opaque calls read them, so a call that mutates a struct
+through `this` changes nothing the IR observes. Struct and type-parameter
+receivers therefore take opaque calls without a null check, and their
+constants are approximations. Implicit reference conversions and boxing of
+opaque values pass through to opaque callees, whose possible allocation covers
+the box. Contract APIs, nonvirtual source callees, `ref` arguments and shadow
+or metadata-Requires lowering never take opaque calls.
 Static and volatile reads, dispatched properties, array stores, external
 fields, other unsupported calls and incomplete initialization abstain; this shadow does not change compiler
 effect authority. Refutation requires an original-program write-site witness

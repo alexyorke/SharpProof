@@ -59,15 +59,16 @@ public sealed class NativeFieldReadTests
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
     }
 
-    [TestCase("return cell.Shared;")]
-    [TestCase("return cell.Virtual;")]
-    public async Task VolatileAndDispatchedReadsRemainUnsupported(string body)
+    // A volatile read stays unsupported; a dispatched getter is an opaque call.
+    [TestCase("return cell.Shared;", WorkerClaimReason.UnsupportedBody)]
+    [TestCase("return cell.Virtual;", WorkerClaimReason.CounterexampleNotReplayable)]
+    public async Task VolatileAndDispatchedReadsStayUnknown(string body, WorkerClaimReason reason)
     {
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
             "Contract.Requires(cell != null); " + body + " }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(result.Outcome, Is.Null);
-        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That(result.Reason, Is.EqualTo(reason));
     }
 
     private static CompilerCallablePreparation Prepare(string method)

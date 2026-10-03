@@ -125,7 +125,7 @@ public sealed class TypedMetadataCallTests
             """);
         Assert.That(subject.Invoke(3), Is.EqualTo(3));
         Assert.That(subject.Compilation.GetTypeByMetadataName("Library")!.StaticConstructors, Is.Empty);
-        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
+        Assert.That(CompilerTotalCallableArtifactTests.IsAbstractOrOpaque(subject.CreateArtifact().Callables.Single().Total!), Is.True);
     }
 
     [TestCase(-1)]
@@ -188,7 +188,7 @@ public sealed class TypedMetadataCallTests
                     break;
             }
         });
-        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
+        Assert.That(CompilerTotalCallableArtifactTests.IsAbstractOrOpaque(subject.CreateArtifact().Callables.Single().Total!), Is.True);
     }
 
     [Test]
@@ -221,7 +221,8 @@ public sealed class TypedMetadataCallTests
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return Library.Target(x); } }
             """);
-        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.EqualTo(initialization != "static Library() { }"));
+        Assert.That(CompilerTotalCallableArtifactTests.IsAbstractOrOpaque(subject.CreateArtifact().Callables.Single().Total!),
+            Is.EqualTo(initialization != "static Library() { }"));
     }
 
     [Test]
@@ -236,7 +237,7 @@ public sealed class TypedMetadataCallTests
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return Library.Target(x); } }
             """);
         Assert.That(subject.Invoke(0), Is.EqualTo(1));
-        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
+        Assert.That(CompilerTotalCallableArtifactTests.IsAbstractOrOpaque(subject.CreateArtifact().Callables.Single().Total!), Is.True);
     }
 
     [Test]
@@ -322,7 +323,7 @@ public sealed class TypedMetadataCallTests
                 bytes[offset] = mutation == "32-bit" ? (byte)(bytes[offset] | 2) : (byte)(bytes[offset] & ~1);
             }
         });
-        Assert.That(subject.CreateArtifact().Callables.Single().Total!.IsBodyAbstraction, Is.True);
+        Assert.That(CompilerTotalCallableArtifactTests.IsAbstractOrOpaque(subject.CreateArtifact().Callables.Single().Total!), Is.True);
     }
 
     [Test]

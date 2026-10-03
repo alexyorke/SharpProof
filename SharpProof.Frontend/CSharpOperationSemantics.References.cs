@@ -56,16 +56,31 @@ internal static partial class CSharpOperationSemantics
         }
     }
 
+    // An opaque callee sees its argument only as a value. An implicit reference
+    // conversion keeps the reference, and boxing an opaque value is one of the
+    // callee's unknown allocations; scalar boxing stays a visible allocation.
+    internal static IOperation OpaqueArgument(IOperation value)
+    {
+        if (value is not IConversionOperation { IsImplicit: true, OperatorMethod: null, Conversion.IsImplicit: true } conversion)
+        { return value; }
+        var boxing = IsOpaqueDomain(conversion.Operand.Type) && conversion.Type?.IsReferenceType == true;
+        return conversion.Conversion.IsReference || boxing ? conversion.Operand : value;
+    }
+
     internal static bool IsValueDomain(ITypeSymbol? type)
     {
         return IsScalar(type) || IsReferenceDomain(type) || IsOpaqueDomain(type);
     }
 
-    // A type-parameter value is opaque: it may be stored, passed and returned,
-    // and type-tested, but no operator, conversion or default applies to it.
+    // Type-parameter and non-scalar struct values are opaque: they may be
+    // stored, passed, returned and given to opaque calls, but no operator,
+    // conversion, field read or default applies to them. Only opaque calls
+    // can observe a struct's contents, so a call that mutates it through
+    // `this` changes nothing the IR can read.
     internal static bool IsOpaqueDomain(ITypeSymbol? type)
     {
-        return type is ITypeParameterSymbol;
+        return type is ITypeParameterSymbol ||
+            type is { IsValueType: true, TypeKind: TypeKind.Struct or TypeKind.Enum } && !IsScalar(type);
     }
 
     // `value is T2` on a type-parameter value runs no user code and cannot
@@ -75,9 +90,12 @@ internal static partial class CSharpOperationSemantics
     {
         return operation switch
         {
-            IIsTypeOperation test when IsOpaqueDomain(test.ValueOperand.Type) => test.ValueOperand,
-            IIsPatternOperation { Pattern: ITypePatternOperation or IDeclarationPatternOperation { DeclaredSymbol: null } } test
-                when IsOpaqueDomain(test.Value.Type) => test.Value,
+            IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test => test.ValueOperand,
+            IIsPatternOperation
+            {
+                Pattern: ITypePatternOperation or IDeclarationPatternOperation { DeclaredSymbol: null },
+                Value.Type: ITypeParameterSymbol
+            } test => test.Value,
             _ => null
         };
     }

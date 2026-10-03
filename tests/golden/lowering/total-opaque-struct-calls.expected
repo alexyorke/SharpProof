@@ -1,0 +1,67 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] current=v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] old=v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False]
+parameter: 1 entry=v3:int[width=32,signed=True] current=v4:int[width=32,signed=True] old=v5:int[width=32,signed=True]
+result: v6:int[width=32,signed=True]
+variable: v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] source=time
+variable: v4:int[width=32,signed=True] source=value
+variable: v7:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] source=copy
+variable: v9:long[width=64,signed=True] source=ignored
+block: b0 entry
+  i0 op0 Assign v1:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] = v0 source=none
+  i2 op0 Assign v4:int[width=32,signed=True] = v3 source=none
+  i3 op0 Assign v5:int[width=32,signed=True] = v3 source=none
+  i5 op0 Goto b1 source=none
+block: b1 cfg:0
+  i6 op0 Goto b2 source=none
+block: b2 cfg:1
+  i7 op1 Assign v8:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] = v1 source=total-opaque-struct-calls.cs:242+4
+  i8 op2 Assign v7:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] = v8 source=total-opaque-struct-calls.cs:235+11
+  i9 op2 Write Local source=total-opaque-struct-calls.cs:235+11
+  i10 op3 Assign v10:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] = v7 source=total-opaque-struct-calls.cs:270+4
+  i11 op4 Assign v11:int[width=32,signed=True] = 1 source=total-opaque-struct-calls.cs:284+1
+  i12 op5 Assign v12:long[width=64,signed=True] = (("long"#t5)v11) source=total-opaque-struct-calls.cs:284+1
+  i13 op6 Call void member=m0 receiver=none args=[v12] source=total-opaque-struct-calls.cs:270+16
+  i14 op6 Havoc Variables/Approximation [v13:bool[width=0,signed=False]] source=total-opaque-struct-calls.cs:270+16
+  i15 op6 Havoc Variables/Approximation [v14:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False]] source=total-opaque-struct-calls.cs:270+16
+  i16 op7 Branch v13 ? b5 : b6 source=total-opaque-struct-calls.cs:270+16
+block: b3 cfg:2
+  i30 op0 Return void source=none
+block: b4 exceptional:exit
+  i4 op0 ExceptionalExit source=none
+block: b5 throw
+  i17 op7 Throw Unknown -> b4 source=total-opaque-struct-calls.cs:270+16
+block: b6 normal
+  i18 op8 Assign v15:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime[width=0,signed=False] = v14 source=total-opaque-struct-calls.cs:270+16
+  i19 op9 Call void member=m1 receiver=none args=[] source=total-opaque-struct-calls.cs:270+22
+  i20 op9 Havoc Variables/Approximation [v16:bool[width=0,signed=False]] source=total-opaque-struct-calls.cs:270+22
+  i21 op9 Havoc Variables/Approximation [v17:long[width=64,signed=True]] source=total-opaque-struct-calls.cs:270+22
+  i22 op10 Branch v16 ? b7 : b8 source=total-opaque-struct-calls.cs:270+22
+block: b7 throw
+  i23 op10 Throw Unknown -> b4 source=total-opaque-struct-calls.cs:270+22
+block: b8 normal
+  i24 op11 Assign v18:long[width=64,signed=True] = v17 source=total-opaque-struct-calls.cs:270+22
+  i25 op12 Assign v9:long[width=64,signed=True] = v18 source=total-opaque-struct-calls.cs:260+32
+  i26 op12 Write Local source=total-opaque-struct-calls.cs:260+32
+  i27 op14 Assign v19:int[width=32,signed=True] = v4 source=total-opaque-struct-calls.cs:309+5
+  i28 op13 Assign v6:int[width=32,signed=True] = v19 source=total-opaque-struct-calls.cs:309+5
+  i29 op13 Return v6 source=total-opaque-struct-calls.cs:309+5
+term: ir0 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime width=0 signed=False value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v3
+term: ir2 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime width=0 signed=False value=v1
+term: ir3 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime width=0 signed=False value=v8
+term: ir4 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime width=0 signed=False value=v7
+term: ir6 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir7 Variable type=t1:int width=32 signed=True value=v11
+term: ir8 Cast type=t5:long width=64 signed=True value=(("long"#t5)v11)
+term: ir9 Variable type=t5:long width=64 signed=True value=v12
+term: ir11 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.DateTime width=0 signed=False value=v14
+term: ir12 Variable type=t0:bool width=0 signed=False value=v13
+term: ir14 Variable type=t5:long width=64 signed=True value=v17
+term: ir15 Variable type=t0:bool width=0 signed=False value=v16
+term: ir16 Variable type=t5:long width=64 signed=True value=v18
+term: ir17 Variable type=t1:int width=32 signed=True value=v4
+term: ir18 Variable type=t1:int width=32 signed=True value=v19
+term: ir19 Variable type=t1:int width=32 signed=True value=v6

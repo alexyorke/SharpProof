@@ -87,13 +87,41 @@ public sealed class NativeOpaqueCallTests
         }
     }
 
-    [Test]
-    public async Task StructReceiversStayUnsupported()
+    [TestCase("var ignored = time.ToBinary(); return value;", WorkerClaimOutcome.Proven)]
+    [TestCase("var copy = time; var ignored = copy.AddTicks(1).Ticks; return value;", WorkerClaimOutcome.Proven)]
+    [TestCase("var created = new System.DateTime(1); return value;", WorkerClaimOutcome.Unknown)]
+    public async Task StructValuesAreOpaque(string body, WorkerClaimOutcome outcome)
     {
-        // A struct method may mutate the caller's copy through `this`.
-        var preparation = Prepare("public static int Target(int value) { " +
-            "Contract.Ensures(Contract.Result<int>() == value); var span = new System.DateTime(1); var ignored = span.ToBinary(); return value; }");
-        Assert.That(await PostconditionAsync(preparation), Is.EqualTo(WorkerClaimOutcome.Unknown));
+        // Only opaque calls read a struct, so mutation through `this` is
+        // unobservable; constructing one stays unsupported.
+        var preparation = Prepare("public static int Target(System.DateTime time, int value) { " +
+            "Contract.Ensures(Contract.Result<int>() == value); " + body + " }");
+        Assert.That(await PostconditionAsync(preparation), Is.EqualTo(outcome));
+    }
+
+    [TestCase(true, typeof(ProvenOutcome))]
+    [TestCase(false, null)]
+    public async Task CatchAllHandlesDispatchedAndConstrainedCalls(bool guarded, Type? outcome)
+    {
+        var body = "var entry = _collection.Find(item.Key); return entry.Value.Equals(item.Value);";
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+            public class Tree<TKey, TValue> { public virtual KeyValuePair<TKey, TValue> Find(TKey key) { throw new System.Exception(); } }
+            public class Map<TKey, TValue> {
+                private Tree<TKey, TValue> _collection { get; set; }
+                [DoesNotThrow] public bool Contains(KeyValuePair<TKey, TValue> item) {
+            """ + (guarded ? "try { " + body + " } catch (System.Exception) { return false; }" : body) + " } }");
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(
+            preparations.Single(preparation => preparation.EffectClaims.Length != 0), new WorkerBudgets());
+        if (outcome != null)
+        { Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString()); }
+        else
+        {
+            Assert.That(result.Outcome, Is.Null);
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+        }
     }
 
     private static async Task<PassiveCallableCheckResult> ExceptionsAsync(string body)

@@ -3314,7 +3314,9 @@ public sealed class WorkerTests
             var targetName = "Verify" + signature.Name;
             var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName]);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
-            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(targetName == "VerifyInadmissibleCall"), targetName);
+            Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
+                .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
+                Is.EqualTo(targetName == "VerifyInadmissibleCall"), targetName);
         }
     }
 
@@ -3421,7 +3423,9 @@ public sealed class WorkerTests
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
             var preparation = lowerer.Prepare(targets[targetName]);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
-            Assert.That(preparation.Total!.IsBodyAbstraction, Is.EqualTo(targetName == "VerifyManyLocals"), targetName);
+            Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
+                .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
+                Is.EqualTo(targetName == "VerifyManyLocals"), targetName);
         }
 
         var wideLowerer = new CompilerCallableLowerer(
@@ -3430,7 +3434,8 @@ public sealed class WorkerTests
         var widePreparation = wideLowerer.Prepare(
             targets["VerifyManyParameters"]);
         Assert.That(
-            widePreparation.Total!.IsBodyAbstraction,
+            widePreparation.Total!.IsBodyAbstraction || widePreparation.Total.Program.Blocks
+                .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
             Is.True);
     }
 

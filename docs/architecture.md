@@ -539,7 +539,9 @@ followed by approximation havocs of its result and of an `Unknown` exception
 flag. The VC counts each one as a possible allocation, write and lock. Replay
 continues past such a call only in model-driven replay. The collector keeps a
 body with an opaque call as an abstraction if any body or clause term reads an
-array element. Source inlining also covers nonvirtual instance methods and
+array element. Dispatched source calls and calls on struct or type-parameter
+receivers are opaque too; non-scalar structs and enums share the opaque value
+domain with type parameters. Source inlining also covers nonvirtual instance methods and
 getters: the caller null-checks the receiver after the arguments, and callee
 field reads through `this` stay approximations. Reference casts between class
 types are identity on the reference sort, which bridges generic container

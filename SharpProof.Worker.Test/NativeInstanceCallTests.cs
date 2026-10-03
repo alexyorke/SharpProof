@@ -91,13 +91,14 @@ public sealed class NativeInstanceCallTests
     }
 
     [Test]
-    public async Task VirtualMembersStayUnsupported()
+    public async Task VirtualMembersAreOpaqueCalls()
     {
+        // Any override may run, so the call is opaque rather than inlined.
         var preparation = Prepare("public static class C { [DoesNotThrow] public static int Target(Counter counter) { " +
             "Contract.Requires(counter != null); return counter.Dispatched(1); } }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(result.Outcome, Is.Null);
-        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
     }
 
     private static CompilerCallablePreparation Prepare(string types, bool effects = true)

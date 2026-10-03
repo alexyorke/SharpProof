@@ -858,6 +858,14 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
     }
 
+    // A metadata body that supplies no evidence is either abstracted or an
+    // opaque call: in neither case does its IL reach the program.
+    internal static bool IsAbstractOrOpaque(CompilerTotalCallableArtifact total)
+    {
+        return total.IsBodyAbstraction ||
+            total.Graph.Blocks.SelectMany(block => block.Instructions).Any(instruction => instruction.Kind == IrInstructionKind.Call);
+    }
+
     internal static CompilerManifestArtifact CreateArtifact(string source,
         int maximumExpressionDepth = WorkerBudgets.DefaultMaximumExpressionDepth)
     {
