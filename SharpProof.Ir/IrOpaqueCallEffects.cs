@@ -14,7 +14,8 @@ internal enum IrOpaqueCallEffects
     NativeCode = 32,
     Reflection = 64,
     Nondeterminism = 128,
-    All = 255
+    Reads = 256,
+    All = 511
 }
 
 internal static class IrOpaqueCallSite

@@ -28,6 +28,9 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<IrTerm> _potentialExceptionAllocations = [];
     // Opaque calls: each may allocate, write and synchronize.
     private readonly List<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls = [];
+    // Approximated field and element reads.
+    private readonly List<IrTerm> _reads = [];
+    internal ImmutableArray<IrTerm> Reads => [.. _reads];
     private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
     private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
@@ -293,6 +296,8 @@ internal sealed class PassiveCallableVcBuilder
                         if (havoc.HavocKind != IrHavocKind.Variables ||
                             havoc.Origin is not (IrHavocOrigin.Input or IrHavocOrigin.Approximation))
                         { return null; }
+                        if (havoc.Origin == IrHavocOrigin.Approximation && ReadsState(havoc.Operation))
+                        { _reads.Add(reach); }
                         foreach (var variable in havoc.Variables)
                         {
                             Spend();
@@ -490,6 +495,19 @@ internal sealed class PassiveCallableVcBuilder
         { throw new ConstructionLimitException(); }
         _remainingWork -= amount;
     }
+    // Field and element reads, including the read inside an increment or a
+    // compound assignment, are approximations at these sites.
+    private bool ReadsState(OperationId site)
+    {
+        var description = _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : "";
+        return description.StartsWith("FieldReference@", StringComparison.Ordinal) ||
+            description.StartsWith("PropertyReference@", StringComparison.Ordinal) ||
+            description.StartsWith("ArrayElementReference@", StringComparison.Ordinal) ||
+            description.StartsWith("Increment@", StringComparison.Ordinal) ||
+            description.StartsWith("Decrement@", StringComparison.Ordinal) ||
+            description.StartsWith("CompoundAssignment@", StringComparison.Ordinal);
+    }
+
     private bool Scalar(IrTypeId type)
     {
         var info = _factory.GetTypeInfo(type);

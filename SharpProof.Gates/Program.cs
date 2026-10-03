@@ -25,13 +25,14 @@ internal static class Program
         {
             var root = RepositoryLayout.FindRoot();
             var command = args.Length == 0 ? "corpus" : args[0];
-            if (command is "exception-shadow" or "allocation-shadow" or "purity-shadow" or "capability-shadow")
+            if (command is "exception-shadow" or "allocation-shadow" or "purity-shadow" or "capability-shadow" or "effectcontract-shadow")
             {
                 var maximumMethods = args.Length == 1 ? 0 : args.Length == 3 && args[1] == "--limit"
                     ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)
                     : throw new ArgumentException("Use exception-shadow, allocation-shadow, purity-shadow or capability-shadow [--limit <method-count>].", nameof(args));
                 var result = await NativeExceptionShadow.RunAsync(root, maximumMethods, allocations: command == "allocation-shadow",
-                    purity: command == "purity-shadow", capabilities: command == "capability-shadow").ConfigureAwait(false);
+                    purity: command == "purity-shadow", capabilities: command == "capability-shadow",
+                    summary: command == "effectcontract-shadow").ConfigureAwait(false);
                 Console.WriteLine(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.ComparisonPassed ? 0 : 1;
             }

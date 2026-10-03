@@ -17,6 +17,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
     private readonly ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls;
+    private readonly ImmutableArray<IrTerm> _reads;
     private readonly ImmutableArray<IrVarId> _model;
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
@@ -36,6 +37,7 @@ internal sealed class PassiveCallableVcPlan
         _callPreconditions = builder.CallPreconditions;
         _potentialExceptionAllocations = builder.PotentialExceptionAllocations;
         _opaqueCalls = builder.OpaqueCalls;
+        _reads = builder.Reads;
         HasUnmodeledAllocations = builder.HasUnmodeledAllocations;
         _model = builder.Model;
         _labels = builder.Labels;
@@ -157,6 +159,19 @@ internal sealed class PassiveCallableVcPlan
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, (synchronizationAllowed ? [] : _locks.Select(site => site.Reach))
+                .Concat(OpaqueCalls(callViolates))),
+            ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+    }
+
+    // An effect summary forbids reachable writes, reads, locks and calls whose
+    // effects it does not declare.
+    internal VerificationQuery EffectSiteQuery(Func<IrWriteRegion, bool> writeViolates, bool readsViolate, bool locksViolate,
+        Func<IrOpaqueCallEffects, bool> callViolates)
+    {
+        return new(Factory, _entry.AddRange(_body), new Goal(Factory,
+            EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => writeViolates(write.Region)).Select(write => write.Reach)
+                .Concat(readsViolate ? _reads : [])
+                .Concat(locksViolate ? _locks.Select(site => site.Reach) : [])
                 .Concat(OpaqueCalls(callViolates))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }

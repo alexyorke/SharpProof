@@ -81,6 +81,105 @@ internal static class NativeEffectSiteVerifier
         return capabilities;
     }
 
+    // An EffectContract summary bounds every effect of the body: exceptions
+    // must be declared and listed, allocation needs Allocates, and writes,
+    // reads, locks and opaque calls need their effects and capabilities. The
+    // IR does not track which state an object belongs to, so a field or
+    // element access needs every state flag of its kind; only a store through
+    // a parameter is known to write argument state.
+    internal static async Task<PassiveCallableCheckResult> VerifyEffectContractAsync(CompilerCallablePreparation preparation,
+        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.EffectContract).ToArray();
+        if (claims.Length != 1 || preparation.Total is not { } total || !total.ValidEffectClaimIds.Contains(claims[0].ClaimId) ||
+            total.ExceptionConstraints.FirstOrDefault(constraint => constraint.ClaimId == claims[0].ClaimId) is not { } exceptions)
+        { return Unknown(WorkerClaimReason.UnsupportedContract); }
+        if (!total.EffectsCompleteAtEntry)
+        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
+        if (candidate == null)
+        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
+            IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
+        { return Unknown(WorkerClaimReason.UnsupportedExpression); }
+        if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
+        { return Unknown(failure); }
+        var constraint = claims[0].Constraint;
+        var effects = constraint.AllowedEffects;
+        var capabilities = constraint.AllowedCapabilities;
+        bool Allows(WorkerEffectSet required)
+        { return (required & ~effects) == 0; }
+        bool WriteViolates(IrWriteRegion region)
+        {
+            return region switch
+            {
+                IrWriteRegion.Local => false,
+                IrWriteRegion.Parameter => !Allows(WorkerEffectSet.WritesArgumentState),
+                IrWriteRegion.Static => !Allows(WorkerEffectSet.WritesStaticState),
+                _ => !Allows(AnyStateWrites)
+            };
+        }
+        bool CallViolates(IrOpaqueCallEffects call)
+        { return !Allows(CallEffects(call)) || (Capabilities(call) & ~capabilities) != 0; }
+        var factory = candidate.Program.Factory;
+        var allowedTypes = constraint.AllowedExceptionTypes.ToHashSet(StringComparer.Ordinal);
+        var throwsDeclared = (effects & WorkerEffectSet.Throws) != 0;
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
+        if (entry.Outcome is not RefutedOutcome)
+        { return entry; }
+        var thrown = await solver.VerifyExceptionsAsync([.. exceptions.AllowedKinds], !throwsDeclared || allowedTypes.Count == 0,
+            site => throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
+            site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false);
+        if (thrown.Outcome is not ProvenOutcome)
+        { return thrown; }
+        if (!Allows(WorkerEffectSet.Allocates))
+        {
+            var allocated = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
+            if (allocated.Outcome is not ProvenOutcome)
+            { return allocated; }
+        }
+        var readFlags = AnyStateReads;
+        var locksViolate = !Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0;
+        var sites = await solver.VerifyEffectSitesAsync(WriteViolates, !Allows(readFlags), locksViolate, CallViolates, cancellationToken)
+            .ConfigureAwait(false);
+        return sites with { EntryModel = sites.Outcome is ProvenOutcome ? entry.EntryModel : sites.EntryModel };
+    }
+
+    private const WorkerEffectSet AnyStateWrites = WorkerEffectSet.WritesReceiverState | WorkerEffectSet.WritesArgumentState |
+        WorkerEffectSet.WritesCapturedState | WorkerEffectSet.WritesStaticState | WorkerEffectSet.WritesAmbientState;
+    private const WorkerEffectSet AnyStateReads = WorkerEffectSet.ReadsReceiverState | WorkerEffectSet.ReadsArgumentState |
+        WorkerEffectSet.ReadsCapturedState | WorkerEffectSet.ReadsStaticState | WorkerEffectSet.ReadsAmbientState;
+
+    // An unspecified call may have every effect.
+    private static WorkerEffectSet CallEffects(IrOpaqueCallEffects call)
+    {
+        if (call == IrOpaqueCallEffects.All)
+        { return WorkerEffectSet.AllKnown; }
+        var effects = WorkerEffectSet.None;
+        if ((call & IrOpaqueCallEffects.Writes) != 0)
+        { effects |= AnyStateWrites; }
+        if ((call & IrOpaqueCallEffects.Reads) != 0)
+        { effects |= AnyStateReads; }
+        if ((call & IrOpaqueCallEffects.Allocates) != 0)
+        { effects |= WorkerEffectSet.Allocates; }
+        if ((call & IrOpaqueCallEffects.Throws) != 0)
+        { effects |= WorkerEffectSet.Throws; }
+        if ((call & IrOpaqueCallEffects.Synchronizes) != 0)
+        { effects |= WorkerEffectSet.Synchronizes; }
+        if ((call & IrOpaqueCallEffects.InputOutput) != 0)
+        { effects |= WorkerEffectSet.ReadsAmbientState | WorkerEffectSet.WritesAmbientState; }
+        if ((call & IrOpaqueCallEffects.Nondeterminism) != 0)
+        { effects |= WorkerEffectSet.UsesNondeterminism; }
+        if ((call & IrOpaqueCallEffects.NativeCode) != 0)
+        { effects |= WorkerEffectSet.UsesNativeCode; }
+        if ((call & IrOpaqueCallEffects.Reflection) != 0)
+        { effects |= WorkerEffectSet.UsesReflection; }
+        return effects;
+    }
+
     // Synchronization-only masks, as measured by the synchronization shadow.
     internal static async Task<PassiveCallableCheckResult> VerifySynchronizationShadowAsync(
         CompilerCallablePreparation preparation, string claimId, WorkerEffectCapabilitySet expectedMask,

@@ -445,7 +445,8 @@ internal static class CompilerTotalCallableArtifactCodec
             if (row == null || row.ClaimId == null || row.AllowedKinds == null)
             { throw new InvalidDataException("An exception constraint contains a missing row or field."); }
             Require(seen.Add(row.ClaimId) && owned.TryGetValue(row.ClaimId, out var claim) &&
-                claim.Kind == WorkerClaimKind.Effect && claim.EffectContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions,
+                claim.Kind == WorkerClaimKind.Effect && claim.EffectContractKind is WorkerEffectContractKind.DoesNotThrow or
+                    WorkerEffectContractKind.AllowedExceptions or WorkerEffectContractKind.EffectContract,
                 "An exception constraint must own a unique exception-effect claim.");
             var owner = owned[row.ClaimId];
             Require(row.AllowedKinds.Length <= Enum.GetValues(typeof(IrExceptionKind)).Length &&

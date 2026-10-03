@@ -1,23 +1,25 @@
 namespace SharpProof.Worker;
 
-// Z3 decides exception, allocation, purity and capability claims over the Total program.
+// Z3 decides every effect claim over the Total program.
 // A proof is a complete may-effect summary; a refutation names the first
 // replayed violating site. Compiler effect evidence never supplies a proof;
 // where Z3 stays Unknown, only a compiler violation that replays is kept.
 internal static class NativeEffectClaims
 {
-    // EffectContract still uses compiler evidence.
     internal static bool IsNative(WorkerEffectContractKind kind)
     {
         return kind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
             WorkerEffectContractKind.ZeroAllocations or WorkerEffectContractKind.EnforcePure or
-            WorkerEffectContractKind.AllowedCapabilities;
+            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract;
     }
 
     internal static async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
         CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
-        var claims = target.EffectClaims.Where(claim => IsNative(claim.ContractKind)).ToArray();
+        // A trusted complete boundary is a declared assumption about a body
+        // SharpProof does not see; it is published as declared.
+        var claims = target.EffectClaims.Where(claim => IsNative(claim.ContractKind) &&
+            claim.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary).ToArray();
         // An invalid contract has nothing to verify, whatever the entry.
         bool Invalid(CompilerEffectClaimArtifact claim)
         { return target.Total is { } total && !total.ValidEffectClaimIds.Contains(claim.ClaimId); }
@@ -48,6 +50,7 @@ internal static class NativeEffectClaims
                 WorkerEffectContractKind.ZeroAllocations => await NativeEffectSiteVerifier.VerifyAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 WorkerEffectContractKind.EnforcePure => await NativeEffectSiteVerifier.VerifyPurityAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 WorkerEffectContractKind.AllowedCapabilities => await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(target, budgets, cancellationToken).ConfigureAwait(false),
+                WorkerEffectContractKind.EffectContract => await NativeEffectSiteVerifier.VerifyEffectContractAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 _ => exceptions[claim.ClaimId]
             };
             var result = Project(target, claim.ClaimId, check);

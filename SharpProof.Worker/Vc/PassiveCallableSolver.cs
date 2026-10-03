@@ -82,6 +82,43 @@ internal sealed class PassiveCallableSolver : IDisposable
             new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }
 
+    // A concretely reached violating write or lock refutes an effect summary;
+    // reads and call effects are may-effects.
+    internal async Task<PassiveCallableCheckResult> VerifyEffectSitesAsync(Func<IrWriteRegion, bool> writeViolates, bool readsViolate,
+        bool locksViolate, Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
+    {
+        if (_plan.HasBodyAbstraction)
+        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
+        var proof = await VerifyAsync(_plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates), null, cancellationToken)
+            .ConfigureAwait(false);
+        if (proof.Outcome is ProvenOutcome)
+        { return proof; }
+        var encoding = _plan.LoopSearch ?? _plan;
+        var witness = _plan.LoopSearch == null ? proof
+            : await VerifyAsync(encoding.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates), null, cancellationToken, encoding)
+                .ConfigureAwait(false);
+        if (witness.Outcome is not RefutedOutcome)
+        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        OperationId? write = null;
+        OperationId? synchronization = null;
+        _plan.ReplayEffects(witness.EntryModel, cancellationToken,
+            writePrefixObserver: (instruction, approximation) =>
+            {
+                if (!approximation && writeViolates(instruction.Region))
+                { write ??= instruction.Operation; }
+            },
+            lockPrefixObserver: locksViolate ? (instruction, approximation) =>
+            {
+                if (!approximation)
+                { synchronization ??= instruction.Operation; }
+            }
+        : null);
+        cancellationToken.ThrowIfCancellationRequested();
+        return synchronization != null ? witness with { LockWitness = synchronization }
+            : write != null ? witness with { WriteWitness = write }
+            : new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
+    }
+
     private async Task<PassiveCallableCheckResult> VerifySitesAsync(bool allocations, CancellationToken cancellationToken)
     {
         if (_plan.HasBodyAbstraction || allocations && _plan.HasUnmodeledAllocations)

@@ -65,7 +65,8 @@ internal static partial class CallableVerificationPolicy
         {
             entryPublished = true;
             entryFeasibility = entry;
-            foreach (var evidence in target.EffectClaims.Where(evidence => !NativeEffectClaims.IsNative(evidence.ContractKind)))
+            foreach (var evidence in target.EffectClaims.Where(evidence => !NativeEffectClaims.IsNative(evidence.ContractKind) ||
+                evidence.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary))
             {
                 var result = EffectClaimResultAssembler.Assemble(target, evidence, entry, methodBoundary.Token);
                 completed[result.ClaimId] = result;

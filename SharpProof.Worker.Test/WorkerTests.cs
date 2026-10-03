@@ -541,7 +541,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task EffectClaimsRetainCompilerEvidenceWithSupportedNominalRequires()
+    public async Task EffectContractsAreDecidedNatively()
     {
         using var project = TestProject.Create(
             """
@@ -609,13 +609,15 @@ public sealed class WorkerTests
             Assert.That(
                 throwing.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
+            // A null exception throws a runtime NullReferenceException, which
+            // allocates; Allocates is not declared.
             Assert.That(
                 throwing.Reason,
-                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+                Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(
                 throwing.EffectCertainty,
                 Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+                    WorkerEffectEvidenceCertainty.Unavailable));
             Assert.That(
                 throwing.ProofCore,
                 Is.Empty);

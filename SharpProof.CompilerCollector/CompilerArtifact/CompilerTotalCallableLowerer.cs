@@ -280,6 +280,8 @@ internal static class CompilerTotalCallableLowerer
         { effects |= IrOpaqueCallEffects.Writes; }
         if ((declared & SpecEffect.Synchronization) != 0)
         { effects |= IrOpaqueCallEffects.Synchronizes; }
+        if ((declared & (SpecEffect.ReadsReceiverState | SpecEffect.ReadsArgumentState | SpecEffect.ReadsAmbientState | SpecEffect.InputOutput)) != 0)
+        { effects |= IrOpaqueCallEffects.Reads; }
         if ((declared & SpecEffect.InputOutput) != 0)
         { effects |= IrOpaqueCallEffects.InputOutput; }
         if ((declared & SpecEffect.NativeCode) != 0)
@@ -515,16 +517,19 @@ internal static class CompilerTotalCallableLowerer
         {
             cancellationToken.ThrowIfCancellationRequested();
             var evidence = claim.Evidence;
-            if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions) ||
-                !claim.HasValidConstraint)
+            if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
+                    WorkerEffectContractKind.EffectContract) || !claim.HasValidConstraint)
             { continue; }
+            var listsTypes = evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions ||
+                evidence.ContractKind == WorkerEffectContractKind.EffectContract &&
+                (evidence.Constraint.AllowedEffects & WorkerEffectSet.Throws) != 0;
             var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
             foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
             {
                 var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
                 if (runtime == null)
                 { return []; }
-                if (evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions &&
+                if (listsTypes &&
                     CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
                         evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal)))
                 { allowed.Add(kind); }

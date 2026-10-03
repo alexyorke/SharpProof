@@ -63,22 +63,24 @@ attributes normally receive distinct manifest claims. Repeated
 `[AllowedExceptions]` attributes are the exception: their allowed types are
 unioned and emitted as one combined claim at the callable location, with all
 occurrences contributing to its stable identity and evidence.
-Each effect claim is `Proven` only when a complete compiler-produced effect
-summary establishes its contract. The compiler can record a structured
-`DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 18 carries independently replayable events for a
-definite managed object or array allocation, an exact framework explicit throw,
-an empty `lock`, or an exact `Monitor` call. Event operands must already be
-known to complete; object allocation cannot depend on unmodeled static
-initialization, and an explicit throw requires an approved nonthrowing,
-terminating exception constructor. The worker derives the event's effects,
-capabilities, and exact exception hierarchy rather than trusting the compiler's
-witness bits. It then applies the authenticated allowed-effect, capability, and
-exception constraints. Allocation can refute `ZeroAllocations` or an
-`EffectContract` that excludes `Allocates`, synchronization can refute
-`EnforcePure`, `AllowedCapabilities`, or `EffectContract`, and explicit throw
-can refute `DoesNotThrow`, `AllowedExceptions`, or `EffectContract`. Observable
-purity still permits fresh allocation.
+Z3 decides every effect claim over the callable's Total program: a proof is a
+complete may-effect summary, and a refutation names a violating site reached by
+concrete replay. Compiler effect evidence never supplies a proof. Where Z3
+stays Unknown, a compiler violation is published only if its independently
+replayable event trace (a definite allocation, an exact framework explicit
+throw, an empty `lock`, or an exact `Monitor` call) replays; the worker
+derives that event's effects, capabilities and exception hierarchy itself. A
+trusted complete boundary on a bodyless declaration is published as declared.
+Allocation can refute `ZeroAllocations` or an `EffectContract` that excludes
+`Allocates`; a write or lock can refute `EnforcePure`, `AllowedCapabilities` or
+`EffectContract`; and a throw can refute `DoesNotThrow`, `AllowedExceptions` or
+`EffectContract`. Observable purity still permits fresh allocation.
+An `EffectContract` on an implementation bounds every effect of the body:
+exceptions need `Throws` and a listed type, allocation needs `Allocates`,
+reads and writes of fields and elements need every state flag of their kind
+(a store through a parameter needs only `WritesArgumentState`), locks need
+`Synchronizes` and the Synchronization capability, and opaque calls need their
+specified effects and capabilities.
 
 Other direct candidates, including receiver-field access, user-constructed
 exception types, static-initialization-sensitive allocation, and other
@@ -464,9 +466,9 @@ throws, allocates, writes or synchronizes only when the specification says so,
 and uses only the capabilities it declares. A call without a specification may
 do all of these. Native AllowedCapabilities forbids reachable locks and calls
 whose capabilities fall outside the allowed set; only a reached lock refutes.
-Z3 decides AllowedCapabilities as well, after `SharpProof.Gates
-capability-shadow` retained every legacy proof; EffectContract still uses
-compiler evidence.
+Z3 decides AllowedCapabilities and EffectContract as well, after
+`SharpProof.Gates capability-shadow` and `effectcontract-shadow` retained
+every legacy proof.
 Claim lowering admits array element stores, increments and compound
 assignments. The array and indexes evaluate first; a store then evaluates its
 value, and the null and bounds checks follow (an increment or compound

@@ -40,7 +40,8 @@ internal sealed record NativeExceptionShadowReport(string UniverseSha256, int Un
 internal static class NativeExceptionShadow
 {
     internal static async Task<NativeExceptionShadowReport> RunAsync(string root, int maximumMethods = 0,
-        bool allocations = false, bool purity = false, bool capabilities = false, CancellationToken cancellationToken = default)
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false,
+        CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
         var document = OpenSourceCorpusCatalog.Load(root);
@@ -53,18 +54,19 @@ internal static class NativeExceptionShadow
             Methods = [.. document.Methods.OrderBy(method => method.Id, StringComparer.Ordinal)
                 .Take(maximumMethods == 0 ? document.Methods.Length : maximumMethods)]
         };
-        var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken, allocations, purity, capabilities),
+        var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken, allocations, purity, capabilities, summary),
             selected.Methods.Select(method => method.Id).ToImmutableArray(), root,
-            universeSha256, document.Methods.Length, allocations, purity, capabilities, cancellationToken).ConfigureAwait(false);
+            universeSha256, document.Methods.Length, allocations, purity, capabilities, summary, cancellationToken).ConfigureAwait(false);
         return report with { WallSeconds = wall.Elapsed.TotalSeconds };
     }
 
     internal static async Task<NativeExceptionShadowReport> ObserveAsync(CSharpCompilation compilation,
         ImmutableArray<string> methodIds, string root, string universeSha256, int universeMethodCount,
-        bool allocations = false, bool purity = false, bool capabilities = false, CancellationToken cancellationToken = default)
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false,
+        CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
-        if (new[] { allocations, purity, capabilities }.Count(selected => selected) > 1)
+        if (new[] { allocations, purity, capabilities, summary }.Count(selected => selected) > 1)
         { throw new ArgumentException("A shadow run must select exactly one effect contract.", nameof(purity)); }
         if (methodIds.IsDefaultOrEmpty || methodIds.Any(string.IsNullOrWhiteSpace) || methodIds.Distinct(StringComparer.Ordinal).Count() != methodIds.Length ||
             methodIds.Length > universeMethodCount)
@@ -93,14 +95,18 @@ internal static class NativeExceptionShadow
             var target = targets[id];
             var evaluation = EffectContractDiagnostics.Evaluate(target.Method, target.Method.Locations[0], legacy,
                 static _ => { }, cancellationToken, includeDiagnosticPayload: false)
-                .Single(evaluation => evaluation.Kind == (capabilities ? EffectEvaluationContractKind.AllowedCapabilities
+                .Single(evaluation => evaluation.Kind == (summary ? EffectEvaluationContractKind.EffectContract
+                    : capabilities ? EffectEvaluationContractKind.AllowedCapabilities
                     : purity ? EffectEvaluationContractKind.EnforcePure : allocations
                     ? EffectEvaluationContractKind.ZeroAllocations : EffectEvaluationContractKind.DoesNotThrow));
             var preparation = owned[target.Entry.CallableId];
-            var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == (capabilities ? WorkerEffectContractKind.AllowedCapabilities
+            var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == (summary ? WorkerEffectContractKind.EffectContract
+                : capabilities ? WorkerEffectContractKind.AllowedCapabilities
                 : purity ? WorkerEffectContractKind.EnforcePure : allocations
                 ? WorkerEffectContractKind.ZeroAllocations : WorkerEffectContractKind.DoesNotThrow));
-            var evidence = capabilities
+            var evidence = summary
+                ? await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false)
+                : capabilities
                 ? await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false)
                 : purity
                 ? await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false)
@@ -133,7 +139,7 @@ internal static class NativeExceptionShadow
         }
         return Summarize(universeSha256, universeMethodCount, rows.ToImmutable(), wall.Elapsed.TotalSeconds) with
         {
-            ContractKind = capabilities ? "AllowedCapabilities" : purity ? "EnforcePure" : allocations ? "ZeroAllocations" : "DoesNotThrow",
+            ContractKind = summary ? "EffectContract" : capabilities ? "AllowedCapabilities" : purity ? "EnforcePure" : allocations ? "ZeroAllocations" : "DoesNotThrow",
             ReachableSourceBodyCount = sourceSummaries.Count,
             ReachableSourceMayDivergeCount = sourceSummaries.Values.Count(summary => summary.MayDiverge),
             ReachableSourceUnknownEffectCount = sourceSummaries.Values.Count(summary =>

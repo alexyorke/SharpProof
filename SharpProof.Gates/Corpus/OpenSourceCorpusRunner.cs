@@ -134,13 +134,15 @@ internal static class OpenSourceCorpusRunner
     }
 
     internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
-        bool allocations = false, bool purity = false, bool capabilities = false)
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
     {
-        return Prepare(document, capabilities
+        return Prepare(document, summary
+            ? "global::SharpProof.Attributes.EffectContract(global::SharpProof.Attributes.SharpProofEffect.None)"
+            : capabilities
             ? "global::SharpProof.Attributes.AllowedCapabilities(global::SharpProof.Attributes.SharpProofCapability.None)"
             : purity ? "global::SharpProof.Attributes.EnforcePure" : allocations
             ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken,
-            includeExternalEffectsFixture: purity || capabilities).Compilation;
+            includeExternalEffectsFixture: purity || capabilities || summary).Compilation;
     }
 
     internal static string? CorpusMethodId(SyntaxNode? declaration)
