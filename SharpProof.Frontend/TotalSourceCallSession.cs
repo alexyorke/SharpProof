@@ -29,6 +29,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // and metadata-Requires lowering keep rejecting them.
     internal bool OpaqueCalls { get; set; }
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
+    internal bool ApproximateElementReads { get; set; }
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
     { return prepareMetadata?.Invoke(frame, body) ?? true; }
 

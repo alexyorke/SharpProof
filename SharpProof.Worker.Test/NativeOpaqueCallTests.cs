@@ -31,14 +31,15 @@ public sealed class NativeOpaqueCallTests
 
     [TestCase("System.Array.Sort(items); return items[0];")]
     [TestCase("var first = items[0]; System.Array.Sort(items); return first;")]
-    public async Task OpaqueCallsKeepNoArrayElementReads(string body)
+    public async Task OpaqueCallsMakeElementReadsApproximations(string body)
     {
-        // The callee may write any array, and element reads are pure in the IR.
+        // The callee may write any array, so no read may assume the entry value.
         var preparation = Prepare("public static int Target(int[] items) { " +
             "Contract.Requires(items != null && items.Length == 2 && items[0] == 2 && items[1] == 1); " +
             "Contract.Ensures(Contract.Result<int>() == 2); " + body + " }");
-        Assert.That(preparation.Total?.IsBodyAbstraction != false, Is.True);
-        Assert.That(await PostconditionAsync(preparation), Is.Not.EqualTo(WorkerClaimOutcome.Refuted));
+        var outcome = await PostconditionAsync(preparation);
+        Assert.That(outcome, Is.Not.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }
 
     [Test]

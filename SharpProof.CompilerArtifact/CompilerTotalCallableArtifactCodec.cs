@@ -463,8 +463,8 @@ internal static class CompilerTotalCallableArtifactCodec
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64 ||
             info.Kind == IrTypeKind.Reference || type == factory.StringType || info.Kind == IrTypeKind.Sequence &&
-                info.ElementType is { } element && (factory.GetTypeInfo(element).Kind is IrTypeKind.Boolean or IrTypeKind.Integer ||
-                    element == factory.ObjectType || element == factory.StringType);
+                info.ElementType is { } element && (factory.GetTypeInfo(element).Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.Reference ||
+                    element == factory.StringType);
     }
 
     private static bool SupportedType(PortableIrGraph graph, int index)

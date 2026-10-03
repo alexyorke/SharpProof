@@ -70,12 +70,20 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken,
             opaqueCalls: true);
+        // A body that writes elements reads them as approximations.
+        if (lowering.IsExact && MutatesElements(lowering.Program) && ReadsElements(context.Factory, BodyTerms(lowering.Program)))
+        {
+            lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken,
+                opaqueCalls: true, approximateElementReads: true);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
-            OpaqueCallMayChangeReadElements(context.Factory, lowering.Program,
-                binding.Clauses.SelectMany(clause => new[] { clause.Value, clause.SafeCondition })))
+            MutatesElements(lowering.Program) && ReadsElements(context.Factory, BodyTerms(lowering.Program)
+                .Concat(binding.Clauses.Where(clause => clause.Kind != BoundContractKind.Requires)
+                    .SelectMany(clause => new[] { clause.Value, clause.SafeCondition }))
+                .Concat(lowering.CallPreconditions.Values.SelectMany(clause => new[] { clause.Value, clause.Safe }))))
         {
             if (lowering.ConstructionLimitExceeded || graph.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
                 graph.Blocks.Sum(block => block.Operations.Length) > CompilerPreparedBody.MaximumInstructions ||
@@ -280,14 +288,21 @@ internal static class CompilerTotalCallableLowerer
     }
 
     // The IR reads an array element as a pure function of the reference, which
-    // holds while no lowered code writes elements. An opaque call may write any
-    // array, so a body with one keeps no array element reads.
-    private static bool OpaqueCallMayChangeReadElements(IrFactory factory, IrProgram program, IEnumerable<IrTerm> clauses)
+    // holds only while nothing writes elements: neither an element store nor an
+    // opaque call, which may write any array. Entry preconditions see the
+    // initial arrays; every other read must then be an approximation.
+    private static bool MutatesElements(IrProgram program)
     {
-        var instructions = program.Blocks.SelectMany(block => block.Instructions).ToArray();
-        if (!instructions.Any(instruction => instruction is IrCallInstruction { Receiver: null, Target: null }))
-        { return false; }
-        var pending = new Stack<IrTerm>(instructions.SelectMany(IrInstructionFacts.ReadTerms).Concat(clauses));
+        return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+            instruction is IrCallInstruction { Receiver: null, Target: null } or IrWriteInstruction { Region: IrWriteRegion.Element });
+    }
+
+    private static IEnumerable<IrTerm> BodyTerms(IrProgram program)
+    { return program.Blocks.SelectMany(block => block.Instructions).SelectMany(IrInstructionFacts.ReadTerms); }
+
+    private static bool ReadsElements(IrFactory factory, IEnumerable<IrTerm> terms)
+    {
+        var pending = new Stack<IrTerm>(terms);
         while (pending.Count != 0)
         {
             switch (pending.Pop())
@@ -326,7 +341,8 @@ internal static class CompilerTotalCallableLowerer
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
         ControlFlowGraph graph, TotalLoweringContext context, CompilerReferenceSnapshot[]? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
-        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
+        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false,
+        bool approximateElementReads = false)
     {
         context.AllowObjectWidening = enableMetadataRequires;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
@@ -373,7 +389,7 @@ internal static class CompilerTotalCallableLowerer
         }, new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, cancellationToken,
             method => ResolveScalarModel(method, context.Factory, apiSpecs, specificationPacks),
             enableMetadataRequires ? (frame, body) => PrepareMetadataRequires(compilation, frame, body, cancellationToken) : null,
-            opaqueCalls, method => OpaqueEffects(apiSpecs, method));
+            opaqueCalls, method => OpaqueEffects(apiSpecs, method), approximateElementReads);
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory,

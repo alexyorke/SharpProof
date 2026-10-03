@@ -28,6 +28,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowOpaqueCalls { get; set; }
 
+    // Element reads are approximations when the program also writes elements
+    // or calls opaque code; otherwise a read is a pure function of the array.
+    internal bool ApproximateElementReads { get; set; }
+
     // An API specification narrows what an opaque call may do.
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
 
@@ -233,6 +237,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, constant);
             return new(_factory.Variable(constant), block, FrontendSubsetClassification.Exact);
         }
+        if (depth < 256 && operation is IArrayElementReferenceOperation element && CSharpOperationSemantics.IsModeledElementAccess(element) &&
+            (ApproximateElementReads || element.ArrayReference.Type is not IArrayTypeSymbol { IsSZArray: true } single ||
+                !CSharpOperationSemantics.IsScalar(single.ElementType)))
+        { return ElementAccess(element, null, block, depth); }
+        // Element stores need the collector's guard on element reads, so only
+        // claim lowering admits them.
+        if (depth < 256 && AllowOpaqueCalls && operation is ISimpleAssignmentOperation { IsRef: false, Target: IArrayElementReferenceOperation stored } store &&
+            CSharpOperationSemantics.IsModeledElementAccess(stored))
+        { return ElementAccess(stored, store, block, depth); }
+        if (depth < 256 && AllowOpaqueCalls && operation is IIncrementOrDecrementOperation { Target: IArrayElementReferenceOperation incremented } &&
+            CSharpOperationSemantics.IsModeledElementAccess(incremented) && incremented.Type?.IsValueType == true)
+        { return ElementAccess(incremented, operation, block, depth); }
+        if (depth < 256 && AllowOpaqueCalls && operation is ICompoundAssignmentOperation { Target: IArrayElementReferenceOperation compounded } &&
+            CSharpOperationSemantics.IsModeledElementAccess(compounded) && compounded.Type?.IsValueType == true)
+        { return ElementAccess(compounded, operation, block, depth); }
         if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
         {
             var tested = LowerBodyValue(typeTestOperand, block, depth + 1);
@@ -503,6 +522,87 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             result = _factory.Variable(target);
         }
         return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
+    }
+
+    // An element read, store, increment or compound assignment. The array and
+    // indexes evaluate first. A store evaluates its value before the null and
+    // bounds checks; an increment or compound assignment checks first. The
+    // element read is an approximation, and every store is an Element write.
+    private TotalBodyValue ElementAccess(IArrayElementReferenceOperation access, IOperation? mutation, IrBlockId block, int depth)
+    {
+        var array = LowerBodyValue(access.ArrayReference, block, depth + 1);
+        if (!array.Classification.IsExact)
+        { return Approximate(mutation ?? access, array.Continuation, array.Classification.Abstention); }
+        block = array.Continuation;
+        var indices = new List<IrTerm>();
+        foreach (var index in access.Indices)
+        {
+            var lowered = LowerBodyValue(index, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(mutation ?? access, lowered.Continuation, lowered.Classification.Abstention); }
+            indices.Add(lowered.Value);
+            block = lowered.Continuation;
+        }
+        var site = _context.Site(mutation ?? access);
+        TotalBodyValue? stored = null;
+        if (mutation is ISimpleAssignmentOperation assignment)
+        {
+            stored = LowerBodyValue(assignment.Value, block, depth + 1);
+            if (!stored.Value.Classification.IsExact)
+            { return Approximate(mutation, stored.Value.Continuation, stored.Value.Classification.Abstention); }
+            block = stored.Value.Continuation;
+        }
+        IrTerm? outside = null;
+        if (indices.Count != 1 || access.ArrayReference.Type is IArrayTypeSymbol { IsSZArray: false })
+        {
+            var flag = _context.Temporary(_factory.BooleanType);
+            _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, flag);
+            outside = _factory.Variable(flag);
+        }
+        var guard = CSharpOperationSemantics.ElementGuard(_factory, array.Value, outside == null ? indices[0] : null, outside);
+        if (!guard.Classification.IsExact)
+        { return Approximate(mutation ?? access, block, guard.Classification.Abstention); }
+        block = ApplyRule(access, guard, block).Continuation;
+        var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
+        if (stored is { } value)
+        {
+            if (!elementType.IsValueType && !elementType.IsSealed)
+            {
+                // A covariant array may reject the stored reference.
+                var mismatch = _context.Temporary(_factory.BooleanType);
+                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mismatch);
+                block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
+                    [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
+            }
+            _builder!.Write(block, site, IrWriteRegion.Element);
+            return new(value.Value, block, FrontendSubsetClassification.Exact);
+        }
+        var current = _context.Temporary(_context.Type(elementType));
+        _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
+        var old = new TotalBodyValue(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
+        if (mutation == null)
+        { return old; }
+        TotalBodyValue next;
+        if (mutation is IIncrementOrDecrementOperation increment)
+        {
+            var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
+            if (!rule.Classification.IsExact)
+            { return Approximate(mutation, block, rule.Classification.Abstention); }
+            next = ApplyRule(mutation, rule, block);
+        }
+        else
+        {
+            var compound = (ICompoundAssignmentOperation)mutation;
+            var right = LowerBodyValue(compound.Value, block, depth + 1);
+            if (!right.Classification.IsExact)
+            { return Approximate(mutation, right.Continuation, right.Classification.Abstention); }
+            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value);
+            if (!rule.Classification.IsExact)
+            { return Approximate(mutation, right.Continuation, rule.Classification.Abstention); }
+            next = ApplyRule(mutation, rule, right.Continuation);
+        }
+        _builder.Write(next.Continuation, site, IrWriteRegion.Element);
+        return mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
     }
 
     // Contract and attribute APIs are specifications, never opaque calls.

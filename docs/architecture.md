@@ -459,6 +459,9 @@ classifies opaque calls from ApiSpec facets into IrOpaqueCallEffects, recorded i
 the call site's description; allocation, purity and capability goals use only the
 calls whose effects matter to them. `SharpProof.Gates capability-shadow` measures
 native AllowedCapabilities retention before that contract changes authority.
+The collector lowers a callable once and, if the program writes elements (an
+Element write or an opaque call) while reading them through SequenceAccess,
+lowers it again with element reads approximated.
 The `SharpProof.Gates exception-shadow` command separately instruments the pinned
 200-method OSS corpus with DoesNotThrow. It compares raw legacy analyzer
 outcomes, published compiler evidence, and native results after production

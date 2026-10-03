@@ -16,8 +16,9 @@ internal static partial class CSharpOperationSemantics
     {
         return type?.SpecialType is SpecialType.System_Object or SpecialType.System_String ||
             type?.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate ||
-            type is IArrayTypeSymbol { IsSZArray: true } array &&
-            (IsScalar(array.ElementType) || array.ElementType.SpecialType is SpecialType.System_Object or SpecialType.System_String);
+            // Arrays of arrays stay closed. Reads of non-scalar elements, and of
+            // any multidimensional array, are approximations.
+            type is IArrayTypeSymbol array && array.ElementType is not IArrayTypeSymbol && IsValueDomain(array.ElementType);
     }
 
     // `(Derived)value` between class or interface types keeps the reference.

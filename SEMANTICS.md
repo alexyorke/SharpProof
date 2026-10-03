@@ -466,6 +466,17 @@ do all of these. Native AllowedCapabilities forbids reachable locks and calls
 whose capabilities fall outside the allowed set; only a reached lock refutes.
 Compiler evidence still decides AllowedCapabilities until `SharpProof.Gates
 capability-shadow` retains its proofs.
+Claim lowering admits array element stores, increments and compound
+assignments. The array and indexes evaluate first; a store then evaluates its
+value, and the null and bounds checks follow (an increment or compound
+assignment checks before reading). Each store writes Element state, and a
+store of a reference into an array whose element type is not sealed may fail
+its covariance check. A body that stores elements or calls opaque code reads
+elements as approximations, and stays abstract when an Ensures clause or a
+callee precondition reads elements. Arrays of any value-domain element type,
+and multidimensional arrays, are references; their non-scalar or
+multidimensional element reads are approximations, and multidimensional bounds
+are approximated.
 Uncaught exits retain guarded exception kinds across joins; allowed kinds are
 checked at the exit rather than inferred from absence of a normal return.
 The compiler normalizes each declared DoesNotThrow or AllowedExceptions

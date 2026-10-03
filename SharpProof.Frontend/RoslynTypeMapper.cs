@@ -28,7 +28,8 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             return scalar;
         }
 
-        if (type is IArrayTypeSymbol array)
+        // Total IR keeps multidimensional arrays as opaque references.
+        if (type is IArrayTypeSymbol array && (array.IsSZArray || _factory.Semantics != IrExecutionSemantics.Total))
         {
             var element = GetTypeId(array.ElementType);
             return _factory.GetOrCreateSequenceType(
