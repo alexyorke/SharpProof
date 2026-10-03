@@ -137,7 +137,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         var target = factory.GetTypeInfo(cast.Type);
         // All references share one sort: widening to object and casts between
         // class types keep the reference itself.
-        if (cast.Type == factory.ObjectType && source.Kind is IrTypeKind.Reference or IrTypeKind.String ||
+        if (cast.Type == factory.ObjectType && source.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||
             source.Kind == IrTypeKind.Reference && target.Kind == IrTypeKind.Reference)
         { return Encode(cast.Operand, meter); }
         if (!IsInteger(source) || !IsInteger(target))

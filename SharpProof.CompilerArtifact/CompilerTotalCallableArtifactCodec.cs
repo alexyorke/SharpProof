@@ -169,7 +169,7 @@ internal static class CompilerTotalCallableArtifactCodec
                 (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
                 (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer ||
                     artifact.Graph.Types[term.Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
-                    artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind is IrTypeKind.Reference or IrTypeKind.String ||
+                    artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||
                     artifact.Graph.Types[term.Type].Kind == IrTypeKind.Reference &&
                     artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Reference) &&
                 (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||

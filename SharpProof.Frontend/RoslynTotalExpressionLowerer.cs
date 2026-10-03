@@ -181,10 +181,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             }
             return AllocateValue(operation, block);
         }
-        if (depth < 256 && _context.AllowObjectWidening && operation is IConversionOperation
+        if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
             {
                 IsImplicit: true, OperatorMethod: null, Type.SpecialType: SpecialType.System_Object,
-                Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate
+                Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate or TypeKind.Array
             } widening &&
             widening.Conversion.IsReference)
         {

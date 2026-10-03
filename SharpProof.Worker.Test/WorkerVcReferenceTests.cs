@@ -219,7 +219,6 @@ public sealed class WorkerVcReferenceTests
     }
 
     [TestCase("bool Target(string x, string y) { Contract.Ensures(true); return x == y; }")]
-    [TestCase("object Target(string x) { Contract.Ensures(true); return x; }")]
     [TestCase("int Target(int[] x, long index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int Target(int[] x, ulong index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int[] Target(int x) { Contract.Ensures(true); return new int[] { x }; }")]

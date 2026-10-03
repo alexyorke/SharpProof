@@ -585,7 +585,10 @@ back. Roslyn's flow captures of `this`, and of a field of `this` used as an
 assignment target, stand for that receiver and field. An instance field store
 is admitted when the type's static constructors are compiler-generated, and
 entry initialization is effect-free when such a constructor only stores scalar
-constants into readonly statics. A dispatched (virtual, abstract, override or interface) source call is also
+constants into readonly statics.
+Claim lowering widens class, interface, delegate and array references to
+object implicitly (for example the receiver a `lock` hands to
+Monitor.Enter); the cast keeps the reference. A dispatched (virtual, abstract, override or interface) source call is also
 opaque. Non-scalar struct and enum values are an opaque domain like type
 parameters: only opaque calls read them, so a call that mutates a struct
 through `this` changes nothing the IR observes. Struct and type-parameter
