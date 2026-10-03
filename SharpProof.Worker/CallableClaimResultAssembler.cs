@@ -67,99 +67,6 @@ internal static class CallableClaimResultAssembler
         return record;
     }
 
-    internal static WorkerClaimResult FromOutcome(CompilerCallablePreparation target, int contractOrdinal,
-        ProofOutcome outcome,
-        IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
-        IReadOnlyDictionary<ProofJustification, string> userAssumptionIds,
-        WorkerVacuityKind vacuity,
-        IReadOnlySet<string>? effectClaimIds = null)
-    {
-        var claimId = target.Entry.ClaimIds[contractOrdinal];
-        var effectCertainty = (effectClaimIds?.Contains(claimId) ??
-            target.EffectClaims.Any(evidence => evidence.ClaimId == claimId))
-            ? WorkerEffectEvidenceCertainty.Unavailable
-            : WorkerEffectEvidenceCertainty.Unspecified;
-        WorkerClaimResult record;
-        var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
-        switch (outcome)
-        {
-            case ProvenOutcome proven:
-                var proofCore = new SortedSet<string>(StringComparer.Ordinal);
-                var hasMalformedEvidence = false;
-                foreach (var justification in proven.Core)
-                {
-                    if (!assumptionLabels.TryGetValue(justification, out var label))
-                    {
-                        hasMalformedEvidence = true;
-                        break;
-                    }
-
-                    proofCore.Add(label);
-                    if (userAssumptionIds.TryGetValue(justification, out var id))
-                    {
-                        usedUserAssumptions.Add(id);
-                    }
-                }
-
-                if (hasMalformedEvidence)
-                {
-                    usedUserAssumptions.Clear();
-                    record = Create(
-                        target,
-                        claimId,
-                        WorkerClaimOutcome.Unknown,
-                        WorkerClaimReason.MalformedBackendResult,
-                        effectCertainty,
-                        projectAssumptions: false);
-                    break;
-                }
-
-                record = Create(
-                    target,
-                    claimId,
-                    WorkerClaimOutcome.Proven,
-                    WorkerClaimReason.None,
-                    effectCertainty,
-                    projectAssumptions: false);
-                record.Vacuity = vacuity;
-                record.ProofCore = [.. proofCore];
-                break;
-            case RefutedOutcome refuted:
-                record = Create(
-                    target,
-                    claimId,
-                    WorkerClaimOutcome.Refuted,
-                    WorkerClaimReason.None,
-                    effectCertainty,
-                    projectAssumptions: false);
-                record.Model = CreateModel(refuted, target.Variables);
-                break;
-            case UnknownOutcome unknown:
-                record = Create(
-                    target,
-                    claimId,
-                    WorkerClaimOutcome.Unknown,
-                    WorkerProjections.MapAbstention(unknown.Reason),
-                    effectCertainty,
-                    projectAssumptions: false);
-                break;
-            default:
-                record = Create(
-                    target,
-                    claimId,
-                    WorkerClaimOutcome.Unknown,
-                    WorkerClaimReason.MalformedBackendResult,
-                    effectCertainty,
-                    projectAssumptions: false);
-                break;
-        }
-        record.Assumptions = ProjectAssumptions(
-            target,
-            evidence => evidence.Kind == WorkerAssumptionKind.UserAssume &&
-                usedUserAssumptions.Contains(evidence.Id));
-        return record;
-    }
-
     private static WorkerAssumptionEvidence[] ProjectAssumptions(
         CompilerCallablePreparation target,
         Func<WorkerAssumptionEvidence, bool> isUsed)
@@ -304,28 +211,5 @@ internal static class CallableClaimResultAssembler
         return ProjectAssumptions(
             target,
             evidence => evidence.Used || usedAssumptionIds.Contains(evidence.Id));
-    }
-
-    private static WorkerModelValue[] CreateModel(
-        RefutedOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables)
-    {
-        var names = variables.ToDictionary(
-            static variable => variable.Variable, static variable => variable.ModelLabel);
-        var model = new List<WorkerModelValue>();
-        foreach (var assignment in outcome.Model.Assignments)
-        {
-            if (names.TryGetValue(assignment.Key, out var name))
-            {
-                model.Add(ModelValue(name, assignment.Value));
-            }
-        }
-        return [.. model.OrderBy(
-            static value => value.Variable, StringComparer.Ordinal)];
-    }
-
-    private static WorkerModelValue ModelValue(string variable, IrValue value)
-    {
-        var formatted = WorkerProjections.FormatValue(value);
-        return new WorkerModelValue { Variable = variable, Kind = formatted.Kind, Value = formatted.Value };
     }
 }

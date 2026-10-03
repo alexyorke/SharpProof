@@ -323,23 +323,6 @@ public sealed class WorkerTcbEdgeCaseTests
             CompilerManifestArtifactJson.DeserializePrepared(json, out _);
         }));
     }
-    [Test]
-    public void MalformedBackendOutcomeBecomesTypedUnknown()
-    {
-        var result = CallableClaimResultAssembler.FromOutcome(
-            CreateTrivialTarget(),
-            0,
-            outcome: null!,
-            new Dictionary<ProofJustification, string>(),
-            new Dictionary<ProofJustification, string>(),
-            WorkerVacuityKind.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
-        }
-    }
 
     [Test]
     public void ClaimAssumptionsDoNotAliasManifestOrSiblingEvidence()
@@ -376,146 +359,6 @@ public sealed class WorkerTcbEdgeCaseTests
             Assert.That(sibling.Assumptions[0].Id, Is.EqualTo("assumption"));
             Assert.That(sibling.Assumptions[0].Used, Is.False);
         }
-    }
-
-    [Test]
-    public void ProvenOutcomeWithUnmappedEvidenceFailsClosed()
-    {
-        var factory = new IrFactory();
-        var outcome = CreateProvenOutcome([
-            new LoweredJustification(factory.CreateOperation("unmapped"))
-        ]);
-
-        var result = CallableClaimResultAssembler.FromOutcome(
-            CreateTrivialTarget(),
-            0,
-            outcome,
-            new Dictionary<ProofJustification, string>(),
-            new Dictionary<ProofJustification, string>(),
-            WorkerVacuityKind.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
-            Assert.That(result.ProofCore, Is.Empty);
-        }
-    }
-
-    [Test]
-    public void ProvenOutcomeWithEmptyEvidenceCoreRemainsValid()
-    {
-        var result = CallableClaimResultAssembler.FromOutcome(
-            CreateTrivialTarget(),
-            0,
-            CreateProvenOutcome([]),
-            new Dictionary<ProofJustification, string>(),
-            new Dictionary<ProofJustification, string>(),
-            WorkerVacuityKind.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(result.ProofCore, Is.Empty);
-        }
-    }
-
-    [Test]
-    public void CounterexampleModelFormattingCoversEveryIrValueKind()
-    {
-        var factory = new IrFactory();
-        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var values = new[] {
-            (Variable: factory.CreateVariable("boolean", factory.BooleanType),
-                Label: "boolean", Value: factory.CreateBooleanValue(true)),
-            (Variable: factory.CreateVariable("integer", factory.IntegerType),
-                Label: "integer", Value: factory.CreateIntegerValue(-1)),
-            (Variable: factory.CreateVariable("string", factory.StringType),
-                Label: "string", Value: factory.CreateStringValue("text")),
-            (Variable: factory.CreateVariable("null", factory.StringType),
-                Label: "null", Value: factory.CreateNullValue(factory.StringType)),
-            (Variable: factory.CreateVariable("reference", factory.ObjectType),
-                Label: "reference", Value: factory.CreateReferenceValue(factory.ObjectType, new object())),
-            (Variable: factory.CreateVariable("sequence", sequenceType),
-                Label: "sequence", Value: factory.CreateSequenceValue(
-                    sequenceType,
-                    [factory.CreateIntegerValue(1)]))
-        };
-        var variables = values.Select((item, index) =>
-            new CompilerCanonicalVariable(
-                CompilerVariableRole.Parameter,
-                index,
-                item.Variable,
-                null,
-                null,
-                item.Label)).ToImmutableArray();
-        var assignments = values.ToImmutableDictionary(
-            static item => item.Variable,
-            static item => item.Value);
-        var validatedModel = (ValidatedModel)typeof(ValidatedModel)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single()
-            .Invoke([assignments]);
-        var refuted = (RefutedOutcome)typeof(RefutedOutcome)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single()
-            .Invoke([validatedModel]);
-        var target = CreateTarget(
-            factory,
-            factory.Boolean(false),
-            variables,
-            CompilerPreparedBody.Trivial());
-
-        var result = CallableClaimResultAssembler.FromOutcome(
-            target,
-            0,
-            refuted,
-            new Dictionary<ProofJustification, string>(),
-            new Dictionary<ProofJustification, string>(),
-            WorkerVacuityKind.None);
-
-        (string Variable, string Kind, string Value)[] expected = [
-            ("boolean", "Boolean", "true"),
-            ("integer", "Integer", "-1"),
-            ("null", "Null", "null"),
-            ("reference", "Reference", "<opaque>"),
-            ("sequence", "Sequence", "<opaque>"),
-            ("string", "String", "text")
-        ];
-        Assert.That(
-            result.Model.Select(static value => (value.Variable, value.Kind, value.Value)),
-            Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void TrivialReplayRejectsAResultVariableWithoutAProgram()
-    {
-        var factory = new IrFactory();
-        var result = factory.CreateVariable(
-            "result",
-            factory.IntegerType);
-        var target = CreateTarget(
-            factory,
-            factory.Boolean(false),
-            [new CompilerCanonicalVariable(
-                CompilerVariableRole.Result,
-                -1,
-                result,
-                null,
-                null,
-                "result")],
-            CompilerPreparedBody.Trivial());
-
-        var reason = CallableReplayTestHarness.Replay(
-            target,
-            0,
-            ImmutableDictionary<IrVarId, IrValue>.Empty,
-            target.Clauses);
-
-        Assert.That(
-            reason,
-            Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [TestCase(
@@ -660,15 +503,6 @@ public sealed class WorkerTcbEdgeCaseTests
             factory.Boolean(true),
             [],
             CompilerPreparedBody.Trivial());
-    }
-
-    private static ProvenOutcome CreateProvenOutcome(
-        ImmutableArray<ProofJustification> core)
-    {
-        return (ProvenOutcome)typeof(ProvenOutcome)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single()
-            .Invoke([core]);
     }
 
     private static CompilerCallablePreparation CreateTarget(
