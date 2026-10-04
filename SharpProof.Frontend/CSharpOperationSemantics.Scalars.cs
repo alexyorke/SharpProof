@@ -106,6 +106,7 @@ internal static partial class CSharpOperationSemantics
         new(BinaryOperatorKind.Multiply, IrBinaryOperator.Multiply, true, true),
         new(BinaryOperatorKind.Divide, IrBinaryOperator.Divide, true),
         new(BinaryOperatorKind.Remainder, IrBinaryOperator.Remainder, true),
+        new(BinaryOperatorKind.And, IrBinaryOperator.BitwiseAnd),
         new(BinaryOperatorKind.ConditionalAnd, IrBinaryOperator.AndAlso),
         new(BinaryOperatorKind.ConditionalOr, IrBinaryOperator.OrElse),
         new(BinaryOperatorKind.Equals, IrBinaryOperator.Equal, negatedKind: BinaryOperatorKind.NotEquals),

@@ -119,6 +119,11 @@ public sealed class TypedReferenceProgramLoweringTests
     public static IEnumerable<TestCaseData> ArrayReadCases()
     {
         var sampleArray = new[] { 42 };
+        yield return Case("int Target(int[] x) => x[0] & 0;", [sampleArray], 0);
+        yield return Case("int Target(int[] x) => x[0] & 0;", [null!], typeof(NullReferenceException));
+        yield return Case("int Target(int[] x) => x[0] & 0;", [Array.Empty<int>()], typeof(IndexOutOfRangeException));
+        yield return Case("int Target(int[] x) { int seen = 0; try { return x[seen++] & 0; } catch (System.NullReferenceException) when (seen == 1) { return seen; } }", [null!], 1);
+        yield return Case("int Target(int[] x) { int seen = 0; try { return x[0] & seen++; } catch (System.NullReferenceException) { return seen; } }", [null!], 0);
         (string Type, Array Input, object Expected)[] scalars =
         [
             ("sbyte", new[] { sbyte.MinValue }, sbyte.MinValue), ("byte", new[] { byte.MaxValue }, byte.MaxValue),

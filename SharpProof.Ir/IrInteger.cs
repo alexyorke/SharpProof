@@ -75,6 +75,8 @@ internal static class IrBitVectorOperations
                 return Integer(unchecked(left.Bits - right.Bits));
             case IrBinaryOperator.Multiply:
                 return Integer(unchecked(left.Bits * right.Bits));
+            case IrBinaryOperator.BitwiseAnd:
+                return Integer(left.Bits & right.Bits);
             case IrBinaryOperator.Divide:
             case IrBinaryOperator.Remainder:
                 if (!left.Signed)

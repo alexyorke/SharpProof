@@ -99,6 +99,8 @@ internal static partial class CSharpOperationSemantics
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
+        if (kind == IrBinaryOperator.BitwiseAnd && factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer)
+        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
         if (kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
         { return IntegerArithmetic(factory, kind, value, right, binary.IsChecked); }
         if (kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)

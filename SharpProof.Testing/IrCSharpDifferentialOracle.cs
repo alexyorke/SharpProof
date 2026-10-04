@@ -438,6 +438,7 @@ public sealed class IrCSharpDifferentialOracle
             IrBinaryOperator.Multiply => "*",
             IrBinaryOperator.Divide => "/",
             IrBinaryOperator.Remainder => "%",
+            IrBinaryOperator.BitwiseAnd => "&",
             IrBinaryOperator.AndAlso => "&&",
             IrBinaryOperator.OrElse => "||",
             IrBinaryOperator.Equal => "==",

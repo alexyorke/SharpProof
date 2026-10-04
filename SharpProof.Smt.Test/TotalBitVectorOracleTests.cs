@@ -15,7 +15,7 @@ public sealed class TotalBitVectorOracleTests
     [TestCase(32, true)]
     [TestCase(64, false)]
     [TestCase(64, true)]
-    public async Task TotalDivisionAndRemainderAgreeWithIndependentZ3Completion(int width, bool isSigned)
+    public async Task TotalIntegerOperatorsAgreeWithIndependentZ3Completion(int width, bool isSigned)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(width, isSigned);
@@ -24,19 +24,20 @@ public sealed class TotalBitVectorOracleTests
         var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         using var context = new Context();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        foreach (var left in new[] { 0UL, 1UL, mask, 1UL << (width - 1) })
+        foreach (var left in new[] { 0UL, 1UL, mask, 1UL << (width - 1), 0xAAAAAAAAAAAAAAAAUL & mask })
         {
-            foreach (var right in new[] { 0UL, 1UL, mask })
+            foreach (var right in new[] { 0UL, 1UL, mask, 0x5555555555555555UL & mask })
             {
                 using var first = context.MkBV(left, (uint)width);
                 using var second = context.MkBV(right, (uint)width);
-                foreach (var operation in new[] { IrBinaryOperator.Divide, IrBinaryOperator.Remainder })
+                foreach (var operation in new[] { IrBinaryOperator.Divide, IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd })
                 {
                     using var expression = (operation, isSigned) switch
                     {
                         (IrBinaryOperator.Divide, true) => context.MkBVSDiv(first, second),
                         (IrBinaryOperator.Divide, false) => context.MkBVUDiv(first, second),
                         (IrBinaryOperator.Remainder, true) => context.MkBVSRem(first, second),
+                        (IrBinaryOperator.BitwiseAnd, _) => context.MkBVAND(first, second),
                         _ => context.MkBVURem(first, second)
                     };
                     using var simplified = expression.Simplify();

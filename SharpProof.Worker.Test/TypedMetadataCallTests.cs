@@ -17,6 +17,11 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class TypedMetadataCallTests
 {
+    [TestCase("int", "int", "value & int.MaxValue", -1, int.MaxValue)]
+    [TestCase("uint", "uint", "value & 0x80000000U", uint.MaxValue, 0x80000000U)]
+    [TestCase("long", "long", "value & long.MaxValue", -1L, long.MaxValue)]
+    [TestCase("ulong", "ulong", "value & 0x8000000000000000UL", ulong.MaxValue, 0x8000000000000000UL)]
+    [TestCase("bool", "bool", "value & !value", true, false)]
     [TestCase("sbyte", "sbyte", "unchecked((sbyte)(value + 1))", 127, -128)]
     [TestCase("byte", "byte", "checked((byte)(value + 1))", 255, typeof(OverflowException))]
     [TestCase("int", "byte", "value * value", 255, 65025)]

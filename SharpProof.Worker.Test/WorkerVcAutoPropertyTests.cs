@@ -99,6 +99,31 @@ public sealed class WorkerVcAutoPropertyTests
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
             }
+            public static int Mask(int x) {
+                Contract.Ensures(Contract.Result<int>() >= 0);
+                return checked(x & int.MaxValue);
+            }
+            public void MaskCount() {
+                Contract.Ensures(Count == (Contract.Old(Count) & int.MaxValue));
+                Count &= int.MaxValue;
+            }
+            public static int MaskRefuted(int x) {
+                Contract.Requires(x == -1);
+                Contract.Ensures(Contract.Result<int>() == 0);
+                return int.MaxValue & x;
+            }
+            public static int MaskUnknown([NotNull] System.Version version) {
+                Contract.Ensures(Contract.Result<int>() == 1);
+                return version.GetHashCode() & int.MaxValue;
+            }
+            public static int MaskElement(int x) {
+                Contract.Ensures(Contract.Result<int>() == ((Contract.Old(x) & 5) * 100 + 1));
+                int[] values = new int[1];
+                values[0] = x;
+                int i = 0;
+                values[i++] &= (values[0] = 5);
+                return values[0] * 100 + i;
+            }
         }
         """;
 
@@ -126,6 +151,9 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("CountBag")]
     [TestCase("KeepAfterScale")]
     [TestCase("MakeKeyed")]
+    [TestCase("Mask")]
+    [TestCase("MaskElement")]
+    [TestCase("MaskCount")]
     public void PostconditionIsProven(string method)
     {
         var claim = Claim(method);
@@ -137,6 +165,18 @@ public sealed class WorkerVcAutoPropertyTests
     public void WrittenRefParameterStaysUnsupported()
     {
         Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [Test]
+    public void IntegerMaskCounterexampleReplays()
+    {
+        Assert.That(Claim("MaskRefuted").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
+    [Test]
+    public void IntegerMaskDoesNotRefuteAnApproximateHash()
+    {
+        Assert.That(Claim("MaskUnknown").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     [Test]

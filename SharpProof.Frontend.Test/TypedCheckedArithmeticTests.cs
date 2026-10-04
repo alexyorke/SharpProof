@@ -9,6 +9,9 @@ public sealed class TypedCheckedArithmeticTests
 {
     public static IEnumerable<TestCaseData> CheckedCases()
     {
+        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x & 128));", (sbyte)-1);
+        yield return Case("short Target(short x) => checked((short)(x & 32768));", (short)-1);
+        yield return Case("byte Target(byte x) { checked { x &= 255; return x; } }", byte.MaxValue);
         foreach (var expression in new[] { "x + y", "x - y", "x * y" })
         {
             foreach (var pair in new[] { (int.MaxValue, 2), (int.MinValue, -1), (int.MaxValue, -1), (int.MinValue, 1),

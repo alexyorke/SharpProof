@@ -46,6 +46,7 @@ internal static class IrScalarOperations
                 IrBinaryOperator.Multiply => Integer(checked(left * right)),
                 IrBinaryOperator.Divide => Integer(checked(left / right)),
                 IrBinaryOperator.Remainder => Integer(left % right),
+                IrBinaryOperator.BitwiseAnd => Integer(left & right),
                 IrBinaryOperator.LessThan => Boolean(left < right),
                 IrBinaryOperator.LessThanOrEqual => Boolean(left <= right),
                 IrBinaryOperator.GreaterThan => Boolean(left > right),
@@ -349,7 +350,7 @@ public sealed class IrInterpreter(IrFactory factory)
         return binary.Operator switch
         {
             IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply
-                or IrBinaryOperator.Divide or IrBinaryOperator.Remainder
+                or IrBinaryOperator.Divide or IrBinaryOperator.Remainder or IrBinaryOperator.BitwiseAnd
                 or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual
                 or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual =>
                 EvaluateIntegerBinary(binary.Operator, left.Value!, right.Value!),

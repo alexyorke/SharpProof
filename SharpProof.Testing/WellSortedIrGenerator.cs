@@ -46,7 +46,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 {
     private static readonly IrBinaryOperator[] IntegerOperators = [
         IrBinaryOperator.Add, IrBinaryOperator.Subtract, IrBinaryOperator.Multiply,
-        IrBinaryOperator.Divide, IrBinaryOperator.Remainder];
+        IrBinaryOperator.Divide, IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd];
     private static readonly IrBinaryOperator[] ComparisonOperators = [
         IrBinaryOperator.Equal, IrBinaryOperator.NotEqual, IrBinaryOperator.LessThan,
         IrBinaryOperator.LessThanOrEqual, IrBinaryOperator.GreaterThan, IrBinaryOperator.GreaterThanOrEqual];

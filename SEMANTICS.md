@@ -726,6 +726,14 @@ and its implicit Defined channel have been removed. Arithmetic faults must
 be represented explicitly in normal-completion predicates or control flow.
 CSharpOperationSemantics owns the scalar type/operator metadata, explicit
 Roslyn operation decisions, stage-support flags and local throw classification.
+Total source scalar lowering supports built-in integer `&` and `&=` using a
+width-preserving bitwise AND in the IR, SMT encoder and concrete replay.
+Operands evaluate once, left to right, including when a zero mask makes the
+result constant. AND itself cannot overflow in a checked context; compound
+assignment retains its storage conversion and any checked conversion fault.
+Source Boolean, lifted and user-defined AND remain unsupported. IL AND handles
+integer stack values and retains normalized Boolean handling. Existing wire opcode
+identities are unchanged; bitwise AND appends a new opcode.
 Source and IL scalar lowering share integer widths and operator rules. The
 remaining analyzer range domain uses an explicit signed-long projection of
 the same metadata; it does not admit UInt64 arithmetic. CFG reachability helpers

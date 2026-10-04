@@ -39,7 +39,8 @@ public enum IrBinaryOperator
     StringConcat = 13,
     // C# string ==: null-aware ordinal comparison of UTF-16 code units.
     // Equal on strings is reference identity.
-    StringEquals = 14
+    StringEquals = 14,
+    BitwiseAnd = 15
 }
 
 internal static class IrOperatorCatalog
@@ -109,6 +110,7 @@ internal static class IrOperatorCatalog
             IrBinaryOperator.GreaterThanOrEqual => (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">="),
             IrBinaryOperator.StringConcat => (13, IrTypeKind.String, IrTypeKind.String, "++"),
             IrBinaryOperator.StringEquals => (14, IrTypeKind.String, IrTypeKind.Boolean, "string=="),
+            IrBinaryOperator.BitwiseAnd => (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"),
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }

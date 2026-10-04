@@ -49,7 +49,7 @@ internal static partial class CSharpOperationSemantics
     internal static TotalScalarRule Compound(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right)
     {
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined ||
-            !TryBinary(operation.OperatorKind, out var kind) || kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply))
+            !TryBinary(operation.OperatorKind, out var kind) || kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply or IrBinaryOperator.BitwiseAnd))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var first = factory.GetTypeInfo(left.Type);
         var second = factory.GetTypeInfo(right.Type);
@@ -64,7 +64,9 @@ internal static partial class CSharpOperationSemantics
                 ? factory.GetOrCreateIntegerType(64, true)
                 : first.Width == 32 && !first.Signed || second.Width == 32 && !second.Signed
                     ? factory.GetOrCreateIntegerType(32, false) : factory.GetOrCreateIntegerType(32, true);
-        var rule = IntegerArithmetic(factory, kind, factory.Cast(promoted, left), factory.Cast(promoted, right), operation.IsChecked);
+        var rule = kind == IrBinaryOperator.BitwiseAnd
+            ? Exact(factory.Binary(kind, factory.Cast(promoted, left), factory.Cast(promoted, right)))
+            : IntegerArithmetic(factory, kind, factory.Cast(promoted, left), factory.Cast(promoted, right), operation.IsChecked);
         var conversion = ConvertInteger(factory, rule.Value, left.Type, operation.IsChecked);
         return new(conversion.Value, [.. rule.Throws, .. conversion.Throws], conversion.Classification);
     }

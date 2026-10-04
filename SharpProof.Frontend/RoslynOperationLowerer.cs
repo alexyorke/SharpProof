@@ -826,6 +826,8 @@ public sealed class RoslynOperationLowerer
 
             if (mapped.Value != IrBinaryOperator.StringConcat)
             {
+                if (mapped.Value == IrBinaryOperator.BitwiseAnd && _owner._factory.Semantics != IrExecutionSemantics.Total)
+                { return OpaqueBinary(operation, FrontendAbstention.UnsupportedOperationKind); }
                 if (semantics.IsIntegerArithmetic &&
                     !CSharpOperationSemantics.SupportsExactIntegerIrArithmetic(
                         operation.Type?.SpecialType ?? SpecialType.None))

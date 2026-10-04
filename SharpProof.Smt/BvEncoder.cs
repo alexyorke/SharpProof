@@ -141,6 +141,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             IrBinaryOperator.Add => (Expr)context.MkBVAdd(x, y),
             IrBinaryOperator.Subtract => context.MkBVSub(x, y),
             IrBinaryOperator.Multiply => context.MkBVMul(x, y),
+            IrBinaryOperator.BitwiseAnd => context.MkBVAND(x, y),
             IrBinaryOperator.Divide => signed ? context.MkBVSDiv(x, y) : context.MkBVUDiv(x, y),
             IrBinaryOperator.Remainder => signed ? context.MkBVSRem(x, y) : context.MkBVURem(x, y),
             IrBinaryOperator.LessThan => signed ? context.MkBVSLT(x, y) : context.MkBVULT(x, y),

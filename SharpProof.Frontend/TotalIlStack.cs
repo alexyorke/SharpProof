@@ -123,7 +123,12 @@ internal static class TotalIlStack
             }
             if (left == 0 || Math.Abs(right) != Math.Abs(left))
             { return false; }
-            if (code is "And" or "Or" or "Xor")
+            if (code == "And")
+            {
+                stack.Add(left == -32 && right == -32 ? -32 : Math.Abs(left));
+                return true;
+            }
+            if (code is "Or" or "Xor")
             {
                 if (left != -32 || right != -32)
                 { return false; }

@@ -15,6 +15,24 @@ public sealed class TypedProgramLoweringTests
 {
     public static IEnumerable<TestCaseData> ScalarCases()
     {
+        foreach (var input in new[] { int.MinValue, int.MinValue + 1, -2, -1, 0, 1, int.MaxValue })
+        {
+            yield return Case("int Target(int x) => checked(x & int.MaxValue);", input);
+            yield return Case("int Target(int x) => int.MaxValue & x;", input);
+        }
+        yield return Case("int Target(int x, int y) => x & y;", -1, int.MinValue);
+        yield return Case("uint Target(uint x, uint y) => checked(x & y);", uint.MaxValue, 0x80000000U);
+        yield return Case("long Target(long x, long y) => x & y;", -1L, long.MinValue);
+        yield return Case("ulong Target(ulong x, ulong y) => checked(x & y);", ulong.MaxValue, 0x8000000000000000UL);
+        yield return Case("int Target(sbyte x, byte y) => x & y;", (sbyte)-1, (byte)128);
+        yield return Case("int Target(short x, ushort y) => x & y;", (short)-1, (ushort)32768);
+        yield return Case("long Target(uint x, int y) => x & y;", uint.MaxValue, -1);
+        yield return Case("int Target(int x) { int y = x++ & ++x; return y * 100 + x; }", 3);
+        yield return Case("int Target(int x) { x &= x++; return x; }", 3);
+        yield return Case("sbyte Target(sbyte x) { unchecked { x &= (sbyte)-128; return x; } }", (sbyte)-1);
+        yield return Case("short Target(short x) { unchecked { x &= (short)-32768; return x; } }", (short)-1);
+        yield return Case("uint Target(uint x, uint y) { x &= y; return x; }", uint.MaxValue, 0x80000000U);
+        yield return Case("ulong Target(ulong x, ulong y) { x &= y; return x; }", ulong.MaxValue, 0x8000000000000000UL);
         yield return Case("int Target(byte a, sbyte b) => a + b;", (byte)255, (sbyte)-128);
         yield return Case("int Target(ushort a) => -a;", ushort.MaxValue);
         yield return Case("long Target(uint a, int b) => a + b;", uint.MaxValue, -1);
@@ -102,6 +120,16 @@ public sealed class TypedProgramLoweringTests
             Assert.That(execution.ReturnValue.Kind == IrValueKind.Boolean ? (object)execution.ReturnValue.Boolean : execution.ReturnValue.IntegerNumericValue,
                 Is.EqualTo(expected.Kind == IrValueKind.Boolean ? (object)expected.Boolean : expected.IntegerNumericValue));
         }
+    }
+
+    [TestCase("bool Target(bool x, bool y) => x & y;")]
+    [TestCase("bool Target(bool x, bool y) { x &= y; return x; }")]
+    [TestCase("int? Target(int? x, int? y) => x & y;")]
+    [TestCase("int Target(Box x, Box y) => x & y; public sealed class Box { public static int operator &(Box x, Box y) => 1; }")]
+    public void NonIntegerBitwiseAndRemainsClosed(string members)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(subject.Lower().IsExact, Is.False);
     }
 
     [TestCase(0, 0, "a / b")]

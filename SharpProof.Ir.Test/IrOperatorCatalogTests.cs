@@ -127,7 +127,9 @@ public sealed class IrOperatorCatalogTests
             [IrBinaryOperator.StringConcat] =
                 (13, IrTypeKind.String, IrTypeKind.String, "++"),
             [IrBinaryOperator.StringEquals] =
-                (14, IrTypeKind.String, IrTypeKind.Boolean, "string==")
+                (14, IrTypeKind.String, IrTypeKind.Boolean, "string=="),
+            [IrBinaryOperator.BitwiseAnd] =
+                (15, IrTypeKind.Integer, IrTypeKind.Integer, "&")
         };
 
         AssertOperatorMetadata(
