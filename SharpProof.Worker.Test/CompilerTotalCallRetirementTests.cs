@@ -201,7 +201,6 @@ public sealed class CompilerTotalCallRetirementTests
         foreach (var preparation in CompilerManifestArtifactJson.DecodeCallables(artifact))
         {
             Assert.That(preparation.Total, Is.Not.Null);
-            Assert.That(preparation.Body, Is.Null);
             await AssertProvesAsync(preparation);
         }
     }

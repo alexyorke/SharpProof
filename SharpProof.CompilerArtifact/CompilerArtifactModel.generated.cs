@@ -49,46 +49,9 @@ internal enum CompilerContractEvidence
     Companion = 2
 }
 
-internal enum CompilerVariableRole
-{
-    Receiver = 0,
-    Parameter = 1,
-    Result = 2,
-    PreState = 3
-}
-
-internal enum CompilerScalarDomain
-{
-    None = 0,
-    SByte = 1,
-    Byte = 2,
-    Short = 3,
-    UShort = 4,
-    Int = 5,
-    UInt = 6,
-    Long = 7
-}
-
-internal enum CompilerPreparedBodyKind
-{
-    Trivial = 0,
-    Program = 1
-}
-
-internal enum CompilerSummaryOrigin
-{
-    Source = 0,
-    ImplementationIl = 1,
-    SpecificationPack = 2
-}
-
 internal sealed record CompilerCallablePreparation(
-    IrFactory Factory,
     WorkerCallableManifestEntry Entry,
-    ImmutableArray<CompilerPreparedClause> Clauses,
-    ImmutableArray<CompilerCanonicalVariable> Variables,
-    WorkerClaimReason FailureReason,
-    CompilerPreparedBody? Body
+    WorkerClaimReason FailureReason
 )
 {
     internal bool IsSuccess => FailureReason == WorkerClaimReason.None;
@@ -204,85 +167,9 @@ internal sealed class CompilerTotalClauseArtifact
     public string? AssumptionId { get; set; }
 }
 
-internal sealed record CompilerPreparedClause(
-    CompilerContractKind Kind,
-    IrTerm Condition,
-    CompilerContractEvidence Evidence,
-    string? ClaimId,
-    string? AssumptionId
-);
-
-internal readonly record struct CompilerIntegerInterval(
-    long Minimum,
-    long Maximum
-);
-
-internal sealed record CompilerCanonicalVariable(
-    CompilerVariableRole Role,
-    int Ordinal,
-    IrVarId Variable,
-    IrVarId? CurrentStateVariable,
-    CompilerIntegerInterval? SourceIntegerInterval,
-    string ModelLabel
-);
-
-internal sealed record CompilerPreparedBody(
-    CompilerPreparedBodyKind Kind,
-    IrProgram? Program,
-    ImmutableDictionary<IrVarId, IrVarId> ParameterBindings,
-    ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> SpecCalls,
-    ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> SummaryCalls
-)
+internal static class CompilerArtifactLimits
 {
     internal const int MaximumInstructions = 4096;
-
-    internal static CompilerPreparedBody Trivial() =>
-        new(
-            CompilerPreparedBodyKind.Trivial,
-            null,
-            ImmutableDictionary<IrVarId, IrVarId>.Empty,
-            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
-            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);
-
-    internal static CompilerPreparedBody ProgramBody(
-        IrProgram program,
-        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
-        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
-        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls) =>
-        new(
-            CompilerPreparedBodyKind.Program,
-            program ?? throw new ArgumentNullException(nameof(program)),
-            parameterBindings,
-            specCalls,
-            summaryCalls);
-}
-
-internal sealed record CompilerPreparedSpecCall(
-    IrInstructionId Instruction,
-    string CallIdentity,
-    string WitnessIdentifier,
-    bool ConsumesMemoryHavoc
-);
-
-internal sealed record CompilerPreparedSummaryEvidence(
-    CompilerSummaryOrigin Origin,
-    string CallIdentity,
-    string EvidenceSha256,
-    string EvidenceIdentity
-);
-
-internal sealed record CompilerPreparedSummaryCall(
-    IrInstructionId Instruction,
-    string CallIdentity,
-    CompilerSummaryOrigin Origin,
-    IrVarId Result,
-    ImmutableArray<IrVarId> ExistentialVariables,
-    IrTerm NormalRelation,
-    string EvidenceSha256,
-    string EvidenceIdentity,
-    ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence
-)
-{
 }
 
 internal sealed class CompilerSpecificationPackConfiguration
@@ -296,10 +183,6 @@ internal sealed class CompilerCallableArtifact
 {
     public string CallableId { get; set; } = string.Empty;
     public WorkerClaimReason FailureReason { get; set; }
-    public PortableIrGraph? Graph { get; set; }
-    public CompilerClauseArtifact[] Clauses { get; set; } = [];
-    public CompilerVariableArtifact[] Variables { get; set; } = [];
-    public CompilerBodyArtifact? Body { get; set; }
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompilerTotalCallableArtifact? Total { get; set; }
@@ -324,72 +207,6 @@ internal sealed class CompilerEffectConstraintArtifact
     public WorkerEffectSet AllowedEffects { get; set; }
     public WorkerEffectCapabilitySet AllowedCapabilities { get; set; }
     public string[] AllowedExceptionTypes { get; set; } = [];
-}
-
-internal sealed class CompilerClauseArtifact
-{
-    public CompilerContractKind Kind { get; set; }
-    public CompilerContractEvidence Evidence { get; set; }
-    public int Root { get; set; } = -1;
-    public string? ClaimId { get; set; }
-    public string? AssumptionId { get; set; }
-}
-
-internal sealed class CompilerVariableArtifact
-{
-    public CompilerVariableRole Role { get; set; }
-    public int Ordinal { get; set; }
-    public int Variable { get; set; } = -1;
-    public int CurrentStateVariable { get; set; } = -1;
-    public int SourceOrdinal { get; set; } = -1;
-    public long? Minimum { get; set; }
-    public long? Maximum { get; set; }
-    public CompilerScalarDomain ScalarDomain { get; set; }
-    public string ModelLabel { get; set; } = string.Empty;
-}
-
-internal sealed class CompilerBodyArtifact
-{
-    public CompilerPreparedBodyKind Kind { get; set; }
-    public CompilerVariableMappingArtifact[] ParameterBindings { get; set; } = [];
-    public CompilerCallIdentityArtifact[] Calls { get; set; } = [];
-    public CompilerSpecCallArtifact[] SpecCalls { get; set; } = [];
-    public CompilerSummaryCallArtifact[] SummaryCalls { get; set; } = [];
-}
-
-internal sealed class CompilerVariableMappingArtifact
-{
-    public int Source { get; set; } = -1;
-    public int SourceOrdinal { get; set; } = -1;
-    public int SourceType { get; set; } = -1;
-    public string SourceName { get; set; } = string.Empty;
-    public int Target { get; set; } = -1;
-}
-
-internal sealed class CompilerCallIdentityArtifact
-{
-    public int Instruction { get; set; } = -1;
-    public string Identity { get; set; } = string.Empty;
-}
-
-internal sealed class CompilerSpecCallArtifact
-{
-    public int Instruction { get; set; } = -1;
-    public string WitnessIdentifier { get; set; } = string.Empty;
-    public bool ConsumesMemoryHavoc { get; set; }
-}
-
-internal sealed class CompilerSummaryCallArtifact
-{
-    public int Instruction { get; set; } = -1;
-    public string Identity { get; set; } = string.Empty;
-    public CompilerSummaryOrigin Origin { get; set; }
-    public int Result { get; set; } = -1;
-    public int[] ExistentialVariables { get; set; } = [];
-    public int NormalRelationRoot { get; set; } = -1;
-    public string EvidenceSha256 { get; set; } = string.Empty;
-    public string EvidenceIdentity { get; set; } = string.Empty;
-    public CompilerPreparedSummaryEvidence[] DependencyEvidence { get; set; } = [];
 }
 
 internal enum CompilerOutputKind

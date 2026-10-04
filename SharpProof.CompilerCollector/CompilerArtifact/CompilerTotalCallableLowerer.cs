@@ -9,7 +9,7 @@ internal static class CompilerTotalCallableLowerer
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
-            target.Method.Parameters.Length > CompilerPreparedBody.MaximumInstructions)
+            target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
@@ -17,7 +17,7 @@ internal static class CompilerTotalCallableLowerer
         var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context);
         cancellationToken.ThrowIfCancellationRequested();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions ||
+        if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions ||
             binding.Clauses.Length != preconditions.Length)
         { return null; }
         return new(target.Entry.CallableId, context.Factory,
@@ -33,7 +33,7 @@ internal static class CompilerTotalCallableLowerer
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
-            target.Method.Parameters.Length > CompilerPreparedBody.MaximumInstructions)
+            target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         var declaration = target.Declaration!;
         var autoAccessor = TotalBodyLowering.AutoAccessor(declaration);
@@ -44,7 +44,7 @@ internal static class CompilerTotalCallableLowerer
         var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
             : new ContractBinder(compilation, context.Factory).BindTotal(context);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!binding.IsSuccess || binding.Clauses.Length > CompilerPreparedBody.MaximumInstructions)
+        if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         var ensures = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Ensures).ToArray();
         // A postcondition on an overridable method is a contract for every
@@ -84,18 +84,18 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         var program = lowering.Program;
         var isBodyAbstraction = false;
-        if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
+        if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions ||
             TotalBodyLowering.MutatesElements(lowering.Program) && TotalBodyLowering.ReadsElements(context.Factory, TotalBodyLowering.BodyTerms(lowering.Program)
                 .Concat(binding.Clauses.Where(clause => clause.Kind != BoundContractKind.Requires)
                     .SelectMany(clause => new[] { clause.Value, clause.SafeCondition }))
                 .Concat(lowering.CallPreconditions.Values.SelectMany(clause => new[] { clause.Value, clause.Safe }))))
         {
-            if (lowering.ConstructionLimitExceeded || graph == null || graph.Blocks.Length > CompilerPreparedBody.MaximumInstructions ||
-                graph.Blocks.Sum(block => block.Operations.Length) > CompilerPreparedBody.MaximumInstructions ||
+            if (lowering.ConstructionLimitExceeded || graph == null || graph.Blocks.Length > CompilerArtifactLimits.MaximumInstructions ||
+                graph.Blocks.Sum(block => block.Operations.Length) > CompilerArtifactLimits.MaximumInstructions ||
                 binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume) ||
                 context.Parameters.Any(parameter => !Primitive(parameter.Entry)) ||
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
-                context.Parameters.Length * 2 + 2 > CompilerPreparedBody.MaximumInstructions)
+                context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
             { return null; }
             var builder = new IrProgramBuilder(context.Factory);
             var block = builder.CreateBlock();
@@ -121,7 +121,7 @@ internal static class CompilerTotalCallableLowerer
         foreach (var block in program.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (block.Instructions.Length > CompilerPreparedBody.MaximumInstructions - instructionCount)
+            if (block.Instructions.Length > CompilerArtifactLimits.MaximumInstructions - instructionCount)
             { return null; }
             instructionCount += block.Instructions.Length;
         }
@@ -162,7 +162,7 @@ internal static class CompilerTotalCallableLowerer
         if (compilation.References.Any(static reference => reference is CompilationReference))
         { return new([], [new(0, 0, 0, "UnsupportedSourceReference")]); }
         var trees = compilation.SyntaxTrees.ToArray();
-        if (trees.Length > CompilerPreparedBody.MaximumInstructions)
+        if (trees.Length > CompilerArtifactLimits.MaximumInstructions)
         { return new([], [new(0, 0, 0, "InventoryBudget")]); }
         if (trees.Length != capturedTrees.Length)
         { return new([], [new(0, 0, 0, "SourceSnapshotMismatch")]); }
@@ -217,7 +217,7 @@ internal static class CompilerTotalCallableLowerer
     {
         cancellationToken.ThrowIfCancellationRequested();
         reason = "UnsupportedBody";
-        if (owner.Method.Parameters.Length > CompilerPreparedBody.MaximumInstructions ||
+        if (owner.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions ||
             !ReferenceEquals(owner.SemanticModel.Compilation, compilation) ||
             !ReferenceEquals(owner.SemanticModel.SyntaxTree, owner.Declaration.SyntaxTree) ||
             !SymbolEqualityComparer.Default.Equals(
@@ -241,13 +241,13 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken, initializationFree, enableMetadataRequires);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerPreparedBody.MaximumInstructions)
+        if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         var instructionCount = 0;
         foreach (var block in lowering.Program.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (block.Instructions.Length > CompilerPreparedBody.MaximumInstructions - instructionCount)
+            if (block.Instructions.Length > CompilerArtifactLimits.MaximumInstructions - instructionCount)
             { return null; }
             instructionCount += block.Instructions.Length;
         }
@@ -287,7 +287,7 @@ internal static class CompilerTotalCallableLowerer
             { return false; }
             if (!types.TryGetValue(type, out var typeSafe))
             {
-                if (types.Count >= CompilerPreparedBody.MaximumInstructions)
+                if (types.Count >= CompilerArtifactLimits.MaximumInstructions)
                 { return false; }
                 typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
                 types.Add(type, typeSafe);
@@ -311,7 +311,7 @@ internal static class CompilerTotalCallableLowerer
     // constants into readonly statics has no effect a body could observe.
     private static bool HasNoTypeEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type, CancellationToken cancellationToken)
     {
-        var remaining = CompilerPreparedBody.MaximumInstructions;
+        var remaining = CompilerArtifactLimits.MaximumInstructions;
         for (var current = type; current != null; current = current.ContainingType)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -345,7 +345,7 @@ internal static class CompilerTotalCallableLowerer
     {
         var pending = new Stack<INamespaceOrTypeSymbol>();
         pending.Push(compilation.Assembly.GlobalNamespace);
-        var remaining = CompilerPreparedBody.MaximumInstructions;
+        var remaining = CompilerArtifactLimits.MaximumInstructions;
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();

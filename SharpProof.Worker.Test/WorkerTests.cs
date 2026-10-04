@@ -2112,7 +2112,7 @@ public sealed class WorkerTests
             WorkerCacheIdentity.Current,
             CancellationToken.None);
         var expectedUsedIds = snapshot.CompilerManifest.Callables.Single()
-            .Clauses.Where(static clause =>
+            .Total!.Clauses.Where(static clause =>
                 clause.Kind == CompilerContractKind.Assume)
             .Select(static clause => clause.AssumptionId).ToArray();
         using var backend = new CountingNativeBackend();
@@ -2945,7 +2945,6 @@ public sealed class WorkerTests
         var roundTrip = CompilerManifestArtifactJson.Deserialize(canonicalJson);
         Assert.That(canonicalJson, Is.EqualTo(manifestJson));
         Assert.That(roundTrip.Callables.Single().Total, Is.Not.Null);
-        Assert.That(roundTrip.Callables.Single().Body, Is.Null);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request);

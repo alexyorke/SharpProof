@@ -18,4 +18,20 @@ internal static partial class CSharpOperationSemantics
                 method.Parameters[1].RefKind == RefKind.Ref && method.Parameters[1].Type.SpecialType == SpecialType.System_Boolean &&
                 invocation.Arguments[1].Value is ILocalReferenceOperation);
     }
+
+    // An interceptor replaces the bound call at run time, so the lowering
+    // cannot use the bound target. Without a compilation to ask, any call in a
+    // tree that may be intercepted is treated as intercepted.
+    internal static bool IsIntercepted(IOperation operation, Compilation? compilation)
+    {
+        if (operation is not IInvocationOperation { Syntax: Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax syntax })
+        { return false; }
+        if (compilation == null || !compilation.SyntaxTrees.Contains(syntax.SyntaxTree))
+        {
+            return syntax.SyntaxTree.Options.Features.Keys.Any(static feature =>
+                feature.StartsWith("Interceptors", StringComparison.Ordinal));
+        }
+        return Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetInterceptorMethod(
+            Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree), syntax) != null;
+    }
 }

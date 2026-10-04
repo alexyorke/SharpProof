@@ -71,7 +71,6 @@ public sealed class CompilerSpecificationPackProviderTests
             {
                 Compilation = null!
             }), Is.False);
-            Assert.That(CompilerSpecificationPackSelection.GetSummaryPrefix((CompilerSummaryOrigin)int.MaxValue), Is.Null);
         }
     }
 

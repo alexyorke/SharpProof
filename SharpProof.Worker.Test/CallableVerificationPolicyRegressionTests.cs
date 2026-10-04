@@ -13,7 +13,6 @@ public sealed class CallableVerificationPolicyRegressionTests
     {
         const string claimId = "spc1:effect";
         var target = new CompilerCallablePreparation(
-            new IrFactory(),
             new WorkerCallableManifestEntry
             {
                 CallableId = "M:Subject.Verify()",
@@ -26,10 +25,7 @@ public sealed class CallableVerificationPolicyRegressionTests
                     }
                 ]
             },
-            [],
-            [],
-            WorkerClaimReason.UnsupportedBody,
-            null)
+            WorkerClaimReason.UnsupportedBody)
         {
             EffectClaims = [
                 new CompilerEffectClaimArtifact

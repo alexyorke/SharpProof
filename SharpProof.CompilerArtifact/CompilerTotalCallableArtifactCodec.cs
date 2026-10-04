@@ -97,7 +97,7 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(artifact, nameof(artifact));
-        Require(!string.IsNullOrWhiteSpace(ownerId) && ownerId.Length <= CompilerPreparedBody.MaximumInstructions,
+        Require(!string.IsNullOrWhiteSpace(ownerId) && ownerId.Length <= CompilerArtifactLimits.MaximumInstructions,
             "A shadow body has an invalid owner label.");
         Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry &&
             artifact.Clauses is { Length: 0 } && artifact.ValidEffectClaimIds is { Length: 0 } &&
@@ -124,9 +124,9 @@ internal static class CompilerTotalCallableArtifactCodec
         if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null ||
             artifact.CallPreconditions == null || artifact.Result < -1)
         { throw new InvalidDataException("The Total callable payload is incomplete."); }
-        Require(artifact.Parameters!.Length <= CompilerPreparedBody.MaximumInstructions &&
-            artifact.Clauses!.Length <= CompilerPreparedBody.MaximumInstructions &&
-            artifact.CallPreconditions!.Length <= CompilerPreparedBody.MaximumInstructions &&
+        Require(artifact.Parameters!.Length <= CompilerArtifactLimits.MaximumInstructions &&
+            artifact.Clauses!.Length <= CompilerArtifactLimits.MaximumInstructions &&
+            artifact.CallPreconditions!.Length <= CompilerArtifactLimits.MaximumInstructions &&
             (!(entryOnly || artifact.IsBodyAbstraction) || artifact.CallPreconditions.Length == 0),
             "The Total callable metadata exceeds its bound or mode.");
         Require(artifact.Parameters.All(parameter => parameter != null) && artifact.Clauses.All(clause => clause != null) &&
@@ -138,9 +138,9 @@ internal static class CompilerTotalCallableArtifactCodec
         { throw new InvalidDataException("The Total graph is incomplete."); }
         Require(graph.Roots.Length == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
             "The Total graph has an invalid mode or root closure.");
-        Require(graph.Blocks.Length <= CompilerPreparedBody.MaximumInstructions,
+        Require(graph.Blocks.Length <= CompilerArtifactLimits.MaximumInstructions,
             "The Total graph exceeds its program bound.");
-        var remainingInstructions = CompilerPreparedBody.MaximumInstructions;
+        var remainingInstructions = CompilerArtifactLimits.MaximumInstructions;
         foreach (var block in graph.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -254,7 +254,7 @@ internal static class CompilerTotalCallableArtifactCodec
         if (!entryOnly)
         { ValidateProgram(decoded.Program!, result, clauses, parameters, artifact.IsBodyAbstraction, cancellationToken); }
         var exceptionConstraints = DecodeExceptionConstraints(artifact.ExceptionConstraints, claims, entryOnly, cancellationToken);
-        Require(artifact.ValidEffectClaimIds != null && artifact.ValidEffectClaimIds.Length <= CompilerPreparedBody.MaximumInstructions &&
+        Require(artifact.ValidEffectClaimIds != null && artifact.ValidEffectClaimIds.Length <= CompilerArtifactLimits.MaximumInstructions &&
             (!entryOnly || artifact.ValidEffectClaimIds.Length == 0), "Validated effect claims have an invalid bound or mode.");
         var effectOwners = claims.Where(claim => claim.Kind == WorkerClaimKind.Effect).Select(claim => claim.ClaimId)
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -304,7 +304,7 @@ internal static class CompilerTotalCallableArtifactCodec
             Require(row.InstructionIndex > previous && row.InstructionIndex < decoded.Instructions.Count &&
                 decoded.Instructions[row.InstructionIndex] is IrAssignInstruction &&
                 !string.IsNullOrWhiteSpace(row.CalleeIdentity) && row.CalleeIdentity.Length <= 4096 &&
-                row.ClauseOrdinal >= 0 && row.ClauseOrdinal < CompilerPreparedBody.MaximumInstructions &&
+                row.ClauseOrdinal >= 0 && row.ClauseOrdinal < CompilerArtifactLimits.MaximumInstructions &&
                 row.ClauseSite >= 0 && row.ClauseSite < decoded.Operations.Count &&
                 row.ValueRoot == artifact.Clauses.Length * 2 + ordinal * 2 && row.SafeRoot == row.ValueRoot + 1,
                 "A Total call precondition has an invalid instruction, clause, or root binding.");
@@ -434,7 +434,7 @@ internal static class CompilerTotalCallableArtifactCodec
         CompilerTotalExceptionConstraintArtifact[] rows, ImmutableArray<WorkerClaimManifestEntry> claims,
         bool entryOnly, CancellationToken cancellationToken)
     {
-        Require(rows.Length <= CompilerPreparedBody.MaximumInstructions && (!entryOnly || rows.Length == 0),
+        Require(rows.Length <= CompilerArtifactLimits.MaximumInstructions && (!entryOnly || rows.Length == 0),
             "An exception constraint list has an invalid bound or mode.");
         var owned = claims.ToDictionary(claim => claim.ClaimId, StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -480,8 +480,8 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateProgram(IrProgram program, IrVarId? result,
         IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters, bool isBodyAbstraction, CancellationToken cancellationToken)
     {
-        Require(program.Blocks.Length <= CompilerPreparedBody.MaximumInstructions &&
-            program.Blocks.Sum(block => block.Instructions.Length) <= CompilerPreparedBody.MaximumInstructions,
+        Require(program.Blocks.Length <= CompilerArtifactLimits.MaximumInstructions &&
+            program.Blocks.Sum(block => block.Instructions.Length) <= CompilerArtifactLimits.MaximumInstructions,
             "The Total program exceeds its construction bound.");
         if (isBodyAbstraction)
         {
@@ -625,7 +625,7 @@ internal static class CompilerTotalCallableArtifactCodec
         pending.Enqueue((program.Entry, false, false));
         var canonicalParameters = parameters.ToArray();
         var inputPrefix = pointCount == 0 ? 0 : canonicalParameters.Length * 2;
-        var remaining = CompilerPreparedBody.MaximumInstructions * 8;
+        var remaining = CompilerArtifactLimits.MaximumInstructions * 8;
         while (pending.Count != 0)
         {
             Spend();

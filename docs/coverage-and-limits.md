@@ -48,7 +48,9 @@ synchronous, non-generic, by-value signatures over managed types, outside
 unsafe code. Async, generic, by-reference, pointer, function-pointer, delegate,
 dynamic and ref-like signatures are unsupported. Whether a body is supported is
 decided by lowering it to the Total IR: `CSharpOperationSemantics` decides each
-operation, and an operation it does not model makes the body abstain. A selected
+operation, and an operation it does not model makes the body abstain. A call
+replaced by a C# interceptor abstains, since the bound target is not the code
+that runs. A selected
 callable whose body abstains is reported as SP0047 by the analyzer and stays
 Unknown in the worker.
 

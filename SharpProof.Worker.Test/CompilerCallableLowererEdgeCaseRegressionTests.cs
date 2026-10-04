@@ -12,80 +12,6 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerCallableLowererEdgeCaseRegressionTests
 {
     [Test]
-    public void SignedInt64SourceIntervalsAreProjected()
-    {
-        var preparation = Prepare(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static long Identity(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """,
-            "Identity");
-
-        Assert.That(
-            preparation.IsSuccess,
-            Is.True,
-            preparation.FailureReason.ToString());
-        AssertSignedInt64SourceIntervals(preparation);
-    }
-
-    [Test]
-    public void SignedInt64SourceIntervalsRoundTripThroughCompilerArtifact()
-    {
-        var source =
-            """
-            #undef SHARPPROOF_CONTRACTS
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static long Identity(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """;
-        var (compilation, discovery) = CreateCompilation(source);
-        var artifact = CompilerManifestArtifactProducer.Create(
-            compilation,
-            TestContext.CurrentContext.WorkDirectory,
-            "net8.0",
-            WorkerFeatureSet.All,
-            discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
-
-        var roundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
-        var preparation = CompilerManifestArtifactJson.DecodeCallables(
-            roundTrip).Single();
-        AssertSignedInt64SourceIntervals(preparation);
-    }
-
-    private static void AssertSignedInt64SourceIntervals(
-        CompilerCallablePreparation preparation)
-    {
-        var expected = new CompilerIntegerInterval(
-            long.MinValue,
-            long.MaxValue);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                preparation.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Parameter)
-                    .SourceIntegerInterval,
-                Is.EqualTo(expected));
-            Assert.That(
-                preparation.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Result)
-                    .SourceIntegerInterval,
-                Is.EqualTo(expected));
-        }
-    }
-
-    [Test]
     public void ExpressionBodiedRequiresOnlyVoidMethodIsAdmitted()
     {
         var preparation = Prepare(
@@ -107,10 +33,6 @@ public sealed class CompilerCallableLowererEdgeCaseRegressionTests
             Assert.That(
                 preparation.FailureReason,
                 Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                preparation.Clauses.Select(static clause => clause.Kind),
-                Is.EqualTo(new[] { CompilerContractKind.Requires }));
-            Assert.That(preparation.Body, Is.Null);
         }
     }
 

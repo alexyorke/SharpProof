@@ -89,7 +89,7 @@ internal sealed partial class ClaimManifestBuilder(
         foreach (var tree in _compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (treeOrdinal >= CompilerPreparedBody.MaximumInstructions)
+            if (treeOrdinal >= CompilerArtifactLimits.MaximumInstructions)
             {
                 gaps.Add(new(treeOrdinal, 0, 0, "InventoryBudget"));
                 return new([], gaps.ToImmutable());
@@ -121,7 +121,7 @@ internal sealed partial class ClaimManifestBuilder(
                 {
                     continue;
                 }
-                if (owners.Count + gaps.Count >= CompilerPreparedBody.MaximumInstructions)
+                if (owners.Count + gaps.Count >= CompilerArtifactLimits.MaximumInstructions)
                 {
                     gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "InventoryBudget"));
                     return new(owners.ToImmutable(), gaps.ToImmutable());
@@ -241,7 +241,7 @@ internal sealed partial class ClaimManifestBuilder(
                 {
                     continue;
                 }
-                if (visited.Count > CompilerPreparedBody.MaximumInstructions)
+                if (visited.Count > CompilerArtifactLimits.MaximumInstructions)
                 {
                     return new(0, 0, 0, "ReferenceBudget", source.Compilation.AssemblyName);
                 }

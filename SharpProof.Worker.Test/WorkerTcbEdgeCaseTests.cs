@@ -130,20 +130,6 @@ public sealed class WorkerTcbEdgeCaseTests
         Assert.That(entry.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
     }
     [Test]
-    public void EmptySourceIntervalFailsClosedBeforeBackendInvocation()
-    {
-        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static int Target(int value) { Contract.Ensures(true); return value; }
-            }
-            """);
-        var parameter = artifact.Callables.Single().Variables.Single(variable => variable.Role == CompilerVariableRole.Parameter);
-        parameter.Minimum = 1;
-        parameter.Maximum = 0;
-        RejectMalformedArtifact(artifact);
-    }
-    [Test]
     public async Task ResourceCounterCrossingMethodLimitDiscardsBackendOutcome()
     {
         using var project = new ShadowTestProject(NativeTrivialSource);
@@ -497,49 +483,13 @@ public sealed class WorkerTcbEdgeCaseTests
     }
     private static CompilerCallablePreparation CreateTrivialTarget()
     {
-        var factory = new IrFactory();
-        return CreateTarget(
-            factory,
-            factory.Boolean(true),
-            [],
-            CompilerPreparedBody.Trivial());
-    }
-
-    private static CompilerCallablePreparation CreateTarget(
-        IrFactory factory,
-        IrTerm postcondition,
-        ImmutableArray<CompilerCanonicalVariable> variables,
-        CompilerPreparedBody? body)
-    {
-        return CreateTarget(
-            factory,
-            [new CompilerPreparedClause(
-                CompilerContractKind.Ensures,
-                postcondition,
-                CompilerContractEvidence.CompilerBoundInvocation,
-                "claim",
-                null)],
-            variables,
-            body);
-    }
-
-    private static CompilerCallablePreparation CreateTarget(
-        IrFactory factory,
-        ImmutableArray<CompilerPreparedClause> clauses,
-        ImmutableArray<CompilerCanonicalVariable> variables,
-        CompilerPreparedBody? body)
-    {
         return new(
-            factory,
             new WorkerCallableManifestEntry
             {
                 CallableId = "M:Test.Subject.Verify",
                 ClaimIds = ["claim"]
             },
-            clauses,
-            variables,
-            WorkerClaimReason.None,
-            body);
+            WorkerClaimReason.None);
     }
 
     private static MethodResourceBudget CreateResourceBudget()

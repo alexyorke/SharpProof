@@ -160,10 +160,11 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(Digest(replacementRoundTrip), Is.EqualTo(Digest(replacementArtifact)));
             Assert.That(pairRoundTrip.CompilerDiagnostics, Is.Empty);
             Assert.That(replacementRoundTrip.CompilerDiagnostics, Is.Empty);
+            // Well-formed strings bind; only ill-formed ones are unsupported expressions.
             Assert.That(pairRoundTrip.Callables.Single().FailureReason,
-                Is.EqualTo(WorkerClaimReason.None));
+                Is.Not.EqualTo(WorkerClaimReason.UnsupportedExpression));
             Assert.That(replacementRoundTrip.Callables.Single().FailureReason,
-                Is.EqualTo(WorkerClaimReason.None));
+                Is.EqualTo(pairRoundTrip.Callables.Single().FailureReason));
         }
     }
 

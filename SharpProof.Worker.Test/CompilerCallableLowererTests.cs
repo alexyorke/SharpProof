@@ -16,12 +16,6 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerCallableLowererTests
 {
-    private static readonly CompilerContractKind[] ExpectedClauseKinds = [
-        CompilerContractKind.Requires,
-        CompilerContractKind.Assume,
-        CompilerContractKind.Ensures
-    ];
-
     [TestCase(ContractBindingFailure.UnsupportedExpression,
         WorkerClaimReason.UnsupportedExpression)]
     [TestCase(ContractBindingFailure.InvalidClausePlacement,
@@ -42,58 +36,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public void BoundContractsAndExecutableBodyRetainVerifierInputs()
-    {
-        var preparation = Prepare(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Identity(int value) {
-                    Contract.Requires(value >= 0);
-                    Contract.Assume(value <= 100);
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return value;
-                }
-            }
-            """,
-            "Identity");
-
-        Assert.That(preparation.IsSuccess, Is.True);
-        Assert.That(
-            preparation.Clauses.Select(static clause => clause.Kind),
-            Is.EqualTo(ExpectedClauseKinds));
-        Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
-        Assert.That(
-            preparation.Clauses.Single(static clause => clause.Kind == CompilerContractKind.Ensures).ClaimId,
-            Is.EqualTo(preparation.Entry.ClaimIds[0]));
-        Assert.That(
-            preparation.Entry.Assumptions.Count(static evidence =>
-                evidence.Kind == WorkerAssumptionKind.UserAssume),
-            Is.EqualTo(1));
-        var parameter = preparation.Variables.Single(static variable =>
-            variable.Role == CompilerVariableRole.Parameter);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(parameter.ModelLabel, Is.EqualTo("parameter:0"));
-            Assert.That(
-                parameter.SourceIntegerInterval,
-                Is.EqualTo(new CompilerIntegerInterval(int.MinValue, int.MaxValue)));
-            Assert.That(
-                preparation.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Result).ModelLabel,
-                Is.EqualTo("result"));
-            Assert.That(preparation.Body, Is.Not.Null);
-            Assert.That(preparation.Body!.Kind, Is.EqualTo(CompilerPreparedBodyKind.Program));
-            Assert.That(preparation.Body.Program, Is.Not.Null);
-            Assert.That(preparation.Body.ParameterBindings, Has.Count.EqualTo(1));
-            Assert.That(preparation.Body.SpecCalls, Is.Empty);
-            Assert.That(preparation.Body.Program!.Entry.Value, Is.Zero);
-            Assert.That(preparation.Body.Program.Entry, Is.EqualTo(preparation.Body.Program.Blocks[0].Id));
-        }
-    }
-
-    [Test]
-    public void LeadingGotoCannotSelectAnUnreachableReturnBeforeAReachableLoop()
+    public void LeadingGotoLoopIsLoweredByTheTotalIr()
     {
         var preparation = Prepare(
             """
@@ -119,53 +62,13 @@ public sealed class CompilerCallableLowererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(preparation.IsSuccess, Is.False);
-            Assert.That(
-                preparation.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(preparation.IsSuccess, Is.True);
+            Assert.That(preparation.Total, Is.Not.Null);
         }
     }
 
     [Test]
-    public void ResolvedNonThrowingSpecCallIsBoundToExactLoweredInstruction()
-    {
-        var preparation = Prepare(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static string Concat(string left, string right) {
-                    Contract.Ensures(Contract.Result<string>() != null);
-                    return string.Concat(left, right);
-                }
-            }
-            """,
-            "Concat");
-
-        Assert.That(
-            preparation.IsSuccess,
-            Is.True,
-            preparation.FailureReason.ToString());
-        var body = preparation.Body!;
-        var descriptor = body.SpecCalls.Values.Single();
-        var call = body.Program!.Blocks
-            .SelectMany(static block => block.Instructions)
-            .OfType<IrCallInstruction>()
-            .Single(instruction => instruction.Id == descriptor.Instruction);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                descriptor.WitnessIdentifier,
-                Is.EqualTo("bcl.string.concat.string-string"));
-            Assert.That(
-                descriptor.CallIdentity,
-                Is.EqualTo("M:System.String.Concat(System.String,System.String)"));
-            Assert.That(descriptor.ConsumesMemoryHavoc, Is.False);
-            Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
-        }
-    }
-
-    [Test]
-    public void NullableValueGetterRemainsUnsupported()
+    public void NullableValueGetterIsLoweredByTheTotalIr()
     {
         var preparation = Prepare(
             """
@@ -181,69 +84,9 @@ public sealed class CompilerCallableLowererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(preparation.IsSuccess, Is.False);
-            Assert.That(
-                preparation.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(preparation.IsSuccess, Is.True);
+            Assert.That(preparation.Total, Is.Not.Null);
         }
-    }
-
-    [Test]
-    public void SpecCallThrowSemanticsRequireNormalCompletionForMayThrowRows()
-    {
-        var evidence = new SpecEvidence(
-            SpecEvidenceKind.Documented, "focused-test");
-        var doesNotThrow = new SpecThrowFacet(
-            SpecThrowBehavior.DoesNotThrow, [], evidence);
-        var missingCompletion = new SpecThrowFacet(
-            SpecThrowBehavior.MayThrow,
-            ["System.InvalidOperationException"],
-            evidence);
-        var withCompletion = new SpecThrowFacet(
-            SpecThrowBehavior.MayThrow,
-            ["System.InvalidOperationException"],
-            evidence,
-            new SpecBooleanDeclaration(true));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                CompilerCallableLowerer.HasSupportedThrowSemantics(
-                    doesNotThrow),
-                Is.True);
-            Assert.That(
-                CompilerCallableLowerer.HasSupportedThrowSemantics(
-                    missingCompletion),
-                Is.False);
-            Assert.That(
-                CompilerCallableLowerer.HasSupportedThrowSemantics(
-                    withCompletion),
-                Is.True);
-        }
-    }
-
-    [Test]
-    public void MathAbsMayThrowSpecCallHasAValidatedNormalCompletionCondition()
-    {
-        var preparation = Prepare(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Absolute(int value) {
-                    Contract.Ensures(Contract.Result<int>() >= 0);
-                    return System.Math.Abs(value);
-                }
-            }
-            """,
-            "Absolute");
-
-        Assert.That(
-            preparation.IsSuccess,
-            Is.True,
-            preparation.FailureReason.ToString());
-        Assert.That(
-            preparation.Body!.SpecCalls.Values.Single().WitnessIdentifier,
-            Is.EqualTo("bcl.math.abs.int32"));
     }
 
     [Test]
@@ -265,7 +108,6 @@ public sealed class CompilerCallableLowererTests
             "Verify");
 
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Body, Is.Null);
         Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
 
@@ -324,12 +166,11 @@ public sealed class CompilerCallableLowererTests
 
         var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Body, Is.Null);
         Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
 
     [Test]
-    public void ConstructorAndRefBodyAreTypedUnsupported()
+    public void PlainConstructorIsLoweredAndRefBodyIsUnsupported()
     {
         var constructor = Prepare(
             """
@@ -355,10 +196,8 @@ public sealed class CompilerCallableLowererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(constructor.IsSuccess, Is.False);
-            Assert.That(
-                constructor.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(constructor.IsSuccess, Is.True);
+            Assert.That(constructor.Total, Is.Not.Null);
             Assert.That(byReference.IsSuccess, Is.False);
             Assert.That(
                 byReference.FailureReason,
@@ -371,7 +210,7 @@ public sealed class CompilerCallableLowererTests
     {
         var statements = string.Concat(Enumerable.Repeat(
             "value = value;\n",
-            CompilerPreparedBody.MaximumInstructions));
+            CompilerArtifactLimits.MaximumInstructions));
         var preparation = Prepare(
             """
             using SharpProof.Attributes;
@@ -414,7 +253,6 @@ public sealed class CompilerCallableLowererTests
             Assert.That(preparation.IsSuccess, Is.True);
             Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(preparation.Entry.ClaimIds, Is.Empty);
-            Assert.That(preparation.Body, Is.Null);
             Assert.That(
                 verification.Callable.Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
@@ -434,7 +272,7 @@ public sealed class CompilerCallableLowererTests
     [TestCase(
         "return new[] { value }[0];",
         TestName = "RequiresOnlyHeapAccessHasNativeCoverage")]
-    public async Task RequiresOnlyLegacyUnsupportedBodyHasNativeCoverage(
+    public async Task RequiresOnlyLoweredBodyHasNativeCoverage(
         string body)
     {
         var preparation = Prepare(
@@ -456,10 +294,8 @@ public sealed class CompilerCallableLowererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(preparation.IsSuccess, Is.False);
-            Assert.That(
-                preparation.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(preparation.IsSuccess, Is.True);
+            Assert.That(preparation.Total, Is.Not.Null);
             Assert.That(preparation.Entry.ClaimIds, Is.Empty);
             Assert.That(
                 verification.Callable.Coverage,
@@ -472,7 +308,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public async Task MixedEffectAndRequiresUnsupportedBodyProvesNatively()
+    public async Task MixedEffectAndRequiresLoopBodyProvesNatively()
     {
         var preparation = Prepare(
             """
@@ -493,10 +329,8 @@ public sealed class CompilerCallableLowererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(preparation.IsSuccess, Is.False);
-            Assert.That(
-                preparation.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(preparation.IsSuccess, Is.True);
+            Assert.That(preparation.Total, Is.Not.Null);
             Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
             Assert.That(
                 preparation.EffectClaims.Single().Outcome,
@@ -548,7 +382,6 @@ public sealed class CompilerCallableLowererTests
             Assert.That(preparation.IsSuccess, Is.True);
             Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
-            Assert.That(preparation.Body, Is.Null);
             Assert.That(
                 verification.Callable.Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));

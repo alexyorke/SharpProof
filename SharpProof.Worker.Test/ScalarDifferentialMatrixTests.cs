@@ -829,36 +829,19 @@ public sealed class ScalarDifferentialMatrixTests
         CompilerCallablePreparation target,
         params object[] inputs)
     {
-        var body = target.Body ??
+        var total = target.Total ??
             throw new InvalidOperationException(
-                $"Callable '{target.Entry.CallableId}' has no body.");
-        var program = body.Program ??
-            throw new InvalidOperationException(
-                $"Callable '{target.Entry.CallableId}' has no IR program.");
-        var canonicalParameters = target.Variables
-            .Where(static variable =>
-                variable.Role == CompilerVariableRole.Parameter)
-            .ToDictionary(static variable => variable.Variable);
-        var initial = body.ParameterBindings.ToDictionary(
-            static binding => binding.Key,
-            binding =>
-            {
-                var parameter = canonicalParameters[binding.Value];
-                return inputs[parameter.Ordinal] switch
-                {
-                    bool value => target.Factory.CreateBooleanValue(value),
-                    { } value => target.Factory.CreateIntegerValue(
-                        Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-                    _ => throw new InvalidOperationException(
-                        "Null is not a supported scalar matrix input.")
-                };
-            });
-        var maximumSteps = program.Blocks.Sum(static block =>
-            block.Instructions.Length);
-        return new IrProgramInterpreter(target.Factory).Execute(
-            program,
-            initial,
-            maximumSteps);
+                $"Callable '{target.Entry.CallableId}' has no Total program.");
+        var factory = total.Program.Factory;
+        var initial = total.Parameters.Select((parameter, ordinal) => (parameter.Entry, Value: inputs[ordinal] switch
+        {
+            bool value => factory.CreateBooleanValue(value),
+            { } value => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type,
+                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+            _ => throw new InvalidOperationException(
+                "Null is not a supported scalar matrix input.")
+        })).ToDictionary(static item => item.Entry, static item => item.Value);
+        return new IrProgramInterpreter(factory).Execute(total.Program, initial);
     }
 
     private static void AssertIntegerReturn(
@@ -877,8 +860,8 @@ public sealed class ScalarDifferentialMatrixTests
                 Is.EqualTo(IrValueKind.Integer),
                 message);
             Assert.That(
-                execution.ReturnValue?.Integer,
-                Is.EqualTo(expected),
+                execution.ReturnValue?.IntegerNumericValue,
+                Is.EqualTo(new System.Numerics.BigInteger(expected)),
                 message);
         }
     }

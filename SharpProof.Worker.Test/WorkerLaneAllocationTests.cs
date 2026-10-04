@@ -10,9 +10,8 @@ public sealed class WorkerLaneAllocationTests
     [Test]
     public void CompilerAbstentionsDoNotConsumeSolverLaneCapacity()
     {
-        var factory = new IrFactory();
-        var unsupported = Preparation(factory, WorkerClaimReason.UnsupportedBody);
-        var successful = Preparation(factory, WorkerClaimReason.None);
+        var unsupported = Preparation(WorkerClaimReason.UnsupportedBody);
+        var successful = Preparation(WorkerClaimReason.None);
 
         Assert.That(
             SharpProofWorker.CountSolverTargets([unsupported, successful]),
@@ -22,12 +21,9 @@ public sealed class WorkerLaneAllocationTests
             Is.Zero);
     }
 
-    private static CompilerCallablePreparation Preparation(
-        IrFactory factory, WorkerClaimReason reason)
+    private static CompilerCallablePreparation Preparation(WorkerClaimReason reason)
     {
         return new CompilerCallablePreparation(
-            factory,
-            new WorkerCallableManifestEntry { CallableId = Guid.NewGuid().ToString("N") },
-            [], [], reason, null);
+            new WorkerCallableManifestEntry { CallableId = Guid.NewGuid().ToString("N") }, reason);
     }
 }

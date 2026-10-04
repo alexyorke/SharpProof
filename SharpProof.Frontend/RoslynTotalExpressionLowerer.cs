@@ -110,6 +110,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue LowerBodyValue(IOperation operation, IrBlockId block, int depth = 0)
     {
         Spend?.Invoke();
+        if (CSharpOperationSemantics.IsIntercepted(operation, _context.Compilation))
+        { return Approximate(operation, block, FrontendAbstention.UnsupportedInvocationShape); }
         if (depth < 256 && operation is IConversionOperation
             { OperatorMethod: null, IsTryCast: false, Operand: ICollectionExpressionOperation converted } collectionConversion &&
             !collectionConversion.Conversion.IsUserDefined && SymbolEqualityComparer.Default.Equals(collectionConversion.Type, converted.Type) &&
@@ -943,6 +945,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return FrontendAbstention.ExpressionDepthLimit; }
         if (operation is IParameterReferenceOperation parameter && !_context.OwnsParameter(parameter.Parameter))
         { return FrontendAbstention.UnsupportedOperationKind; }
+        if (CSharpOperationSemantics.IsIntercepted(operation, _context.Compilation))
+        { return FrontendAbstention.UnsupportedInvocationShape; }
         if (!CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision))
         { return FrontendAbstention.UnknownOperationKind; }
         var admission = decision.Admission;

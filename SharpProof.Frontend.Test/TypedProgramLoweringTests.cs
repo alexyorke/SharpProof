@@ -116,21 +116,6 @@ public sealed class TypedProgramLoweringTests
         Assert.That(subject.Invoke([10, firstDenominator, 20, secondDenominator]), Is.TypeOf<DivideByZeroException>());
     }
 
-    [TestCase("int Target(int x) => System.Math.Abs(x);")]
-    [TestCase("int Target(int[] x) { x[0] = 1; return 1; }")]
-    [TestCase("int Target(int x) { ref int r = ref x; r++; return x; }")]
-    public void UnsupportedCandidateDoesNotChangeLegacyClassification(string members)
-    {
-        using var subject = TypedProgramSubject.Create(members);
-        Assert.That(subject.Lower().IsExact, Is.False);
-        var legacy = new IrFactory();
-        var first = new RoslynProgramLowerer(legacy).Lower(subject.Graph);
-        var otherLegacy = new IrFactory();
-        var second = new RoslynProgramLowerer(otherLegacy).Lower(subject.Graph);
-        Assert.That(first.Classification.Decision, Is.EqualTo(second.Classification.Decision));
-        Assert.That(first.Classification.Abstention, Is.EqualTo(second.Classification.Abstention));
-    }
-
     [TestCase("int Target(int x) { ref int r = ref x; r++; return x; }")]
     [TestCase("int Target(int x) { ref readonly int r = ref x; x++; return r; }")]
     public void ReferenceLocalAliasesAbstainInsteadOfCopyingStorage(string members)

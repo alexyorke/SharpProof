@@ -13,7 +13,7 @@ namespace SharpProof.Frontend.Test;
 public sealed class InterceptorDispatchLoweringRegressionTests
 {
     [Test]
-    public void ProgramLoweringUsesTheBoundInterceptorMethod()
+    public void TotalLoweringAbstainsOnAnInterceptedCall()
     {
         const string callerSource = """
             public static class Subject
@@ -105,16 +105,12 @@ public sealed class InterceptorDispatchLoweringRegressionTests
             .OfType<MethodDeclarationSyntax>()
             .Single(static declaration => declaration.Identifier.ValueText == "Target");
         var graph = ControlFlowGraph.Create(method, model);
-        var factory = new IrFactory();
-        var lowered = new RoslynProgramLowerer(factory).Lower(graph!);
-        var call = lowered.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .OfType<IrCallInstruction>()
-            .Single();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(method)!);
+        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, context, static _ => true, CancellationToken.None);
 
-        Assert.That(
-            factory.GetString(factory.GetMemberInfo(call.Member).Name),
-            Does.Contain("Replace"));
+        // Inlining the bound target would verify Helper while Replace runs.
+        Assert.That(lowered.IsExact, Is.False);
     }
 
     private static string EscapeStringLiteral(string value)

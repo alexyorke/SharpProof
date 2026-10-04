@@ -47,7 +47,7 @@ internal static class CompilerReachableSourceCollector
             {
                 var stack = new Stack<IOperation>();
                 stack.Push(operation);
-                var remaining = CompilerPreparedBody.MaximumInstructions;
+                var remaining = CompilerArtifactLimits.MaximumInstructions;
                 while (stack.Count != 0)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -167,7 +167,7 @@ internal static class CompilerReachableSourceCollector
             var id = Id(syntax);
             if (bodies.TryGetValue(id, out var existing))
             { return existing; }
-            if (bodies.Count >= CompilerPreparedBody.MaximumInstructions || !methods.Add(method))
+            if (bodies.Count >= CompilerArtifactLimits.MaximumInstructions || !methods.Add(method))
             { return null; }
             var body = new CompilerSourceBodyArtifact
             {
@@ -179,7 +179,7 @@ internal static class CompilerReachableSourceCollector
             };
             body.CallIdentity = CompilerIdentityBridge.CreateSymbolDisplay(method);
             body.IsStatic = method.IsStatic;
-            if (method.Parameters.Length <= CompilerPreparedBody.MaximumInstructions &&
+            if (method.Parameters.Length <= CompilerArtifactLimits.MaximumInstructions &&
                 method.Parameters.All(parameter => CSharpOperationSemantics.IsValueDomain(parameter.Type)) &&
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
@@ -277,7 +277,7 @@ internal static class CompilerReachableSourceCollector
     {
         var pending = new Stack<IOperation>();
         pending.Push(operation);
-        var remaining = CompilerPreparedBody.MaximumInstructions;
+        var remaining = CompilerArtifactLimits.MaximumInstructions;
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();

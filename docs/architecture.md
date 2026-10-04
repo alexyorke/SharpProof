@@ -417,8 +417,8 @@ Late or conditional placement remains unsupported. Decoding binds each filter
 to its owned clause and requires reachable prologue placement before body
 execution. The optional Total artifact and shadow comparison reuse decoded
 preparations; authoritative worker responses and cache claims remain legacy.
-`TotalCallableVerifier` owns candidate orchestration independently of legacy
-lowering success and shadow reporting. It publishes each completed claim with
+`TotalCallableVerifier` owns candidate orchestration independently of the
+callable's admission reason and shadow reporting. It publishes each completed claim with
 canonical entry evidence and assumption usage before starting the next claim,
 so later cancellation preserves earlier kernel-validated results.
 The native verifier may also borrow a worker-owned backend and its matching
@@ -427,8 +427,7 @@ budget. Both full-callable and independent entry queries use ProofKernel on
 the supplied session; default standalone verification still owns its session.
 The internal `SharpProofWorker.CreateNative` qualification route uses one native
 session per callable factory and keeps resource counts monotonic across each
-lane. It admits independently prepared typed callables even when legacy lowering
-failed, projects native claims into ordinary worker responses, and retains
+lane. It admits independently prepared typed callables, projects native claims into ordinary worker responses, and retains
 completed claims across a later method interruption.
 The same native route retains settled results after project timeout or caller
 cancellation, including earlier completed callables. Only unfinished claims

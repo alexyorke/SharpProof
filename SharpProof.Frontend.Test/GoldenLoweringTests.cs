@@ -53,7 +53,7 @@ public sealed class GoldenLoweringTests
         var sourceCalls = fixture.Source.Contains("// golden-inline-source: true", StringComparison.Ordinal);
         var frameworkModels = fixture.Source.Contains("// golden-framework-models: true", StringComparison.Ordinal);
         var opaqueCalls = fixture.Source.Contains("// golden-opaque-calls: true", StringComparison.Ordinal);
-        var result = context == null ? new RoslynProgramLowerer(factory).Lower(graph)
+        var result = context == null ? throw new InvalidOperationException("Golden lowering fixtures lower the Total IR.")
             : opaqueCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,
                 CancellationToken.None, opaqueCalls: true)
             : frameworkModels ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,

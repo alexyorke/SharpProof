@@ -153,16 +153,12 @@ public sealed class ExceptionIdentityReplayTests
             };
             CompilerEffectClaimArtifactCodec.Seal(evidence);
             var target = new CompilerCallablePreparation(
-                new IrFactory(),
                 new WorkerCallableManifestEntry
                 {
                     CallableId = "M:Subject.Compare",
                     ClaimIds = [claimId]
                 },
-                [],
-                [],
-                WorkerClaimReason.None,
-                CompilerPreparedBody.Trivial())
+                WorkerClaimReason.None)
             {
                 EffectClaims = [evidence]
             };

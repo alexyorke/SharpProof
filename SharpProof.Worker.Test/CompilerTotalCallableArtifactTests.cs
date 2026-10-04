@@ -548,7 +548,6 @@ public sealed class CompilerTotalCallableArtifactTests
         var preparation = preparations.Single();
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
-        Assert.That(total.Program.Factory, Is.Not.SameAs(preparation.Factory));
         Assert.That(total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).Select(clause => clause.ClaimId),
             Is.EqualTo(roundTrip.Manifest.Claims.Select(claim => claim.ClaimId)));
         Assert.That(total.Clauses.Single(clause => clause.Kind == CompilerContractKind.Requires).AssumptionId,
@@ -663,36 +662,6 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(check.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void LegacyGraphBytesAndFailureRowsRemainUnchanged(bool sourceAssume)
-    {
-        var compilation = TestCompilation.Create("LegacyPreservation", ("Subject.cs", sourceAssume ? WorkerVcSourceAssumeTests.Source : DiamondSource));
-        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
-        var withTotal = CompilerLoweredArtifact.Encode(preparation);
-        var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        Assert.That(JsonSerializer.Serialize(withTotal.Graph, WorkerProtocolJson.SharedOptions),
-            Is.EqualTo(JsonSerializer.Serialize(legacy.Graph, WorkerProtocolJson.SharedOptions)));
-        withTotal.Total = null;
-        Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions),
-            Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
-    }
-
-    [Test]
-    public void OptionalLoopEvidencePreservesEveryLegacyRowAndGraphByte()
-    {
-        var compilation = TestCompilation.Create("LegacyLoopPreservation", ("Subject.cs", WorkerVcLoopTests.LoopSource));
-        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
-        Assert.That(preparation.Total, Is.Not.Null);
-        var withTotal = CompilerLoweredArtifact.Encode(preparation);
-        var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        withTotal.Total = null;
-        Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions),
-            Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
-    }
-
     [TestCase("Subject.cs")]
     [TestCase("")]
     [TestCase("/project/Subject.cs")]
@@ -733,7 +702,7 @@ public sealed class CompilerTotalCallableArtifactTests
     [Test]
     public void OversizedExactSourceOmitsTotalWithoutInvalidatingLegacyArtifact()
     {
-        var statements = string.Concat(Enumerable.Repeat("x = 0;\n", CompilerPreparedBody.MaximumInstructions + 1));
+        var statements = string.Concat(Enumerable.Repeat("x = 0;\n", CompilerArtifactLimits.MaximumInstructions + 1));
         var artifact = CreateArtifact($$"""
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {

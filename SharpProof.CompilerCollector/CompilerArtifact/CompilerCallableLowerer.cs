@@ -1,19 +1,16 @@
 // This lowerer runs only in the build-time compiler collector.
-using Microsoft.CodeAnalysis.Text;
-
 namespace SharpProof.CompilerArtifact;
 
+// Classifies a discovered callable and lowers its Total programs. The reason
+// says why a callable cannot be verified; a body the Total IR cannot lower is
+// UnsupportedBody.
 internal sealed class CompilerCallableLowerer
 {
-    private const int MaximumBodyBlocks = 64;
-    private readonly IrFactory _factory;
     private readonly CSharpCompilation _compilation;
     private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
     private readonly CompilerReferenceSnapshot[]? _capturedReferences;
     private readonly ContractBinder _contracts;
-    private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerSpecificationPackConfiguration _specificationPackAuthority;
-    private readonly CompilerSpecificationPackProvider _specificationPacks;
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
@@ -37,11 +34,8 @@ internal sealed class CompilerCallableLowerer
         _compilation = compilation;
         _capturedTrees = capturedTrees;
         _capturedReferences = capturedReferences;
-        _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _specificationPackAuthority = specificationPackAuthority;
-        _contracts = new ContractBinder(compilation, factory);
-        _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        _specificationPacks = new CompilerSpecificationPackProvider(factory, specificationPackAuthority);
+        _contracts = new ContractBinder(compilation, ArgumentNullGuard.NotNull(factory, nameof(factory)));
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
@@ -54,230 +48,43 @@ internal sealed class CompilerCallableLowerer
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
                 [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)]);
-        return PrepareLegacy(target, cancellationToken) with { Total = total, TotalEntry = entry };
+        var reason = Classify(target, total != null, cancellationToken);
+        if (reason != CompilerCallableArtifactReasonCatalog.SuccessReason &&
+            !CompilerCallableArtifactReasonCatalog.IsFailureReason(reason))
+        {
+            throw new InvalidOperationException(
+                "The compiler callable failure reason is not producer-owned.");
+        }
+        return new(target.Entry, reason) { Total = total, TotalEntry = entry };
     }
 
-    private CompilerCallablePreparation PrepareLegacy(ManifestCallableTarget target, CancellationToken cancellationToken)
+    private WorkerClaimReason Classify(ManifestCallableTarget target, bool hasTotal, CancellationToken cancellationToken)
     {
-        target = ArgumentNullGuard.NotNull(target, nameof(target));
-
         cancellationToken.ThrowIfCancellationRequested();
         if (!target.IsVerifierSupported || target.Declaration is not BaseMethodDeclarationSyntax || target.SemanticModel == null)
         {
-            return Fail(target, WorkerClaimReason.UnsupportedCallable);
+            return WorkerClaimReason.UnsupportedCallable;
         }
 
         var binding = _contracts.Bind(target.Method);
         if (!binding.IsSuccess)
         {
-            return Fail(target, MapBindingFailure(binding.Failure));
+            return MapBindingFailure(binding.Failure);
         }
 
         var contracts = binding.Contracts!;
-        var manifestAssumptions = ArgumentNullGuard.NotNull(
-            target.Entry.Assumptions,
-            nameof(target.Entry.Assumptions));
-        var preconditions = ImmutableArray.CreateBuilder<WorkerAssumptionEvidence>();
-        var userAssumptions = ImmutableArray.CreateBuilder<WorkerAssumptionEvidence>();
-        foreach (var evidence in manifestAssumptions)
+        var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
+        if (contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires) !=
+                assumptions.Count(static evidence => evidence.Kind == WorkerAssumptionKind.Precondition) ||
+            contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Assume) !=
+                assumptions.Count(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume) ||
+            !HasManifestParity(target, contracts))
         {
-            if (evidence.Kind == WorkerAssumptionKind.Precondition)
-            {
-                preconditions.Add(evidence);
-            }
-            else if (evidence.Kind == WorkerAssumptionKind.UserAssume)
-            {
-                userAssumptions.Add(evidence);
-            }
+            return WorkerClaimReason.UnsupportedContract;
         }
 
-        var requiresCount = 0;
-        var assumeCount = 0;
-        foreach (var clause in contracts.Clauses)
-        {
-            if (clause.Kind == BoundContractKind.Requires)
-            {
-                requiresCount++;
-            }
-            else if (clause.Kind == BoundContractKind.Assume)
-            {
-                assumeCount++;
-            }
-        }
-        if (requiresCount != preconditions.Count ||
-            assumeCount != userAssumptions.Count)
-        {
-            return Fail(target, WorkerClaimReason.UnsupportedContract);
-        }
-
-        if (!HasManifestParity(target, contracts))
-        {
-            return Fail(target, WorkerClaimReason.UnsupportedContract);
-        }
-
-        var preconditionOrdinal = 0;
-        var assumptionOrdinal = 0;
-        var claimOrdinal = 0;
-        ImmutableArray<CompilerPreparedClause> clauses = [.. contracts.Clauses.Select(clause => new CompilerPreparedClause(
-            CompilerLoweringWireMappings.ToCompiler(clause.Kind), clause.Condition,
-            CompilerLoweringWireMappings.ToCompiler(clause.Evidence),
-            clause.Kind == BoundContractKind.Ensures ? target.Claims[claimOrdinal++].Entry.ClaimId : null,
-            clause.Kind == BoundContractKind.Requires ? preconditions[preconditionOrdinal++].Id :
-                clause.Kind == BoundContractKind.Assume ? userAssumptions[assumptionOrdinal++].Id : null))];
-        ImmutableArray<CompilerCanonicalVariable> variables = [.. contracts.Variables.Select(
-            variable => CreateVariable(variable, contracts))];
-        if (target.Claims.IsDefaultOrEmpty &&
-            contracts.Clauses.Any(static clause =>
-                clause.Kind != BoundContractKind.Ensures))
-        {
-            // A callable with only entry clauses has no body to replay, but we
-            // still classify an unsupported implementation so its typed
-            // incomplete result is not reported as complete. Effect-only
-            // callables without clauses intentionally skip this admission.
-            _ = PrepareBody(target, contracts, cancellationToken, out var bodyFailure);
-            if (bodyFailure != WorkerClaimReason.None)
-            {
-                return Fail(target, bodyFailure, clauses, variables);
-            }
-
-            return Success(target, clauses, variables, body: null);
-        }
-
-        if (target.Claims.IsDefaultOrEmpty)
-        {
-            return Success(target, clauses, variables, body: null);
-        }
-
-        var preparedBody = PrepareBody(target, contracts, cancellationToken, out var failure);
-        if (failure != WorkerClaimReason.None)
-        {
-            return Fail(target, failure, clauses, variables);
-        }
-
-        return Success(
-            target,
-            clauses,
-            variables,
-            target.Claims.IsDefaultOrEmpty ? null : preparedBody);
-    }
-
-    private CompilerPreparedBody? PrepareBody(ManifestCallableTarget target, BoundMethodContracts contracts,
-        CancellationToken cancellationToken, out WorkerClaimReason failure)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (target.Method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None))
-        {
-            return Unsupported(out failure);
-        }
-
-        if (target.Method.MethodKind == MethodKind.Constructor)
-        {
-            return Unsupported(out failure);
-        }
-
-        var inventory = _contracts.GetClauseInventory(target.Method);
-        var clauseSites = target.VerifierDeclaration.Body is { } &&
-            !inventory.Clauses.IsDefaultOrEmpty
-            ? CreateClauseSiteIndex(inventory)
-            : null;
-        if (target.Method.ReturnsVoid)
-        {
-            failure = ContainsOnlyContractStatements(
-                target,
-                inventory,
-                clauseSites) ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody;
-            return failure == WorkerClaimReason.None ? CompilerPreparedBody.Trivial() : null;
-        }
-        var bodyStart = FindExecutableBodyStart(target, inventory, clauseSites);
-        if (!bodyStart.HasValue)
-        {
-            return Unsupported(out failure);
-        }
-
-        Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph? graph;
-        try
-        {
-            graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
-                target.VerifierDeclaration,
-                target.VerifierSemanticModel);
-        }
-        catch (ArgumentException)
-        {
-            return Unsupported(out failure);
-        }
-        if (graph == null)
-        {
-            return Unsupported(out failure);
-        }
-
-        var elidedClauseSites = inventory.Clauses
-            .Where(static clause => !clause.IsValid)
-            .Select(static clause => clause.Invocation.Syntax)
-            .ToImmutableArray();
-        if (!TryFindProgramStart(
-                graph, bodyStart.Value, out var entry, out var firstOperation))
-        {
-            return Unsupported(out failure);
-        }
-
-        var selected = new RoslynProgramLowerer(
-            _factory,
-            _apiSpecs.IsSideEffectFree).LowerSelected(
-            graph, entry!, firstOperation,
-            operation => ContainsElidedClause(operation, elidedClauseSites));
-        var lowering = selected.Lowering;
-        if (!lowering.IsExact ||
-            !TryValidateAcyclicBody(lowering.Program, lowering.Program.Entry, cancellationToken) ||
-            !TryCreateParameterBindings(
-                target, contracts, lowering.Variables, out var parameterBindings))
-        {
-            return Unsupported(out failure);
-        }
-
-        var specCalls = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
-        foreach (var binding in selected.Calls)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryGetCallIdentity(
-                    binding.Value.TargetMethod,
-                    out var callIdentity))
-            {
-                return Unsupported(out failure);
-            }
-
-            var admissibleByValue = TryGetAdmissibleByValueCall(
-                binding.Key,
-                binding.Value);
-            if (TryPrepareSpecCall(
-                    binding.Key,
-                    binding.Value,
-                    callIdentity,
-                    admissibleByValue,
-                    out var preparedSpec))
-            {
-                specCalls.Add(binding.Key.Id, preparedSpec!);
-                continue;
-            }
-
-            return Unsupported(out failure);
-        }
-        if (specCalls.Count != selected.Calls.Count)
-        {
-            return Unsupported(out failure);
-        }
-
-        failure = WorkerClaimReason.None;
-        return CompilerPreparedBody.ProgramBody(
-            lowering.Program,
-            parameterBindings,
-            specCalls.ToImmutable(),
-            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);
-    }
-
-    private static CompilerPreparedBody? Unsupported(out WorkerClaimReason failure)
-    {
-        failure = WorkerClaimReason.UnsupportedBody;
-        return null;
+        // An effect-only callable without clauses needs no body admission.
+        return contracts.Clauses.IsDefaultOrEmpty || hasTotal ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody;
     }
 
     private static bool HasManifestParity(ManifestCallableTarget target, BoundMethodContracts contracts)
@@ -307,379 +114,6 @@ internal sealed class CompilerCallableLowerer
         return true;
     }
 
-    private static CompilerCanonicalVariable CreateVariable(BoundContractVariable variable, BoundMethodContracts contracts)
-    {
-        var source = CompilerCallableProjections.GetVariableSource(
-            variable,
-            contracts);
-        return new CompilerCanonicalVariable(
-            CompilerLoweringWireMappings.ToCompiler(variable.Role), variable.Ordinal, variable.Variable,
-            variable.CurrentStateVariable,
-            IntegerInterval(source?.SpecialType),
-            CompilerCallableProjections.GetModelLabel(variable));
-    }
-
-    private static CompilerIntegerInterval? IntegerInterval(SpecialType? type)
-    {
-        return type.HasValue && CSharpOperationSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
-            ? new(semantics.Minimum, semantics.Maximum) : null;
-    }
-
-    private bool TryPrepareSpecCall(IrCallInstruction call, IInvocationOperation invocation, string callIdentity,
-        bool admissibleByValue,
-        out CompilerPreparedSpecCall? prepared)
-    {
-        prepared = null;
-        if (!admissibleByValue)
-        {
-            return false;
-        }
-
-        // Enabled scalar packs are lowered by the Total path. Do not replace
-        // their operations with a less precise legacy API-spec descriptor.
-        if (_specificationPacks.CanResolve(invocation.TargetMethod))
-        {
-            return false;
-        }
-
-        var targetType = _factory.GetVariableInfo(call.Target!.Value).Type;
-        if (!_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
-            !HasSupportedThrowSemantics(resolved.Template.Facets.Throws) ||
-            !TryAdmitSpecCallEffects(invocation, call, resolved.Template, out var consumesMemoryHavoc) ||
-            !resolved.Template.Result.HasValue ||
-            !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
-                targetType, out var resultType) ||
-            targetType != resultType ||
-            invocation.Arguments.Length != resolved.Template.Parameters.Length ||
-            resolved.Template.Target.DocumentationCommentId != callIdentity ||
-            resolved.Template.Receiver.HasValue != (call.Receiver != null) ||
-            call.Arguments.Length != resolved.Template.Parameters.Length)
-        {
-            return false;
-        }
-
-        prepared = new CompilerPreparedSpecCall(
-            call.Id, callIdentity, resolved.Template.Target.WitnessIdentifier, consumesMemoryHavoc);
-        return true;
-    }
-
-    internal static bool HasSupportedThrowSemantics(SpecThrowFacet throws)
-    {
-        return throws.Behavior == SpecThrowBehavior.DoesNotThrow ||
-            throws.Behavior == SpecThrowBehavior.MayThrow &&
-            throws.NormalCompletion != null;
-    }
-
-    private static bool TryGetAdmissibleByValueCall(
-        IrCallInstruction call,
-        IInvocationOperation invocation)
-    {
-        return call.Target.HasValue &&
-            RoslynProgramLowerer.IsDirectInvocation(invocation) &&
-            !invocation.TargetMethod.Parameters.Any(
-                static parameter => parameter.RefKind != RefKind.None);
-    }
-
-    private static bool TryGetCallIdentity(IMethodSymbol method, out string identity)
-    {
-        var symbol = ResolvedApiSpecTable.NormalizeSymbol(method);
-        identity = symbol?.GetDocumentationCommentId() ?? string.Empty;
-        // Compiler artifacts bound identity fields to 512 characters. Reject
-        // an otherwise legal Roslyn documentation ID here so a long symbol
-        // becomes a scoped unsupported call instead of failing artifact
-        // construction after partially lowering the body.
-        return identity is { Length: > 0 and <= 512 } &&
-            identity.All(static character => !char.IsControl(character));
-    }
-
-    private static bool TryAdmitSpecCallEffects(IInvocationOperation invocation, IrCallInstruction call,
-        ApiSpecTemplate template, out bool consumesMemoryHavoc)
-    {
-        var effects = template.Facets.Effects.Effects;
-        consumesMemoryHavoc = effects != SpecEffect.None;
-        var cardinality = template.Facets.Cardinality;
-        return !consumesMemoryHavoc ||
-               effects == SpecEffect.Unknown &&
-               invocation.TargetMethod.IsStatic &&
-               invocation.TargetMethod.Parameters.IsEmpty && invocation.Instance == null &&
-               invocation.Arguments.IsEmpty && call.Receiver == null && call.Arguments.IsEmpty &&
-               invocation.Type is IArrayTypeSymbol &&
-               !template.Receiver.HasValue &&
-               template.Parameters.IsEmpty &&
-               template.Postconditions.IsDefaultOrEmpty &&
-               template.Facets.Nullness.Result == SpecNullness.NonNull &&
-               (cardinality.Result is SpecCardinality.Empty or SpecCardinality.NonEmpty
-                || cardinality is { Result: SpecCardinality.Exact, ExactCount: not null });
-    }
-
-    private bool TryGetSpecResultType(ITypeSymbol? sourceType, IrTypeKind? specType,
-        IrTypeId loweredResultType, out IrTypeId resultType)
-    {
-        switch (specType)
-        {
-            case IrTypeKind.Boolean when sourceType?.SpecialType == SpecialType.System_Boolean:
-                resultType = _factory.BooleanType;
-                return true;
-            case IrTypeKind.Integer when CSharpOperationSemantics.IsSupportedInteger(
-                sourceType?.SpecialType ?? SpecialType.None):
-                resultType = _factory.IntegerType;
-                return true;
-            case IrTypeKind.String when sourceType?.SpecialType == SpecialType.System_String:
-                resultType = _factory.StringType;
-                return true;
-            case IrTypeKind.Sequence when sourceType is IArrayTypeSymbol
-                && _factory.GetTypeInfo(loweredResultType).Kind == IrTypeKind.Sequence:
-                resultType = loweredResultType;
-                return true;
-            default:
-                resultType = default;
-                return false;
-        }
-    }
-
-    private static int? FindExecutableBodyStart(
-        ManifestCallableTarget target,
-        ContractClauseInventory inventory,
-        Dictionary<SyntaxTree, HashSet<TextSpan>>? clauseSites)
-    {
-        var declaration = target.VerifierDeclaration;
-        if (declaration.ExpressionBody is { } expressionBody)
-        {
-            return expressionBody.Expression.SpanStart;
-        }
-
-        if (declaration.Body is not { } body)
-        {
-            return null;
-        }
-
-        foreach (var statement in body.Statements)
-        {
-            if (statement is EmptyStatementSyntax ||
-                IsContractStatement(inventory, statement, clauseSites))
-            {
-                continue;
-            }
-
-            return statement.SpanStart;
-        }
-        return null;
-    }
-
-    private static bool IsAtOrAfterBodyStart(IOperation? operation, int bodyStart)
-    {
-        return operation != null && (operation.Syntax.SpanStart >= bodyStart || operation.Syntax.Span.Contains(bodyStart));
-    }
-
-    private static bool ContainsElidedClause(
-        IOperation? operation, ImmutableArray<SyntaxNode> sites)
-    {
-        return operation != null && sites.Any(site =>
-            site.SyntaxTree == operation.Syntax.SyntaxTree &&
-            operation.Syntax.Span.Contains(site.Span));
-    }
-
-    private static bool TryFindProgramStart(
-        Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph graph,
-        int bodyStart,
-        out Microsoft.CodeAnalysis.FlowAnalysis.BasicBlock? entry,
-        out int firstOperation)
-    {
-        var blocks = graph.Blocks;
-        var ordinalOrder = true;
-        for (var index = 0; index < blocks.Length; index++)
-        {
-            if (blocks[index].Ordinal != index)
-            {
-                ordinalOrder = false;
-                break;
-            }
-        }
-
-        IEnumerable<Microsoft.CodeAnalysis.FlowAnalysis.BasicBlock> orderedBlocks =
-            ordinalOrder
-                ? blocks
-                : blocks.OrderBy(static block => block.Ordinal);
-        foreach (var block in orderedBlocks)
-        {
-            if (!block.IsReachable)
-            {
-                continue;
-            }
-
-            for (var index = 0; index < block.Operations.Length; index++)
-            {
-                if (block.Operations[index] is not IEmptyOperation &&
-                    IsAtOrAfterBodyStart(block.Operations[index], bodyStart))
-                {
-                    entry = block;
-                    firstOperation = index;
-                    return true;
-                }
-            }
-
-            if (IsAtOrAfterBodyStart(block.BranchValue, bodyStart))
-            {
-                entry = block;
-                firstOperation = block.Operations.Length;
-                return true;
-            }
-        }
-        entry = null;
-        firstOperation = -1;
-        return false;
-    }
-
-    private static bool TryValidateAcyclicBody(IrProgram program, IrBlockId start, CancellationToken cancellationToken)
-    {
-        var colors = new Dictionary<IrBlockId, int>();
-        var reachable = 0;
-        var instructions = 0;
-        return Visit(start);
-
-        bool Visit(IrBlockId blockId)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (colors.TryGetValue(blockId, out var color))
-            {
-                return color == 2;
-            }
-
-            if (++reachable > MaximumBodyBlocks)
-            {
-                return false;
-            }
-
-            colors.Add(blockId, 1);
-            var block = program.GetBlock(blockId);
-            if (block.Instructions.Length > CompilerPreparedBody.MaximumInstructions - instructions)
-            {
-                return false;
-            }
-
-            instructions += block.Instructions.Length;
-            var successors = IrInstructionFacts.TryGetSuccessors(block.Terminator);
-            if (successors is { } known)
-            {
-                if (known.First is { } first && !Visit(first))
-                {
-                    return false;
-                }
-                if (known.Second is { } second && !Visit(second))
-                {
-                    return false;
-                }
-            }
-            colors[blockId] = 2;
-            return true;
-        }
-    }
-
-    private static bool TryCreateParameterBindings(ManifestCallableTarget target, BoundMethodContracts contracts,
-        ImmutableArray<FrontendVariableBinding> variables,
-        out ImmutableDictionary<IrVarId, IrVarId> parameterBindings)
-    {
-        var canonicalParameters = contracts.Variables.Where(
-            static variable => variable.Role == BoundContractVariableRole.Parameter).ToDictionary(static variable => variable.Ordinal);
-        var receiver = !target.Method.IsStatic
-            ? contracts.Variables.FirstOrDefault(
-                static variable => variable.Role == BoundContractVariableRole.Receiver)
-            : null;
-        var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
-        foreach (var binding in variables)
-        {
-            if (binding.Symbol is ILocalSymbol)
-            {
-                continue;
-            }
-
-            if (binding.Symbol is ITypeSymbol instanceType &&
-                receiver != null &&
-                SymbolEqualityComparer.Default.Equals(
-                    instanceType, target.Method.ContainingType))
-            {
-                bindings.Add(binding.Variable, receiver.Variable);
-                continue;
-            }
-
-            if (binding.Symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, target.Method) ||
-                !canonicalParameters.TryGetValue(parameter.Ordinal, out var canonical))
-            {
-                parameterBindings = ImmutableDictionary<IrVarId, IrVarId>.Empty;
-                return false;
-            }
-            bindings.Add(binding.Variable, canonical.Variable);
-        }
-        parameterBindings = bindings.ToImmutable();
-        return true;
-    }
-
-    private static bool ContainsOnlyContractStatements(
-        ManifestCallableTarget target,
-        ContractClauseInventory inventory,
-        Dictionary<SyntaxTree, HashSet<TextSpan>>? clauseSites)
-    {
-        var declaration = target.VerifierDeclaration;
-        return declaration.Body is { } body
-            ? body.Statements.All(statement =>
-                IsContractStatement(inventory, statement, clauseSites))
-            : declaration.ExpressionBody is { Expression: { } expression } &&
-                IsContractExpression(inventory, expression, clauseSites);
-    }
-
-    private static bool IsContractStatement(
-        ContractClauseInventory inventory,
-        StatementSyntax statement,
-        Dictionary<SyntaxTree, HashSet<TextSpan>>? clauseSites)
-    {
-        if (statement is EmptyStatementSyntax)
-        {
-            return true;
-        }
-
-        return statement is ExpressionStatementSyntax expression &&
-            IsContractExpression(inventory, expression.Expression, clauseSites);
-    }
-
-    private static bool IsContractExpression(
-        ContractClauseInventory inventory,
-        ExpressionSyntax expression,
-        Dictionary<SyntaxTree, HashSet<TextSpan>>? clauseSites)
-    {
-        if (clauseSites is { } sites)
-        {
-            return sites.TryGetValue(expression.SyntaxTree, out var spans) &&
-                spans.Contains(expression.Span);
-        }
-
-        return inventory.Clauses.Any(
-            clause =>
-                clause.Invocation.Syntax.SyntaxTree ==
-                    expression.SyntaxTree &&
-                clause.Invocation.Syntax.Span == expression.Span);
-    }
-
-    private static Dictionary<SyntaxTree, HashSet<TextSpan>> CreateClauseSiteIndex(
-        ContractClauseInventory inventory)
-    {
-        var clauseSites = new Dictionary<SyntaxTree, HashSet<TextSpan>>(
-            ReferenceComparer<SyntaxTree>.Instance);
-        foreach (var clause in inventory.Clauses)
-        {
-            var syntax = clause.Invocation.Syntax;
-            if (!clauseSites.TryGetValue(syntax.SyntaxTree, out var spans))
-            {
-                spans = new HashSet<TextSpan>();
-                clauseSites.Add(syntax.SyntaxTree, spans);
-            }
-
-            spans.Add(syntax.Span);
-        }
-
-        return clauseSites;
-    }
-
     private static WorkerClaimReason MapBindingFailure(ContractBindingFailure failure)
     {
         try
@@ -690,29 +124,5 @@ internal sealed class CompilerCallableLowerer
         {
             return WorkerClaimReason.UnsupportedCallable;
         }
-    }
-
-    private CompilerCallablePreparation Success(ManifestCallableTarget target,
-        ImmutableArray<CompilerPreparedClause> clauses,
-        ImmutableArray<CompilerCanonicalVariable> variables,
-        CompilerPreparedBody? body)
-    {
-        return new(_factory, target.Entry,
-            clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables,
-            CompilerCallableArtifactReasonCatalog.SuccessReason, body);
-    }
-
-    private CompilerCallablePreparation Fail(ManifestCallableTarget target, WorkerClaimReason reason,
-        ImmutableArray<CompilerPreparedClause> clauses = default,
-        ImmutableArray<CompilerCanonicalVariable> variables = default)
-    {
-        if (!CompilerCallableArtifactReasonCatalog.IsFailureReason(reason))
-        {
-            throw new InvalidOperationException(
-                "The compiler callable failure reason is not producer-owned.");
-        }
-
-        return new(_factory, target.Entry,
-            clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables, reason, null);
     }
 }

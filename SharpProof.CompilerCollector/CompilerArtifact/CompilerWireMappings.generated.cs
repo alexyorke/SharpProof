@@ -151,13 +151,6 @@ internal static partial class CompilerLoweringWireMappings
         throw new ArgumentOutOfRangeException(nameof(value));
     }
 
-    internal static CompilerVariableRole ToCompiler(BoundContractVariableRole value)
-    {
-        if (CompilerWireIdentityMappings.TryMap<BoundContractVariableRole, CompilerVariableRole>(value, out var result))
-            return result;
-        throw new ArgumentOutOfRangeException(nameof(value));
-    }
-
     internal static WorkerClaimEvidence ToWorkerEvidence(BoundContractEvidence value)
     {
         return value switch
