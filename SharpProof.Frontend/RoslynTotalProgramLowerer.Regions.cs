@@ -339,8 +339,17 @@ internal sealed partial class RoslynTotalProgramLowerer
             {
                 if (parent.Kind == ControlFlowRegionKind.TryAndCatch)
                 {
-                    var handler = parent.NestedRegions.FirstOrDefault(candidate =>
-                        candidate.Kind == ControlFlowRegionKind.Catch && Catches(candidate, token));
+                    ControlFlowRegion? handler = null;
+                    foreach (var candidate in parent.NestedRegions)
+                    {
+                        if (candidate.Kind != ControlFlowRegionKind.Catch)
+                        { continue; }
+                        var catches = Catches(candidate, token);
+                        if (catches == null)
+                        { return RegionExceptionSearch(source, token); }
+                        if (catches == true)
+                        { handler = candidate; break; }
+                    }
                     if (handler != null)
                     {
                         target = RegionCatchEntry(handler, token);
@@ -383,10 +392,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
 
     // An Unknown exception is caught by Exception/Object handlers; whether a
-    // narrower handler would catch it is not known, so lowering abstains. An
-    // explicit exception of static type S is caught by a handler for T when
-    // S derives from T, and lowering abstains when T derives from S.
-    private bool Catches(ControlFlowRegion handler, RegionExceptionToken token)
+    // narrower handler catches it is not known (null), and the search then
+    // chooses either way. An explicit exception of static type S is caught by
+    // a handler for T when S derives from T, and may be when T derives from S.
+    private bool? Catches(ControlFlowRegion handler, RegionExceptionToken token)
     {
         var kinds = _regionCatchKinds[handler];
         if (token.Kind == IrExceptionKind.Explicit && _explicitThrowTypes.TryGetValue(token.Site, out var thrown))
@@ -395,11 +404,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (caught == null || caught.SpecialType == SpecialType.System_Object || CSharpOperationSemantics.DerivesFrom(thrown, caught))
             { return true; }
             if (CSharpOperationSemantics.DerivesFrom(caught, thrown))
-            { throw new RegionIncompleteException(); }
+            { return null; }
             return false;
         }
         if (token.Kind is IrExceptionKind.Unknown or IrExceptionKind.Explicit && !kinds.Contains(IrExceptionKind.Unknown))
-        { throw new RegionIncompleteException(); }
+        { return null; }
         return kinds.Contains(token.Kind);
     }
 
@@ -454,7 +463,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             foreach (var token in tokens)
             {
                 SpendRegion();
-                if (Catches(request.Catch, token))
+                if (Catches(request.Catch, token) != false)
                 {
                     selected.Add(token);
                 }

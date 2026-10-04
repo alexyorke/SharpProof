@@ -922,11 +922,11 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 100,
+                        ["SP0002"] = 102,
                         ["SP0016"] = 18,
                         ["SP0045"] = 9,
                         ["SP0046"] = 9,
-                        ["SP0047"] = 85,
+                        ["SP0047"] = 83,
                         ["silent-unclassified"] = 1
                     }));
             Assert.That(

@@ -58,12 +58,22 @@ public sealed class NativeOpaqueCallTests
     }
 
     [Test]
-    public async Task NarrowHandlersAroundOpaqueCallsAbstain()
+    public async Task NarrowHandlersAroundOpaqueCallsMayMatch()
     {
         // The unknown exception may or may not be an ArgumentException.
-        var result = await ExceptionsAsync("try { return version.GetHashCode(); } catch (System.ArgumentException) { return 0; }");
-        Assert.That(result.Outcome, Is.Null);
-        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        var narrow = await ExceptionsAsync("try { return version.GetHashCode(); } catch (System.ArgumentException) { return 0; }");
+        var covered = await ExceptionsAsync("try { return version.GetHashCode(); } catch (System.ArgumentException) { return 0; } " +
+            "catch (System.Exception) { return 1; }");
+        var rethrown = await ExceptionsAsync("try { return version.GetHashCode(); } catch (System.ArgumentException) { throw; } " +
+            "catch (System.Exception) { return 1; }");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(narrow.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+            Assert.That(narrow.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+            Assert.That(covered.Outcome, Is.TypeOf<ProvenOutcome>(), covered.Reason.ToString());
+            Assert.That(rethrown.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+            Assert.That(rethrown.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+        }
     }
 
     [TestCase("Contract.Requires(x > 0); return x > 0 ? x : version.GetHashCode();", true)]

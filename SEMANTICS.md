@@ -474,7 +474,8 @@ compiler evidence. Native exception checks use the same passive SSA body facts.
 `throw e` raises an explicit exception of e's static type, or
 NullReferenceException when e is null; core-library exception constructors
 taking strings and inner exceptions only allocate. Handlers match the thrown
-static type, and lowering abstains when a handler's type derives from it. Each
+static type; a handler whose type derives from it may or may not match, and
+the search takes both ways through an approximation choice. Each
 explicit throw site carries its own exception code: an AllowedExceptions claim
 admits a site whose static type derives from an allowed type, and refutes only
 at a site that creates an exception of a disallowed type. DoesNotThrow is
@@ -619,8 +620,10 @@ A metadata call with no model, IL body or contract (an opaque call) takes
 by-value arguments on a static or reference receiver. It may allocate, write,
 synchronize and throw an exception of unknown type. Its result is an
 approximation. Only a `catch` of `Exception` or a bare `catch` is known to
-handle that exception, so a narrower handler abstains. A body with an opaque
-call keeps no array element reads, because the callee may write any array.
+handle that exception; a narrower handler may or may not, and the search
+takes both ways through an approximation choice that no refutation depends
+on. A body with an opaque call keeps no array element reads, because the
+callee may write any array.
 Postconditions are still checked when a normal return exists only through
 approximations.
 Nonvirtual source methods and getters inline on a class receiver. The

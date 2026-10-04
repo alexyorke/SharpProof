@@ -8,7 +8,7 @@ namespace SharpProof.Worker.Test;
 
 // `throw e` raises an exception of e's static type, or NullReferenceException
 // when e is null. Handlers are chosen by that type; a handler for a subtype
-// of it may or may not match, so lowering abstains.
+// of it may or may not match, so the search takes both ways.
 [TestFixture]
 public sealed class NativeExplicitThrowTests
 {
@@ -33,13 +33,19 @@ public sealed class NativeExplicitThrowTests
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
     }
 
-    [Test]
-    public async Task HandlersForSubtypesAbstain()
+    [TestCase("catch (System.ObjectDisposedException) { }", null)]
+    [TestCase("catch (System.ObjectDisposedException) { } catch (System.InvalidOperationException) { }", typeof(ProvenOutcome))]
+    public async Task HandlersForSubtypesMayMatch(string handlers, Type? outcome)
     {
         var result = await ExceptionsAsync("[DoesNotThrow] public static void Target(System.InvalidOperationException error) { " +
-            "try { throw error; } catch (System.ObjectDisposedException) { } }");
-        Assert.That(result.Outcome, Is.Null);
-        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            "if (error == null) { return; } try { throw error; } " + handlers + " }");
+        if (outcome != null)
+        { Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString()); }
+        else
+        {
+            Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+            Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        }
     }
 
     [Test]

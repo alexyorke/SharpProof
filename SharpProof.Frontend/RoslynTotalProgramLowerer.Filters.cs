@@ -67,7 +67,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         // Search all matching filters before leaving any try. Each selected
         // handler owns the precise prefix of finally regions being left.
         var unwind = new List<ControlFlowRegion>();
-        var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind)>();
+        var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind, bool Uncertain)>();
         var preserveResult = HasEnclosingRegionFinally(source);
         var complete = false;
         for (var region = source; region != null && !complete; region = region.EnclosingRegion)
@@ -87,14 +87,15 @@ internal sealed partial class RoslynTotalProgramLowerer
                 SpendRegion();
                 var caught = handler.Kind == ControlFlowRegionKind.FilterAndHandler
                     ? handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch) : handler;
-                if (caught.Kind != ControlFlowRegionKind.Catch || !Catches(caught, token))
+                var catches = caught.Kind == ControlFlowRegionKind.Catch ? Catches(caught, token) : false;
+                if (catches == false)
                 { continue; }
                 RegionFilter? filter = handler.Kind == ControlFlowRegionKind.FilterAndHandler
                     ? _regionFilters[handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Filter)] : null;
                 foreach (var _ in unwind)
                 { SpendRegion(); }
-                candidates.Add((caught, filter, unwind.ToArray()));
-                if (filter == null)
+                candidates.Add((caught, filter, unwind.ToArray(), catches == null));
+                if (filter == null && catches == true)
                 { complete = true; break; }
             }
         }
@@ -113,13 +114,23 @@ internal sealed partial class RoslynTotalProgramLowerer
             SpendRegion();
             var candidate = candidates[ordinal];
             var selected = Resume(Unwind(candidate.Unwind, RegionCatchEntry(candidate.Catch, token)));
-            if (candidate.Filter is not { } filter)
-            { next = selected; continue; }
-            var entry = RegionBlock("filter:entry");
-            _builder.Assign(entry, token.Site, filter.Selector, _context.Factory.Integer(RegionInteger, filter.Transfers.Count));
-            _builder.Goto(entry, token.Site, _blocks[_regionGraph.Blocks[filter.Region.FirstBlockOrdinal]]);
-            filter.Transfers.Add((selected, next, token.Site));
-            next = entry;
+            var matched = selected;
+            if (candidate.Filter is { } filter)
+            {
+                matched = RegionBlock("filter:entry");
+                _builder.Assign(matched, token.Site, filter.Selector, _context.Factory.Integer(RegionInteger, filter.Transfers.Count));
+                _builder.Goto(matched, token.Site, _blocks[_regionGraph.Blocks[filter.Region.FirstBlockOrdinal]]);
+                filter.Transfers.Add((selected, next, token.Site));
+            }
+            if (!candidate.Uncertain)
+            { next = matched; continue; }
+            // Whether the handler's type matches is unknown: an approximation
+            // choice, so no refutation depends on it.
+            var choice = RegionBlock("catch:uncertain");
+            var chosen = _context.Temporary(_context.Factory.BooleanType);
+            _builder.Havoc(choice, token.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, chosen);
+            _builder.Branch(choice, token.Site, _context.Factory.Variable(chosen), matched, next);
+            next = choice;
         }
         return next;
 
