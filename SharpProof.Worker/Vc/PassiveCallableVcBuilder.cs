@@ -59,6 +59,16 @@ internal sealed class PassiveCallableVcBuilder
     private int _remainingWork = MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
     internal PassiveCallableCandidate Candidate => _candidate;
     internal ImmutableArray<Assumption> EntryAssumptions { get; private set; }
+
+    // `this` is never null; an entry witness must respect it.
+    internal const string ReceiverLabel = "input:receiver";
+
+    internal static Assumption ReceiverAssumption(IrFactory factory, IrVarId receiver, OperationId site)
+    {
+        var value = factory.Variable(receiver);
+        return new(factory, factory.Unary(IrUnaryOperator.Not, factory.Binary(IrBinaryOperator.Equal, value, factory.Null(value.Type))),
+            new LoweredJustification(site));
+    }
     internal ImmutableArray<IrTerm> Goals { get; private set; }
     internal IrTerm NormalCompletion { get; private set; } = null!;
     internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => [.. _exceptions];
@@ -193,6 +203,7 @@ internal sealed class PassiveCallableVcBuilder
             // identity before running the original entry assignments.
             Fact(Equal(_factory.Variable(parameter.Current), _factory.Variable(parameter.Entry)), entry, "input");
         }
+
         _incoming.Add(program.Entry, [new(_factory.Boolean(true), initial.ToImmutable(), null)]);
         foreach (var blockId in order)
         {
@@ -435,6 +446,12 @@ internal sealed class PassiveCallableVcBuilder
             var assumption = new Assumption(_factory, And(clause.Safe, clause.Value), new LoweredJustification(clause.Operation));
             _labels.Add(assumption.Justification, "requires:" + entryAssumptions.Count.ToString(CultureInfo.InvariantCulture));
             entryAssumptions.Add(assumption);
+        }
+        if (_candidate.HasReceiver)
+        {
+            var receiver = ReceiverAssumption(_factory, _candidate.Parameters[_candidate.Parameters.Length - 1].Entry, entry);
+            _labels.Add(receiver.Justification, ReceiverLabel);
+            entryAssumptions.Add(receiver);
         }
         var goals = ImmutableArray.CreateBuilder<IrTerm>();
         foreach (var clause in _candidate.Ensures)

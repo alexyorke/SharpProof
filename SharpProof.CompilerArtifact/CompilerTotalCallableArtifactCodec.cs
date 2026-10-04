@@ -16,6 +16,7 @@ internal static class CompilerTotalCallableArtifactCodec
         var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result,
             preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions);
         artifact.EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry;
+        artifact.HasReceiver = preparation.HasReceiver;
         artifact.ValidEffectClaimIds = [.. preparation.ValidEffectClaimIds];
         artifact.ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => new CompilerTotalExceptionConstraintArtifact
         { ClaimId = constraint.ClaimId, AllowedKinds = [.. constraint.AllowedKinds] })];
@@ -24,7 +25,11 @@ internal static class CompilerTotalCallableArtifactCodec
 
     internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
     {
-        return preparation == null ? null : EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses);
+        if (preparation == null)
+        { return null; }
+        var artifact = EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses);
+        artifact.HasReceiver = preparation.HasReceiver;
+        return artifact;
     }
 
     private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
@@ -75,6 +80,7 @@ internal static class CompilerTotalCallableArtifactCodec
             ExceptionConstraints = decoded.ExceptionConstraints,
             CallPreconditions = decoded.CallPreconditions,
             EffectsCompleteAtEntry = artifact!.EffectsCompleteAtEntry,
+            HasReceiver = artifact.HasReceiver,
             ValidEffectClaimIds = [.. artifact.ValidEffectClaimIds]
         };
     }
@@ -83,7 +89,8 @@ internal static class CompilerTotalCallableArtifactCodec
         WorkerCallableManifestEntry entry, CancellationToken cancellationToken)
     {
         var decoded = DecodeCore(artifact, entry.Assumptions, [], entryOnly: true, cancellationToken);
-        return decoded == null ? null : new(entry.CallableId, decoded.Factory, decoded.Parameters, decoded.Clauses);
+        return decoded == null ? null : new(entry.CallableId, decoded.Factory, decoded.Parameters, decoded.Clauses)
+        { HasReceiver = artifact!.HasReceiver };
     }
 
     internal static CompilerDecodedShadowBody DecodeShadowBody(string ownerId,
@@ -99,7 +106,7 @@ internal static class CompilerTotalCallableArtifactCodec
         ArgumentNullGuard.NotNull(artifact, nameof(artifact));
         Require(!string.IsNullOrWhiteSpace(ownerId) && ownerId.Length <= CompilerArtifactLimits.MaximumInstructions,
             "A shadow body has an invalid owner label.");
-        Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry &&
+        Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry && !artifact.HasReceiver &&
             artifact.Clauses is { Length: 0 } && artifact.ValidEffectClaimIds is { Length: 0 } &&
             artifact.ExceptionConstraints is { Length: 0 },
             "A shadow body cannot carry own contracts, effects or abstraction.");
@@ -120,6 +127,7 @@ internal static class CompilerTotalCallableArtifactCodec
         { return null; }
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
+        Require(!artifact.HasReceiver || !artifact.IsBodyAbstraction, "A body abstraction has no receiver.");
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null ||
             artifact.CallPreconditions == null || artifact.Result < -1)
@@ -212,6 +220,9 @@ internal static class CompilerTotalCallableArtifactCodec
                 "Total canonical parameter types disagree.");
             parameters.Add(parameter);
         }
+        Require(!artifact.HasReceiver || parameters.Count != 0 &&
+            factory.GetVariableInfo(parameters[parameters.Count - 1].Entry).Type == factory.ObjectType,
+            "A receiver is a trailing object parameter.");
         IrVarId? result = artifact.Result == -1 ? null : Variable(artifact.Result, "result");
         var entryVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Entry));
         var currentVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Current));

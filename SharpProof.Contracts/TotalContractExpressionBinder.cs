@@ -167,7 +167,7 @@ public sealed partial class ContractBinder
                     ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.PreState)
                     : null
         };
-        var allowed = new HashSet<IrVarId>(context.Parameters.SelectMany(binding => new[] { binding.Entry, binding.Current, binding.PreState }));
+        var allowed = new HashSet<IrVarId>(context.Inputs.SelectMany(binding => new[] { binding.Entry, binding.Current, binding.PreState }));
         if (context.Result is { } resultVariable)
         { allowed.Add(resultVariable); }
         var clauses = ImmutableArray.CreateBuilder<BoundTotalContractClause>();

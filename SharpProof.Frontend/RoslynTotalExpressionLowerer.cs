@@ -87,6 +87,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return Compose(operation, [LowerClause(conversion.Operand, state, depth + 1)]);
             case IPropertyReferenceOperation { Instance: { } receiver }:
                 return Compose(operation, [LowerClause(receiver, state, depth + 1)]);
+            case IFieldReferenceOperation { Instance: { } owner } fieldReference when IsImplicitThis(owner) &&
+                _context.ReceiverValue(state) is { } self && FieldMember(fieldReference.Field) is { } member:
+                return new(_factory.PureOpaque(member, self), _factory.Boolean(true), FrontendSubsetClassification.Exact);
             case IFieldReferenceOperation { Instance: { } owner } fieldReference when !IsImplicitThis(owner) &&
                 FieldMember(fieldReference.Field) is { } member:
                 {
@@ -305,19 +308,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (operation is IFlowCaptureReferenceOperation thisReference && _context.IsThisCapture(thisReference.Id))
         { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
         if (depth < 256 && _context.CapturedField(operation) is { } capturedRead)
-        { return FieldRead(operation, capturedRead.Field, capturedRead.Instance, block, depth); }
+        { return FieldRead(operation, capturedRead.Field, capturedRead.Instance, block, depth, captured: true); }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false } capturedStore &&
             _context.CapturedField(capturedStore.Target) is { } capturedTarget &&
             CSharpOperationSemantics.IsSupportedFieldWrite(capturedTarget.Field, _context.Target.ContainingAssembly))
-        { return FieldWrite(capturedStore, capturedTarget, block, depth); }
+        { return FieldWrite(capturedStore, capturedTarget, block, depth, captured: true); }
         if (depth < 256 && operation is IIncrementOrDecrementOperation incrementedField &&
             (incrementedField.Target as IFieldReferenceOperation ?? _context.CapturedField(incrementedField.Target)) is { } incrementTarget &&
             IsMutableField(incrementTarget))
-        { return FieldMutation(operation, incrementTarget, block, depth); }
+        { return FieldMutation(operation, incrementTarget, block, depth, captured: incrementedField.Target is not IFieldReferenceOperation); }
         if (depth < 256 && operation is ICompoundAssignmentOperation compoundedField &&
             (compoundedField.Target as IFieldReferenceOperation ?? _context.CapturedField(compoundedField.Target)) is { } compoundTarget &&
             IsMutableField(compoundTarget))
-        { return FieldMutation(operation, compoundTarget, block, depth); }
+        { return FieldMutation(operation, compoundTarget, block, depth, captured: compoundedField.Target is not IFieldReferenceOperation); }
         if (depth < 256 && CSharpOperationSemantics.OpaqueTypeTestOperand(operation) is { } typeTestOperand)
         {
             var tested = LowerBodyValue(typeTestOperand, block, depth + 1);
@@ -517,7 +520,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(field.Instance);
         // A modeled field keeps its value, so the increment is computed.
-        if (!implicitThis && field.Instance != null && !ApproximateElementReads && FieldMember(field.Field) != null)
+        if ((implicitThis ? _context.Receiver != null : field.Instance != null) && !ApproximateElementReads && FieldMember(field.Field) != null)
         { return FieldMutation(operation, field, block, 1); }
         if (!implicitThis)
         {
@@ -711,7 +714,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     }
 
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
-        IrBlockId block, int depth)
+        IrBlockId block, int depth, bool captured = false)
     {
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(instance);
@@ -725,9 +728,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
-        if (receiver != null && !ApproximateElementReads && FieldMember(field) is { } member)
+        if ((receiver ?? (implicitThis && !captured ? _context.ReceiverValue() : null)) is { } owner && !ApproximateElementReads &&
+            FieldMember(field) is { } member)
         {
-            var read = ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.PureOpaque(member, AsObject(receiver)), receiver), block);
+            var read = ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.PureOpaque(member, AsObject(owner)), receiver), block);
             return PinElementReads && read.Classification.IsExact ? Pin(operation, read) : read;
         }
         var value = _context.Temporary(_context.Type(field.Type));
@@ -759,9 +763,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             (IsImplicitThis(field.Instance) || field.Instance is IParameterReferenceOperation or ILocalReferenceOperation);
     }
 
-    private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth)
+    private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth,
+        bool captured = false)
     {
-        var old = FieldRead(field, field.Field, field.Instance, block, depth);
+        var old = FieldRead(field, field.Field, field.Instance, block, depth, captured);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
         if (old.Value is not IrVariableTerm)
@@ -793,14 +798,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
         var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        Store(stored.Continuation, ReceiverWriteSite(operation, field.Instance), region, field.Field, receiver, next.Value);
+        Store(stored.Continuation, ReceiverWriteSite(operation, field.Instance), region, field.Field,
+            receiver ?? (captured ? null : ImplicitReceiver(field.Instance)), next.Value);
         return operation is IIncrementOrDecrementOperation { IsPostfix: true }
             ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
             : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
     }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
-        IFieldReferenceOperation field, IrBlockId block, int depth)
+        IFieldReferenceOperation field, IrBlockId block, int depth, bool captured = false)
     {
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(field.Instance);
@@ -823,12 +829,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.FieldWrite(_factory, right.Value, receiver), right.Continuation);
         var region = field.Field.IsStatic ? IrWriteRegion.Static :
             field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        Store(result.Continuation, ReceiverWriteSite(assignment, field.Instance), region, field.Field, receiver, right.Value);
+        Store(result.Continuation, ReceiverWriteSite(assignment, field.Instance), region, field.Field,
+            receiver ?? (captured ? null : ImplicitReceiver(field.Instance)), right.Value);
         return result;
     }
 
-    // A modeled field of an explicit receiver is stored with its value; any
-    // other field write is an effect site only.
+    // The modeled `this`, when the field belongs to it. A capture of a field
+    // of `this` reads at a different time than C# does, so it stays approximate.
+    private IrTerm? ImplicitReceiver(IOperation? instance)
+    { return IsImplicitThis(instance) ? _context.ReceiverValue() : null; }
+
+    // A modeled field of an object is stored with its value; any other field
+    // write is an effect site only.
     private void Store(IrBlockId block, OperationId site, IrWriteRegion region, IFieldSymbol field, IrTerm? receiver, IrTerm value)
     {
         if (receiver != null && region is IrWriteRegion.Field or IrWriteRegion.Parameter && FieldMember(field) is { } member &&

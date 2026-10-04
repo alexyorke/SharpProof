@@ -79,7 +79,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             foreach (var child in region.NestedRegions.Reverse())
             { SpendRegion(); regions.Push(child); }
         }
-        foreach (var binding in _context.Parameters)
+        foreach (var binding in _context.Inputs)
         {
             SpendRegion();
             _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));

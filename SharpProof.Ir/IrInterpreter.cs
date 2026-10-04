@@ -152,17 +152,20 @@ public sealed class IrInterpreter(IrFactory factory)
         return Evaluate(term, variables, onVariableRead, heap: null, cancellationToken);
     }
 
-    // The heap holds the current contents of each array stored to so far.
+    // The heap holds the current contents of each array and field stored to
+    // so far. A read through an Old snapshot variable sees the entry contents.
     internal IrEvaluationResult Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
-        Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken)
+        Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken,
+        IReadOnlyCollection<IrVarId>? snapshots = null)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
         return EvaluateCore(
             term,
-            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken) { Heap = heap });
+            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken)
+            { Heap = heap, Snapshots = snapshots });
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
@@ -270,7 +273,7 @@ public sealed class IrInterpreter(IrFactory factory)
         // A field reads what the execution stored, else its entry value.
         if (IrFieldSites.IsFieldRead(_factory, opaque) && receiverValue is { Kind: IrValueKind.Reference } owner)
         {
-            if (state.Heap != null && state.Heap.Fields.TryGetValue((owner.Reference, opaque.Member), out var stored))
+            if (state.CurrentHeap(opaque.Receiver!) is { } heap && heap.Fields.TryGetValue((owner.Reference, opaque.Member), out var stored))
             { return Value(stored); }
             if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
             { return Value(initial); }
@@ -629,7 +632,7 @@ public sealed class IrInterpreter(IrFactory factory)
         if (invalid != null)
         { return invalid; }
         var position = (int)index.Value!.Integer;
-        return Value(state.Heap != null && state.Heap.Elements.TryGetValue(sequence.Value!, out var stored)
+        return Value(state.CurrentHeap(access.Sequence) is { } heap && heap.Elements.TryGetValue(sequence.Value!, out var stored)
             ? stored[position] : sequence.Value!.Elements[position]);
     }
 
@@ -722,5 +725,12 @@ public sealed class IrInterpreter(IrFactory factory)
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
         internal int Depth { get; set; }
         internal IrHeap? Heap { get; set; }
+        internal IReadOnlyCollection<IrVarId>? Snapshots { get; set; }
+
+        internal IrHeap? CurrentHeap(IrTerm owner)
+        {
+            return Heap == null || Snapshots is { Count: > 0 } snapshots && IrTraversal.CollectVariables(owner).Any(snapshots.Contains)
+                ? null : Heap;
+        }
     }
 }

@@ -62,7 +62,11 @@ internal sealed record CompilerCallablePreparation(
 }
 
 internal sealed record CompilerTotalEntryPreparation(string CallableId, IrFactory Factory,
-    ImmutableArray<CompilerTotalParameter> Parameters, ImmutableArray<CompilerTotalClause> Clauses);
+    ImmutableArray<CompilerTotalParameter> Parameters, ImmutableArray<CompilerTotalClause> Clauses)
+{
+    // The last parameter is `this`, which is never null.
+    internal bool HasReceiver { get; init; }
+}
 
 internal sealed record CompilerTotalCallablePreparation(
     string CallableId,
@@ -76,6 +80,8 @@ internal sealed record CompilerTotalCallablePreparation(
     internal ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions { get; init; } = [];
     internal bool EffectsCompleteAtEntry { get; init; }
     internal ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
+    // The last parameter is `this`, which is never null.
+    internal bool HasReceiver { get; init; }
 }
 
 // Detached graph validation only. External source ownership is established
@@ -117,6 +123,8 @@ internal sealed class CompilerTotalCallableArtifact
     public string[] ValidEffectClaimIds { get; set; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool IsBodyAbstraction { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool HasReceiver { get; set; }
     public PortableIrGraph Graph { get; set; } = new();
     public CompilerTotalParameterArtifact[] Parameters { get; set; } = [];
     public int Result { get; set; } = -1;

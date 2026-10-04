@@ -14,6 +14,7 @@ internal static class CompilerTotalCallableLowerer
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
+        context.ModelReceiver();
         var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context);
         cancellationToken.ThrowIfCancellationRequested();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
@@ -21,9 +22,10 @@ internal static class CompilerTotalCallableLowerer
             binding.Clauses.Length != preconditions.Length)
         { return null; }
         return new(target.Entry.CallableId, context.Factory,
-            [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
+            [.. context.Inputs.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             [.. binding.Clauses.Select((clause, ordinal) => new CompilerTotalClause(CompilerContractKind.Requires,
-                clause.Value, clause.SafeCondition, clause.SourceOperation, null, preconditions[ordinal].Id))]);
+                clause.Value, clause.SafeCondition, clause.SourceOperation, null, preconditions[ordinal].Id))])
+        { HasReceiver = context.Receiver != null };
     }
 
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
@@ -40,6 +42,7 @@ internal static class CompilerTotalCallableLowerer
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
+        context.ModelReceiver();
         // An auto-property accessor has no body to carry contract clauses.
         var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
             : new ContractBinder(compilation, context.Factory).BindTotal(context);
@@ -93,6 +96,8 @@ internal static class CompilerTotalCallableLowerer
             if (lowering.ConstructionLimitExceeded || graph == null || graph.Blocks.Length > CompilerArtifactLimits.MaximumInstructions ||
                 graph.Blocks.Sum(block => block.Operations.Length) > CompilerArtifactLimits.MaximumInstructions ||
                 binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume) ||
+                context.Receiver is { } receiver && binding.Clauses.Any(clause => IrTraversal.CollectVariables([clause.Value, clause.SafeCondition])
+                    .Any(variable => variable == receiver.Entry || variable == receiver.Current || variable == receiver.PreState)) ||
                 context.Parameters.Any(parameter => !Primitive(parameter.Entry)) ||
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
                 context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
@@ -128,8 +133,9 @@ internal static class CompilerTotalCallableLowerer
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
+        ImmutableArray<TotalInputBinding> inputs = isBodyAbstraction ? [.. context.Parameters] : context.Inputs;
         return new(target.Entry.CallableId, program,
-            [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
+            [.. inputs.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result,
             [.. binding.Clauses.Select(clause => new CompilerTotalClause(CompilerLoweringWireMappings.ToCompiler(clause.Kind),
                 clause.Value, clause.SafeCondition, clause.SourceOperation,
@@ -137,6 +143,7 @@ internal static class CompilerTotalCallableLowerer
                 clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id :
                     clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction)
         {
+            HasReceiver = inputs.Length != context.Parameters.Length,
             EffectsCompleteAtEntry = HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],

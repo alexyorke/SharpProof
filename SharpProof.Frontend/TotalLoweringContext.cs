@@ -1,11 +1,18 @@
 namespace SharpProof.Frontend;
 
-public sealed class TotalParameterBinding(IParameterSymbol parameter, IrVarId entry, IrVarId current, IrVarId preState)
+// A callable input: its value on entry, its current storage and its Old
+// snapshot.
+public class TotalInputBinding(IrVarId entry, IrVarId current, IrVarId preState)
 {
-    public IParameterSymbol Parameter { get; } = parameter;
     public IrVarId Entry { get; } = entry;
     public IrVarId Current { get; } = current;
     public IrVarId PreState { get; } = preState;
+}
+
+public sealed class TotalParameterBinding(IParameterSymbol parameter, IrVarId entry, IrVarId current, IrVarId preState)
+    : TotalInputBinding(entry, current, preState)
+{
+    public IParameterSymbol Parameter { get; } = parameter;
 }
 
 internal enum TotalParameterState { Entry, Current, PreState }
@@ -103,12 +110,39 @@ public sealed class TotalLoweringContext
         return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
     }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
+
+    // `this` of a class instance member, once modeled, is a trailing input
+    // whose fields are read and stored like those of any other object.
+    internal TotalInputBinding? Receiver { get; private set; }
+
+    internal void ModelReceiver()
+    {
+        if (Receiver != null || Target.IsStatic || !Target.ContainingType.IsReferenceType)
+        { return; }
+        var ordinal = Parameters.Length.ToString(CultureInfo.InvariantCulture);
+        Receiver = new(Factory.CreateVariable("entry:" + ordinal, Factory.ObjectType),
+            Factory.CreateVariable("current:" + ordinal, Factory.ObjectType),
+            Factory.CreateVariable("old:" + ordinal, Factory.ObjectType));
+    }
+
+    internal IrTerm? ReceiverValue(TotalParameterState state = TotalParameterState.Current)
+    {
+        return Receiver == null ? null : Factory.Variable(state switch
+        {
+            TotalParameterState.Entry => Receiver.Entry,
+            TotalParameterState.PreState => Receiver.PreState,
+            _ => Receiver.Current
+        });
+    }
+
+    internal ImmutableArray<TotalInputBinding> Inputs =>
+        Receiver == null ? [.. Parameters] : [.. Parameters, Receiver];
     internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.
-    public ImmutableArray<IrVarId> EntryVariables => [.. Parameters.Select(binding => binding.Entry)];
+    public ImmutableArray<IrVarId> EntryVariables => [.. Inputs.Select(binding => binding.Entry)];
 
     // A virtual or overriding body is lowered as written; callers dispatching
     // to it are a separate concern, so only a body-free method is excluded.
@@ -181,8 +215,8 @@ public sealed class TotalLoweringContext
     { return _thisCaptures.Contains(capture); }
 
     // Roslyn also captures a field of `this` used as an assignment target. A
-    // read through it is a fresh field read, which over-approximates the value
-    // at capture time since every field read is an approximation.
+    // read through it is a fresh approximate field read, which
+    // over-approximates the value at capture time.
     private readonly Dictionary<CaptureId, IFieldReferenceOperation> _fieldCaptures = [];
     internal void RecordFieldCapture(CaptureId capture, IFieldReferenceOperation field)
     { _fieldCaptures[capture] = field; }

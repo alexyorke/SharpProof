@@ -417,22 +417,25 @@ and index on the executed path, else the array's entry contents; arrays are
 compared by identity, so aliases see each other's stores. Element reads in a
 body that stores elements are evaluated where they occur, so a later store
 cannot change them. A postcondition reads the final contents, and
-`Contract.Old` reads the entry contents; replay declines a counterexample
-whose postcondition reads old elements after stores. A call, an unmodeled
+`Contract.Old` reads the entry contents, in replay as in the verification
+condition. A call, an unmodeled
 element write or a loop that stores elements forgets the contents: later
 reads are unknown until stored again.
 
-Scalar instance fields of classes, read and stored through an explicit
-receiver (a parameter or local), follow the same model. A field read is a
+Scalar instance fields of classes, read and stored through a parameter, a
+local or `this`, follow the same model. A field read is a
 pure `field:` member applied to the receiver widened to object, and denotes
 the field's entry value; stores carry their receiver, field and value and
 keep their write region. Z3 encodes each field as a function from objects to
 values, and a counterexample's objects carry their decoded entry field values,
 so replay and the kernel's model check read concrete fields. Contract clauses
 may read such fields, safe only for a non-null receiver, and `Contract.Old`
-reads entry values. Reads of non-fresh objects' fields are state reads for
-EnforcePure. Static fields, fields read through `this`, struct fields and
-reference-typed fields stay approximated.
+reads entry values. In a class instance member `this` is a trailing input,
+named `this` in counterexamples and assumed non-null on entry; a field of
+`this` reached through a Roslyn flow capture, and any field of `this` inside an
+inlined callee, stays approximated. Reads of non-fresh objects' fields are
+state reads for EnforcePure. Static fields, struct fields and reference-typed
+fields stay approximated.
 Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
 claims over the Total program: a proof is a complete may-effect summary and a
 refutation names a replayed violating site. Compiler effect evidence never
@@ -604,8 +607,8 @@ parameter, and the assignment's value is the assigned one. Effect claims on
 virtual and overriding methods verify the body as written; a postcondition on
 such a method stays unsupported, since it binds every override.
 Field increments and compound assignments on `this`, a parameter or a local
-read the field as an approximation (faulting on a null receiver) and write it
-back. Roslyn's flow captures of `this`, and of a field of `this` used as an
+read the field (faulting on a null receiver) and write it back; the field is
+modeled as above or approximated. Roslyn's flow captures of `this`, and of a field of `this` used as an
 assignment target, stand for that receiver and field. An instance field store
 is admitted when the type's static constructors are compiler-generated, and
 entry initialization is effect-free when such a constructor only stores scalar

@@ -96,6 +96,8 @@ internal sealed class PassiveCallableCandidate
     internal bool IsBodyAbstraction { get; }
     internal IrFactory Factory => Program.Factory;
     internal ImmutableArray<PassiveParameterBinding> Parameters { get; }
+    // The last parameter is `this`, which is never null.
+    internal bool HasReceiver { get; init; }
     internal IrVarId? Result { get; }
     internal ImmutableArray<PassiveContractClause> Requires { get; }
     internal ImmutableArray<PassiveContractClause> Ensures { get; }

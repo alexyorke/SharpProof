@@ -44,7 +44,7 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         builder.SetEntry(block);
         var site = context.SyntaxSite(getter ? OperationKind.FieldReference : OperationKind.SimpleAssignment, declaration);
         var structural = _factory.CreateOperation("candidate:auto-accessor");
-        foreach (var binding in context.Parameters)
+        foreach (var binding in context.Inputs)
         {
             builder.Assign(block, structural, binding.Current, _factory.Variable(binding.Entry));
             builder.Assign(block, structural, binding.PreState, _factory.Variable(binding.Entry));

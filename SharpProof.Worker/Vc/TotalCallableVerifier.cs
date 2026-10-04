@@ -25,7 +25,7 @@ internal static class TotalCallableVerifier
         { throw new ArgumentException("The entry preparation belongs to another callable.", nameof(preparation)); }
         if (entry.Clauses.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
-        var assumptions = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length);
+        var assumptions = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length + (entry.HasReceiver ? 1 : 0));
         var labels = new Dictionary<ProofJustification, string>();
         var ids = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var clause in entry.Clauses)
@@ -37,6 +37,13 @@ internal static class TotalCallableVerifier
             labels.Add(assumption.Justification, label);
             ids.Add(label, clause.AssumptionId!);
             assumptions.Add(assumption);
+        }
+        if (entry.HasReceiver)
+        {
+            var receiver = PassiveCallableVcBuilder.ReceiverAssumption(entry.Factory, entry.Parameters[entry.Parameters.Length - 1].Entry,
+                entry.Clauses.IsEmpty ? entry.Factory.CreateOperation("receiver") : entry.Clauses[0].Operation);
+            labels.Add(receiver.Justification, PassiveCallableVcBuilder.ReceiverLabel);
+            assumptions.Add(receiver);
         }
         if (backend == null)
         { ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }
@@ -88,7 +95,8 @@ internal static class TotalCallableVerifier
             candidate = new(candidate.CallableId, candidate.Program, candidate.Parameters, candidate.Result,
                 candidate.Requires, [.. candidate.Ensures.Select((clause, index) => deep[index]
                     ? new PassiveContractClause(candidate.Factory.Boolean(true), candidate.Factory.Boolean(true), clause.Operation)
-                    : clause)], candidate.IsBodyAbstraction, candidate.CallPreconditions);
+                    : clause)], candidate.IsBodyAbstraction, candidate.CallPreconditions)
+            { HasReceiver = candidate.HasReceiver };
         }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var constructionReason, cancellationToken))
         {
@@ -188,9 +196,9 @@ internal static class TotalCallableVerifier
         { return CallableEntryFeasibility.Unknown(entry.Reason); }
         if (entry.Outcome is RefutedOutcome)
         { return CallableEntryFeasibility.Feasible; }
-        if (entry.Outcome is not ProvenOutcome || entry.Core.Any(label => !requiresByLabel.ContainsKey(label)))
+        var core = entry.Core.Where(label => label != PassiveCallableVcBuilder.ReceiverLabel).ToArray();
+        if (entry.Outcome is not ProvenOutcome || core.Any(label => !requiresByLabel.ContainsKey(label)))
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.MalformedBackendResult); }
-        return CallableEntryFeasibility.Contradictory(entry.Core,
-            entry.Core.Select(label => requiresByLabel[label]));
+        return CallableEntryFeasibility.Contradictory(core, core.Select(label => requiresByLabel[label]));
     }
 }

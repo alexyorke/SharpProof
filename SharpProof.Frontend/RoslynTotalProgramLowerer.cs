@@ -69,7 +69,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             Return(entry, structural);
             return;
         }
-        foreach (var binding in _context.Parameters)
+        foreach (var binding in _context.Inputs)
         {
             _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));
             _builder.Assign(entry, structural, binding.PreState, _context.Factory.Variable(binding.Entry));

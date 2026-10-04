@@ -51,7 +51,8 @@ internal static class CallableClaimResultAssembler
                     var formatted = WorkerProjections.FormatTotalValue(value);
                     return new WorkerModelValue
                     {
-                        Variable = "parameter:" + ordinal.ToString(CultureInfo.InvariantCulture),
+                        Variable = total.HasReceiver && ordinal == total.Parameters.Length - 1 ? "this"
+                            : "parameter:" + ordinal.ToString(CultureInfo.InvariantCulture),
                         Kind = formatted.Kind,
                         Value = formatted.Value
                     };

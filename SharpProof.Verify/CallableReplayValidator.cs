@@ -55,13 +55,6 @@ internal static class CallableReplayValidator
                 return AbstentionReason.CounterexampleNotReplayable;
             }
             heap = execution.Heap;
-            // An old element read sees the arrays as the callable entered; the
-            // final heap holds only their current contents.
-            if (heap is { IsEmpty: false } && (ReadsOldElements(context.Postcondition, context) ||
-                context.PostconditionGuard is { } oldGuard && ReadsOldElements(oldGuard, context)))
-            {
-                return AbstentionReason.CounterexampleNotReplayable;
-            }
             if (execution.Status != IrProgramExecutionStatus.Returned)
             {
                 return execution.Status == IrProgramExecutionStatus.Unsupported &&
@@ -133,13 +126,15 @@ internal static class CallableReplayValidator
             }
         }
         var interpreter = new IrInterpreter(factory);
+        // An Old read sees the objects as the callable entered.
+        var snapshots = context.PreStateBindings.Keys.ToArray();
         if (factory.Semantics == IrExecutionSemantics.Total)
         {
             if (context.PostconditionGuard is not { } guard || guard.Type != factory.BooleanType)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
-            var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken);
+            var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken, snapshots);
             if (consumedApproximation)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
@@ -153,7 +148,7 @@ internal static class CallableReplayValidator
                 return AbstentionReason.PostconditionMayBeUndefined;
             }
         }
-        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken);
+        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken, snapshots);
         if (consumedApproximation)
         {
             return AbstentionReason.CounterexampleNotReplayable;
@@ -166,12 +161,5 @@ internal static class CallableReplayValidator
             evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false }
                 ? null
                 : AbstentionReason.CounterexampleReplayFailed;
-    }
-
-    private static bool ReadsOldElements(IrTerm root, CallableReplayContext context)
-    {
-        return IrTraversal.Any(root, term => (term is IrSequenceAccessTerm access ? access.Sequence
-                : term is IrOpaqueTerm { Receiver: { } receiver } ? receiver : null) is { } owner &&
-            IrTraversal.CollectVariables(owner).Any(variable => context.PreStateBindings.ContainsKey(variable)));
     }
 }
