@@ -12,6 +12,10 @@ public sealed class WorkerVcAutoPropertyTests
     private const string Source =
         """
         using SharpProof.Attributes;
+        public sealed class Bag : System.Collections.Generic.IEnumerable<int> {
+            public System.Collections.Generic.IEnumerator<int> GetEnumerator() { yield return 1; }
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { return GetEnumerator(); }
+        }
         public sealed class Holder {
             private int Count { get; set; }
             public Holder Next { get; set; }
@@ -60,6 +64,12 @@ public sealed class WorkerVcAutoPropertyTests
                 Depth(n - 1);
                 return n;
             }
+            public static int CountBag([NotNull] Bag bag) {
+                Contract.Ensures(Contract.Result<int>() >= 0);
+                var count = 0;
+                foreach (var item in bag) { if (count < 1000) { count++; } }
+                return count;
+            }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
@@ -88,6 +98,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("CountUpTo")]
     [TestCase("ReadThroughRef")]
     [TestCase("Depth")]
+    [TestCase("CountBag")]
     public void PostconditionIsProven(string method)
     {
         var claim = Claim(method);

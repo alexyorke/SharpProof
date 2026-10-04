@@ -130,14 +130,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // assigned value as its final `value` parameter. A generic callee runs its
     // declaration, whose parameters must share the call's value domains.
     // With `contractOnly`, a callee already being inlined (a recursive call)
-    // gets a frame for its preconditions and no body.
+    // gets a frame for its preconditions and no body; so does an iterator
+    // without preconditions, whose body runs only as it is enumerated.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false)
     {
         frame = null;
         graph = null;
-        if (!Spend(method.Parameters.Length + 1) || IsActive(method) != contractOnly ||
+        if (!Spend(method.Parameters.Length + 1) || !contractOnly && IsActive(method) ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
@@ -176,11 +177,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or
                 AccessorDeclarationSyntax { ExpressionBody: not null }))
         { return false; }
+        var iterator = false;
         foreach (var node in declaration.DescendantNodesAndSelf())
         {
-            if (!Spend() || node is YieldStatementSyntax)
+            if (!Spend() || node is YieldStatementSyntax && !contractOnly)
             { return false; }
+            iterator |= node is YieldStatementSyntax;
         }
+        if (contractOnly && !IsActive(method) && !iterator)
+        { return false; }
         if (!HasNoTypeInitialization(method.ContainingType) || !Spend(method.Parameters.Length * 3 + 1))
         { return false; }
         // Source operations bind to declaration symbols. Closed outer types
@@ -191,7 +196,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (!prepareCallee(frame))
         { frame = null; return false; }
         if (contractOnly)
-        { return true; }
+        {
+            // An iterator checks its preconditions only once enumerated.
+            if (iterator && !frame.SourceCallPreconditions.IsEmpty)
+            { frame = null; return false; }
+            return true;
+        }
         cancellationToken.ThrowIfCancellationRequested();
         try
         { graph = ControlFlowGraph.Create(declaration, CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree), cancellationToken); }

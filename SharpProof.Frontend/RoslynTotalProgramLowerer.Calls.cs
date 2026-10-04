@@ -137,7 +137,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         Func<IrBlockId, IrBlockId>? prelude = null)
     {
         if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null) &&
-            !(_expressions.AllowOpaqueCalls && _calls.IsActive(method) &&
+            !(_expressions.AllowOpaqueCalls &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true)))
         { return null; }
         var callee = frame!;
@@ -219,7 +219,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         RecordCallPreconditions(callee, arguments, block, site, callAncestry);
         // A recursive call checks its callee's preconditions, then runs the
-        // callee as an unknown call: it may do anything, throw included.
+        // callee as an unknown call: it may do anything, throw included. So
+        // does a call to an iterator, which has none.
         if (graph == null)
         {
             var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
