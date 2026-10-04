@@ -13,28 +13,32 @@ internal sealed partial class BvEncoder
         if (!_fields.TryGetValue(read.Member, out var field))
         {
             var type = factory.GetTypeInfo(read.Type);
-            using Sort sort = type.Kind == IrTypeKind.Boolean ? context.MkBoolSort()
-                : IsInteger(type) ? context.MkBitVecSort((uint)type.Width)
-                : throw new UnsupportedIrEncodingException();
-            field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, sort);
+            if (IsReference(type))
+            { field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, ReferenceSort); }
+            else
+            {
+                using Sort sort = type.Kind == IrTypeKind.Boolean ? context.MkBoolSort()
+                    : IsInteger(type) ? context.MkBitVecSort((uint)type.Width)
+                    : throw new UnsupportedIrEncodingException();
+                field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, sort);
+            }
             _fields.Add(read.Member, field);
         }
         return owner.Own(context.MkApp(field, receiver));
     }
 
-    // An object of the model with every encoded field's entry value.
-    private IrObjectState ObjectState(Expr reference, Model model, SmtQueryResourceMeter meter)
+    // Fills an object of the model with every encoded field's entry value.
+    private void FillObjectState(IrObjectState state, Expr reference, Model model, SmtQueryResourceMeter meter,
+        Func<IrTypeId, Expr, IrValue?> decode)
     {
-        var state = new IrObjectState();
-        foreach (var field in _fields)
+        foreach (var field in _fields.ToArray())
         {
             meter.Consume();
             using var application = context.MkApp(field.Value, reference);
             using var value = model.Evaluate(application, true);
-            if (CreateValue(factory, factory.GetMemberInfo(field.Key).ReturnType, value) is { } decoded)
+            if (decode(factory.GetMemberInfo(field.Key).ReturnType, value) is { } decoded)
             { state.Fields[field.Key] = decoded; }
         }
-        return state;
     }
 
     private void DisposeFields()

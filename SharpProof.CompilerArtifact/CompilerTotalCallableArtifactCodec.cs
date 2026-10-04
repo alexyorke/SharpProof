@@ -186,8 +186,8 @@ internal static class CompilerTotalCallableArtifactCodec
                         IrBinaryOperator.StringEquals),
                 "The Total graph contains unsupported term evidence.");
         }
-        // The only opaque term is a pure read of an instance scalar field
-        // through an object receiver.
+        // The only opaque term is a pure read of an instance scalar or
+        // reference field through an object receiver.
         static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
         {
             return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
@@ -195,7 +195,8 @@ internal static class CompilerTotalCallableArtifactCodec
                 graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
                 term.Items is not { Length: > 0 } && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
                 PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure &&
-                graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer;
+                graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.Reference or IrTypeKind.String or
+                    IrTypeKind.Sequence;
         }
         var identities = new HashSet<IrVarId>();
         IrVarId Variable(int index, string name)

@@ -422,13 +422,14 @@ condition. A call, an unmodeled
 element write or a loop that stores elements forgets the contents: later
 reads are unknown until stored again.
 
-Scalar instance fields of classes, read and stored through a parameter, a
-local or `this`, follow the same model. A field read is a
+Scalar and reference (object, string and array) instance fields of classes,
+read and stored through a parameter, a local or `this`, follow the same model. A field read is a
 pure `field:` member applied to the receiver widened to object, and denotes
 the field's entry value; stores carry their receiver, field and value and
 keep their write region. Z3 encodes each field as a function from objects to
 values, and a counterexample's objects carry their decoded entry field values,
-so replay and the kernel's model check read concrete fields. Contract clauses
+referenced objects, strings and arrays included (each model token decodes to
+one identity), so replay and the kernel's model check read concrete fields. Contract clauses
 may read such fields, safe only for a non-null receiver, and `Contract.Old`
 reads entry values. In a class instance member `this` is a trailing input,
 named `this` in counterexamples and assumed non-null on entry, and a value
@@ -436,8 +437,8 @@ outside constructors (a constructor's `this` stays a receiver only). An
 inlined instance callee's `this` is the receiver as evaluated before the
 arguments, unknown when the caller's own `this` is not modeled. A field of
 `this` reached through a Roslyn flow capture stays approximated. Reads of non-fresh objects' fields are
-state reads for EnforcePure. Static fields, struct fields and reference-typed
-fields stay approximated.
+state reads for EnforcePure. Static fields and struct fields stay
+approximated.
 Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
 claims over the Total program: a proof is a complete may-effect summary and a
 refutation names a replayed violating site. Compiler effect evidence never

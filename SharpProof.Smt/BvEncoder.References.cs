@@ -112,67 +112,76 @@ internal sealed partial class BvEncoder
         // with one (an object-typed view of it) keeps it as its identity, as
         // a Total cast to object does.
         var shared = new Dictionary<string, object>(StringComparer.Ordinal);
+        using var nullValue = model.Evaluate(NullReference, true);
         foreach (var variable in query.ModelVariables.OrderBy(variable =>
             factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind == IrTypeKind.Reference))
         {
             meter.Consume();
-            var type = factory.GetVariableInfo(variable).Type;
-            var info = factory.GetTypeInfo(type);
             using var evaluated = model.Evaluate(GetVariable(variable, meter), true);
-            IrValue? value;
-            if (!IsReference(info))
-            {
-                value = CreateValue(factory, type, evaluated);
-            }
-            else
-            {
-                using var nullValue = model.Evaluate(NullReference, true);
-                if (evaluated.Equals(nullValue))
-                {
-                    values.Add(variable, factory.CreateNullValue(type));
-                    continue;
-                }
-                var token = evaluated.ToString();
-                if (!aliases.TryGetValue((type, token), out value))
-                {
-                    if (info.Kind == IrTypeKind.Reference)
-                    {
-                        if (!identities.TryGetValue(token, out var identity))
-                        { identities.Add(token, identity = shared.TryGetValue(token, out var view) ? view : ObjectState(evaluated, model, meter)); }
-                        value = factory.CreateReferenceValue(type, identity);
-                    }
-                    else
-                    {
-                        using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
-                        if (length is not BitVecNum number || number.UInt64 > int.MaxValue)
-                        { return null; }
-                        var count = (int)number.UInt64;
-                        // Charge and check cancellation before allocating any witness data.
-                        // Refusing a large SAT witness never narrows the proof input domain.
-                        meter.Consume(count + 1L);
-                        if (info.Kind == IrTypeKind.String && count == 0)
-                        {
-                            // CLR construction canonicalizes empty strings. Never
-                            // replay distinct Ref tokens as that same concrete object.
-                            if (emptyStringToken != null && emptyStringToken != token)
-                            { throw new UnsupportedIrEncodingException(); }
-                            emptyStringToken = token;
-                        }
-                        var text = info.Kind == IrTypeKind.String ? DecodeText(GetVariable(variable, meter), model, meter) : null;
-                        value = info.Kind == IrTypeKind.String
-                            ? factory.CreateStringValue(text?.Length == count ? text : new string('\0', count))
-                            : DecodeArrayWitness(type, count, token, observations);
-                    }
-                    aliases.Add((type, token), value);
-                    if (info.Kind != IrTypeKind.Reference && !shared.ContainsKey(token))
-                    { shared.Add(token, info.Kind == IrTypeKind.String ? value.String : value); }
-                }
-            }
-            if (value == null)
+            if (Decode(factory.GetVariableInfo(variable).Type, evaluated) is not { } value)
             { return null; }
             values.Add(variable, value);
         }
         return values;
+
+        // An object decodes once per model token; its fields, references
+        // included, decode after it is registered, so cycles terminate.
+        IrValue? Decode(IrTypeId type, Expr evaluated)
+        {
+            var info = factory.GetTypeInfo(type);
+            if (!IsReference(info))
+            { return CreateValue(factory, type, evaluated); }
+            if (evaluated.Equals(nullValue))
+            { return factory.CreateNullValue(type); }
+            var token = evaluated.ToString();
+            if (aliases.TryGetValue((type, token), out var value))
+            { return value; }
+            if (info.Kind == IrTypeKind.Reference)
+            {
+                if (!identities.TryGetValue(token, out var identity))
+                {
+                    if (shared.TryGetValue(token, out var view))
+                    { identities.Add(token, identity = view); }
+                    else
+                    {
+                        var state = new IrObjectState();
+                        identities.Add(token, identity = state);
+                        FillObjectState(state, evaluated, model, meter, Decode);
+                    }
+                }
+                value = factory.CreateReferenceValue(type, identity);
+            }
+            else
+            {
+                using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
+                if (length is not BitVecNum number || number.UInt64 > int.MaxValue)
+                { return null; }
+                var count = (int)number.UInt64;
+                // Charge and check cancellation before allocating any witness data.
+                // Refusing a large SAT witness never narrows the proof input domain.
+                meter.Consume(count + 1L);
+                if (info.Kind == IrTypeKind.String && count == 0)
+                {
+                    // CLR construction canonicalizes empty strings. Never
+                    // replay distinct Ref tokens as that same concrete object.
+                    if (emptyStringToken != null && emptyStringToken != token)
+                    { throw new UnsupportedIrEncodingException(); }
+                    emptyStringToken = token;
+                }
+                var text = info.Kind == IrTypeKind.String ? DecodeText(evaluated, model, meter) : null;
+                value = info.Kind == IrTypeKind.String
+                    ? factory.CreateStringValue(text?.Length == count ? text : new string('\0', count))
+                    : DecodeArrayWitness(type, count, token, observations);
+                if (value == null)
+                { return null; }
+                if (!shared.ContainsKey(token))
+                { shared.Add(token, info.Kind == IrTypeKind.String ? value.String : value); }
+            }
+            // A cyclic object may already have aliased itself while its
+            // fields decoded.
+            aliases[(type, token)] = value;
+            return value;
+        }
     }
 
     private IrValue DefaultValue(IrTypeId type)

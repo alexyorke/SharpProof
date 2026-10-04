@@ -744,11 +744,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
     }
 
-    // A scalar instance field of a class: its reads and stores are modeled
-    // through an object-typed receiver.
+    // A scalar or reference instance field of a class: its reads and stores
+    // are modeled through an object-typed receiver.
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
-        return field.IsStatic || !field.ContainingType.IsReferenceType || !CSharpOperationSemantics.IsScalar(field.Type)
+        return field.IsStatic || !field.ContainingType.IsReferenceType ||
+            !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type)
             ? null
             : _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, field), _factory.ObjectType,
                 IrFieldSites.Prefix + CompilerIdentityBridge.CreateSymbolDisplay(field), _context.Type(field.Type), false);

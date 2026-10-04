@@ -7,7 +7,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsSupportedFieldWrite(IFieldSymbol field, IAssemblySymbol sourceAssembly)
     {
         return SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
-            IsScalar(field.Type) && field.ContainingType.IsReferenceType &&
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType &&
             !field.IsVolatile && !field.IsReadOnly && !field.IsConst &&
             // An instance store never runs type initialization; a compiler-
             // generated static constructor only runs static field initializers.
@@ -17,8 +17,8 @@ internal static partial class CSharpOperationSemantics
 
     // An instance field read runs no code; its only fault is a null receiver.
     // A static field read runs no code when its type has no initializer.
-    // The heap is not modeled, so the value read is an approximation: it can
-    // support universal proofs but never a concrete refutation.
+    // A scalar or reference instance field of a class is modeled; any other
+    // field read is an approximation.
     internal static bool IsSupportedFieldRead(IFieldSymbol field)
     {
         return !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
