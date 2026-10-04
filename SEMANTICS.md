@@ -435,7 +435,11 @@ compared by identity, so aliases see each other's stores. Element reads in a
 body that stores elements are evaluated where they occur, so a later store
 cannot change them. A postcondition reads the final contents, and
 `Contract.Old` reads the entry contents, in replay as in the verification
-condition. A call, an unmodeled
+condition. A conditional receiver selects the heap of its chosen reference
+branch, including through casts and nested fields. Old values in a guard or
+index alone do not change the receiver's heap. Both verification and replay
+use this same bounded selection rule and close unsupported receiver shapes.
+A call, an unmodeled
 element write or a loop that stores elements forgets the contents: later
 reads are unknown until stored again; element contents alone are forgotten by
 an element write, which never changes a field. A loop whose every heap store

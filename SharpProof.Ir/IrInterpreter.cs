@@ -274,7 +274,9 @@ public sealed class IrInterpreter(IrFactory factory)
         // A field reads what the execution stored, else its entry value.
         if (IrFieldSites.IsFieldRead(_factory, opaque) && receiverValue is { Kind: IrValueKind.Reference } owner)
         {
-            if (state.CurrentHeap(opaque.Receiver!) is { } heap && heap.Fields.TryGetValue((owner.Reference, opaque.Member), out var stored))
+            if (!TryCurrentHeap(opaque.Receiver!, state, out var heap, out var failure))
+            { return failure!; }
+            if (heap != null && heap.Fields.TryGetValue((owner.Reference, opaque.Member), out var stored))
             { return Value(stored); }
             if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
             { return Value(initial); }
@@ -633,7 +635,9 @@ public sealed class IrInterpreter(IrFactory factory)
         if (invalid != null)
         { return invalid; }
         var position = (int)index.Value!.Integer;
-        return Value(state.CurrentHeap(access.Sequence) is { } heap && heap.Elements.TryGetValue(sequence.Value!, out var stored)
+        if (!TryCurrentHeap(access.Sequence, state, out var heap, out var failure))
+        { return failure!; }
+        return Value(heap != null && heap.Elements.TryGetValue(sequence.Value!, out var stored)
             ? stored[position] : sequence.Value!.Elements[position]);
     }
 
@@ -715,6 +719,26 @@ public sealed class IrInterpreter(IrFactory factory)
         return IrEvaluationResult.FromException(kind, detail);
     }
 
+    private bool TryCurrentHeap(IrTerm owner, EvaluationState state, out IrHeap? heap, out IrEvaluationResult? failure)
+    {
+        heap = state.Heap;
+        failure = null;
+        if (heap == null || state.Snapshots is not { Count: > 0 } snapshots)
+        { return true; }
+        if (!IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard,
+            () => --state.SnapshotWork >= 0, state.SnapshotSelectors, out var selector, state.CancellationToken))
+        {
+            failure = Unsupported(IrUnsupportedReason.UnsupportedOperation, "Snapshot receiver selection is unsupported or exceeds its work limit.");
+            return false;
+        }
+        var selected = EvaluateCore(selector, state);
+        if (selected.Status != IrEvaluationStatus.Value)
+        { failure = selected; return false; }
+        if (selected.Value!.Boolean)
+        { heap = null; }
+        return true;
+    }
+
     private sealed class EvaluationState(
         IReadOnlyDictionary<IrVarId, IrValue> variables,
         Action<IrVarId>? onVariableRead,
@@ -727,11 +751,7 @@ public sealed class IrInterpreter(IrFactory factory)
         internal int Depth { get; set; }
         internal IrHeap? Heap { get; set; }
         internal IReadOnlyCollection<IrVarId>? Snapshots { get; set; }
-
-        internal IrHeap? CurrentHeap(IrTerm owner)
-        {
-            return Heap == null || Snapshots is { Count: > 0 } snapshots && IrTraversal.CollectVariables(owner).Any(snapshots.Contains)
-                ? null : Heap;
-        }
+        internal Dictionary<IrId, IrTerm> SnapshotSelectors { get; } = [];
+        internal int SnapshotWork = 4096;
     }
 }

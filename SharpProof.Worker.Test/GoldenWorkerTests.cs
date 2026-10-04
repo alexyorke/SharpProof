@@ -33,7 +33,8 @@ public sealed class GoldenWorkerTests
         var first = fixture.Source.Split('\n')[0];
         Assert.That(first, Does.StartWith(prefix));
         var scenario = first[prefix.Length..];
-        var actual = scenario == "write-operand-approximation" ? await WriteOperandApproximation()
+        var actual = scenario == "mixed-snapshot-owners" ? await MixedSnapshotOwners()
+            : scenario == "write-operand-approximation" ? await WriteOperandApproximation()
             : scenario == "synchronization-projection" ? await SynchronizationProjection(fixture)
             : scenario == "native-infrastructure" ? await NativeInfrastructure()
             : scenario == "native-cancellation" ? await NativeCancellation()
@@ -58,6 +59,61 @@ public sealed class GoldenWorkerTests
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static async Task<string> MixedSnapshotOwners()
+    {
+        var output = new StringBuilder();
+        foreach (var array in new[] { false, true })
+        {
+            foreach (var chooseOld in new[] { false, true })
+            {
+                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
+                PassiveParameterBinding Parameter(string name, IrTypeId parameterType)
+                {
+                    return new(factory.CreateVariable(name + ":entry", parameterType), factory.CreateVariable(name + ":current", parameterType),
+                        factory.CreateVariable(name + ":old", parameterType));
+                }
+                var a = Parameter("a", type);
+                var b = Parameter("b", type);
+                var flag = Parameter("flag", factory.BooleanType);
+                var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+                IrTerm Read(IrTerm owner)
+                { return array ? factory.SequenceAccess(owner, factory.Integer(0)) : factory.PureOpaque(field, owner); }
+                IrTerm Equal(IrTerm left, IrTerm right)
+                { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+                var site = factory.CreateOperation();
+                var requires = new List<PassiveContractClause>();
+                foreach (var parameter in new[] { a, b })
+                {
+                    requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(parameter.Entry), factory.Null(type)), factory.Boolean(true), site));
+                    if (array)
+                    { requires.Add(new(factory.Binary(IrBinaryOperator.GreaterThan, factory.Length(factory.Variable(parameter.Entry)), factory.Integer(0)), factory.Boolean(true), site)); }
+                }
+                requires.Add(new(Equal(factory.Variable(flag.Entry), factory.Boolean(chooseOld)), factory.Boolean(true), site));
+                requires.Add(new(Equal(Read(factory.Conditional(factory.Variable(flag.Entry), factory.Variable(a.Entry), factory.Variable(b.Entry))), factory.Integer(1)), factory.Boolean(true), site));
+                var builder = new IrProgramBuilder(factory);
+                var block = builder.CreateBlock();
+                if (array)
+                { builder.ElementStore(block, site, factory.Variable(b.Current), factory.Integer(0), factory.Integer(2)); }
+                else
+                { builder.FieldStore(block, site, IrWriteRegion.Field, factory.Variable(b.Current), field, factory.Integer(2)); }
+                builder.Return(block, site, factory.Integer(0));
+                var result = factory.CreateVariable("result", factory.IntegerType);
+                var mixed = factory.Conditional(factory.Variable(flag.Current), factory.Variable(a.Old), factory.Variable(b.Current));
+                var candidate = new PassiveCallableCandidate("mixed-snapshot", builder.Build(), [a, b, flag], result, [.. requires],
+                    [new(Equal(Read(mixed), factory.Integer(1)), factory.Boolean(true), site)]);
+                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+                using var solver = new PassiveCallableSolver(plan!);
+                Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+                var verified = await solver.VerifyEnsuresAsync(0);
+                Assert.That(verified.Outcome, chooseOld ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
+                output.Append(array ? "array-" : "field-").Append(chooseOld ? "old: " : "current: ")
+                    .Append(verified.Outcome!.GetType().Name).Append('/').Append(verified.Reason).Append('\n');
+            }
+        }
+        return output.ToString();
     }
 
     private static async Task<string> WriteOperandApproximation()

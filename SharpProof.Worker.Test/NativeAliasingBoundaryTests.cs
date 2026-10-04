@@ -6,6 +6,29 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeAliasingBoundaryTests
 {
+    [TestCase(false, 7, WorkerClaimOutcome.Proven)]
+    [TestCase(false, 2, WorkerClaimOutcome.Refuted)]
+    [TestCase(true, 1, WorkerClaimOutcome.Proven)]
+    [TestCase(true, 7, WorkerClaimOutcome.Refuted)]
+    public async Task ConditionalOldOwnerUsesSelectedHeap(bool chooseOld, int expected, WorkerClaimOutcome outcome)
+    {
+        var source = $$"""
+            using SharpProof.Attributes;
+            public sealed class Node { public int Value; }
+            public static class C {
+                public static int Target(Node a, Node b, bool choose) {
+                    Contract.Requires(a != null && b != null && a != b);
+                    Contract.Requires(a.Value == 1 && b.Value == 2 && choose == {{(chooseOld ? "true" : "false")}});
+                    Contract.Ensures((choose ? Contract.Old(a) : b).Value == {{expected}});
+                    b.Value = 7;
+                    a.Value = 9;
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(await Verify(source), Is.EqualTo(outcome));
+    }
+
     [TestCase("ref", "cell.Value = 5;")]
     [TestCase("in", "cell.Value = 5;")]
     [TestCase("ref", "Change(cell);")]

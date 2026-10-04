@@ -273,7 +273,8 @@ public sealed class WorkerVcShadowSourceGateTests
                 !source.StartsWith("// golden-scenario: synchronization-projection\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: typed-il-call-requires\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: shadow-call-ancestry-tampered-predicate\n", StringComparison.Ordinal) &&
-                !source.StartsWith("// golden-scenario: write-operand-approximation\n", StringComparison.Ordinal);
+                !source.StartsWith("// golden-scenario: write-operand-approximation\n", StringComparison.Ordinal) &&
+                !source.StartsWith("// golden-scenario: mixed-snapshot-owners\n", StringComparison.Ordinal);
         }).ToArray();
         Assert.That(goldenNames, Has.Length.EqualTo(64));
         var cases = Universe.Concat(goldenNames.Select(name =>

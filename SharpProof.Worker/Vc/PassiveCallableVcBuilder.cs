@@ -543,10 +543,19 @@ internal sealed class PassiveCallableVcBuilder
             substitutions.Add(variable, replacement);
         }
         var consistent = true;
+        var snapshotSelectors = new Dictionary<IrId, IrTerm>();
+        IrTerm Snapshot(IrTerm owner, Func<IrTerm, IrTerm> rewritten)
+        {
+            if (IrSnapshotReads.TrySelector(_factory, owner, _oldInputs.ContainsKey, rewritten,
+                () => { Spend(); return true; }, snapshotSelectors, out var selector, _cancellationToken))
+            { return selector; }
+            consistent = false;
+            return _factory.Boolean(false);
+        }
         IrTerm? Read(IrTerm original, Func<IrTerm, IrTerm> rewritten)
         {
             if (original is IrSequenceAccessTerm access)
-            { return ElementRead(access, rewritten(access.Sequence), rewritten(access.Index)); }
+            { return ElementRead(access, rewritten(access.Sequence), rewritten(access.Index), Snapshot(access.Sequence, rewritten)); }
             if (!IrFieldSites.IsFieldRead(_factory, original))
             { return null; }
             var field = (IrOpaqueTerm)original;
@@ -555,7 +564,8 @@ internal sealed class PassiveCallableVcBuilder
             // A read through an Old snapshot sees the objects as the callable
             // entered; only clauses and loop invariants read through one.
             var entry = _factory.PureOpaque(field.Member, receiver);
-            if (IrTraversal.CollectVariables(field.Receiver!).Any(_oldInputs.ContainsKey))
+            var snapshot = Snapshot(field.Receiver!, rewritten);
+            if (snapshot is IrBooleanTerm { Value: true })
             { return entry; }
             IrTerm read = heap.Forgotten ? Fresh(original.Type) : entry;
             foreach (var store in heap.Stores)
@@ -566,13 +576,13 @@ internal sealed class PassiveCallableVcBuilder
                 { consistent = false; continue; }
                 read = _factory.Conditional(And(store.Reach, Equal(receiver, store.Target)), store.Value, read);
             }
-            return read;
+            return snapshot is IrBooleanTerm { Value: false } ? read : _factory.Conditional(snapshot, entry, read);
         }
-        IrTerm ElementRead(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index)
+        IrTerm ElementRead(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index, IrTerm snapshot)
         {
             Spend(heap.Stores.Length);
             // An old value reads the arrays as the callable entered.
-            if (IrTraversal.CollectVariables(original.Sequence).Any(_oldInputs.ContainsKey))
+            if (snapshot is IrBooleanTerm { Value: true })
             { return _factory.SequenceAccess(sequence, index); }
             IrTerm read = heap.Forgotten || heap.ElementsForgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
@@ -584,7 +594,8 @@ internal sealed class PassiveCallableVcBuilder
                 read = _factory.Conditional(And(store.Reach, And(Equal(sequence, store.Target), Equal(position, stored))),
                     store.Value, read);
             }
-            return read;
+            return snapshot is IrBooleanTerm { Value: false } ? read
+                : _factory.Conditional(snapshot, _factory.SequenceAccess(sequence, index), read);
         }
         // Indexes of every modeled width compare as Int32.
         IrTerm? Position(IrTerm index)
