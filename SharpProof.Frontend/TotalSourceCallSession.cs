@@ -124,14 +124,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // An instance callee is a nonvirtual member on a reference receiver. Its
     // implicit `this` is never null and is the caller's receiver value.
     // An accessor takes its property's arguments, and a setter also takes the
-    // assigned value as its final `value` parameter.
+    // assigned value as its final `value` parameter. A generic callee runs its
+    // declaration, whose parameters must share the call's value domains.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false)
     {
         frame = null;
         graph = null;
-        if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) ||
+        if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) || _active.Contains(method.OriginalDefinition) ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
@@ -139,7 +140,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 : method.IsStatic != (instance == null)) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
             method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
-            method.Arity != 0 || method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
+            method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>
                 !CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type)).Any() ||

@@ -629,7 +629,11 @@ never null. `base.Property` reads a virtual auto-property's backing field
 without dispatch. An explicit reference downcast keeps the reference and
 throws InvalidCastException for a non-null value whose type test, an
 approximation, fails. A generic container's declared class, interface and
-type-parameter types bridge to the caller's by reference casts.
+type-parameter types bridge to the caller's by reference casts, and so do a
+generic method's: its declaration inlines when every parameter and its result
+share the call's value domain (`Swap<T>(IList<T>, int, int)` called on an
+`IList<int>`), while a scalar argument for a type parameter (`Id<int>(x)`)
+does not.
 Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on

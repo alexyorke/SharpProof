@@ -123,6 +123,8 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) { for (int i = 0; i < 2; i++) x = Increment(x); return x; } static int Increment(int value) { return value + 1; }", 3, 5)]
     [TestCase("int Target(int x) { try { return Outer(x); } catch (System.DivideByZeroException) when (++x > 0) { return x; } } static int Outer(int value) { return Inner(value); } static int Inner(int value) { return 10 / value; }", 0, 1)]
     [TestCase("int Target(int x) { try { return Inner(x); } catch (System.DivideByZeroException) when (10 / x > 0) { return 7; } catch (System.DivideByZeroException) { return 8; } } static int Inner(int value) { return 10 / value; }", 0, 8)]
+    [TestCase("int Target(int x) { return Generic<System.Exception>(x, null); } static int Generic<T>(int value, T unused) => value + 1;", 3, 4)]
+    [TestCase("int Target(int x) { return Generic<int>(x); } static int Generic<T>(int value) => value * 2;", 3, 6)]
     public void SourceCallsHaveIndependentCompiledResults(string members, int input, int expected)
     {
         using var subject = TypedProgramSubject.Create(members);
@@ -216,7 +218,7 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) { return A(x); } static int A(int value) { return B(value); } static int B(int value) { return A(value); }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static External() { } public static int Add(int x) => x + 1; }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static int state = System.Environment.TickCount; public static int Add(int x) => x + 1; }")]
-    [TestCase("int Target(int x) { return Generic<int>(x); } static int Generic<T>(int value) => value;")]
+    [TestCase("int Target(int x) { return Generic<int>(x); } static T Generic<T>(T value) => value;")]
     [TestCase("int Target(int x) { return ByReference(ref x); } static int ByReference(ref int value) => value;")]
     [TestCase("int Target(int x) { return Params(x); } static int Params(params int[] value) => value[0];")]
     [TestCase("int Target(int x) { return System.Math.Abs(x); }")]
