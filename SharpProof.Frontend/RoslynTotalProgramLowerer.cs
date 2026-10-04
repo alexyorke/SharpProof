@@ -269,6 +269,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 return Value(expression.Operation, block).Continuation;
             case IInvocationOperation invocation when CSharpOperationSemantics.IsMonitorAttempt(invocation):
                 return Value(invocation, block).Continuation;
+            // A compiler-generated call statement, such as the Dispose a
+            // foreach or using runs in its finally, is a value discarded.
+            case IInvocationOperation { IsImplicit: true } implicitCall:
+                return Value(implicitCall, block).Continuation;
             case ISimpleAssignmentOperation or IIncrementOrDecrementOperation or ICompoundAssignmentOperation:
                 return Value(operation, block).Continuation;
             case IFlowCaptureOperation { Value: IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } } thisCapture

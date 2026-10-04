@@ -21,6 +21,20 @@ internal static partial class CSharpOperationSemantics
             type is IArrayTypeSymbol array && array.ElementType is not IArrayTypeSymbol && IsValueDomain(array.ElementType);
     }
 
+    // An implicit conversion from a class, interface or delegate to a base
+    // class or interface (an IEnumerator<T> to IDisposable) keeps the
+    // reference and never throws.
+    internal static IConversionOperation? ReferenceUpcast(IOperation operation)
+    {
+        return operation is IConversionOperation
+        {
+            IsTryCast: false, OperatorMethod: null,
+            Conversion: { IsReference: true, IsImplicit: true },
+            Type: { TypeKind: TypeKind.Class or TypeKind.Interface, SpecialType: not (SpecialType.System_String or SpecialType.System_Object) },
+            Operand.Type: { TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate, SpecialType: not SpecialType.System_String }
+        } conversion ? conversion : null;
+    }
+
     // `(Derived)value` between class or interface types keeps the reference.
     // A non-null value of another runtime type throws InvalidCastException;
     // whether the value fits is unknown to the IR, so `fits` is approximated.

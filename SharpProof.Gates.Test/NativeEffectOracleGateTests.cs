@@ -68,7 +68,7 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.UniverseMethodCount, Is.EqualTo(200));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.UniverseSha256, Is.EqualTo("A35CBCBDE4CF956E35790BC55A9E381913CBDFDABF725BAF7ED99706028D29C3"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("4101D2D2E1A698008C9146B74AD1C83625519E78D0E3A4F3732FA586E0160042"));
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
@@ -177,7 +177,7 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.UniverseSha256, Is.EqualTo("A35CBCBDE4CF956E35790BC55A9E381913CBDFDABF725BAF7ED99706028D29C3"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("4101D2D2E1A698008C9146B74AD1C83625519E78D0E3A4F3732FA586E0160042"));
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.Passed, Is.True);
         var retained = report.Rows.Single(row => row.MethodId == "OSS0199");
@@ -294,7 +294,7 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
-        Assert.That(report.UniverseSha256, Is.EqualTo("A35CBCBDE4CF956E35790BC55A9E381913CBDFDABF725BAF7ED99706028D29C3"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("4101D2D2E1A698008C9146B74AD1C83625519E78D0E3A4F3732FA586E0160042"));
         Assert.That(report.Passed, Is.True);
         await TestContext.Progress.WriteLineAsync($"Purity oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; {report.NativeRefuted} refuted.");
     }

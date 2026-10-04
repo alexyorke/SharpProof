@@ -658,8 +658,8 @@
       "declarationSha256": "7fc065298af86425a3cb05e585f572a771c3aff2716cf2a27361a007cd8ddc46",
       "methodName": "_initializeDataMembers",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0005",

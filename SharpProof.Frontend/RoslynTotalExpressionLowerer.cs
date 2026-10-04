@@ -243,6 +243,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 ? new(_factory.Cast(_factory.ObjectType, operand.Value), operand.Continuation, operand.Classification)
                 : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
         }
+        if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && CSharpOperationSemantics.ReferenceUpcast(operation) is { } upcast)
+        {
+            var operand = LowerBodyValue(upcast.Operand, block, depth + 1);
+            return operand.Classification.IsExact
+                ? new(_factory.Cast(_context.Type(upcast.Type), operand.Value), operand.Continuation, operand.Classification)
+                : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
+        }
         if (depth < 256 && CSharpOperationSemantics.ReferenceDowncast(operation) is { } downcast)
         {
             var operand = LowerBodyValue(downcast.Operand, block, depth + 1);
@@ -1214,7 +1221,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         if (operation.ConstantValue is { HasValue: true, Value: string text } && !Utf16WellFormedness.IsWellFormed(text))
         { return FrontendAbstention.UnsupportedOperationKind; }
-        return CSharpOperationSemantics.IsValueDomain(operation.Type) ||
+        // Roslyn types a foreach's iteration-variable assignment by nothing;
+        // its target's type is its value's.
+        var type = operation is ISimpleAssignmentOperation { Type: null } untyped ? untyped.Target.Type : operation.Type;
+        return CSharpOperationSemantics.IsValueDomain(type) ||
             operation is ILiteralOperation { ConstantValue.HasValue: true, ConstantValue.Value: null }
             ? FrontendAbstention.None : FrontendAbstention.UnsupportedType;
     }

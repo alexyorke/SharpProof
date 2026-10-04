@@ -133,7 +133,8 @@ internal sealed partial class PassiveLoopCutter
             {
                 Spend();
                 if (instruction is not (IrAllocationInstruction or IrWriteInstruction or IrLockInstruction or IrAssignInstruction or IrHavocInstruction or IrAssumeInstruction or
-                    IrBranchInstruction or IrGotoInstruction or IrThrowInstruction or IrExceptionalExitInstruction or IrReturnInstruction))
+                    IrBranchInstruction or IrGotoInstruction or IrThrowInstruction or IrExceptionalExitInstruction or IrReturnInstruction) &&
+                    instruction is not IrCallInstruction { Target: null, Receiver: null })
                 { return false; }
             }
         }
@@ -192,8 +193,9 @@ internal sealed partial class PassiveLoopCutter
                     group.Writers.Select(writer => ((IrVariableTerm)((IrAssignInstruction)writer).Value).Variable).Distinct().Count() == 1)
                 { copies.Add(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
             }
-            var cells = new List<Cell>();
-            foreach (var write in instructions.OfType<IrWriteInstruction>()
+            // An opaque call may write anything.
+            List<Cell>? cells = instructions.Any(instruction => instruction is IrCallInstruction) ? null : [];
+            foreach (var write in cells == null ? [] : instructions.OfType<IrWriteInstruction>()
                 .Where(write => write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown))
             {
                 if (write.Region == IrWriteRegion.Element)
@@ -204,8 +206,8 @@ internal sealed partial class PassiveLoopCutter
                 var target = write.IsFieldStore ? IrSubstitution.Substitute(_candidate.Factory, write.Target!, copies) : null;
                 if (target == null || !IrTraversal.CollectVariables(target).All(variable => inputs.Contains(variable) && !written.Contains(variable)))
                 { cells = null; break; }
-                if (!cells.Any(cell => cell.Target.Id == target.Id && cell.Field == write.Field!.Value))
-                { cells.Add(new(target, write.Field!.Value, write)); }
+                if (!cells!.Any(cell => cell.Target.Id == target.Id && cell.Field == write.Field!.Value))
+                { cells!.Add(new(target, write.Field!.Value, write)); }
             }
             _cells.Add(header, cells == null ? null : [.. cells]);
         }
@@ -305,6 +307,9 @@ internal sealed partial class PassiveLoopCutter
                     case IrLockInstruction synchronization:
                         builder.Lock(encoded, synchronization.Operation, synchronization.Receiver);
                         break;
+                    case IrCallInstruction call:
+                        builder.Call(encoded, call.Operation, call.Target, call.Member, call.Receiver, [.. call.Arguments]);
+                        break;
                     case IrWriteInstruction { Target: { } stored, Index: { } index, Value: { } value } write:
                         builder.ElementStore(encoded, write.Operation, stored, index, value);
                         break;
@@ -360,8 +365,7 @@ internal sealed partial class PassiveLoopCutter
                 Count();
                 stops.Add(builder.Assume(stop, site, _candidate.Factory.Boolean(false)).Id);
                 Count();
-                IrTerm? filler = _candidate.Result is { } result ? _candidate.Factory.GetVariableInfo(result).Type == _candidate.Factory.BooleanType
-                    ? _candidate.Factory.Boolean(false) : _candidate.Factory.Integer(_candidate.Factory.GetVariableInfo(result).Type, 0L) : null;
+                IrTerm? filler = _candidate.Result is { } result ? Filler(_candidate.Factory.GetVariableInfo(result).Type) : null;
                 builder.Return(stop, site, filler);
                 return stop;
             }
@@ -447,6 +451,15 @@ internal sealed partial class PassiveLoopCutter
             if (++instructions > PassiveCallableVcBuilder.MaximumSteps)
             { throw new ConstructionLimitException(); }
         }
+    }
+
+    // Any value of the result type; a stop block never returns.
+    private IrTerm Filler(IrTypeId type)
+    {
+        var factory = _candidate.Factory;
+        return type == factory.BooleanType ? factory.Boolean(false)
+            : factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ? factory.Integer(type, 0L)
+            : factory.Null(type);
     }
 
     private static IEnumerable<IrBlockId> Targets(IrInstruction terminator)

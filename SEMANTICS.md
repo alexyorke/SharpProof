@@ -650,7 +650,14 @@ or parameter that a branching right-hand side assigns (`a = a ?? b`) stores
 that variable; a compound assignment through such a capture stays unsupported,
 since C# reads its target before the right-hand side. A setter that is neither
 inlined nor a modeled backing-field store (an interface indexer, `c[i] = v`)
-is an opaque call taking the assigned value last. A metadata constructor of
+is an opaque call taking the assigned value last. An implicit conversion from
+a class, interface or delegate to a base class or interface keeps the
+reference and never throws. `foreach` over an interface lowers as Roslyn's
+control flow writes it: GetEnumerator, MoveNext, Current and the Dispose its
+finally runs (a compiler-generated call statement) are opaque calls, and the
+iteration variable's assignment, which Roslyn leaves untyped, has its
+target's type. A loop that makes an opaque call is cut like any other; the
+call may write anything, so the loop forgets all heap contents at its header. A metadata constructor of
 a class (`new HashSet<T>()`) evaluates its arguments, allocates the object
 and runs as an opaque call that may throw; its value is the fresh object.
 Claim lowering widens class, interface, delegate and array references to

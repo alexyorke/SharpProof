@@ -37,6 +37,12 @@ public sealed class WorkerVcAutoPropertyTests
                 values[0] = 5;
                 return 5;
             }
+            public static int CountUpTo([NotNull] System.Collections.Generic.IEnumerable<int> values) {
+                Contract.Ensures(Contract.Result<int>() >= 0);
+                var count = 0;
+                foreach (var value in values) { if (count < 1000) { count++; } }
+                return count;
+            }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
@@ -62,6 +68,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("Fresh")]
     [TestCase("OrEmptyInPlace")]
     [TestCase("StoreThroughList")]
+    [TestCase("CountUpTo")]
     public void PostconditionIsProven(string method)
     {
         var response = s_response!;
