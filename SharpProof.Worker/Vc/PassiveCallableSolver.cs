@@ -283,15 +283,18 @@ internal sealed class PassiveCallableSolver : IDisposable
     {
         if (_plan.LoopSearch == null || witness.Outcome is RefutedOutcome || witness.Reason == WorkerClaimReason.ResourceLimit)
         { return null; }
-        if (await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is { } invariants)
+        var invariants = await InvariantPlanAsync(cancellationToken).ConfigureAwait(false);
+        if (invariants != null)
         {
             var proven = await VerifyAsync(query(invariants.Plan), null, cancellationToken, invariants.Plan).ConfigureAwait(false);
             if (proven.Outcome is ProvenOutcome)
             { return WithInvariantPremises(proven, invariants); }
         }
+        // Only the surviving templates join Spacer's proposals, which keeps
+        // the second search within the method's budget.
         var proposals = HornProposals(query, cancellationToken);
         if (proposals.IsEmpty ||
-            await HoudiniAsync([.. Templates(cancellationToken), .. proposals], cancellationToken).ConfigureAwait(false) is not { } extended)
+            await HoudiniAsync([.. invariants?.Invariants ?? [], .. proposals], cancellationToken).ConfigureAwait(false) is not { } extended)
         { return null; }
         var result = await VerifyAsync(query(extended.Plan), null, cancellationToken, extended.Plan).ConfigureAwait(false);
         return result.Outcome is ProvenOutcome ? WithInvariantPremises(result, extended) : null;
@@ -307,7 +310,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         };
     }
 
-    private sealed record InvariantSet(PassiveCallableVcPlan Plan, ImmutableArray<string> Core, ImmutableArray<OperationId> Assumptions);
+    private sealed record InvariantSet(PassiveCallableVcPlan Plan, ImmutableArray<PassiveLoopCutter.Invariant> Invariants,
+        ImmutableArray<string> Core, ImmutableArray<OperationId> Assumptions);
 
     private ImmutableArray<PassiveLoopCutter.Invariant> Templates(CancellationToken cancellationToken)
     {
@@ -334,11 +338,23 @@ internal sealed class PassiveCallableSolver : IDisposable
         // an entry edge) is dropped before any check.
         if (!active.IsEmpty && PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken) == null)
         { active = [.. active.Where(invariant => PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null)]; }
+        var rechecking = false;
         while (!active.IsEmpty)
         {
             var plan = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
             if (plan == null)
             { return null; }
+            // Usually only the first round has failing candidates; a later one
+            // is one query.
+            if (rechecking)
+            {
+                var together = await VerifyAsync(plan.AllInvariantsQuery(), null, cancellationToken, plan).ConfigureAwait(false);
+                if (together.Reason == WorkerClaimReason.ResourceLimit)
+                { return null; }
+                if (together.Outcome is ProvenOutcome)
+                { return new(plan, active, together.Core, together.BodyAssumptions); }
+            }
+            rechecking = true;
             var failed = new HashSet<int>();
             var cores = new HashSet<string>(StringComparer.Ordinal);
             var assumptions = new HashSet<OperationId>();
@@ -358,7 +374,7 @@ internal sealed class PassiveCallableSolver : IDisposable
                 { failed.Add(invariant); }
             }
             if (failed.Count == 0)
-            { return new(plan, [.. cores], [.. assumptions]); }
+            { return new(plan, active, [.. cores], [.. assumptions]); }
             active = [.. active.Where((_, ordinal) => !failed.Contains(ordinal))];
         }
         return null;

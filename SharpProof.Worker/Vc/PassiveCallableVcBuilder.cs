@@ -15,8 +15,10 @@ internal sealed class PassiveCallableVcBuilder
     // false on every path that does not execute it, and a path that executes
     // it before a read processes it first, so the latest matching store
     // decides a read.
+    // Element contents can be forgotten alone: an element store never
+    // changes a field.
     private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm Value)> Stores,
-        bool Forgotten);
+        bool Forgotten, bool ElementsForgotten = false);
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
     private readonly IrProgram _program;
@@ -307,7 +309,9 @@ internal sealed class PassiveCallableVcBuilder
                             Spend(_heap.Stores.Length);
                             _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement)) };
                         }
-                        else if (write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
+                        else if (write.Region == IrWriteRegion.Element)
+                        { _heap = new([.. _heap.Stores.Where(store => store.Field != null)], _heap.Forgotten, true); }
+                        else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
                         { _heap = new([], true); }
                         break;
                     case IrCallInstruction call:
@@ -570,7 +574,7 @@ internal sealed class PassiveCallableVcBuilder
             // An old value reads the arrays as the callable entered.
             if (IrTraversal.CollectVariables(original.Sequence).Any(_oldInputs.ContainsKey))
             { return _factory.SequenceAccess(sequence, index); }
-            IrTerm read = heap.Forgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
+            IrTerm read = heap.Forgotten || heap.ElementsForgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
                 if (store.Index is not { } storeIndex || store.Target.Type != sequence.Type)

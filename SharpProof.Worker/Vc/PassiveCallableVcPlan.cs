@@ -83,6 +83,19 @@ internal sealed class PassiveCallableVcPlan
                 ProofDiagnosticKind.Postcondition, new SourceLocationId(checkpoint.Ordinal)), _model)))];
     }
 
+    // Every invariant checkpoint at once: one query when they all hold.
+    internal VerificationQuery AllInvariantsQuery()
+    {
+        IrTerm goal = Factory.Boolean(true);
+        foreach (var checkpoint in _checkpoints)
+        {
+            goal = Factory.Binary(IrBinaryOperator.AndAlso, goal,
+                Factory.Binary(IrBinaryOperator.OrElse, Factory.Unary(IrUnaryOperator.Not, checkpoint.Reach), checkpoint.Predicate));
+        }
+        return new(Factory, _entry.AddRange(_checkpoints.SelectMany(checkpoint => checkpoint.Facts).Distinct()),
+            new Goal(Factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), _model);
+    }
+
     internal ImmutableArray<VerificationQuery> CallPreconditionQueries(int ordinal)
     {
         if (ordinal < 0 || ordinal >= CallPreconditionCount)

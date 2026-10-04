@@ -15,8 +15,10 @@ internal sealed partial class PassiveLoopCutter
     private readonly List<IrBlockId> _finished = [];
     private readonly Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc = [];
     // The field stores of each loop whose every heap store is one of them,
-    // through a receiver over inputs; any other heap store forgets the heap.
+    // through a receiver over inputs, or an element store; any other heap
+    // store forgets the heap.
     private readonly Dictionary<IrBlockId, ImmutableArray<Cell>?> _cells = [];
+    private readonly HashSet<IrBlockId> _storesElements = [];
 
     // A location a loop stores to: its receiver over inputs the loop does not
     // write, the field, and a store that writes it.
@@ -194,6 +196,11 @@ internal sealed partial class PassiveLoopCutter
             foreach (var write in instructions.OfType<IrWriteInstruction>()
                 .Where(write => write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown))
             {
+                if (write.Region == IrWriteRegion.Element)
+                {
+                    _storesElements.Add(header);
+                    continue;
+                }
                 var target = write.IsFieldStore ? IrSubstitution.Substitute(_candidate.Factory, write.Target!, copies) : null;
                 if (target == null || !IrTraversal.CollectVariables(target).All(variable => inputs.Contains(variable) && !written.Contains(variable)))
                 { cells = null; break; }
@@ -248,8 +255,8 @@ internal sealed partial class PassiveLoopCutter
             var source = _candidate.Program.GetBlock(original);
             if (!unroll && _havoc.TryGetValue(original, out var writes))
             {
-                // A loop that stores only to fixed fields forgets those; any
-                // other heap store forgets all heap contents.
+                // A loop that stores only to fixed fields and to elements
+                // forgets those; any other heap store forgets all heap contents.
                 var cells = _cells[original];
                 var memory = cells == null;
                 var values = cells is { } stored
@@ -271,6 +278,12 @@ internal sealed partial class PassiveLoopCutter
                         original.Value.ToString(CultureInfo.InvariantCulture), _candidate.Factory.GetOperationInfo(cell.Store.Operation).SourceSpan),
                         cell.Store.Region == IrWriteRegion.Parameter ? IrWriteRegion.Parameter : IrWriteRegion.Field, cell.Target, cell.Field,
                         _candidate.Factory.Variable(values[ordinal]));
+                }
+                if (!memory && _storesElements.Contains(original))
+                {
+                    Count();
+                    builder.Write(encoded, _candidate.Factory.CreateOperation(IrWriteSites.LoopCellPrefix +
+                        original.Value.ToString(CultureInfo.InvariantCulture)), IrWriteRegion.Element);
                 }
             }
             if (!unroll)

@@ -56,6 +56,8 @@ internal static class LoopInvariantCandidates
         var written = loop.Writes.ToHashSet();
         var read = new HashSet<IrVarId>();
         var constants = new HashSet<IrTerm>();
+        var lengths = new List<IrTerm>();
+        var copies = new Dictionary<IrVarId, IrTerm?>();
         foreach (var block in loop.Blocks.OrderBy(block => block.Value))
         {
             foreach (var instruction in candidate.Program.GetBlock(block).Instructions)
@@ -69,9 +71,27 @@ internal static class LoopInvariantCandidates
                     IrReturnInstruction returned => returned.Value,
                     _ => null
                 };
+                if (instruction is IrAssignInstruction copy)
+                {
+                    // A variable the loop only ever sets to one unwritten
+                    // variable is that variable wherever the loop reads it.
+                    var source = copy.Value is IrVariableTerm { Variable: var original } && !written.Contains(original) ? copy.Value : null;
+                    copies[copy.Target] = copies.TryGetValue(copy.Target, out var previous) && previous?.Id != source?.Id ? null : source;
+                }
+                else if (instruction is IrHavocInstruction havoc)
+                {
+                    foreach (var variable in havoc.Variables)
+                    { copies[variable] = null; }
+                }
                 if (term == null)
                 { continue; }
                 read.UnionWith(IrTraversal.CollectVariables(term));
+                _ = IrTraversal.Any(term, child =>
+                {
+                    if (child is IrLengthTerm)
+                    { lengths.Add(child); }
+                    return false;
+                });
                 if (instruction is IrBranchInstruction)
                 {
                     _ = IrTraversal.Any(term, child =>
@@ -101,8 +121,13 @@ internal static class LoopInvariantCandidates
             (parameter.Entry, (IrTerm)factory.Variable(parameter.Old)), (parameter.Current, factory.Variable(parameter.Old))
         }).ToDictionary(pair => pair.Item1, pair => pair.Item2);
         var entered = loop.Fields.Select(field => IrSubstitution.Substitute(factory, field, snapshots)).Where(field => !loop.Fields.Contains(field));
+        // The length of an array the loop does not replace is fixed.
+        var resolved = copies.Where(pair => pair.Value != null).ToDictionary(pair => pair.Key, pair => pair.Value!);
+        var fixedLengths = lengths.Select(length => IrSubstitution.Substitute(factory, length, resolved))
+            .Where(length => IrTraversal.CollectVariables(length).All(variable => !written.Contains(variable))).Distinct();
         var anchors = read.Where(variable => !written.Contains(variable)).OrderBy(variable => variable.Value)
-            .Select(variable => (IrTerm)factory.Variable(variable)).Concat(entered).Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
+            .Select(variable => (IrTerm)factory.Variable(variable)).Concat(entered).Concat(fixedLengths)
+            .Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
         return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.Value)
             .Select(variable => (IrTerm)factory.Variable(variable)).Concat(loop.Fields)], anchors);
     }

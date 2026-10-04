@@ -406,8 +406,10 @@ An inductive invariant holds on every execution reaching its header, so every
 claim decided over the cut (exceptions, allocations, purity, capabilities and
 effect contracts) retries with the same invariants: for example, `i >= 0`
 keeps `values[i]` in bounds in a counting loop and rules out a site guarded by
-`i < 0`. When the surviving templates do not prove a goal, Z3's Spacer engine
-proposes more: each loop's invariant becomes an unknown relation over the
+`i < 0`. After the first round, Houdini checks every surviving checkpoint in
+one query before checking them one by one. When the surviving templates do
+not prove a goal, Z3's Spacer engine proposes more, which join only the
+surviving templates: each loop's invariant becomes an unknown relation over the
 boolean and integer values it carries and reads, the checkpoints and the goal
 become Horn clauses over those relations, and Spacer solves their unbounded
 integer reading (arithmetic does not wrap; any other operation is a fresh
@@ -429,15 +431,20 @@ cannot change them. A postcondition reads the final contents, and
 `Contract.Old` reads the entry contents, in replay as in the verification
 condition. A call, an unmodeled
 element write or a loop that stores elements forgets the contents: later
-reads are unknown until stored again. A loop whose every heap store is a
-field store through a receiver over inputs it does not write (`this`, a
-parameter, or a copy of one) forgets only those fields at its header: the cut
-stores an unknown value into each, which is no write of the program, and other
-fields keep their contents. Those fields join the loop's invariant candidates,
+reads are unknown until stored again; element contents alone are forgotten by
+an element write, which never changes a field. A loop whose every heap store
+is an element store or a field store through a receiver over inputs it does
+not write (`this`, a parameter, or a copy of one) forgets only those fields,
+and element contents if it stores elements, at its header: the cut stores an
+unknown value into each field, which is no write of the program, and other
+fields keep their contents. The length of an array the loop does not replace
+is an anchor for its candidates (`i <= values.Length`). Those fields join the loop's invariant candidates,
 compared with its counters and with their entry values (a read through an Old
 snapshot, which in invariants as in clauses sees the entry contents), and
-they are part of the state Spacer reasons about, where a field read or a
-reference comparison is an unknown: `count == Old(count) + i` proves
+they are part of the state Spacer reasons about, where references are integers
+and an uninterpreted application (a field read, a length) is an unknown per
+function and arguments, equal for equal arguments (Ackermann's reduction):
+`count == Old(count) + i` proves
 `count == Old(count) + n` after a loop that increments `count` n times.
 
 Scalar and reference (object, string and array) instance fields of classes,

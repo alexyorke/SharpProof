@@ -37,6 +37,9 @@ public static class HornInvariantSearch
         private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
         private readonly Dictionary<uint, Expr> _unknowns = [];
+        private readonly Dictionary<uint, Expr> _converted = [];
+        private readonly Dictionary<string, Expr> _applications = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (string Function, Expr[] Arguments)> _applied = new(StringComparer.Ordinal);
         private FuncDecl? _error;
 
         internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
@@ -59,8 +62,9 @@ public static class HornInvariantSearch
             foreach (var relation in _relations.Values)
             { fixedpoint.RegisterRelation(relation); }
             fixedpoint.RegisterRelation(_error);
-            foreach (var rule in rules)
+            foreach (var converted in rules)
             {
+                var rule = Ackermann(converted);
                 var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
                 Collect(rule, constants);
                 fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constants.Values], rule)));
@@ -84,11 +88,47 @@ public static class HornInvariantSearch
             return proposals;
         }
 
+        // A rule whose uninterpreted applications became unknowns also
+        // requires equal unknowns for equal arguments (Ackermann's reduction).
+        private BoolExpr Ackermann(BoolExpr rule)
+        {
+            var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
+            Collect(rule, constants);
+            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            var congruence = new List<BoolExpr>();
+            for (var left = 0; left < applied.Length; left++)
+            {
+                for (var right = left + 1; right < applied.Length; right++)
+                {
+                    var (function, arguments) = _applied[applied[left]];
+                    var (other, otherArguments) = _applied[applied[right]];
+                    if (function != other || arguments.Length != otherArguments.Length)
+                    { continue; }
+                    congruence.Add(Own(context.MkImplies(
+                        Own(context.MkAnd([.. arguments.Select((argument, ordinal) => Own(context.MkEq(argument, otherArguments[ordinal])))])),
+                        Own(context.MkEq(constants[applied[left]], constants[applied[right]])))));
+                }
+            }
+            if (congruence.Count == 0 || !rule.IsImplies)
+            { return rule; }
+            return Own(context.MkImplies(Own(context.MkAnd([.. congruence, (BoolExpr)rule.Args[0]])), (BoolExpr)rule.Args[1]));
+        }
+
         // The unbounded integer reading of a bitvector formula: arithmetic does
-        // not wrap and comparisons ignore signedness; an operation with no
-        // integer reading (a field read, a reference comparison) is an
-        // unknown, the same one wherever the operation recurs.
+        // not wrap, comparisons ignore signedness and references are integers;
+        // an uninterpreted application (a field read, a length) is an unknown
+        // per function and arguments, and any other operation with no integer
+        // reading is an unknown, the same one wherever it recurs.
         private Expr Integer(Expr expression)
+        {
+            if (_converted.TryGetValue(expression.Id, out var converted))
+            { return converted; }
+            converted = IntegerCore(expression);
+            _converted[expression.Id] = converted;
+            return converted;
+        }
+
+        private Expr IntegerCore(Expr expression)
         {
             _meter.Consume();
             if (expression is BitVecNum number)
@@ -112,7 +152,7 @@ public static class HornInvariantSearch
             }
             if (expression.IsConst && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
-                if (expression.Sort is not BitVecSort)
+                if (expression.Sort is not (BitVecSort or UninterpretedSort))
                 { return expression; }
                 var name = expression.FuncDecl.Name.ToString();
                 if (!_integers.TryGetValue(name, out var integer))
@@ -124,9 +164,20 @@ public static class HornInvariantSearch
             }
             if (!expression.IsApp)
             { throw new UnsupportedIrEncodingException(); }
-            if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
-            { return Unknown(expression); }
             var operands = expression.Args.Select(Integer).ToArray();
+            if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
+            {
+                var function = expression.FuncDecl.Name.ToString();
+                var key = function + "(" + string.Join(",", operands.Select(operand => operand.Id.ToString(CultureInfo.InvariantCulture))) + ")";
+                if (!_applications.TryGetValue(key, out var application))
+                {
+                    var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
+                    application = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
+                    _applications.Add(key, application);
+                    _applied.Add(name, (function, operands));
+                }
+                return application;
+            }
             if (expression.FuncDecl.DeclKind is Z3_decl_kind.Z3_OP_EQ or Z3_decl_kind.Z3_OP_DISTINCT &&
                 operands.Any(operand => !operand.Sort.Equals(context.BoolSort) && operand.Sort is not IntSort))
             {

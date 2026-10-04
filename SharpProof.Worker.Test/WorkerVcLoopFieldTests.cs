@@ -3,9 +3,9 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-// A loop that stores only to fields of fixed objects forgets just those fields
-// at its header, and invariants may relate them to the loop's counters and to
-// their entry values.
+// A loop that stores only to fields of fixed objects, and to array elements,
+// forgets just those at its header, and invariants may relate the fields to
+// the loop's counters and to their entry values.
 [TestFixture]
 public sealed class WorkerVcLoopFieldTests
 {
@@ -43,6 +43,16 @@ public sealed class WorkerVcLoopFieldTests
                 count = 0;
                 for (var i = 0; i < n; i++) { count++; }
             }
+            public void FillAndCount([NotNull] int[] values) {
+                Contract.Ensures(count == values.Length);
+                count = 0;
+                for (var i = 0; i < values.Length; i++) { values[i] = 0; count++; }
+            }
+            public void FillKeepsFlag([NotNull] int[] values) {
+                Contract.Requires(flag);
+                Contract.Ensures(flag);
+                for (var i = 0; i < values.Length; i++) { values[i] = 1; }
+            }
             public static void ParameterLoop([NotNull] Counter other, int n) {
                 Contract.Requires(n >= 0);
                 Contract.Ensures(other.count == n);
@@ -69,6 +79,8 @@ public sealed class WorkerVcLoopFieldTests
     [TestCase("KeepFlag")]
     [TestCase("UntouchedField")]
     [TestCase("ParameterLoop")]
+    [TestCase("FillAndCount")]
+    [TestCase("FillKeepsFlag")]
     public void LoopFieldPostconditionIsProven(string method)
     {
         var claim = Claim(method);
