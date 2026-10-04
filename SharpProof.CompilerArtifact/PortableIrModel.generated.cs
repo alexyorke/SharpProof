@@ -280,7 +280,7 @@ internal static class PortableIrSlotCatalog
     new("Throw", ["exceptionKind", "blockIndex", "unused", "unused", "empty", "unused"]),
     new("ExceptionalExit", ["unused", "unused", "unused", "unused", "empty", "unused"]),
     new("Allocate", ["typeIndex", "optionalVariableIndex", "optionalTermIndex", "unused", "termIndices", "unused"]),
-    new("Write", ["writeRegion", "unused", "unused", "unused", "empty", "unused"]),
+    new("Write", ["writeRegion", "optionalTermIndex", "optionalTermIndex", "unused", "termIndices", "unused"]),
     new("Lock", ["termIndex", "unused", "unused", "unused", "empty", "unused"]),
     ];
 }
@@ -464,7 +464,8 @@ internal static class PortableIrGraphCodecProjections
             IrLockInstruction synchronization => row(instruction, operationIndex(instruction.Operation),
                 termIndex(synchronization.Receiver), -1, -1, null, null),
             IrWriteInstruction write => row(instruction, operationIndex(instruction.Operation),
-                (int)write.Region, -1, -1, null, null),
+                (int)write.Region, optionalTermIndex(write.Sequence), optionalTermIndex(write.Index),
+                write.Value == null ? null : termIndices([write.Value]), null),
             IrAssignInstruction value => row(
                 instruction,
                 operationIndex(instruction.Operation),
@@ -685,7 +686,11 @@ internal static class PortableIrGraphCodecProjections
         return row.Kind switch
         {
             IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A), optionalVariable(row.B), optionalTerm(row.C), terms(row.Items).ToImmutableArray()),
-            IrInstructionKind.Write => builder.Write(block, operation(row.Operation), (IrWriteRegion)row.A),
+            IrInstructionKind.Write => optionalTerm(row.B) is { } stored
+                ? row.Items.Length == 1 && optionalTerm(row.C) is { } index
+                    ? builder.ElementStore(block, operation(row.Operation), stored, index, terms(row.Items)[0])
+                    : throw invalid()
+                : row.C < 0 && row.Items.Length == 0 ? builder.Write(block, operation(row.Operation), (IrWriteRegion)row.A) : throw invalid(),
             IrInstructionKind.Lock => builder.Lock(block, operation(row.Operation), term(row.A)),
             IrInstructionKind.Assign => builder.Assign(
                 block,

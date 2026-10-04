@@ -33,6 +33,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
     internal bool ApproximateElementReads { get; set; }
+    internal bool PinElementReads { get; set; }
 
     // An API specification narrows what an opaque call may do.
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
@@ -370,7 +371,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 {
                     var array = LowerBodyValue(access.ArrayReference, block, depth + 1);
                     var index = LowerBodyValue(access.Indices[0], array.Continuation, depth + 1);
-                    return ApplyBody(operation, [array, index]);
+                    var elementRead = ApplyBody(operation, [array, index]);
+                    return PinElementReads && elementRead.Classification.IsExact ? Pin(operation, elementRead) : elementRead;
                 }
             case IUnaryOperation unary:
                 return ApplyBody(operation, [LowerBodyValue(unary.Operand, block, depth + 1)]);
@@ -384,6 +386,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             default:
                 return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind);
         }
+    }
+
+    // Evaluates value here: a later element store must not change it.
+    private TotalBodyValue Pin(IOperation operation, TotalBodyValue value)
+    {
+        var pinned = _context.Temporary(value.Value.Type);
+        _builder!.Assign(value.Continuation, _context.Site(operation), pinned, value.Value);
+        return new(_factory.Variable(pinned), value.Continuation, value.Classification);
     }
 
     internal TotalBodyValue AllocateValue(IOperation operation, IrBlockId block)
@@ -622,6 +632,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return Approximate(mutation ?? access, block, guard.Classification.Abstention); }
         block = ApplyRule(access, guard, block).Continuation;
         var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
+        // A scalar element of a single-dimensional array is stored with its
+        // value; other stores are effect sites only.
+        var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
+            _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
         if (stored is { } value)
         {
             if (!elementType.IsValueType && !elementType.IsSealed)
@@ -632,12 +646,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
                     [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
             }
-            _builder!.Write(block, writeSite, IrWriteRegion.Element);
+            if (modeled && value.Value.Type == _context.Type(elementType))
+            { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
+            else
+            { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
             return new(value.Value, block, FrontendSubsetClassification.Exact);
         }
-        var current = _context.Temporary(_context.Type(elementType));
-        _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
-        var old = new TotalBodyValue(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
+        TotalBodyValue old;
+        if (modeled && !ApproximateElementReads)
+        { old = Pin(access, new(_factory.SequenceAccess(array.Value, indices[0]), block, FrontendSubsetClassification.Exact)); }
+        else
+        {
+            var current = _context.Temporary(_context.Type(elementType));
+            _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
+            old = new(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
+        }
         if (mutation == null)
         { return old; }
         TotalBodyValue next;
@@ -659,7 +682,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             { return Approximate(mutation, right.Continuation, rule.Classification.Abstention); }
             next = ApplyRule(mutation, rule, right.Continuation);
         }
-        _builder.Write(next.Continuation, writeSite, IrWriteRegion.Element);
+        if (modeled && next.Value.Type == old.Value.Type)
+        { _builder!.ElementStore(next.Continuation, writeSite, array.Value, indices[0], next.Value); }
+        else
+        { _builder!.Write(next.Continuation, writeSite, IrWriteRegion.Element); }
         return mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
     }
 

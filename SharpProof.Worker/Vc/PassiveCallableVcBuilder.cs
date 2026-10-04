@@ -8,7 +8,13 @@ internal sealed class PassiveCallableVcBuilder
     [SuppressMessage("Design", "CA1032", Justification = "Private construction control flow has no public exception contract.")]
     private sealed class ConstructionLimitException : Exception;
     private sealed record Edge(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? PendingException);
-    private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value);
+    private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value, Heap Contents);
+    // The element stores made so far in program order, each under its reach,
+    // over the entry contents; forgotten contents are unknown after something
+    // wrote elements without a modeled store. A store's reach is false on
+    // every path that does not execute it, and a path that executes it before
+    // a read processes it first, so the latest matching store decides a read.
+    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Sequence, IrTerm Index, IrTerm Value)> Stores, bool Forgotten);
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
     private readonly IrProgram _program;
@@ -45,6 +51,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
     private int _fresh;
     private bool _hasStringConcat;
+    private Heap _heap = new([], false);
     private bool _hasUnmodeledStringAllocations;
     private readonly CancellationToken _cancellationToken;
     private int _remainingWork = MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
@@ -276,6 +283,16 @@ internal sealed class PassiveCallableVcBuilder
                         break;
                     case IrWriteInstruction write:
                         _writes.Add((reach, write.Operation, IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local));
+                        if (write is { Sequence: { } stored, Index: { } storedIndex, Value: { } storedValue })
+                        {
+                            if (!TryRewrite(stored, state, out var storedArray) || !TryRewrite(storedIndex, state, out var storedPosition) ||
+                                !TryRewrite(storedValue, state, out var storedElement))
+                            { return null; }
+                            Spend(_heap.Stores.Length);
+                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedArray, storedPosition, storedElement)) };
+                        }
+                        else if (write.Region is IrWriteRegion.Element or IrWriteRegion.Unknown)
+                        { _heap = new([], true); }
                         break;
                     case IrCallInstruction call:
                         if (call.Receiver != null || call.Target != null)
@@ -286,6 +303,8 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                         }
                         _opaqueCalls.Add((reach, IrOpaqueCallSite.Effects(_factory, call.Operation)));
+                        // A call may write any array.
+                        _heap = new([], true);
                         break;
                     case IrAssignInstruction assign:
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
@@ -323,7 +342,10 @@ internal sealed class PassiveCallableVcBuilder
                         state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm ? value : assigned;
                         break;
                     case IrHavocInstruction havoc:
-                        if (havoc.HavocKind != IrHavocKind.Variables ||
+                        if (havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory &&
+                            havoc.Origin == IrHavocOrigin.Approximation)
+                        { _heap = new([], true); }
+                        else if (havoc.HavocKind != IrHavocKind.Variables ||
                             havoc.Origin is not (IrHavocOrigin.Input or IrHavocOrigin.Approximation))
                         { return null; }
                         if (havoc.Origin == IrHavocOrigin.Approximation && ReadsState(havoc.Operation))
@@ -395,7 +417,7 @@ internal sealed class PassiveCallableVcBuilder
                             : returnedValue != null)
                         { return null; }
                         Spend(state.Count);
-                        _returns.Add(new(reach, state.ToImmutableDictionary(), returnedValue));
+                        _returns.Add(new(reach, state.ToImmutableDictionary(), returnedValue, _heap));
                         break;
                     default:
                         return null;
@@ -418,8 +440,8 @@ internal sealed class PassiveCallableVcBuilder
             foreach (var returned in _returns)
             {
                 Spend();
-                if (!TryRewrite(clause.Value, returned.State, out var value, returned, postcondition: true) ||
-                    !TryRewrite(clause.Safe, returned.State, out var safe, returned, postcondition: true))
+                if (!TryRewrite(clause.Value, returned.State, out var value, returned, postcondition: true, returned.Contents) ||
+                    !TryRewrite(clause.Safe, returned.State, out var safe, returned, postcondition: true, returned.Contents))
                 { return null; }
                 goal = And(goal, Guard(returned.Reach, And(safe, value)));
             }
@@ -474,8 +496,9 @@ internal sealed class PassiveCallableVcBuilder
     }
 
     private bool TryRewrite(IrTerm root, IReadOnlyDictionary<IrVarId, IrTerm> state, out IrTerm value,
-        Exit? returned = null, bool postcondition = false)
+        Exit? returned = null, bool postcondition = false, Heap? heap = null)
     {
+        heap ??= _heap;
         if (!Term(root))
         { value = null!; return false; }
         var substitutions = new Dictionary<IrVarId, IrTerm>();
@@ -493,8 +516,34 @@ internal sealed class PassiveCallableVcBuilder
             { value = null!; return false; }
             substitutions.Add(variable, replacement);
         }
-        value = IrSubstitution.Substitute(_factory, root, substitutions);
-        return true;
+        var consistent = true;
+        IrTerm Read(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index)
+        {
+            Spend(heap.Stores.Length);
+            // An old value reads the arrays as the callable entered.
+            if (postcondition && IrTraversal.CollectVariables(original.Sequence).Any(_oldInputs.ContainsKey))
+            { return _factory.SequenceAccess(sequence, index); }
+            IrTerm read = heap.Forgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
+            foreach (var store in heap.Stores)
+            {
+                if (store.Sequence.Type != sequence.Type)
+                { continue; }
+                if (Position(store.Index) is not { } stored || Position(index) is not { } position || store.Value.Type != original.Type)
+                { consistent = false; continue; }
+                read = _factory.Conditional(And(store.Reach, And(Equal(sequence, store.Sequence), Equal(position, stored))),
+                    store.Value, read);
+            }
+            return read;
+        }
+        // Indexes of every modeled width compare as Int32.
+        IrTerm? Position(IrTerm index)
+        {
+            return index.Type == _factory.IntegerType ? index
+                : _factory.GetTypeInfo(index.Type) is { Kind: IrTypeKind.Integer, Width: > 0 and < 32 } ? _factory.Cast(_factory.IntegerType, index)
+                : null;
+        }
+        value = IrSubstitution.SubstituteWithReads(_factory, root, substitutions, Read);
+        return consistent;
     }
 
     private bool Term(IrTerm root)

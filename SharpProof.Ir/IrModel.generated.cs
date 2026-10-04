@@ -183,14 +183,19 @@ public sealed partial class IrProgramExecutionResult
         ImmutableDictionary<IrVarId, IrValue> values,
         int steps,
         bool consumedApproximation = false,
-        ImmutableHashSet<IrVarId>? approximationVariables = null
+        ImmutableHashSet<IrVarId>? approximationVariables = null,
+        IReadOnlyDictionary<IrValue, IrValue[]>? heap = null
     )
     {
         (Status, ReturnValue, Instruction, Unsupported, Exception, Values, Steps) =
             (status, returnValue, instruction, unsupported, exception, values, steps);
         ConsumedApproximation = consumedApproximation;
         ApproximationVariables = approximationVariables ?? ImmutableHashSet<IrVarId>.Empty;
+        Heap = heap;
     }
+
+    // The contents of every array the execution stored to, by identity.
+    internal IReadOnlyDictionary<IrValue, IrValue[]>? Heap { get; }
 
     public IrProgramExecutionStatus Status { get; }
 
@@ -646,11 +651,18 @@ public sealed class IrLockInstruction : IrInstruction
 
 public sealed class IrWriteInstruction : IrInstruction
 {
-    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
+        IrTerm? sequence = null, IrTerm? index = null, IrTerm? value = null)
         : base(id, IrInstructionKind.Write, operation)
-    { Region = region; }
+    { Region = region; Sequence = sequence; Index = index; Value = value; }
 
     public IrWriteRegion Region { get; }
+    // An element store names its array, index and stored value; other writes
+    // are effect sites only.
+    public IrTerm? Sequence { get; }
+    public IrTerm? Index { get; }
+    public IrTerm? Value { get; }
+    public bool IsElementStore => Sequence != null;
 }
 
 public sealed class IrAssignInstruction : IrInstruction

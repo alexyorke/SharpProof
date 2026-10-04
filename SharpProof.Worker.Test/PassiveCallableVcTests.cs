@@ -364,7 +364,6 @@ public sealed class PassiveCallableVcTests
     }
 
     [TestCase("assert")]
-    [TestCase("memory")]
     [TestCase("call")]
     public void UnsupportedEffectsClose(string scenario)
     {
@@ -374,9 +373,6 @@ public sealed class PassiveCallableVcTests
         {
             case "assert":
                 subject.Builder.Assert(block, subject.Site, subject.Factory.Boolean(true));
-                break;
-            case "memory":
-                subject.Builder.Havoc(block, subject.Site, IrHavocKind.Memory);
                 break;
             case "call":
                 var member = subject.Factory.GetOrCreateMember(subject.Factory.CreateIdentity(), subject.Factory.ObjectType,

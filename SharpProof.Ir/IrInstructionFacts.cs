@@ -22,6 +22,7 @@ internal static class IrInstructionFacts
             IrAssignInstruction assign => [assign.Value],
             IrAllocationInstruction allocation => allocation.Length == null ? allocation.InitialValues : allocation.InitialValues.Insert(0, allocation.Length),
             IrLockInstruction synchronization => [synchronization.Receiver],
+            IrWriteInstruction { Sequence: { } sequence, Index: { } index, Value: { } value } => [sequence, index, value],
             IrCallInstruction call => call.Receiver == null ? call.Arguments : call.Arguments.Insert(0, call.Receiver),
             IrAssumeInstruction assume => [assume.Condition],
             IrAssertInstruction assert => [assert.Condition],

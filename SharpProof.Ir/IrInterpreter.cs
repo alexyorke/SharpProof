@@ -149,12 +149,20 @@ public sealed class IrInterpreter(IrFactory factory)
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
         Action<IrVarId>? onVariableRead, CancellationToken cancellationToken)
     {
+        return Evaluate(term, variables, onVariableRead, heap: null, cancellationToken);
+    }
+
+    // The heap holds the current contents of each array stored to so far.
+    internal IrEvaluationResult Evaluate(
+        IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
+        Action<IrVarId>? onVariableRead, IReadOnlyDictionary<IrValue, IrValue[]>? heap, CancellationToken cancellationToken)
+    {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
         return EvaluateCore(
             term,
-            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken));
+            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken) { Heap = heap });
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
@@ -610,7 +618,11 @@ public sealed class IrInterpreter(IrFactory factory)
         {
             return DefaultValue(access.Type);
         }
-        return invalid ?? Value(sequence.Value!.Elements[(int)index.Value!.Integer]);
+        if (invalid != null)
+        { return invalid; }
+        var position = (int)index.Value!.Integer;
+        return Value(state.Heap != null && state.Heap.TryGetValue(sequence.Value!, out var stored)
+            ? stored[position] : sequence.Value!.Elements[position]);
     }
 
     private IrEvaluationResult CastFault(IrTypeId type, IrExceptionKind kind, string detail)
@@ -701,5 +713,6 @@ public sealed class IrInterpreter(IrFactory factory)
         internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
         internal int Depth { get; set; }
+        internal IReadOnlyDictionary<IrValue, IrValue[]>? Heap { get; set; }
     }
 }

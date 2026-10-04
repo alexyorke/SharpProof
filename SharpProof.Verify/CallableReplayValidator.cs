@@ -22,6 +22,7 @@ internal static class CallableReplayValidator
     {
         var final = model.ToBuilder();
         var approximationVariables = new HashSet<IrVarId>();
+        IReadOnlyDictionary<IrValue, IrValue[]>? heap = null;
         if (!context.IsTrivial)
         {
             if (context.Program is not { } program || !ReferenceEquals(program.Factory, factory) ||
@@ -50,6 +51,14 @@ internal static class CallableReplayValidator
             var execution = new IrProgramInterpreter(factory).Execute(
                 program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
             if (execution.ConsumedApproximation)
+            {
+                return AbstentionReason.CounterexampleNotReplayable;
+            }
+            heap = execution.Heap;
+            // An old element read sees the arrays as the callable entered; the
+            // final heap holds only their current contents.
+            if (heap is { Count: > 0 } && (ReadsOldElements(context.Postcondition, context) ||
+                context.PostconditionGuard is { } oldGuard && ReadsOldElements(oldGuard, context)))
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
@@ -130,7 +139,7 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
-            var defined = interpreter.Evaluate(guard, final, ObserveRead, cancellationToken);
+            var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken);
             if (consumedApproximation)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
@@ -144,7 +153,7 @@ internal static class CallableReplayValidator
                 return AbstentionReason.PostconditionMayBeUndefined;
             }
         }
-        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, cancellationToken);
+        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken);
         if (consumedApproximation)
         {
             return AbstentionReason.CounterexampleNotReplayable;
@@ -159,4 +168,9 @@ internal static class CallableReplayValidator
                 : AbstentionReason.CounterexampleReplayFailed;
     }
 
+    private static bool ReadsOldElements(IrTerm root, CallableReplayContext context)
+    {
+        return IrTraversal.Any(root, term => term is IrSequenceAccessTerm access &&
+            IrTraversal.CollectVariables(access.Sequence).Any(variable => context.PreStateBindings.ContainsKey(variable)));
+    }
 }

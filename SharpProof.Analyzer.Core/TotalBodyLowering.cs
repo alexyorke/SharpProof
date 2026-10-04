@@ -74,20 +74,22 @@ internal static class TotalBodyLowering
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false)
     {
         var lowering = LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
-            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, cancellationToken);
-        // A body that writes elements reads them as approximations.
-        return opaqueCalls && lowering.IsExact && MutatesElements(lowering.Program) &&
-            ReadsElements(context.Factory, BodyTerms(lowering.Program))
-            ? LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
-                initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: true, cancellationToken)
-            : lowering;
+            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: false, cancellationToken);
+        if (!opaqueCalls || !lowering.IsExact || !MutatesElements(lowering.Program) ||
+            !ReadsElements(context.Factory, BodyTerms(lowering.Program)))
+        { return lowering; }
+        // A body whose only element writes are stores reads elements where it
+        // reads them; one that may write elements otherwise approximates them.
+        var unmodeled = UnmodeledElementWrites(lowering.Program);
+        return LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
+            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: unmodeled, pinElementReads: !unmodeled, cancellationToken);
     }
 
     private static FrontendProgramLoweringResult LowerOnce(CSharpCompilation compilation, ControlFlowGraph graph,
         TotalLoweringContext context, ResolveTotalIlBody? resolveIl,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel, Func<INamedTypeSymbol, bool>? initializationFree,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata, bool opaqueCalls, bool approximateElementReads,
-        CancellationToken cancellationToken)
+        bool pinElementReads, CancellationToken cancellationToken)
     {
         context.AllowObjectWidening = prepareMetadata != null;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
@@ -134,7 +136,7 @@ internal static class TotalBodyLowering
         }, resolveIl == null ? null : (method, token) => TrustedContractEffects(contracts, method) == null ? resolveIl(method, token) : null,
             cancellationToken,
             method => ResolveScalarModel(method, context.Factory, apiSpecs) ?? resolveScalarModel?.Invoke(method),
-            prepareMetadata, opaqueCalls, method => OpaqueEffects(contracts, apiSpecs, method), approximateElementReads);
+            prepareMetadata, opaqueCalls, method => OpaqueEffects(contracts, apiSpecs, method), approximateElementReads, pinElementReads);
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory, ResolvedApiSpecTable apiSpecs)
@@ -239,14 +241,21 @@ internal static class TotalBodyLowering
         return IrOpaqueCallSite.WithCapabilities(effects, (int)declared.Capabilities);
     }
 
-    // The IR reads an array element as a pure function of the reference, which
-    // holds only while nothing writes elements: neither an element store nor an
-    // opaque call, which may write any array. Entry preconditions see the
-    // initial arrays; every other read must then be an approximation.
+    // An element read is a pure term evaluated where it is used, which is
+    // only right while nothing writes elements in between: neither an element
+    // store nor an opaque call, which may write any array. Entry preconditions
+    // see the initial arrays.
     internal static bool MutatesElements(IrProgram program)
     {
         return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
             instruction is IrCallInstruction { Receiver: null, Target: null } or IrWriteInstruction { Region: IrWriteRegion.Element });
+    }
+
+    // A call or an unmodeled element write may write any array.
+    internal static bool UnmodeledElementWrites(IrProgram program)
+    {
+        return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+            instruction is IrCallInstruction { Receiver: null, Target: null } or IrWriteInstruction { Region: IrWriteRegion.Element, IsElementStore: false });
     }
 
     internal static IEnumerable<IrTerm> BodyTerms(IrProgram program)

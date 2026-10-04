@@ -408,6 +408,19 @@ effect contracts) retries with the same invariants: for example, `i >= 0`
 keeps `values[i]` in bounds in a counting loop and rules out a site guarded by
 `i < 0`. Refutations still come only from bounded search and replay.
 Unsupported async and iterator callables abstain.
+
+Element stores into single-dimensional arrays of bool or integer elements
+carry their array, index and value (`a[i] = v`, `a[i]++`, compound
+assignments). Replay applies them to the arrays by identity. In the
+verification condition a read is the latest earlier store to the same array
+and index on the executed path, else the array's entry contents; arrays are
+compared by identity, so aliases see each other's stores. Element reads in a
+body that stores elements are evaluated where they occur, so a later store
+cannot change them. A postcondition reads the final contents, and
+`Contract.Old` reads the entry contents; replay declines a counterexample
+whose postcondition reads old elements after stores. A call, an unmodeled
+element write or a loop that stores elements forgets the contents: later
+reads are unknown until stored again.
 Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
 claims over the Total program: a proof is a complete may-effect summary and a
 refutation names a replayed violating site. Compiler effect evidence never

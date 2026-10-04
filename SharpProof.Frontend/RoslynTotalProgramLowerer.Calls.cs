@@ -261,6 +261,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case IrLockInstruction synchronization:
                         _builder.Lock(destination, synchronization.Operation, synchronization.Receiver);
                         break;
+                    case IrWriteInstruction { Sequence: { } stored, Index: { } index, Value: { } value } write:
+                        _builder.ElementStore(destination, write.Operation, stored, index, value);
+                        break;
                     case IrWriteInstruction write:
                         _builder.Write(destination, write.Operation, write.Region);
                         break;

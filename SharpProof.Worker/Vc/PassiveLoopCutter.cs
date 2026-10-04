@@ -205,11 +205,19 @@ internal sealed partial class PassiveLoopCutter
             var (original, layer) = pending.Dequeue();
             var encoded = blocks[(original, layer)];
             var source = _candidate.Program.GetBlock(original);
-            if (!unroll && _havoc.TryGetValue(original, out var writes) && writes.Length != 0)
+            if (!unroll && _havoc.TryGetValue(original, out var writes))
             {
-                Spend(writes.Length);
-                Count();
-                builder.Havoc(encoded, source.Instructions[0].Operation, IrHavocKind.Variables, IrHavocOrigin.Approximation, [.. writes]);
+                // A loop that stores elements also forgets array contents.
+                var memory = _loops[original].Any(node => _candidate.Program.GetBlock(node).Instructions
+                    .Any(instruction => instruction is IrWriteInstruction { Region: IrWriteRegion.Element }));
+                if (writes.Length != 0 || memory)
+                {
+                    Spend(writes.Length);
+                    Count();
+                    builder.Havoc(encoded, source.Instructions[0].Operation,
+                        memory ? writes.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
+                        IrHavocOrigin.Approximation, [.. writes]);
+                }
             }
             if (!unroll)
             {
@@ -229,6 +237,9 @@ internal sealed partial class PassiveLoopCutter
                         break;
                     case IrLockInstruction synchronization:
                         builder.Lock(encoded, synchronization.Operation, synchronization.Receiver);
+                        break;
+                    case IrWriteInstruction { Sequence: { } stored, Index: { } index, Value: { } value } write:
+                        builder.ElementStore(encoded, write.Operation, stored, index, value);
                         break;
                     case IrWriteInstruction write:
                         builder.Write(encoded, write.Operation, write.Region);

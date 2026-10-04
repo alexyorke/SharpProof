@@ -30,6 +30,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool OpaqueCalls { get; set; }
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
     internal bool ApproximateElementReads { get; set; }
+    // Element reads are assigned where they occur, so later stores cannot
+    // change them.
+    internal bool PinElementReads { get; set; }
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
     { return prepareMetadata?.Invoke(frame, body) ?? true; }
 

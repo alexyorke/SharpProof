@@ -66,6 +66,15 @@ public sealed class IrProgramBuilder(IrFactory factory)
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
 
+    // Stores value at sequence[index]; the caller has already guarded the
+    // array's nullness and the index's range.
+    public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value)
+    {
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation, IrWriteRegion.Element,
+            ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
+            ArgumentNullGuard.NotNull(value, nameof(value))));
+    }
+
     public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
     { return Append(block, new IrLockInstruction(NextInstructionId(), operation, receiver)); }
 
@@ -253,6 +262,17 @@ public sealed class IrProgramBuilder(IrFactory factory)
             case IrWriteInstruction write:
                 if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
                 { throw InvalidArgument("A write region is undefined.", "region"); }
+                if (write.Sequence is { } stored)
+                {
+                    var sequenceType = _factory.GetTypeInfo(ValidateTerm(stored, "sequence"));
+                    if (write.Region != IrWriteRegion.Element || sequenceType.Kind != IrTypeKind.Sequence ||
+                        write.Index == null || write.Value == null ||
+                        _factory.GetTypeInfo(ValidateTerm(write.Index, "index")).Kind != IrTypeKind.Integer ||
+                        ValidateTerm(write.Value, "value") != sequenceType.ElementType)
+                    { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "sequence"); }
+                }
+                else if (write.Index != null || write.Value != null)
+                { throw InvalidArgument("Only an element store names an index or value.", "index"); }
                 break;
             case IrAllocationInstruction allocation:
                 if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))

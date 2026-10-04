@@ -90,7 +90,8 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false,
-        Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null, bool approximateElementReads = false)
+        Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null, bool approximateElementReads = false,
+        bool pinElementReads = false)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
@@ -101,6 +102,11 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         { return LowerCandidate(graph, context, cancellationToken); }
         return new RoslynTotalProgramLowerer(context, cancellationToken,
             new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata)
-            { OpaqueCalls = opaqueCalls, OpaqueEffects = opaqueEffects, ApproximateElementReads = approximateElementReads }).Lower(graph);
+            {
+                OpaqueCalls = opaqueCalls,
+                OpaqueEffects = opaqueEffects,
+                ApproximateElementReads = approximateElementReads,
+                PinElementReads = pinElementReads
+            }).Lower(graph);
     }
 }

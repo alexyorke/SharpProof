@@ -95,7 +95,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrAllocationInstruction allocation:
                         if (allocation.Length is { } length)
                         {
-                            var size = _terms.Evaluate(length, values.Current, values.ObserveRead, cancellationToken);
+                            var size = _terms.Evaluate(length, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                             if (size.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(size, allocation, values, steps); }
                             var count = (int)size.Value!.IntegerNumericValue;
@@ -110,7 +110,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             var initial = info.Kind == IrTypeKind.Boolean ? _factory.CreateBooleanValue(false)
                                 : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
                             var elements = allocation.InitialValues.IsEmpty ? Enumerable.Repeat(initial, count)
-                                : allocation.InitialValues.Select(value => _terms.Evaluate(value, values.Current, values.ObserveRead, cancellationToken).Value!);
+                                : allocation.InitialValues.Select(value => _terms.Evaluate(value, values.Current, values.ObserveRead, values.Heap, cancellationToken).Value!);
                             values[allocation.Target!.Value] = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
                         }
                         else if (allocation.Target is { } allocatedTarget)
@@ -119,7 +119,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         replayOptions?.AllocationPrefixObserver?.Invoke(allocation, values.ConsumedApproximation);
                         break;
                     case IrLockInstruction synchronization:
-                        var receiver = _terms.Evaluate(synchronization.Receiver, values.Current, values.ObserveRead, cancellationToken);
+                        var receiver = _terms.Evaluate(synchronization.Receiver, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                         if (receiver.Status != IrEvaluationStatus.Value)
                         { return FromEvaluation(receiver, synchronization, values, steps); }
                         replayOptions?.LockObserver?.Invoke(synchronization);
@@ -129,9 +129,25 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrWriteInstruction write:
                         replayOptions?.WriteObserver?.Invoke(write);
                         replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
+                        if (write is { Sequence: { } storedSequence, Index: { } storedIndex, Value: { } storedElement })
+                        {
+                            var target = _terms.Evaluate(storedSequence, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            if (target.Status != IrEvaluationStatus.Value)
+                            { return FromEvaluation(target, write, values, steps); }
+                            var position = _terms.Evaluate(storedIndex, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            if (position.Status != IrEvaluationStatus.Value)
+                            { return FromEvaluation(position, write, values, steps); }
+                            var element = _terms.Evaluate(storedElement, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            if (element.Status != IrEvaluationStatus.Value)
+                            { return FromEvaluation(element, write, values, steps); }
+                            // The lowering guards the store, so an invalid one is not C#.
+                            if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
+                            { return Unsupported(write, values, steps, "An element store was not in bounds."); }
+                            values.Store(target.Value!, (int)position.Value!.Integer, element.Value!);
+                        }
                         break;
                     case IrAssignInstruction assign:
-                        var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, cancellationToken);
+                        var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                         if (assigned.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(assigned, assign, values, steps);
@@ -188,14 +204,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             : new IrProgramExecutionResult(IrProgramExecutionStatus.Exception, null,
                                 pendingException, null, new IrExceptionInfo(pendingException.ExceptionKind,
                                     "The program followed an explicit exception edge.", pendingException.Operation),
-                                values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
+                                values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
                     case IrReturnInstruction returned:
                         if (returned.Value == null)
                         {
                             return Result(IrProgramExecutionStatus.Returned, returned, values, steps);
                         }
 
-                        var returnValue = _terms.Evaluate(returned.Value, values.Current, values.ObserveRead, cancellationToken);
+                        var returnValue = _terms.Evaluate(returned.Value, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                         if (returnValue.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(returnValue, returned, values, steps);
@@ -286,13 +302,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     member.Receiver, member.Arguments, storedValue, values,
                     "The member access receiver is null.", cancellationToken);
             case IrSequenceLocation sequence:
-                var sequenceResult = _terms.Evaluate(sequence.Sequence, values.Current, values.ObserveRead, cancellationToken);
+                var sequenceResult = _terms.Evaluate(sequence.Sequence, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                 if (sequenceResult.Status != IrEvaluationStatus.Value)
                 {
                     return sequenceResult;
                 }
 
-                var indexResult = _terms.Evaluate(sequence.Index, values.Current, values.ObserveRead, cancellationToken);
+                var indexResult = _terms.Evaluate(sequence.Index, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                 if (indexResult.Status != IrEvaluationStatus.Value)
                 {
                     return indexResult;
@@ -317,7 +333,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         IrValue? receiverValue = null;
         if (receiver != null)
         {
-            var receiverResult = _terms.Evaluate(receiver, values.Current, values.ObserveRead, cancellationToken);
+            var receiverResult = _terms.Evaluate(receiver, values.Current, values.ObserveRead, values.Heap, cancellationToken);
             if (receiverResult.Status != IrEvaluationStatus.Value)
             {
                 return receiverResult;
@@ -327,7 +343,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
         foreach (var argument in arguments)
         {
-            var argumentResult = _terms.Evaluate(argument, values.Current, values.ObserveRead, cancellationToken);
+            var argumentResult = _terms.Evaluate(argument, values.Current, values.ObserveRead, values.Heap, cancellationToken);
             if (argumentResult.Status != IrEvaluationStatus.Value)
             {
                 return argumentResult;
@@ -353,7 +369,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             return null;
         }
 
-        var result = _terms.Evaluate(storedValue, values.Current, values.ObserveRead, cancellationToken);
+        var result = _terms.Evaluate(storedValue, values.Current, values.ObserveRead, values.Heap, cancellationToken);
         return result.Status == IrEvaluationStatus.Value ? null : result;
     }
 
@@ -364,7 +380,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 IrProgramExecutionStatus.Unsupported, null, instruction,
             evaluation.Status == IrEvaluationStatus.Exception ? null : evaluation.Unsupported,
             evaluation.Status == IrEvaluationStatus.Exception ? evaluation.Exception : null,
-            values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
+            values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
     }
 
     private IrEvaluationResult EvaluateCondition(
@@ -374,7 +390,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         out bool value)
     {
         value = false;
-        var result = _terms.Evaluate(condition, values.Current, values.ObserveRead, cancellationToken);
+        var result = _terms.Evaluate(condition, values.Current, values.ObserveRead, values.Heap, cancellationToken);
         if (result.Status != IrEvaluationStatus.Value)
         {
             return result;
@@ -396,14 +412,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     {
         return new(IrProgramExecutionStatus.Unsupported, null, instruction,
                 new IrUnsupportedInfo(IrUnsupportedReason.UnsupportedOperation, detail),
-                null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
+                null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
     }
 
     private static IrProgramExecutionResult Result(IrProgramExecutionStatus status, IrInstruction? instruction,
             ReplayValues values,
             int steps, IrValue? returnValue = null)
     {
-        return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables);
+        return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
     }
 
     private sealed class ReplayValues
@@ -412,6 +428,15 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         private readonly HashSet<IrVarId> _approximations = [];
         internal bool ConsumedApproximation { get; private set; }
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
+        private Dictionary<IrValue, IrValue[]>? _heap;
+        internal IReadOnlyDictionary<IrValue, IrValue[]>? Heap => _heap;
+        internal void Store(IrValue sequence, int index, IrValue value)
+        {
+            _heap ??= new(IrValueIdentity.Instance);
+            if (!_heap.TryGetValue(sequence, out var elements))
+            { _heap.Add(sequence, elements = [.. sequence.Elements]); }
+            elements[index] = value;
+        }
         internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
         internal IrValue this[IrVarId key]
         {
@@ -450,4 +475,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             return _values.ToImmutable();
         }
     }
+}
+
+// Arrays are compared by identity, as the CLR compares references.
+internal sealed class IrValueIdentity : IEqualityComparer<IrValue>
+{
+    internal static IrValueIdentity Instance { get; } = new();
+    public bool Equals(IrValue? x, IrValue? y) { return ReferenceEquals(x, y); }
+    public int GetHashCode(IrValue obj) { return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj); }
 }
