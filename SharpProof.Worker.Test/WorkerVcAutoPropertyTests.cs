@@ -5,7 +5,8 @@ namespace SharpProof.Worker.Test;
 
 // A nonvirtual auto-property's setter stores its backing field, a `??` on a
 // reference is a null test (also when it assigns its own operand), a metadata
-// constructor yields a fresh object and an interface setter is an opaque call.
+// constructor yields a fresh object and an interface setter is an opaque call,
+// as is a source callee whose body does not lower.
 [TestFixture]
 public sealed class WorkerVcAutoPropertyTests
 {
@@ -70,6 +71,17 @@ public sealed class WorkerVcAutoPropertyTests
                 foreach (var item in bag) { if (count < 1000) { count++; } }
                 return count;
             }
+            private static int Scale(int n) {
+                Contract.Requires(n >= 0);
+                var scaled = 1.5 * n;
+                return (int)scaled;
+            }
+            public static int KeepAfterScale(int n) {
+                Contract.Requires(n >= 0);
+                Contract.Ensures(Contract.Result<int>() == n);
+                Scale(n);
+                return n;
+            }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
@@ -99,6 +111,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("ReadThroughRef")]
     [TestCase("Depth")]
     [TestCase("CountBag")]
+    [TestCase("KeepAfterScale")]
     public void PostconditionIsProven(string method)
     {
         var claim = Claim(method);
@@ -112,15 +125,16 @@ public sealed class WorkerVcAutoPropertyTests
         Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
-    // A recursive call is an unknown call after its callee's preconditions,
-    // which stay checked at the call.
-    [Test]
-    public void RecursiveCallKeepsItsPrecondition()
+    // A recursive call, or one whose callee body does not lower, is an
+    // unknown call after its callee's preconditions, which stay checked.
+    [TestCase(".Depth(")]
+    [TestCase(".KeepAfterScale(")]
+    public void UnknownCallKeepsItsPrecondition(string method)
     {
         using var project = new ShadowTestProject(Source);
-        var depth = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(".Depth(", StringComparison.Ordinal));
-        Assert.That(depth.Total, Is.Not.Null);
-        Assert.That(depth.Total!.CallPreconditions, Is.Not.Empty);
+        var caller = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(method, StringComparison.Ordinal));
+        Assert.That(caller.Total, Is.Not.Null);
+        Assert.That(caller.Total!.CallPreconditions, Is.Not.Empty);
     }
 
     private static WorkerClaimResult Claim(string method)

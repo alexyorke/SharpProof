@@ -220,13 +220,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         RecordCallPreconditions(callee, arguments, block, site, callAncestry);
         // A recursive call checks its callee's preconditions, then runs the
         // callee as an unknown call: it may do anything, throw included. So
-        // does a call to an iterator, which has none.
+        // does a call to an iterator, which has none, and a call whose
+        // callee body does not lower.
         if (graph == null)
-        {
-            var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
-                IrOpaqueCallEffects.All);
-            return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
-        }
+        { return Opaque(); }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
@@ -252,7 +249,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         var lowering = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry).Lower(graph!);
         if (!lowering.IsExact)
-        { return new(marker, block, lowering.Classification); }
+        { return _expressions.AllowOpaqueCalls ? Opaque() : new(marker, block, lowering.Classification); }
         var program = lowering.Program;
         var instructionCount = 0;
         foreach (var source in program.Blocks)
@@ -328,6 +325,13 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
         return new(marker, continuation, FrontendSubsetClassification.Exact);
+
+        TotalBodyValue Opaque()
+        {
+            var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
+                IrOpaqueCallEffects.All);
+            return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
+        }
 
         IrBlockId Target(IrBlockId target)
         {

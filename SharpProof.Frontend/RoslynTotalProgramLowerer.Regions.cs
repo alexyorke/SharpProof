@@ -110,6 +110,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             SpendRegion();
             _regionSource = source;
             var block = _blocks[source];
+            // A block Roslyn finds unreachable (after a throw expression) has
+            // an invalid placeholder for the thrown value; it never runs.
+            if (!source.IsReachable)
+            { Return(block, structural); continue; }
             for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
             {
                 SpendRegion();

@@ -648,7 +648,8 @@ unknown call that may do anything, throw included; its result is unknown.
 A call to a source iterator without preconditions (a `GetEnumerator` written
 with `yield`) is such an unknown call too, since its body runs only as it is
 enumerated; an iterator with preconditions stays unsupported, as they would
-run at enumeration, not at the call.
+run at enumeration, not at the call. A call whose callee body does not lower
+is an unknown call as well, after its preconditions are checked at the call.
 Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on
