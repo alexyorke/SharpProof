@@ -39,7 +39,7 @@ public static class HornInvariantSearch
         private readonly Dictionary<uint, Expr> _unknowns = [];
         private readonly Dictionary<uint, Expr> _converted = [];
         private readonly Dictionary<string, Expr> _applications = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, (string Function, Expr[] Arguments)> _applied = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (string Function, Expr[] Arguments, uint Width)> _applied = new(StringComparer.Ordinal);
         private FuncDecl? _error;
 
         internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
@@ -96,12 +96,23 @@ public static class HornInvariantSearch
             Collect(rule, constants);
             var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name, StringComparer.Ordinal).ToArray();
             var congruence = new List<BoolExpr>();
+            // A bitvector unknown keeps its signed range.
+            foreach (var name in applied)
+            {
+                if (_applied[name].Width is var width and > 0)
+                {
+                    var bound = System.Numerics.BigInteger.One << (int)(width - 1);
+                    var value = (ArithExpr)constants[name];
+                    congruence.Add(Own(context.MkLe(Own(context.MkInt((-bound).ToString(CultureInfo.InvariantCulture))), value)));
+                    congruence.Add(Own(context.MkLt(value, Own(context.MkInt(bound.ToString(CultureInfo.InvariantCulture))))));
+                }
+            }
             for (var left = 0; left < applied.Length; left++)
             {
                 for (var right = left + 1; right < applied.Length; right++)
                 {
-                    var (function, arguments) = _applied[applied[left]];
-                    var (other, otherArguments) = _applied[applied[right]];
+                    var (function, arguments, _) = _applied[applied[left]];
+                    var (other, otherArguments, _) = _applied[applied[right]];
                     if (function != other || arguments.Length != otherArguments.Length)
                     { continue; }
                     congruence.Add(Own(context.MkImplies(
@@ -174,7 +185,7 @@ public static class HornInvariantSearch
                     var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
                     application = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
                     _applications.Add(key, application);
-                    _applied.Add(name, (function, operands));
+                    _applied.Add(name, (function, operands, expression.Sort is BitVecSort sort ? sort.Size : 0));
                 }
                 return application;
             }
@@ -202,7 +213,12 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers),
                 Z3_decl_kind.Z3_OP_BMUL when arithmetic => context.MkMul(numbers),
                 Z3_decl_kind.Z3_OP_BNEG when arithmetic => context.MkUnaryMinus(numbers[0]),
-                Z3_decl_kind.Z3_OP_SIGN_EXT or Z3_decl_kind.Z3_OP_ZERO_EXT when arithmetic => operands[0],
+                Z3_decl_kind.Z3_OP_SIGN_EXT when arithmetic => operands[0],
+                // The signed reading of the extended value, read unsigned.
+                Z3_decl_kind.Z3_OP_ZERO_EXT when arithmetic && expression.Args[0].Sort is BitVecSort extended =>
+                    context.MkITE(context.MkLt(numbers[0], context.MkInt(0)),
+                        context.MkAdd(numbers[0], context.MkInt((System.Numerics.BigInteger.One << (int)extended.Size).ToString(CultureInfo.InvariantCulture))),
+                        numbers[0]),
                 Z3_decl_kind.Z3_OP_SLEQ or Z3_decl_kind.Z3_OP_ULEQ when arithmetic => context.MkLe(numbers[0], numbers[1]),
                 Z3_decl_kind.Z3_OP_SLT or Z3_decl_kind.Z3_OP_ULT when arithmetic => context.MkLt(numbers[0], numbers[1]),
                 Z3_decl_kind.Z3_OP_SGEQ or Z3_decl_kind.Z3_OP_UGEQ when arithmetic => context.MkGe(numbers[0], numbers[1]),

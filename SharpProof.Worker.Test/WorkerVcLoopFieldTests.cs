@@ -48,6 +48,11 @@ public sealed class WorkerVcLoopFieldTests
                 count = 0;
                 for (var i = 0; i < values.Length; i++) { values[i] = 0; count++; }
             }
+            public void FillAndAdd([NotNull] int[] values) {
+                Contract.Requires(values.Length <= 1000 && count >= 0 && count <= 1000);
+                Contract.Ensures(count == Contract.Old(count) + values.Length);
+                for (var i = 0; i < values.Length; i++) { values[i] = 0; count++; }
+            }
             public void FillKeepsFlag([NotNull] int[] values) {
                 Contract.Requires(flag);
                 Contract.Ensures(flag);
@@ -80,6 +85,7 @@ public sealed class WorkerVcLoopFieldTests
     [TestCase("UntouchedField")]
     [TestCase("ParameterLoop")]
     [TestCase("FillAndCount")]
+    [TestCase("FillAndAdd")]
     [TestCase("FillKeepsFlag")]
     public void LoopFieldPostconditionIsProven(string method)
     {

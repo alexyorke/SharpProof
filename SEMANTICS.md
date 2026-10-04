@@ -413,7 +413,8 @@ surviving templates: each loop's invariant becomes an unknown relation over the
 boolean and integer values it carries and reads, the checkpoints and the goal
 become Horn clauses over those relations, and Spacer solves their unbounded
 integer reading (arithmetic does not wrap; any other operation is a fresh
-unknown) under a fixed resource limit. Its solution, translated back to IR and
+unknown; a zero-extension reads its operand unsigned and an unknown bitvector
+application keeps its signed range) under a fixed resource limit. Its solution, translated back to IR and
 split into conjuncts, joins the templates as further untrusted candidates for
 Houdini, so the kernel checks every one over bitvectors: `s == 2 * i` proves
 `s == 2 * n` after a loop adding two per step. Refutations still come only
