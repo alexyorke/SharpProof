@@ -391,7 +391,18 @@ bitvector verification conditions. Every worker construction path uses this
 verifier. Entry feasibility uses body-independent predicates, and completed
 claim results survive a later interruption. Bounded loop search can establish
 a refutation only through original-body replay; a bounded UNSAT result cannot
-prove a cyclic program. Unsupported async and iterator callables abstain.
+prove a cyclic program. A cyclic program is proven over its cut: each natural
+loop header forgets what the loop writes. When that cut cannot prove a
+postcondition and bounded search finds no refutation, candidate invariants are
+tried at the headers: each integer the loop carries compared (`<=`, `>=`, `==`)
+with values the loop reads but does not write, the other values it carries,
+zero and the constants of its conditions, and each boolean it carries. The
+candidates are untrusted. The cut encoding assumes them after each header and
+checks them on every edge into it, entry and back edges alike; the kernel must
+prove every check, and a candidate that fails one is dropped until the rest
+are inductive (Houdini). The postcondition is then proven with the surviving
+invariants assumed, and the Requires clauses used by any check count as used.
+Unsupported async and iterator callables abstain.
 Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
 claims over the Total program: a proof is a complete may-effect summary and a
 refutation names a replayed violating site. Compiler effect evidence never

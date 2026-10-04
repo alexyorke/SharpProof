@@ -15,12 +15,23 @@ internal sealed partial class PassiveLoopCutter
     private readonly List<IrBlockId> _finished = [];
     private readonly Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc = [];
     private readonly Dictionary<IrBlockId, ExceptionComponent> _exceptionComponents = [];
+    private ImmutableArray<Invariant> _invariants = [];
 
     internal sealed record Encoding(IrProgram Program, ImmutableHashSet<IrInstructionId> Stops)
     {
         internal ImmutableDictionary<IrInstructionId, IrInstructionId> CallMarkers { get; init; } =
             ImmutableDictionary<IrInstructionId, IrInstructionId>.Empty;
+        // Each assignment that checks an assumed loop invariant on an edge into
+        // its header, with the invariant's ordinal.
+        internal ImmutableDictionary<IrInstructionId, int> Checkpoints { get; init; } =
+            ImmutableDictionary<IrInstructionId, int>.Empty;
     }
+
+    // A natural loop: its header, its blocks and the variables it writes.
+    internal sealed record Loop(IrBlockId Header, ImmutableHashSet<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes);
+
+    // An invariant assumed at a loop header once its writes are cut.
+    internal sealed record Invariant(IrBlockId Header, IrTerm Condition);
     private PassiveLoopCutter(PassiveCallableCandidate candidate, CancellationToken cancellation)
     { _candidate = candidate; _cancellation = cancellation; }
 
@@ -41,6 +52,34 @@ internal sealed partial class PassiveLoopCutter
         }
         catch (ConstructionLimitException)
         { reason = WorkerClaimReason.ResourceLimit; return false; }
+    }
+
+    // The cut loops whose headers can carry invariants.
+    internal static ImmutableArray<Loop> Loops(PassiveCallableCandidate candidate, CancellationToken cancellation)
+    {
+        var cutter = new PassiveLoopCutter(candidate, cancellation);
+        try
+        {
+            return cutter.FindLoops()
+                ? [.. cutter._loops.OrderBy(loop => loop.Key.Value).Select(loop =>
+                    new Loop(loop.Key, [.. loop.Value], cutter._havoc[loop.Key]))]
+                : [];
+        }
+        catch (ConstructionLimitException)
+        { return []; }
+    }
+
+    // The proof encoding with each invariant assumed after its header's cut
+    // and checked on every edge into that header. Invariants hold only when
+    // every checkpoint is proven.
+    internal static Encoding? TryEncodeWithInvariants(PassiveCallableCandidate candidate, ImmutableArray<Invariant> invariants,
+        CancellationToken cancellation)
+    {
+        var cutter = new PassiveLoopCutter(candidate, cancellation) { _invariants = invariants };
+        try
+        { return cutter.FindLoops() && invariants.All(invariant => cutter._loops.ContainsKey(invariant.Header)) ? cutter.Encode(unroll: false) : null; }
+        catch (ConstructionLimitException)
+        { return null; }
     }
 
     private bool FindLoops()
@@ -132,6 +171,7 @@ internal sealed partial class PassiveLoopCutter
         var pending = new Queue<(IrBlockId Block, int Layer)>();
         var stops = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         var callMarkers = ImmutableDictionary.CreateBuilder<IrInstructionId, IrInstructionId>();
+        var checkpoints = ImmutableDictionary.CreateBuilder<IrInstructionId, int>();
         var originalMarkers = _candidate.CallPreconditions.Select(clause => clause.Marker).ToHashSet();
         var instructions = 0;
         var allocatedBlocks = 0;
@@ -155,9 +195,10 @@ internal sealed partial class PassiveLoopCutter
             return encoded;
         }
         var originalEntry = _candidate.Program.Entry;
+        var entrySite = _candidate.Program.GetBlock(originalEntry).Instructions[0].Operation;
         builder.SetEntry(!unroll && _exceptionComponents.TryGetValue(originalEntry, out var entryComponent)
-            ? Router(entryComponent, _candidate.Program.GetBlock(originalEntry).Instructions[0].Operation)
-            : Block(originalEntry, 0));
+            ? Router(entryComponent, entrySite)
+            : Checked(originalEntry, entrySite, Block(originalEntry, 0)));
         while (pending.Count != 0)
         {
             Spend();
@@ -169,6 +210,14 @@ internal sealed partial class PassiveLoopCutter
                 Spend(writes.Length);
                 Count();
                 builder.Havoc(encoded, source.Instructions[0].Operation, IrHavocKind.Variables, IrHavocOrigin.Approximation, [.. writes]);
+            }
+            if (!unroll)
+            {
+                foreach (var invariant in _invariants.Where(invariant => invariant.Header == original))
+                {
+                    Count();
+                    builder.Assume(encoded, source.Instructions[0].Operation, invariant.Condition);
+                }
             }
             foreach (var instruction in source.Instructions)
             {
@@ -222,10 +271,11 @@ internal sealed partial class PassiveLoopCutter
                     (!_exceptionComponents.TryGetValue(original, out var sourceComponent) || !ReferenceEquals(component, sourceComponent)))
                 { return Router(component, site); }
                 if (!_backEdges.Contains((original, destination)))
-                { return Block(destination, layer); }
+                { return unroll ? Block(destination, layer) : Checked(destination, site, Block(destination, layer)); }
                 if (unroll && layer < SearchBackEdges)
                 { return Block(destination, layer + 1); }
                 var stop = CreateBlock("loop:stop");
+                Check(stop, destination, site);
                 Count();
                 stops.Add(builder.Assume(stop, site, _candidate.Factory.Boolean(false)).Id);
                 Count();
@@ -239,7 +289,33 @@ internal sealed partial class PassiveLoopCutter
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None || order.IsDefault)
         { throw new ConstructionLimitException(); }
-        return new(program, stops.ToImmutable()) { CallMarkers = callMarkers.ToImmutable() };
+        return new(program, stops.ToImmutable()) { CallMarkers = callMarkers.ToImmutable(), Checkpoints = checkpoints.ToImmutable() };
+
+        // An edge into a header first checks the header's invariants.
+        IrBlockId Checked(IrBlockId header, OperationId site, IrBlockId target)
+        {
+            if (unroll || !_invariants.Any(invariant => invariant.Header == header))
+            { return target; }
+            var check = CreateBlock("loop:invariant");
+            Check(check, header, site);
+            Count();
+            builder.Goto(check, site, target);
+            return check;
+        }
+
+        void Check(IrBlockId block, IrBlockId header, OperationId site)
+        {
+            if (unroll)
+            { return; }
+            for (var ordinal = 0; ordinal < _invariants.Length; ordinal++)
+            {
+                if (_invariants[ordinal].Header != header)
+                { continue; }
+                Count();
+                var marker = _candidate.Factory.CreateVariable("loop:invariant", _candidate.Factory.BooleanType);
+                checkpoints.Add(builder.Assign(block, site, marker, _invariants[ordinal].Condition).Id, ordinal);
+            }
+        }
 
         IrBlockId Router(ExceptionComponent component, OperationId site)
         {

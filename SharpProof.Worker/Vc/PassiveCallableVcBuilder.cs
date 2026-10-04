@@ -25,6 +25,10 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
     private readonly Dictionary<IrInstructionId, int> _callMarkers;
+    private readonly ImmutableDictionary<IrInstructionId, int> _checkpointMarkers;
+    private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints = [];
+    internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> Checkpoints =>
+        [.. _checkpoints];
     private readonly List<IrTerm> _potentialExceptionAllocations = [];
     // Opaque calls: each may allocate, write and synchronize.
     private readonly List<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls = [];
@@ -79,6 +83,7 @@ internal sealed class PassiveCallableVcBuilder
             .ToDictionary(row => row.Marker, row => row.Ordinal);
         _callMarkers = encoding == null ? originalMarkers : encoding.CallMarkers
             .ToDictionary(row => row.Key, row => originalMarkers[row.Value]);
+        _checkpointMarkers = encoding?.Checkpoints ?? ImmutableDictionary<IrInstructionId, int>.Empty;
         _cancellationToken = cancellationToken;
     }
 
@@ -107,6 +112,18 @@ internal sealed class PassiveCallableVcBuilder
         { plan = null; failure = WorkerClaimReason.ResourceLimit; return false; }
         failure = plan == null ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None;
         return plan != null;
+    }
+
+    // A proof plan whose loop headers assume the given invariants.
+    internal static PassiveCallableVcPlan? TryBuildWithInvariants(PassiveCallableCandidate candidate,
+        ImmutableArray<PassiveLoopCutter.Invariant> invariants, CancellationToken cancellationToken)
+    {
+        if (PassiveLoopCutter.TryEncodeWithInvariants(candidate, invariants, cancellationToken) is not { } encoding)
+        { return null; }
+        try
+        { return new PassiveCallableVcBuilder(candidate, cancellationToken, encoding).Build(); }
+        catch (ConstructionLimitException)
+        { return null; }
     }
 
     private PassiveCallableVcPlan? Build(PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
@@ -280,6 +297,11 @@ internal sealed class PassiveCallableVcBuilder
                             // call obligation by excluding its execution prefix.
                             Spend(_facts.Count);
                             _callPreconditions.Add((callOrdinal, reach, value, [.. _facts]));
+                        }
+                        if (_checkpointMarkers.TryGetValue(assign.Id, out var invariantOrdinal))
+                        {
+                            Spend(_facts.Count);
+                            _checkpoints.Add((invariantOrdinal, reach, value, [.. _facts]));
                         }
                         if (value is IrStringTerm || HasStringConcat(value))
                         {

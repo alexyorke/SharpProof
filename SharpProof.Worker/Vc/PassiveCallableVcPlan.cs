@@ -15,6 +15,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
+    private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints;
     private readonly ImmutableArray<IrTerm> _potentialExceptionAllocations;
     private readonly ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls;
     private readonly ImmutableArray<IrTerm> _reads;
@@ -36,6 +37,7 @@ internal sealed class PassiveCallableVcPlan
         _writes = builder.Writes;
         _locks = builder.Locks;
         _callPreconditions = builder.CallPreconditions;
+        _checkpoints = builder.Checkpoints;
         _potentialExceptionAllocations = builder.PotentialExceptionAllocations;
         _opaqueCalls = builder.OpaqueCalls;
         _reads = builder.Reads;
@@ -51,6 +53,7 @@ internal sealed class PassiveCallableVcPlan
     }
 
     internal IrFactory Factory => _candidate.Factory;
+    internal PassiveCallableCandidate Candidate => _candidate;
     internal int EnsuresCount => _goals.Length;
     internal int CallPreconditionCount => _candidate.CallPreconditions.Length;
     internal string CallableId => _candidate.CallableId;
@@ -69,6 +72,15 @@ internal sealed class PassiveCallableVcPlan
         RequireOrdinal(ordinal);
         return new(Factory, _entry.AddRange(_body), new Goal(Factory, BeforeSynchronization(_goals[ordinal]),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(ordinal)), _model);
+    }
+
+    // Each check that an assumed loop invariant holds on an edge into its
+    // header, with the invariant's ordinal.
+    internal ImmutableArray<(int Invariant, VerificationQuery Query)> InvariantQueries()
+    {
+        return [.. _checkpoints.Select(checkpoint => (checkpoint.Ordinal, new VerificationQuery(Factory, _entry.AddRange(checkpoint.Facts),
+            new Goal(Factory, Factory.Binary(IrBinaryOperator.OrElse, Factory.Unary(IrUnaryOperator.Not, checkpoint.Reach), checkpoint.Predicate),
+                ProofDiagnosticKind.Postcondition, new SourceLocationId(checkpoint.Ordinal)), _model)))];
     }
 
     internal ImmutableArray<VerificationQuery> CallPreconditionQueries(int ordinal)

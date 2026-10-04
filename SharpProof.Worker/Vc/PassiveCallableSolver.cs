@@ -23,6 +23,10 @@ internal sealed class PassiveCallableSolver : IDisposable
     private bool _entryFeasible;
     // A normal return was found, but only through approximation havocs.
     private bool _approximateNormalReturn;
+    private bool _invariantsSearched;
+    private PassiveCallableVcPlan? _invariantPlan;
+    private ImmutableArray<string> _invariantCore = [];
+    private ImmutableArray<OperationId> _invariantAssumptions = [];
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan,
         uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit)
@@ -255,8 +259,69 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
         var witness = await VerifyAsync(search.EnsuresQuery(ordinal), search.Replay(ordinal), cancellationToken, search).ConfigureAwait(false);
+        if (witness.Outcome is not RefutedOutcome && witness.Reason != WorkerClaimReason.ResourceLimit &&
+            await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is { } invariants)
+        {
+            var proven = await VerifyAsync(invariants.EnsuresQuery(ordinal), null, cancellationToken, invariants).ConfigureAwait(false);
+            if (proven.Outcome is ProvenOutcome)
+            {
+                return proven with
+                {
+                    Core = [.. proven.Core.Union(_invariantCore, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
+                    BodyAssumptions = [.. proven.BodyAssumptions.Union(_invariantAssumptions).OrderBy(value => value.Value)]
+                };
+            }
+        }
         // A cut model is never a refutation; finite search is never a proof.
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
+    }
+
+    // The cut proof plan with the largest inductive set of candidate loop
+    // invariants (Houdini): a candidate whose checkpoint the kernel does not
+    // prove is dropped and the rest are checked again.
+    private async Task<PassiveCallableVcPlan?> InvariantPlanAsync(CancellationToken cancellationToken)
+    {
+        if (_invariantsSearched)
+        { return _invariantPlan; }
+        _invariantsSearched = true;
+        var candidate = _plan.Candidate;
+        var active = LoopInvariantCandidates.Generate(candidate, PassiveLoopCutter.Loops(candidate, cancellationToken), cancellationToken);
+        // A candidate the encoding cannot state (it reads a value undefined on
+        // an entry edge) is dropped before any check.
+        if (!active.IsEmpty && PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken) == null)
+        { active = [.. active.Where(invariant => PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null)]; }
+        while (!active.IsEmpty)
+        {
+            var plan = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+            if (plan == null)
+            { return null; }
+            var failed = new HashSet<int>();
+            var cores = new HashSet<string>(StringComparer.Ordinal);
+            var assumptions = new HashSet<OperationId>();
+            foreach (var (invariant, query) in plan.InvariantQueries())
+            {
+                if (failed.Contains(invariant))
+                { continue; }
+                var evidence = await VerifyAsync(query, null, cancellationToken, plan).ConfigureAwait(false);
+                if (evidence.Reason == WorkerClaimReason.ResourceLimit)
+                { return null; }
+                if (evidence.Outcome is ProvenOutcome)
+                {
+                    cores.UnionWith(evidence.Core);
+                    assumptions.UnionWith(evidence.BodyAssumptions);
+                }
+                else
+                { failed.Add(invariant); }
+            }
+            if (failed.Count == 0)
+            {
+                _invariantCore = [.. cores];
+                _invariantAssumptions = [.. assumptions];
+                return _invariantPlan = plan;
+            }
+            active = [.. active.Where((_, ordinal) => !failed.Contains(ordinal))];
+        }
+        return null;
     }
 
     internal async Task<PassiveCallableCheckResult> VerifyNormalCompletionAsync(CancellationToken cancellationToken = default)
