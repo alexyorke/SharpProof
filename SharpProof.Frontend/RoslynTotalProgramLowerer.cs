@@ -50,6 +50,20 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
                     CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent));
+        // Roslyn captures a local or parameter that a branching right-hand
+        // side assigns; every capture of that id names the same variable.
+        foreach (var captures in graph.Blocks.SelectMany(block => block.Operations).OfType<IFlowCaptureOperation>().GroupBy(capture => capture.Id))
+        {
+            var symbols = captures.Select(capture => capture.Value switch
+            {
+                IParameterReferenceOperation parameter when parameter.Parameter.RefKind == RefKind.None && _context.OwnsParameter(parameter.Parameter) =>
+                    (ISymbol)parameter.Parameter,
+                ILocalReferenceOperation { Local.RefKind: RefKind.None } local => local.Local,
+                _ => null
+            }).Distinct(SymbolEqualityComparer.Default).ToArray();
+            if (symbols.Length == 1 && symbols[0] is { } symbol)
+            { _context.RecordStorageCapture(captures.Key, symbol); }
+        }
         if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
         { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");

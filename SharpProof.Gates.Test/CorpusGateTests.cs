@@ -922,11 +922,11 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 36,
+                        ["SP0002"] = 47,
                         ["SP0016"] = 18,
                         ["SP0045"] = 9,
                         ["SP0046"] = 9,
-                        ["SP0047"] = 150,
+                        ["SP0047"] = 139,
                         ["silent-unclassified"] = 1
                     }));
             Assert.That(
@@ -1052,7 +1052,7 @@ public sealed class CorpusGateTests
             line.StartsWith("OSS0139.baseline|", StringComparison.Ordinal))
             .Split('|');
         var openSource = lines.Single(static line =>
-            line.StartsWith("OSS0002.baseline|", StringComparison.Ordinal))
+            line.StartsWith("OSS0003.baseline|", StringComparison.Ordinal))
             .Split('|');
 
         using (Assert.EnterMultipleScope())

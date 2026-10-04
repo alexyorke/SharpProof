@@ -4,7 +4,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 // A nonvirtual auto-property's setter stores its backing field, a `??` on a
-// reference is a null test, and a metadata constructor yields a fresh object.
+// reference is a null test (also when it assigns its own operand), a metadata
+// constructor yields a fresh object and an interface setter is an opaque call.
 [TestFixture]
 public sealed class WorkerVcAutoPropertyTests
 {
@@ -25,6 +26,16 @@ public sealed class WorkerVcAutoPropertyTests
             public static string OrEmpty(string text) {
                 Contract.Ensures(Contract.Result<string>() != null);
                 return text ?? "";
+            }
+            public static string OrEmptyInPlace(string text) {
+                Contract.Ensures(Contract.Result<string>() != null);
+                text = text ?? "";
+                return text;
+            }
+            public static int StoreThroughList([NotNull] System.Collections.Generic.IList<int> values) {
+                Contract.Ensures(Contract.Result<int>() == 5);
+                values[0] = 5;
+                return 5;
             }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
@@ -49,6 +60,8 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("Link")]
     [TestCase("OrEmpty")]
     [TestCase("Fresh")]
+    [TestCase("OrEmptyInPlace")]
+    [TestCase("StoreThroughList")]
     public void PostconditionIsProven(string method)
     {
         var response = s_response!;

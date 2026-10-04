@@ -645,7 +645,12 @@ constants into readonly statics. A nonvirtual auto-property's setter only
 stores its backing field, so stores, increments and compound assignments of
 such a property are those of the field, and a contract clause reading a
 property whose getter returns a field reads that field. Roslyn's null test for
-`??` and `?.` on a reference compares it with null. A metadata constructor of
+`??` and `?.` on a reference compares it with null, and its capture of a local
+or parameter that a branching right-hand side assigns (`a = a ?? b`) stores
+that variable; a compound assignment through such a capture stays unsupported,
+since C# reads its target before the right-hand side. A setter that is neither
+inlined nor a modeled backing-field store (an interface indexer, `c[i] = v`)
+is an opaque call taking the assigned value last. A metadata constructor of
 a class (`new HashSet<T>()`) evaluates its arguments, allocates the object
 and runs as an opaque call that may throw; its value is the fresh object.
 Claim lowering widens class, interface, delegate and array references to

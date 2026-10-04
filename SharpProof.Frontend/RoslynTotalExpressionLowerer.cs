@@ -290,6 +290,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
             SourceSetter?.Invoke(setter, block, depth) is { } set)
         { return set; }
+        // A setter neither inlined nor storing a modeled backing field is opaque.
+        if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation { Property.SetMethod: { } setMethod } opaqueTarget } opaqueStore &&
+            CSharpOperationSemantics.SetterField(opaqueTarget.Property) == null &&
+            OpaqueCall(operation, setMethod, opaqueTarget.Instance, opaqueTarget.Arguments, block, depth, opaqueStore.Value) is { } setterCalled)
+        { return setterCalled; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
             CSharpOperationSemantics.GetterField(sourceProperty.Property, CSharpOperationSemantics.IsBaseAccess(sourceProperty.Instance)) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
@@ -399,7 +404,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 // A discard evaluates its RHS with all calls and faults intact.
                 // It contributes no storage write of its own.
                 return LowerBodyValue(assignment.Value, block, depth + 1);
-            case ISimpleAssignmentOperation { IsRef: false } assignment when TryStorage(assignment.Target, out var target):
+            // Only a simple store goes through a captured variable: a compound
+            // assignment reads its target before its right-hand side.
+            case ISimpleAssignmentOperation { IsRef: false } assignment when TryStorage(assignment.Target, out var target) ||
+                _context.CapturedStorage(assignment.Target) is { } captured && (target = captured) == captured:
                 {
                     var right = LowerBodyValue(assignment.Value, block, depth + 1);
                     if (right.Classification.IsExact)
@@ -588,8 +596,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // receiver is null-checked; a struct or type-parameter receiver is an
     // opaque value, so a mutation through `this` is unobservable. Nonvirtual
     // source callees stay with inlining.
+    // A setter takes the assigned value last; the assignment's value is it.
     private TotalBodyValue? OpaqueCall(IOperation operation, IMethodSymbol method, IOperation? instance,
-        ImmutableArray<IArgumentOperation> arguments, IrBlockId block, int depth)
+        ImmutableArray<IArgumentOperation> arguments, IrBlockId block, int depth, IOperation? assigned = null)
     {
         var dispatched = method.IsVirtual || method.IsAbstract || method.IsOverride || method.ContainingType.TypeKind == TypeKind.Interface;
         if (!AllowOpaqueCalls || !method.DeclaringSyntaxReferences.IsEmpty && !dispatched ||
@@ -599,7 +608,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
             arguments.Any(argument => argument.Parameter == null ||
-                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)) ||
+            assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type))
         { return null; }
         IrTerm? receiver = null;
         if (instance != null && !IsImplicitThis(instance))
@@ -610,13 +620,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
-        var values = new IrTerm[arguments.Length];
+        var values = new IrTerm[arguments.Length + (assigned != null ? 1 : 0)];
         foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
             values[arguments.IndexOf(argument)] = lowered.Value;
+            block = lowered.Continuation;
+        }
+        if (assigned != null)
+        {
+            var lowered = LowerBodyValue(assigned, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+            values[values.Length - 1] = lowered.Value;
             block = lowered.Continuation;
         }
         if (receiver != null && instance!.Type!.IsReferenceType)
@@ -639,7 +657,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
             faults = [new(IrExceptionKind.Unknown, _factory.Variable(throws))];
         }
-        IrTerm result = _factory.Boolean(false);
+        IrTerm result = assigned != null ? values[values.Length - 1] : _factory.Boolean(false);
         if (!method.ReturnsVoid)
         {
             var target = _context.Temporary(resultType);

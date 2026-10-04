@@ -229,6 +229,17 @@ public sealed class TotalLoweringContext
     internal IFieldReferenceOperation? CapturedField(IOperation operation)
     { return operation is IFlowCaptureReferenceOperation reference && _fieldCaptures.TryGetValue(reference.Id, out var field) ? field : null; }
 
+    // A capture of a local or parameter, as an assignment target, is that
+    // variable's storage.
+    private readonly Dictionary<CaptureId, ISymbol> _storageCaptures = [];
+    internal void RecordStorageCapture(CaptureId capture, ISymbol variable)
+    { _storageCaptures[capture] = variable; }
+    internal IrVarId? CapturedStorage(IOperation operation)
+    {
+        return operation is IFlowCaptureReferenceOperation reference && _storageCaptures.TryGetValue(reference.Id, out var variable)
+            ? Variable(variable) : null;
+    }
+
     internal IrVarId Capture(CaptureId capture, ITypeSymbol? type)
     {
         if (!_captures.TryGetValue(capture, out var variable))
