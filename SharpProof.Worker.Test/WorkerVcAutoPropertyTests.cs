@@ -6,7 +6,8 @@ namespace SharpProof.Worker.Test;
 // A nonvirtual auto-property's setter stores its backing field, a `??` on a
 // reference is a null test (also when it assigns its own operand), a metadata
 // constructor yields a fresh object and an interface setter is an opaque call,
-// as is a source callee whose body does not lower.
+// as is a source callee whose body does not lower or a constructor that is not
+// plain.
 [TestFixture]
 public sealed class WorkerVcAutoPropertyTests
 {
@@ -16,6 +17,13 @@ public sealed class WorkerVcAutoPropertyTests
         public sealed class Bag : System.Collections.Generic.IEnumerable<int> {
             public System.Collections.Generic.IEnumerator<int> GetEnumerator() { yield return 1; }
             System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { return GetEnumerator(); }
+        }
+        public sealed class Keyed {
+            private int _key = 3;
+            public Keyed(int key) {
+                Contract.Requires(key >= 0);
+                _key = key;
+            }
         }
         public sealed class Holder {
             private int Count { get; set; }
@@ -82,6 +90,11 @@ public sealed class WorkerVcAutoPropertyTests
                 Scale(n);
                 return n;
             }
+            public static Keyed MakeKeyed(int key) {
+                Contract.Requires(key >= 0);
+                Contract.Ensures(Contract.Result<Keyed>() != null);
+                return new Keyed(key);
+            }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
@@ -112,6 +125,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("Depth")]
     [TestCase("CountBag")]
     [TestCase("KeepAfterScale")]
+    [TestCase("MakeKeyed")]
     public void PostconditionIsProven(string method)
     {
         var claim = Claim(method);
@@ -125,10 +139,12 @@ public sealed class WorkerVcAutoPropertyTests
         Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
-    // A recursive call, or one whose callee body does not lower, is an
-    // unknown call after its callee's preconditions, which stay checked.
+    // A recursive call, one whose callee body does not lower, or one to a
+    // constructor with field initializers is an unknown call after its
+    // callee's preconditions, which stay checked.
     [TestCase(".Depth(")]
     [TestCase(".KeepAfterScale(")]
+    [TestCase(".MakeKeyed(")]
     public void UnknownCallKeepsItsPrecondition(string method)
     {
         using var project = new ShadowTestProject(Source);

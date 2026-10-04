@@ -680,6 +680,9 @@ target's type. A loop that makes an opaque call is cut like any other; the
 call may write anything, so the loop forgets all heap contents at its header. A metadata constructor of
 a class (`new HashSet<T>()`) evaluates its arguments, allocates the object
 and runs as an opaque call that may throw; its value is the fresh object.
+A source class constructor that chains to another, has member initializers
+or a base class other than object is called the same way, after its
+preconditions are checked at the call.
 Claim lowering widens class, interface, delegate and array references to
 object implicitly (for example the receiver a `lock` hands to
 Monitor.Enter); the cast keeps the reference. A dispatched (virtual, abstract, override or interface) source call is also

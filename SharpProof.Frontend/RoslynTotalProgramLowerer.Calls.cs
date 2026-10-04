@@ -87,10 +87,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     // `new C(arguments)` evaluates the arguments, allocates the object and
     // runs the constructor, which a plain constructor does exactly as written.
+    // Any other declared class constructor runs as an unknown call after its
+    // preconditions.
     private TotalBodyValue? InlineSourceConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
     {
         if (_preserveSourceCall != null || creation.Initializer != null || creation.Constructor is not { } constructor ||
-            !CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken))
+            !CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken) &&
+                !(_expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared && constructor.ContainingType.TypeKind == TypeKind.Class))
         { return null; }
         IrTerm? created = null;
         IrBlockId Allocate(IrBlockId current)

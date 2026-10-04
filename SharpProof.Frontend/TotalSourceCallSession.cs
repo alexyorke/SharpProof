@@ -131,7 +131,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // declaration, whose parameters must share the call's value domains.
     // With `contractOnly`, a callee already being inlined (a recursive call)
     // gets a frame for its preconditions and no body; so does an iterator
-    // without preconditions, whose body runs only as it is enumerated.
+    // without preconditions, whose body runs only as it is enumerated, and a
+    // class constructor that chains, initializes fields or has a base class.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false)
@@ -142,7 +143,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
-                ? instance != null || !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)
+                ? instance != null || !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken) &&
+                    !(contractOnly && method.ContainingType.TypeKind == TypeKind.Class)
                 : method.IsStatic != (instance == null)) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
             method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
@@ -184,7 +186,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             { return false; }
             iterator |= node is YieldStatementSyntax;
         }
-        if (contractOnly && !IsActive(method) && !iterator)
+        if (contractOnly && !IsActive(method) && !iterator &&
+            !(method.MethodKind == MethodKind.Constructor && !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)))
         { return false; }
         if (!HasNoTypeInitialization(method.ContainingType) || !Spend(method.Parameters.Length * 3 + 1))
         { return false; }
