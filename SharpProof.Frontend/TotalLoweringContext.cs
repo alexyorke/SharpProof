@@ -153,15 +153,44 @@ public sealed class TotalLoweringContext
     // A virtual or overriding body is lowered as written; callers dispatching
     // to it are a separate concern, so only a body-free method is excluded.
     internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet or
-        MethodKind.PropertySet or MethodKind.Constructor or MethodKind.LocalFunction &&
+        MethodKind.PropertySet or MethodKind.Constructor or MethodKind.LocalFunction or MethodKind.ExplicitInterfaceImplementation &&
         !Target.IsAbstract) &&
         !Target.IsAsync && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
-        Parameters.All(binding => binding.Parameter.RefKind == RefKind.None &&
+        Parameters.All(binding => (binding.Parameter.RefKind == RefKind.None || IsReadOnlyReference(binding.Parameter)) &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
         (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
+
+    // A `ref` or `in` parameter of a scalar or reference type that the body
+    // never writes (no assignment, increment, compound assignment or ref or
+    // out argument naming it) holds its caller's value throughout, as a
+    // by-value parameter does. A struct stays excluded: a call on it may
+    // mutate the caller's storage.
+    private bool IsReadOnlyReference(IParameterSymbol parameter)
+    {
+        if (parameter.RefKind is not (RefKind.Ref or RefKind.In) || Target.DeclaringSyntaxReferences.Length != 1 ||
+            !CSharpOperationSemantics.IsScalar(parameter.Type) && !CSharpOperationSemantics.IsReferenceDomain(parameter.Type))
+        { return false; }
+        var name = parameter.Name;
+        bool Names(Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax? expression)
+        {
+            while (expression is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax parenthesized)
+            { expression = parenthesized.Expression; }
+            return expression is Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax identifier && identifier.Identifier.ValueText == name;
+        }
+        return !Target.DeclaringSyntaxReferences[0].GetSyntax().DescendantNodes().Any(node => node switch
+        {
+            Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax assignment => Names(assignment.Left),
+            Microsoft.CodeAnalysis.CSharp.Syntax.PrefixUnaryExpressionSyntax prefix => Names(prefix.Operand),
+            Microsoft.CodeAnalysis.CSharp.Syntax.PostfixUnaryExpressionSyntax postfix => Names(postfix.Operand),
+            Microsoft.CodeAnalysis.CSharp.Syntax.ArgumentSyntax argument => !argument.RefKindKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.None) &&
+                Names(argument.Expression),
+            Microsoft.CodeAnalysis.CSharp.Syntax.RefExpressionSyntax reference => Names(reference.Expression),
+            _ => false
+        });
+    }
 
     internal bool OwnsBody(IOperation body)
     {

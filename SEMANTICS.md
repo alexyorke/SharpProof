@@ -633,7 +633,12 @@ type-parameter types bridge to the caller's by reference casts, and so do a
 generic method's: its declaration inlines when every parameter and its result
 share the call's value domain (`Swap<T>(IList<T>, int, int)` called on an
 `IList<int>`), while a scalar argument for a type parameter (`Id<int>(x)`)
-does not.
+does not. A `ref` or `in` parameter of a scalar or reference type that the
+body never writes (no assignment, increment, compound assignment, `ref` or
+`out` argument or `ref` expression naming it) holds its caller's value
+throughout and is verified as a by-value input; any other by-reference
+parameter, and every struct one, keeps the callable unsupported. Explicit
+interface implementations are verified like other methods.
 Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on

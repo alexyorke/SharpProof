@@ -43,6 +43,16 @@ public sealed class WorkerVcAutoPropertyTests
                 foreach (var value in values) { if (count < 1000) { count++; } }
                 return count;
             }
+            public static int ReadThroughRef(ref int value, [NotNull] ref System.Collections.Generic.List<int> list) {
+                Contract.Ensures(Contract.Result<int>() == value);
+                list.Add(value);
+                return value;
+            }
+            public static int WriteThroughRef(ref int value) {
+                Contract.Ensures(Contract.Result<int>() == 1);
+                value = 1;
+                return value;
+            }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
@@ -69,14 +79,27 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("OrEmptyInPlace")]
     [TestCase("StoreThroughList")]
     [TestCase("CountUpTo")]
+    [TestCase("ReadThroughRef")]
     public void PostconditionIsProven(string method)
+    {
+        var claim = Claim(method);
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
+    // A ref parameter the body writes stores into its caller's variable.
+    [Test]
+    public void WrittenRefParameterStaysUnsupported()
+    {
+        Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    private static WorkerClaimResult Claim(string method)
     {
         var response = s_response!;
         var name = "M:Holder." + method;
         var callable = response.Manifest.Callables.Single(callable => callable.CallableId == name ||
             callable.CallableId.StartsWith(name + "(", StringComparison.Ordinal) ||
             callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal));
-        var claim = response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
-        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
     }
 }
