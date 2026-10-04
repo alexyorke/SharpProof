@@ -47,6 +47,40 @@ public sealed class NativeArrayElementTests
         Assert.That(result.WriteWitness, Is.Not.Null);
     }
 
+    [Test]
+    public async Task GuardedUnsignedStoresDoNotThrow()
+    {
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(
+            "[DoesNotThrow] public static void Target(int[] values, uint index) { " +
+            "Contract.Requires(values != null && index < (uint)values.Length); values[index] = 1; values[index] &= 5; }"), new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+    }
+
+    [TestCase("return values[index];", true)]
+    [TestCase("values[index] = new object(); return null;", false)]
+    public async Task UnsignedReferenceElementsKeepBoundsAndCovariance(string body, bool proven)
+    {
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(
+            "[DoesNotThrow] public static object Target(object[] values, uint index) { " +
+            "Contract.Requires(values != null && index < (uint)values.Length); " + body + " }"), new WorkerBudgets());
+        Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(proven), result.Reason.ToString());
+        Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+    }
+
+    [TestCase(1U)]
+    [TestCase(0x80000000U)]
+    [TestCase(uint.MaxValue)]
+    public async Task UnsignedBoundsCounterexampleKeepsOriginalIndex(uint index)
+    {
+        var preparation = Prepare("[DoesNotThrow] public static void Target(int[] values, uint index) { " +
+            "Contract.Requires(values != null && values.Length == 1 && index == " +
+            index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "U); values[index] = 1; }");
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.IndexOutOfRange));
+        Assert.That(result.EntryModel![preparation.Total!.Parameters[1].Entry].IntegerBits, Is.EqualTo((ulong)index));
+    }
+
     [TestCase("Contract.Ensures(Contract.Result<int>() == 2); values[0] = 1; return values[0];")]
     [TestCase("Contract.Ensures(values[0] == 2); values[0] = 1; return 0;")]
     public async Task ReadsAfterStoresAreNeverStale(string body)

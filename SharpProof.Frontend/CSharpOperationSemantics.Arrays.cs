@@ -37,7 +37,7 @@ internal static partial class CSharpOperationSemantics
         return access.ArrayReference.Type is IArrayTypeSymbol array && array.Rank == access.Indices.Length &&
             IsValueDomain(array.ElementType) && access.Indices.All(index =>
                 index.Type?.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int16 or SpecialType.System_SByte or
-                    SpecialType.System_Byte or SpecialType.System_UInt16 or SpecialType.System_Char);
+                    SpecialType.System_Byte or SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_UInt32);
     }
 
     private static TotalScalarRule ArrayReadRule(IrFactory factory, IArrayElementReferenceOperation access, ImmutableArray<IrTerm> operands)

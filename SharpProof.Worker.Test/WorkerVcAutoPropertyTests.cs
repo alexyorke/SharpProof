@@ -124,6 +124,20 @@ public sealed class WorkerVcAutoPropertyTests
                 values[i++] &= (values[0] = 5);
                 return values[0] * 100 + i;
             }
+            public static int UnsignedMaskElement(int x) {
+                Contract.Ensures(Contract.Result<int>() == ((Contract.Old(x) & 5) * 100 + 1));
+                int[] values = new int[1];
+                values[0] = x;
+                uint i = 0;
+                values[i++] &= (values[0] = 5);
+                return values[0] * 100 + (int)i;
+            }
+            public static bool UnsignedReferenceReadUnknown() {
+                Contract.Ensures(!Contract.Result<bool>());
+                object[] values = new object[1];
+                uint index = 0;
+                return values[index] == null;
+            }
         }
         """;
 
@@ -153,6 +167,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("MakeKeyed")]
     [TestCase("Mask")]
     [TestCase("MaskElement")]
+    [TestCase("UnsignedMaskElement")]
     [TestCase("MaskCount")]
     public void PostconditionIsProven(string method)
     {
@@ -177,6 +192,12 @@ public sealed class WorkerVcAutoPropertyTests
     public void IntegerMaskDoesNotRefuteAnApproximateHash()
     {
         Assert.That(Claim("MaskUnknown").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [Test]
+    public void UnsignedReferenceReadKeepsApproximation()
+    {
+        Assert.That(Claim("UnsignedReferenceReadUnknown").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     [Test]

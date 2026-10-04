@@ -761,6 +761,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (!guard.Classification.IsExact)
         { return Approximate(mutation ?? access, block, guard.Classification.Abstention); }
         block = ApplyRule(access, guard, block).Continuation;
+        if (outside == null && indices[0].Type != _factory.IntegerType)
+        { indices[0] = _factory.Cast(_factory.IntegerType, indices[0]); }
         var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
         // A scalar element of a single-dimensional array is stored with its
         // value; other stores are effect sites only.

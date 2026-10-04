@@ -116,6 +116,28 @@ public sealed class TypedReferenceProgramLoweringTests
         Assert.That(ReferenceEquals(replay.ReturnValue, value), Is.True);
     }
 
+    public static IEnumerable<TestCaseData> ArrayMutationCases()
+    {
+        foreach (var index in new[] { 0U, 1U, (uint)int.MaxValue, 0x80000000U, uint.MaxValue })
+        {
+            yield return Case("int Target(uint index) { int[] values = new int[1]; values[index] = 7; return values[0]; }",
+                [index], index == 0 ? 7 : typeof(IndexOutOfRangeException), index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        yield return Case("int Target(int x) { int[] values = new int[1]; values[0] = x; uint i = 0; values[i++] &= (values[0] = 5); return values[0] * 100 + (int)i; }", [3], 101);
+        yield return Case("int Target() { int[] values = null; uint index = uint.MaxValue; int seen = 0; try { values[index] = ++seen; } catch (System.NullReferenceException) { return seen; } return -1; }", [], 1);
+        yield return Case("int Target() { int[] values = null; uint index = uint.MaxValue; int seen = 0; try { values[index] &= ++seen; } catch (System.NullReferenceException) { return seen; } return -1; }", [], 0);
+        yield return Case("int Target() { int[] values = new int[2]; uint i = 0; values[i] = (int)(i = 1); return values[0] * 10 + values[1]; }", [], 10);
+        yield return Case("int Target() { int[] values = new int[1]; int[] original = values; uint i = 0; values[i] = (values = new int[1]).Length + (int)(i = 1); return original[0] * 10 + values[0]; }", [], 20);
+        foreach (var assignment in new[] { "=", "&=" })
+        {
+            var expected = assignment == "=" ? 7 : 9;
+            yield return Case($"int Target(int zero) {{ int[] values = null; uint i = 0; try {{ values[i] {assignment} 1 / zero; }} catch (System.DivideByZeroException) {{ return 7; }} catch (System.NullReferenceException) {{ return 9; }} return -1; }}", [0], expected);
+            yield return Case($"int Target(int zero) {{ int[] values = new int[0]; uint i = 0; try {{ values[i] {assignment} 1 / zero; }} catch (System.DivideByZeroException) {{ return 7; }} catch (System.IndexOutOfRangeException) {{ return 9; }} return -1; }}", [0], expected);
+        }
+        yield return Case("int Target(byte index) { int[] values = new int[300]; values[index] = 7; return values[index]; }", [(byte)255], 7);
+        yield return Case("int Target(sbyte index) { int[] values = new int[300]; values[index] = 7; return values[index]; }", [(sbyte)-1], typeof(IndexOutOfRangeException));
+    }
+
     public static IEnumerable<TestCaseData> ArrayReadCases()
     {
         var sampleArray = new[] { 42 };
@@ -152,12 +174,19 @@ public sealed class TypedReferenceProgramLoweringTests
 
     [TestCaseSource(nameof(ArrayReadCases))]
     public void GuardedArrayReadsMatchCompiledExecution(string members, object[] arguments, object expected)
+    { AssertArrayExecution(members, arguments, expected, false); }
+
+    [TestCaseSource(nameof(ArrayMutationCases))]
+    public void GuardedArrayMutationsMatchCompiledExecution(string members, object[] arguments, object expected)
+    { AssertArrayExecution(members, arguments, expected, true); }
+
+    private static void AssertArrayExecution(string members, object[] arguments, object expected, bool opaqueCalls)
     {
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke(arguments);
         Assert.That(expected is Type exceptionType ? actual?.GetType() == exceptionType : Equals(actual, expected), Is.True,
             "Compiled result type: " + actual?.GetType().FullName);
-        var lowered = subject.LowerSourceCalls();
+        var lowered = subject.LowerSourceCalls(false, opaqueCalls: opaqueCalls);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
         var inputs = subject.Context.Parameters.ToDictionary(binding => binding.Entry,

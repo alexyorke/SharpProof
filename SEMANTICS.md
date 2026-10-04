@@ -510,7 +510,13 @@ approximation.
 Claim lowering admits array element stores, increments and compound
 assignments. The array and indexes evaluate first; a store then evaluates its
 value, and the null and bounds checks follow (an increment or compound
-assignment checks before reading). Each store writes Element state, and a
+assignment checks before reading). A single-dimensional index may be a signed
+or unsigned 8- to 32-bit integer.
+Bounds use the original unsigned value or a widened narrow value; only a
+successful check converts the captured index to the signed Int32 domain used
+by sequence reads and stores. A uint index above Int32.MaxValue is rejected
+before that conversion. Index expressions evaluate once.
+Each store writes Element state, and a
 store of a reference into an array whose element type is not sealed may fail
 its covariance check. A body that stores elements or calls opaque code reads
 elements as approximations, and stays abstract when an Ensures clause or a
