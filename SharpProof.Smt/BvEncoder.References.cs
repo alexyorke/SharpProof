@@ -23,6 +23,8 @@ internal sealed partial class BvEncoder
             ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, literal)))));
         }
         _stringLiterals.Add(term.Value, value);
+        if (_text != null)
+        { AddLiteralText(value, factory.GetString(term.Value), meter); }
         return value;
     }
 
@@ -36,12 +38,13 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeStringConcat(IrBinaryTerm term, Expr left, Expr right, SmtQueryResourceMeter meter)
     {
-        // Empty operands preserve CLR aliases. For two nonempty operands the
-        // result is unconstrained beyond non-nullness: content and input-related
-        // length facts remain outside this domain. SAT still requires replay.
+        // Empty operands preserve CLR aliases. Two nonempty operands make a
+        // fresh non-null string whose content, once a query reads content, is
+        // the operands' content in order. SAT still requires replay.
         var value = owner.Own(context.MkConst("concat" + term.Id.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         var empty = EncodeStringLiteral(factory.String(""), meter);
+        RegisterConcatenation(value, left, right, meter);
         var leftEmpty = owner.Own(context.MkEq(EncodeLength(left, meter), owner.Own(context.MkBV(0, 32))));
         var rightEmpty = owner.Own(context.MkEq(EncodeLength(right, meter), owner.Own(context.MkBV(0, 32))));
         return owner.Own(context.MkITE(leftEmpty, owner.Own(context.MkITE(rightEmpty, empty, right)),
@@ -154,7 +157,9 @@ internal sealed partial class BvEncoder
                             { throw new UnsupportedIrEncodingException(); }
                             emptyStringToken = token;
                         }
-                        value = info.Kind == IrTypeKind.String ? factory.CreateStringValue(new string('\0', count))
+                        var text = info.Kind == IrTypeKind.String ? DecodeText(GetVariable(variable, meter), model, meter) : null;
+                        value = info.Kind == IrTypeKind.String
+                            ? factory.CreateStringValue(text?.Length == count ? text : new string('\0', count))
                             : DecodeArrayWitness(type, count, token, observations);
                     }
                     aliases.Add((type, token), value);
@@ -183,6 +188,7 @@ internal sealed partial class BvEncoder
         foreach (var element in _elements.Values)
         { element.Dispose(); }
         _length?.Dispose();
+        DisposeStrings();
         _referenceSort?.Dispose();
     }
 }

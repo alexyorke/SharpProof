@@ -333,6 +333,13 @@ public sealed class IrCSharpDifferentialOracle
                 AppendLazyValue(builder, unary.Operand);
                 builder.Append(')');
                 break;
+            case IrBinaryTerm { Operator: IrBinaryOperator.StringEquals } equality:
+                builder.Append("string.Equals(");
+                AppendLazyValue(builder, equality.Left);
+                builder.Append(", ");
+                AppendLazyValue(builder, equality.Right);
+                builder.Append(')');
+                break;
             case IrBinaryTerm binary:
                 builder.Append('(');
                 AppendLazyValue(builder, binary.Left);

@@ -498,7 +498,17 @@ Constant expressions reuse their literal, and adjacent constants merge before
 choosing the allocation guard. CFG captures preserve flattened operands and
 defer prefix allocation until the root, after later operand evaluation. Longer
 chains, object/formatting overloads and compiler-created params arrays remain
-incomplete. String content and concatenation-related length proofs are deferred.
+incomplete.
+
+`string == string` and `!=` compare content: `StringEquals` is true when both
+operands are null, false when exactly one is, and otherwise compares UTF-16
+code units ordinally. Comparisons whose operands are typed `object` stay
+reference identity, so content equality never proves that two strings are the
+same object. Z3 reads content through `text: Ref -> Seq(BitVec16)` once a query
+compares content: literals fix their text, a concatenation's text is its
+operands' text in order (null as empty), and a non-null string's length is its
+text's length. Counterexamples decode that content for replay. Concatenation
+and `string.Equals` calls inside contract clauses remain unsupported.
 The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic

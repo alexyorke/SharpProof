@@ -78,7 +78,7 @@ public sealed class NativeWorkerRoutingTests
     }
 
     [Test]
-    public async Task NativeStringContentEqualityRemainsUnsupported()
+    public async Task NativeStringContentEqualityRefutesAnyOtherValue()
     {
         using var project = new ShadowTestProject("""
             using SharpProof.Attributes;
@@ -91,7 +91,7 @@ public sealed class NativeWorkerRoutingTests
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
     [Test]

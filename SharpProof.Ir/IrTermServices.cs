@@ -170,6 +170,14 @@ internal static class IrTermServices
                 rightInteger.Value);
         }
 
+        if (@operator == IrBinaryOperator.StringEquals &&
+            left is IrStringTerm or IrNullTerm && right is IrStringTerm or IrNullTerm)
+        {
+            return factory.Boolean(left is IrStringTerm leftText && right is IrStringTerm rightText
+                ? leftText.Value == rightText.Value
+                : left is IrNullTerm && right is IrNullTerm);
+        }
+
         if (left is IrStringTerm leftString &&
             right is IrStringTerm rightString &&
             @operator == IrBinaryOperator.StringConcat)

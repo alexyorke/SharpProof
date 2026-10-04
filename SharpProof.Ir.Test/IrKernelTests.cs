@@ -81,6 +81,42 @@ public sealed class IrKernelTests
             Is.SameAs(factory.Boolean(true)));
     }
 
+    [TestCase(IrExecutionSemantics.Legacy)]
+    [TestCase(IrExecutionSemantics.Total)]
+    public void StringEqualityComparesContentAndNullness(IrExecutionSemantics semantics)
+    {
+        var factory = new IrFactory(semantics);
+        var left = factory.CreateVariable("left", factory.StringType);
+        var right = factory.CreateVariable("right", factory.StringType);
+        var equal = factory.Binary(IrBinaryOperator.StringEquals, factory.Variable(left), factory.Variable(right));
+        var reference = factory.Binary(IrBinaryOperator.Equal, factory.Variable(left), factory.Variable(right));
+        var interpreter = new IrInterpreter(factory);
+        bool Evaluate(IrTerm term, IrValue a, IrValue b)
+        {
+            return interpreter.Evaluate(term, new Dictionary<IrVarId, IrValue> { [left] = a, [right] = b }).Value!.Boolean;
+        }
+        var text = factory.CreateStringValue(new string('a', 2));
+        var copy = factory.CreateStringValue(new string('a', 2));
+        var nil = factory.CreateNullValue(factory.StringType);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Evaluate(equal, text, copy), Is.True);
+            Assert.That(Evaluate(equal, text, factory.CreateStringValue("ab")), Is.False);
+            Assert.That(Evaluate(equal, nil, nil), Is.True);
+            Assert.That(Evaluate(equal, text, nil), Is.False);
+            Assert.That(Evaluate(equal, nil, text), Is.False);
+            // Total equality on strings is reference identity.
+            Assert.That(Evaluate(reference, text, copy), Is.EqualTo(semantics == IrExecutionSemantics.Legacy));
+            Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.String("ab"), factory.String("ab")),
+                Is.SameAs(factory.Boolean(true)));
+            Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.String("ab"), factory.String("ba")),
+                Is.SameAs(factory.Boolean(false)));
+            Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.Null(factory.StringType), factory.String("")),
+                Is.SameAs(factory.Boolean(false)));
+        }
+    }
+
     [Test]
     public void EqualityIdentityDoesNotEraseOperandEvaluation()
     {
@@ -707,6 +743,7 @@ public sealed class IrKernelTests
     [TestCase(IrBinaryOperator.GreaterThan, IrTypeKind.Integer, ">")]
     [TestCase(IrBinaryOperator.GreaterThanOrEqual, IrTypeKind.Integer, ">=")]
     [TestCase(IrBinaryOperator.StringConcat, IrTypeKind.String, "++")]
+    [TestCase(IrBinaryOperator.StringEquals, IrTypeKind.String, "string==")]
     public void BinaryOperatorMetadataPreservesTypesKeysAndTokens(
         IrBinaryOperator @operator,
         IrTypeKind operandKind,

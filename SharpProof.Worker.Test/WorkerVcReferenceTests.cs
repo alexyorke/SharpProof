@@ -218,7 +218,6 @@ public sealed class WorkerVcReferenceTests
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
     }
 
-    [TestCase("bool Target(string x, string y) { Contract.Ensures(true); return x == y; }")]
     [TestCase("int Target(int[] x, long index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int Target(int[] x, ulong index) { Contract.Ensures(true); return x[index]; }")]
     [TestCase("int[] Target(int x) { Contract.Ensures(true); return new int[] { x }; }")]

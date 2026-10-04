@@ -213,7 +213,7 @@ public sealed class PortableIrGraphCodecTests
                 var operands = @operator is
                     IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse
                     ? (boolTerm, boolTerm)
-                    : @operator == IrBinaryOperator.StringConcat
+                    : @operator is IrBinaryOperator.StringConcat or IrBinaryOperator.StringEquals
                         ? (stringTerm, stringTerm)
                         : (integerTerm, integerTerm);
                 return factory.Binary(@operator, operands.Item1, operands.Item2);

@@ -20,7 +20,8 @@ public enum GeneratedIrCategory
     StringLength,
     NullCast,
     ArrayLength,
-    ArrayIndex
+    ArrayIndex,
+    StringEquality
 }
 
 public static class DifferentialIntegerCorpus
@@ -80,6 +81,10 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
             GeneratedIrCategory.ArrayIndex => _factory.SequenceAccess(
                 _factory.Variable(_values),
                 Integer(Math.Min(maximumDepth, 1))),
+            GeneratedIrCategory.StringEquality => _factory.Binary(
+                IrBinaryOperator.StringEquals,
+                String(maximumDepth),
+                String(maximumDepth)),
             _ => throw new InvalidOperationException()
         };
         return CreateCase(term, category);

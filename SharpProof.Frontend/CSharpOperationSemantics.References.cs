@@ -170,6 +170,17 @@ internal static partial class CSharpOperationSemantics
             { left = factory.Null(right.Type); }
             if (right is IrNullTerm && left.Type != right.Type)
             { right = factory.Null(left.Type); }
+            // `string == string` compares content; operands typed object
+            // compare references.
+            if (!binary.IsLifted && left is not IrNullTerm && right is not IrNullTerm &&
+                binary.OperatorKind is BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals &&
+                binary.LeftOperand.Type?.SpecialType == SpecialType.System_String &&
+                binary.RightOperand.Type?.SpecialType == SpecialType.System_String &&
+                factory.GetTypeInfo(left.Type).Kind == IrTypeKind.String && left.Type == right.Type)
+            {
+                var equal = factory.Binary(IrBinaryOperator.StringEquals, left, right);
+                return Exact(binary.OperatorKind == BinaryOperatorKind.Equals ? equal : factory.Unary(IrUnaryOperator.Not, equal));
+            }
             if (binary.IsLifted || left.Type != right.Type ||
                 binary.OperatorKind is not (BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) ||
                 factory.GetTypeInfo(left.Type).Kind == IrTypeKind.String &&

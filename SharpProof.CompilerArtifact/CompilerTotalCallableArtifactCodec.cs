@@ -173,7 +173,8 @@ internal static class CompilerTotalCallableArtifactCodec
                     artifact.Graph.Types[term.Type].Kind == IrTypeKind.Reference &&
                     artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Reference) &&
                 (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
-                    (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat),
+                    (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat or
+                        IrBinaryOperator.StringEquals),
                 "The Total graph contains unsupported term evidence.");
         }
         var identities = new HashSet<IrVarId>();

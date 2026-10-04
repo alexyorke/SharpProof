@@ -4073,7 +4073,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task StringConcatEqualityAbstainsWithoutContentEncoding()
+    public async Task StringConcatInContractClausesAbstains()
     {
         using var project = TestProject.Create(
             """
@@ -6236,7 +6236,7 @@ public sealed class WorkerTests
         File.WriteAllBytes(path, bytes);
     }
 
-    private sealed class TestProject : IDisposable
+    internal sealed class TestProject : IDisposable
     {
         private static readonly ImmutableArray<MetadataReference>
             DefaultReferences = TestMetadataReferences.ForFileNames(

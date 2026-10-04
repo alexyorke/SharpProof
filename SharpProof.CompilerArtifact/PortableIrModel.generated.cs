@@ -214,7 +214,8 @@ internal static class PortableIrWireCatalog
         IrBinaryOperator.LessThanOrEqual,
         IrBinaryOperator.GreaterThan,
         IrBinaryOperator.GreaterThanOrEqual,
-        IrBinaryOperator.StringConcat
+        IrBinaryOperator.StringConcat,
+        IrBinaryOperator.StringEquals
     ];
     internal static readonly ImmutableArray<IrHavocKind> HavocKinds = [
         IrHavocKind.Variables,

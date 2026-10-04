@@ -311,7 +311,8 @@ Other initializer bodies remain unsupported by concrete lowering.
 
 Total IR string equality denotes reference identity, matching its native Ref
 encoding and implementation-IL ceq. Legacy IR retains string content equality.
-The source semantic table still rejects non-null string content comparisons.
+Source `string == string` lowers to the separate `StringEquals` operator, which
+compares content (see SEMANTICS.md).
 Concrete string witnesses preserve aliases; distinct empty Ref tokens abstain
 because the decoder's CLR construction would return the same empty string.
 
@@ -328,8 +329,8 @@ observations. Reads from scalar arrays with int/uint indexes also emit ordered
 NullReference and IndexOutOfRange faults, after evaluating both operands.
 Native element functions preserve each observed scalar element in decoded
 array witnesses, including aliases. Array writes, reference-element reads,
-built-in string content comparisons, general reference casts and allocation
-remain closed. Long/ulong indexes remain closed because their native-width
+general reference casts and allocation remain closed; built-in string content
+comparisons lower to `StringEquals`. Long/ulong indexes remain closed because their native-width
 conversion can overflow before a null check and source evidence does not bind
 that architecture. Length reads emit guarded NullReference faults in bodies
 and safe conditions in clauses. The native
@@ -608,11 +609,11 @@ same concrete empty array. Compiled C# runtime comparisons and artifact
 round-trip validation cover the model. Native two-string concatenation also uses
 the approved framework symbol and preserves argument order and faults. String
 literals retain non-nullness, exact UTF-16 length and canonical empty identity.
-Concatenation retains empty-operand aliases and non-nullness; two nonempty operands
-have no content or input-related length facts in SMT. The VC builder forwards
+Concatenation retains empty-operand aliases and non-nullness; once a query
+compares content, two nonempty operands also fix the result's text and length. The VC builder forwards
 concatenation value expressions for nullness and length observations instead of
 requiring SAT replay to reproduce a fresh allocation's identity. String content
-comparisons remain unsupported at binding. VC admission also rejects non-null
+comparisons lower to `StringEquals`. VC admission still rejects non-null
 string identity comparisons in callables that concatenate strings; existing
 metadata identity transfers without concatenation retain their support.
 Runtime comparisons cover nullable, empty and nonempty operands and aliases. Existing

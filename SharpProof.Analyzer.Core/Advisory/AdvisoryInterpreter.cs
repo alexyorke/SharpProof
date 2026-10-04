@@ -529,6 +529,16 @@ internal sealed class CoreIrAdvisoryInterpreter
 
             return IntervalValue.Range(0, 1);
         }
+        // Content is not tracked; only nullness decides string equality.
+        if (term is IrBinaryTerm { Operator: IrBinaryOperator.StringEquals } stringEquality)
+        {
+            var left = Reference(stringEquality.Left, state, depth + 1).Nullness;
+            var right = Reference(stringEquality.Right, state, depth + 1).Nullness;
+            return left == NullnessValue.Null && right == NullnessValue.Null ? IntervalValue.Constant(1)
+                : left == NullnessValue.Null && right == NullnessValue.NonNull ||
+                    left == NullnessValue.NonNull && right == NullnessValue.Null ? IntervalValue.Constant(0)
+                : IntervalValue.Range(0, 1);
+        }
         if (term is IrIntegerTerm integer && CoreIrScalarIntervalTransfer.TryTypeRange(info, out _))
         {
             return IntervalValue.Constant(integer.Value);

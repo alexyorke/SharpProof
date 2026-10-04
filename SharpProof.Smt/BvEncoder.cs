@@ -92,6 +92,8 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             case IrBinaryOperator.StringConcat:
                 return EncodeStringConcat(binary, left, right, meter);
+            case IrBinaryOperator.StringEquals:
+                return EncodeStringEquals(left, right, meter);
             case IrBinaryOperator.Equal:
                 return owner.Own(context.MkEq(left, right));
             case IrBinaryOperator.NotEqual:

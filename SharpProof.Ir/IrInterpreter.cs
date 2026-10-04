@@ -339,6 +339,7 @@ public sealed class IrInterpreter(IrFactory factory)
             IrBinaryOperator.Equal => EvaluateEquality(left.Value!, right.Value!, negate: false),
             IrBinaryOperator.NotEqual => EvaluateEquality(left.Value!, right.Value!, negate: true),
             IrBinaryOperator.StringConcat => EvaluateStringConcat(left.Value!, right.Value!),
+            IrBinaryOperator.StringEquals => EvaluateStringEquals(left.Value!, right.Value!),
             _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
                 "Unsupported binary operator: " + binary.Operator + ".")
         };
@@ -417,6 +418,19 @@ public sealed class IrInterpreter(IrFactory factory)
         return equal is bool established
             ? Boolean(negate != established)
             : InvalidValue("Equality requires values with compatible runtime kinds.");
+    }
+
+    private IrEvaluationResult EvaluateStringEquals(IrValue left, IrValue right)
+    {
+        if (left.Kind is not (IrValueKind.String or IrValueKind.Null) ||
+            right.Kind is not (IrValueKind.String or IrValueKind.Null))
+        {
+            return InvalidValue("String equality requires string values.");
+        }
+
+        return Boolean(left.Kind == IrValueKind.Null || right.Kind == IrValueKind.Null
+            ? left.Kind == right.Kind
+            : string.Equals(left.String, right.String, StringComparison.Ordinal));
     }
 
     private IrEvaluationResult EvaluateStringConcat(IrValue left, IrValue right)

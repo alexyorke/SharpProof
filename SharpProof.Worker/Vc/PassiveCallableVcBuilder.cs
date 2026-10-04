@@ -486,7 +486,8 @@ internal sealed class PassiveCallableVcBuilder
                     !(cast.Type == _factory.ObjectType && _factory.GetTypeInfo(cast.Operand.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||
                         _factory.GetTypeInfo(cast.Operand.Type).Kind == IrTypeKind.Reference && _factory.GetTypeInfo(cast.Type).Kind == IrTypeKind.Reference) ||
                 term is IrBinaryTerm binary && _factory.GetTypeInfo(binary.Left.Type).Kind == IrTypeKind.String &&
-                    (binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat) ||
+                    (binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat or
+                        IrBinaryOperator.StringEquals) ||
                         _hasStringConcat && binary.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual &&
                             binary.Left is not IrNullTerm && binary.Right is not IrNullTerm);
         });
