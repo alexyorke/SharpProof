@@ -74,6 +74,12 @@ internal sealed partial class BvEncoder
         }
         ReferenceFacts.Add(owner.Own(context.MkEq(Text(concatenation.Value, meter),
             owner.Own(context.MkConcat(Operand(concatenation.Left), Operand(concatenation.Right))))));
+        // The same total in the length sort spares Z3 relating the two. A sum
+        // beyond Int32.MaxValue is no result: the concatenation would throw.
+        // Only content queries get it: other queries keep small witnesses.
+        ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(concatenation.Value, meter),
+            owner.Own(context.MkBVAdd((BitVecExpr)EncodeLength(concatenation.Left, meter),
+                (BitVecExpr)EncodeLength(concatenation.Right, meter))))));
     }
 
     private SeqExpr Literal(string content)

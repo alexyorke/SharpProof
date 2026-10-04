@@ -44,6 +44,16 @@ public sealed class WorkerVcStringEqualityTests
                 Contract.Ensures(Contract.Result<bool>());
                 return "hi " + name != "hi";
             }
+            public static string Greeting(string name) {
+                Contract.Requires(name != null);
+                Contract.Ensures(Contract.Result<string>() == "hi " + name);
+                Contract.Ensures(Contract.Result<string>().Length == name.Length + 3);
+                return "hi " + name;
+            }
+            public static string WrongGreeting(string name) {
+                Contract.Ensures(Contract.Result<string>() == name + "!");
+                return name + "?";
+            }
             public static bool PrefixedLength(string name) {
                 Contract.Requires(name == "ab");
                 Contract.Ensures(Contract.Result<bool>());
@@ -71,10 +81,22 @@ public sealed class WorkerVcStringEqualityTests
     [TestCase("AppendEmpty", WorkerClaimOutcome.Refuted)]
     [TestCase("Prefixed", WorkerClaimOutcome.Proven)]
     [TestCase("PrefixedLength", WorkerClaimOutcome.Proven)]
+    [TestCase("WrongGreeting", WorkerClaimOutcome.Refuted)]
     public void ContentEqualityIsDecided(string method, WorkerClaimOutcome expected)
     {
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
+    }
+
+    [Test]
+    public void ContractConcatenationDescribesContentAndLength()
+    {
+        var response = s_response!;
+        var callable = response.Manifest.Callables.Single(callable =>
+            callable.CallableId.Contains(".Greeting(", StringComparison.Ordinal));
+        var claims = response.ClaimResults.Where(result => callable.ClaimIds.Contains(result.ClaimId)).ToArray();
+        Assert.That(claims.Select(claim => claim.Outcome).ToArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
+            string.Join(", ", claims.Select(claim => claim.Reason)));
     }
 
     // A string equal in content to a literal need not be the literal's object.

@@ -507,8 +507,11 @@ reference identity, so content equality never proves that two strings are the
 same object. Z3 reads content through `text: Ref -> Seq(BitVec16)` once a query
 compares content: literals fix their text, a concatenation's text is its
 operands' text in order (null as empty), and a non-null string's length is its
-text's length. Counterexamples decode that content for replay. Concatenation
-and `string.Equals` calls inside contract clauses remain unsupported.
+text's length; a concatenation's length is then also its operands' total in
+the length sort (a total beyond `Int32.MaxValue` would throw, so it is no
+result). Counterexamples decode that content for replay. Contract clauses may
+concatenate strings with `+`: a clause allocates nothing, so it denotes only
+the resulting content. `string.Equals` calls remain unsupported.
 The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic

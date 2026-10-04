@@ -4073,7 +4073,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task StringConcatInContractClausesAbstains()
+    public async Task StringConcatInContractClausesRefutesNull()
     {
         using var project = TestProject.Create(
             """
@@ -4099,13 +4099,10 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        // A null value concatenates as "", which is not null.
         Assert.That(
             response.ClaimResults.Select(static record => record.Outcome),
-            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(
-            response.ClaimResults.Select(static record => record.Reason),
-            Is.All.EqualTo(
-                WorkerClaimReason.UnsupportedBody));
+            Is.All.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
     [Test]

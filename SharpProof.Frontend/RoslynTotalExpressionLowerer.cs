@@ -89,6 +89,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return Compose(operation, [LowerClause(access.ArrayReference, state, depth + 1), LowerClause(access.Indices[0], state, depth + 1)]);
             case IUnaryOperation unary:
                 return Compose(operation, [LowerClause(unary.Operand, state, depth + 1)]);
+            // A clause only describes the concatenated string; it allocates
+            // nothing at run time.
+            case IBinaryOperation concatenation when CSharpOperationSemantics.IsStringConcatenation(concatenation):
+                {
+                    var left = LowerClause(concatenation.LeftOperand, state, depth + 1);
+                    var right = LowerClause(concatenation.RightOperand, state, depth + 1);
+                    var classification = First(left.Classification, right.Classification);
+                    return classification.IsExact
+                        ? new(CSharpOperationSemantics.StringConcat(_factory, left.Value, right.Value).Value,
+                            And(left.SafeCondition, right.SafeCondition), classification)
+                        : Failed(operation, classification.Abstention);
+                }
             case IBinaryOperation binary:
                 {
                     var operands = CSharpOperationSemantics.EqualityOperands(binary);

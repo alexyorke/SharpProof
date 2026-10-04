@@ -39,8 +39,9 @@ internal sealed partial class BvEncoder
     private Expr EncodeStringConcat(IrBinaryTerm term, Expr left, Expr right, SmtQueryResourceMeter meter)
     {
         // Empty operands preserve CLR aliases. Two nonempty operands make a
-        // fresh non-null string whose content, once a query reads content, is
-        // the operands' content in order. SAT still requires replay.
+        // fresh non-null string; once a query reads content, its content is
+        // the operands' content in order and its length their total. SAT
+        // still requires replay.
         var value = owner.Own(context.MkConst("concat" + term.Id.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         var empty = EncodeStringLiteral(factory.String(""), meter);
