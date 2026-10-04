@@ -165,8 +165,9 @@ public sealed class TotalLoweringContext
 
     // A `ref` or `in` parameter of a scalar or reference type that the body
     // never writes (no assignment, increment, compound assignment or ref or
-    // out argument naming it) holds its caller's value throughout, as a
-    // by-value parameter does. A struct stays excluded: a call on it may
+    // out argument naming it) starts with its caller's value. The final
+    // program pass invalidates its current cell after possible alias writes.
+    // A struct stays excluded: a call on it may
     // mutate the caller's storage.
     private bool IsReadOnlyReference(IParameterSymbol parameter)
     {

@@ -331,6 +331,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private FrontendProgramLoweringResult Result(IrProgram? program = null)
     {
         program ??= _builder.Build();
+        program = InvalidateReferenceInputs(program);
         var instructions = 0;
         foreach (var block in program.Blocks)
         {

@@ -654,8 +654,13 @@ share the call's value domain (`Swap<T>(IList<T>, int, int)` called on an
 `IList<int>`), while a scalar argument for a type parameter (`Id<int>(x)`)
 does not. A `ref` or `in` parameter of a scalar or reference type that the
 body never writes (no assignment, increment, compound assignment, `ref` or
-`out` argument or `ref` expression naming it) holds its caller's value
-throughout and is verified as a by-value input; any other by-reference
+`out` argument or `ref` expression naming it) starts with its caller's value.
+Nonlocal writes and opaque calls with write effects invalidate its current
+value through approximation havoc, since the caller may have passed an
+alias of the written storage. This happens after successful stores and
+before an opaque call's exceptional branch, including writes in inlined
+callees. Entry and Old snapshots remain unchanged. A body without such
+writes retains exact by-value behavior; any other by-reference
 parameter, and every struct one, keeps the callable unsupported. Explicit
 interface implementations are verified like other methods. A call to a
 source callee already being inlined (recursion, direct or mutual) records the

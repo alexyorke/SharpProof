@@ -6,6 +6,19 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedMutationBoundaryTests
 {
+    [TestCase("ref", "cell.Value", "cell.Value = 5;")]
+    [TestCase("in", "cell.Value", "cell.Value = 5;")]
+    [TestCase("ref", "values[0]", "values[0] = 5;")]
+    [TestCase("in", "values[0]", "values[0] = 5;")]
+    public void RuntimeReadonlyReferenceObservesAliasedStore(string modifier, string argument, string mutation)
+    {
+        using var subject = TypedProgramSubject.Create("int Target() { var cell = new Cell(); cell.Value = 3; " +
+            "var values = new int[] { 3 }; return Helper(" + modifier + " " + argument + ", cell, values); } " +
+            "private static int Helper(" + modifier + " int value, Cell cell, int[] values) { " + mutation + " return value; }",
+            "public sealed class Cell { public int Value; }");
+        Assert.That(subject.Invoke([]), Is.EqualTo(5));
+    }
+
     [TestCase("public int Value;")]
     [TestCase("public int Value { get; set; }")]
     public void CompoundFieldStoreRetainsReceiverBeforeRightHandSide(string member)

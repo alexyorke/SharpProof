@@ -1,0 +1,46 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+parameter: 1 entry=v3:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] current=v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] old=v5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False]
+result: v6:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=value
+variable: v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] source=cell
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i2 op0 Assign v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v3 source=none
+  i3 op0 Assign v5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v3 source=none
+  i5 op0 Goto b1 source=none
+block: b1 cfg:0
+  i6 op0 Goto b2 source=none
+block: b2 cfg:1
+  i7 op1 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v4 source=total-readonly-reference-alias.cs:167+4
+  i8 op2 Assign v8:int[width=32,signed=True] = 5 source=total-readonly-reference-alias.cs:180+1
+  i9 op3 Branch (v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b5 : b6 source=total-readonly-reference-alias.cs:167+14
+block: b3 cfg:2
+  i16 op0 Return void source=none
+block: b4 exceptional:exit
+  i4 op0 ExceptionalExit source=none
+block: b5 throw
+  i10 op3 Throw NullReference -> b4 source=total-readonly-reference-alias.cs:167+14
+block: b6 normal
+  i11 op4 Assign v9:int[width=32,signed=True] = v8 source=total-readonly-reference-alias.cs:167+14
+  i12 op5 Write Parameter (("object"#t3)v7).m0 = v8 source=total-readonly-reference-alias.cs:167+14
+  i17 op5 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-readonly-reference-alias.cs:167+14
+  i18 op5 Assign v1:int[width=32,signed=True] = v11 source=total-readonly-reference-alias.cs:167+14
+  i13 op7 Assign v10:int[width=32,signed=True] = v1 source=total-readonly-reference-alias.cs:198+5
+  i14 op6 Assign v6:int[width=32,signed=True] = v10 source=total-readonly-reference-alias.cs:198+5
+  i15 op6 Return v6 source=total-readonly-reference-alias.cs:198+5
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v3
+term: ir2 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v4
+term: ir3 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v7
+term: ir4 Integer type=t1:int width=32 signed=True bits=5 value=5
+term: ir5 Variable type=t1:int width=32 signed=True value=v8
+term: ir6 Null type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)
+term: ir7 Binary type=t0:bool width=0 signed=False value=(v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null))
+term: ir10 Variable type=t1:int width=32 signed=True value=v1
+term: ir11 Variable type=t1:int width=32 signed=True value=v10
+term: ir12 Variable type=t1:int width=32 signed=True value=v6
+term: ir13 Variable type=t1:int width=32 signed=True value=v11
