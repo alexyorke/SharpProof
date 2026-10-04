@@ -118,6 +118,17 @@ internal static partial class CSharpOperationSemantics
             property.Type?.SpecialType == SpecialType.System_Int32 && CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
+    // The framework's static string.Equals(string, string): content equality.
+    internal static bool IsStringEqualsCall(IMethodSymbol method)
+    {
+        return method.IsStatic && method.Name == "Equals" &&
+            method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+            method.ContainingType.SpecialType == SpecialType.System_String &&
+            method.Parameters.Length == 2 &&
+            method.Parameters.All(static parameter => parameter.RefKind == RefKind.None &&
+                parameter.Type.SpecialType == SpecialType.System_String);
+    }
+
     internal static (IOperation Left, IOperation Right) EqualityOperands(IBinaryOperation operation)
     {
         if (operation.OperatorMethod != null || operation.IsLifted ||

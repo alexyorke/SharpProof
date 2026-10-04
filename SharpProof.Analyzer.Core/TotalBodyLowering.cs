@@ -139,6 +139,11 @@ internal static class TotalBodyLowering
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory, ResolvedApiSpecTable apiSpecs)
     {
+        if (CSharpOperationSemantics.IsStringEqualsCall(method))
+        {
+            return new TotalScalarCallModel(2, arguments => new TotalScalarRule(
+                factory.Binary(IrBinaryOperator.StringEquals, arguments[0], arguments[1]), [], FrontendSubsetClassification.Exact));
+        }
         if (!apiSpecs.TryGet(method, out var spec))
         { return null; }
         return spec.Template.Target.DocumentationCommentId switch

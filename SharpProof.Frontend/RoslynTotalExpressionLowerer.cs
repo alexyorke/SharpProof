@@ -66,7 +66,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             case IParenthesizedOperation parenthesized:
                 return LowerClause(parenthesized.Operand, state, depth + 1);
             case IInvocationOperation invocation:
-                return Intrinsic?.Invoke(invocation, state) ?? Failed(operation, FrontendAbstention.UnsupportedInvocationShape);
+                return Intrinsic?.Invoke(invocation, state) ?? StringEqualsClause(invocation, state, depth) ??
+                    Failed(operation, FrontendAbstention.UnsupportedInvocationShape);
             case IConditionalOperation { WhenFalse: { } whenFalse } conditional:
                 {
                     var condition = LowerClause(conditional.Condition, state, depth + 1);
@@ -761,6 +762,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return _context.FreshReceiver && IsImplicitThis(instance) ||
             instance != null && !IsImplicitThis(instance) && CSharpOperationSemantics.IsFreshReceiver(instance.Syntax, _context.Compilation)
             ? _context.FreshWriteSite(operation) : _context.Site(operation);
+    }
+
+    private GuardedExpression? StringEqualsClause(IInvocationOperation invocation, TotalParameterState state, int depth)
+    {
+        if (!CSharpOperationSemantics.IsStringEqualsCall(invocation.TargetMethod) || invocation.Arguments.Length != 2)
+        { return null; }
+        var arguments = new GuardedExpression[2];
+        foreach (var argument in invocation.Arguments)
+        { arguments[argument.Parameter!.Ordinal] = LowerClause(argument.Value, state, depth + 1); }
+        var classification = First(arguments[0].Classification, arguments[1].Classification);
+        return classification.IsExact
+            ? new(_factory.Binary(IrBinaryOperator.StringEquals, arguments[0].Value, arguments[1].Value),
+                And(arguments[0].SafeCondition, arguments[1].SafeCondition), classification)
+            : Failed(invocation, classification.Abstention);
     }
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)

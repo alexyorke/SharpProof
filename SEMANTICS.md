@@ -511,7 +511,9 @@ text's length; a concatenation's length is then also its operands' total in
 the length sort (a total beyond `Int32.MaxValue` would throw, so it is no
 result). Counterexamples decode that content for replay. Contract clauses may
 concatenate strings with `+`: a clause allocates nothing, so it denotes only
-the resulting content. `string.Equals` calls remain unsupported.
+the resulting content. The framework's static `string.Equals(string, string)`
+is the same content comparison, in bodies and clauses; the instance form
+`a.Equals(b)` remains unsupported.
 The shadow runtime oracle measures concrete feasible entries in
 independently compiled source after argument construction and warmup. An empty
 model for a zero-parameter method is distinct from an infeasible entry. Generic
