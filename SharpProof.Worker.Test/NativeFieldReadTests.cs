@@ -49,14 +49,14 @@ public sealed class NativeFieldReadTests
     }
 
     [Test]
-    public async Task CounterexampleThatReadsTheHeapIsNotReplayable()
+    public async Task CounterexampleReadsTheFieldItsObjectEntersWith()
     {
-        // Z3 can pick Value == 0, but nothing concrete establishes that value.
+        // A caller may pass a cell whose Value is 0; the counterexample's
+        // object carries that entry value, so replay divides by zero.
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
             "Contract.Requires(cell != null); return 10 / cell.Value; }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
-        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 
     // A volatile read stays unsupported; a dispatched getter is an opaque call.
@@ -87,8 +87,7 @@ public sealed class NativeFieldReadTests
     {
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare("[EnforcePure] public static int Target(Cell cell) { " +
             "Contract.Requires(cell != null); return ++cell.Value; }"), new WorkerBudgets());
-        // The write is reached concretely, but its witness replay has read an
-        // approximated field first, so it is never a refutation.
+        // The write is reached concretely; it is never a proof.
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 

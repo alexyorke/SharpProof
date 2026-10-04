@@ -578,10 +578,15 @@ public sealed class NativePurityEffectTests
         var factory = total.Program.Factory;
         var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
         var observed = 0;
+        // The objects enter with the field values the runtime run used.
+        var field = write.Field!.Value;
+        var fieldType = factory.GetMemberInfo(field).ReturnType;
         var replay = new IrProgramInterpreter(factory).Execute(total.Program, new Dictionary<IrVarId, IrValue>
         {
-            [entries[0]] = nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object()),
-            [entries[1]] = factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()),
+            [entries[0]] = nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(
+                factory.GetVariableInfo(entries[0]).Type, new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 5L))),
+            [entries[1]] = factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type,
+                new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 10L))),
             [entries[2]] = factory.CreateIntegerValue(factory.GetVariableInfo(entries[2]).Type, 7L)
         }, 10000, new IrProgramReplayOptions(static _ => null)
         {
@@ -599,8 +604,8 @@ public sealed class NativePurityEffectTests
         { Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(returned))); }
     }
 
-    // A mutation whose value or overflow depends on the field reads it as an
-    // approximation, so its write is reached but never a concrete refutation.
+    // A mutation whose value or overflow depends on the field reads the value
+    // its object enters with, so the reached write replays concretely.
     [TestCase("cell.Value += x;", "public int Value;")]
     [TestCase("checked { cell.Value++; }", "public int Value;")]
     [TestCase("return cell.Value++;", "public int Value;")]
@@ -608,11 +613,11 @@ public sealed class NativePurityEffectTests
     [TestCase("int _ = 0; _ = cell.Value++;", "public int Value;")]
     [TestCase("_ = (long)cell.Value++;", "public int Value;")]
     [TestCase("cell.Value++;", "public byte Value;")]
-    public async Task ValueObservingMutationsStayUnknown(string body, string field)
+    public async Task ValueObservingMutationsAreRefuted(string body, string field)
     {
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(InstanceMutationSource(body + " return x;", field))), new WorkerBudgets());
-        Assert.That(result.Outcome, Is.Null);
-        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.WriteWitness, Is.Not.Null);
     }
 
     [TestCase("cell.Value++;", "public volatile int Value;")]

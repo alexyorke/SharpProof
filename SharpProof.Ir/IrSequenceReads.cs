@@ -1,7 +1,8 @@
 namespace SharpProof.Ir;
 
-// Reading the length or an element of a string or array is a read of the
-// state it belongs to, unless the body created that sequence itself. The IR
+// Reading the length or an element of a string or array, or a field of an
+// object, is a read of the state it belongs to, unless the body created that
+// sequence or object itself. The IR
 // models such reads exactly, so they are found from the terms rather than
 // from approximation sites.
 internal static class IrSequenceReads
@@ -34,7 +35,8 @@ internal static class IrSequenceReads
             {
                 var term = pending.Pop();
                 if (term is IrSequenceAccessTerm { Sequence: var accessed } && !IsLocal(accessed, fresh) ||
-                    term is IrLengthTerm { Value: var measured } && !IsLocal(measured, fresh))
+                    term is IrLengthTerm { Value: var measured } && !IsLocal(measured, fresh) ||
+                    IrFieldSites.IsFieldRead(program.Factory, term) && !IsLocal(((IrOpaqueTerm)term).Receiver!, fresh))
                 {
                     readers.Add(instruction.Id);
                     break;

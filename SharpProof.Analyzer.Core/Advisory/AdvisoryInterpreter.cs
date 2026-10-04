@@ -615,6 +615,9 @@ internal sealed class CoreIrAdvisoryInterpreter
                 return IntervalValue.Range(0, 1);
             }
         }
+        // Field contents are not tracked: a field read is any value of its type.
+        if (IrFieldSites.IsFieldRead(_factory, term))
+        { return _domain.RangeType(term.Type); }
         AddGap("unsupported term");
         return _domain.RangeType(term.Type);
     }

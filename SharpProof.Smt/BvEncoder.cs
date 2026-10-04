@@ -67,6 +67,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             IrConditionalTerm conditional => owner.Own(context.MkITE(EncodeBoolean(conditional.Condition, meter),
                 Encode(conditional.WhenTrue, meter), Encode(conditional.WhenFalse, meter))),
             IrCastTerm cast => EncodeCast(cast, meter),
+            IrOpaqueTerm field when IrFieldSites.IsFieldRead(factory, field) => EncodeFieldRead(field, meter),
             _ => throw new UnsupportedIrEncodingException()
         };
         _encoded.Add(term.Id, expression);

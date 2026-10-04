@@ -184,7 +184,7 @@ public sealed partial class IrProgramExecutionResult
         int steps,
         bool consumedApproximation = false,
         ImmutableHashSet<IrVarId>? approximationVariables = null,
-        IReadOnlyDictionary<IrValue, IrValue[]>? heap = null
+        IrHeap? heap = null
     )
     {
         (Status, ReturnValue, Instruction, Unsupported, Exception, Values, Steps) =
@@ -194,8 +194,8 @@ public sealed partial class IrProgramExecutionResult
         Heap = heap;
     }
 
-    // The contents of every array the execution stored to, by identity.
-    internal IReadOnlyDictionary<IrValue, IrValue[]>? Heap { get; }
+    // What the execution stored to arrays and objects, by identity.
+    internal IrHeap? Heap { get; }
 
     public IrProgramExecutionStatus Status { get; }
 
@@ -652,17 +652,20 @@ public sealed class IrLockInstruction : IrInstruction
 public sealed class IrWriteInstruction : IrInstruction
 {
     internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
-        IrTerm? sequence = null, IrTerm? index = null, IrTerm? value = null)
+        IrTerm? target = null, IrTerm? index = null, IrMemberId? field = null, IrTerm? value = null)
         : base(id, IrInstructionKind.Write, operation)
-    { Region = region; Sequence = sequence; Index = index; Value = value; }
+    { Region = region; Target = target; Index = index; Field = field; Value = value; }
 
     public IrWriteRegion Region { get; }
-    // An element store names its array, index and stored value; other writes
-    // are effect sites only.
-    public IrTerm? Sequence { get; }
+    // A store names its array and index, or its object and field, and the
+    // stored value; other writes are effect sites only.
+    public IrTerm? Target { get; }
     public IrTerm? Index { get; }
+    public IrMemberId? Field { get; }
     public IrTerm? Value { get; }
-    public bool IsElementStore => Sequence != null;
+    public bool IsElementStore => Index != null;
+    public bool IsFieldStore => Field != null;
+    public bool IsStore => Value != null;
 }
 
 public sealed class IrAssignInstruction : IrInstruction

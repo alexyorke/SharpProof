@@ -53,13 +53,14 @@ public static class IrSubstitution
             out _);
     }
 
-    // Substitutes variables and rebuilds each element read, bottom-up, from
-    // the original read and its rewritten array and index.
+    // Substitutes variables and rebuilds each element or field read,
+    // bottom-up, from the original read and its rewritten operands; a null
+    // result rebuilds it as usual.
     internal static IrTerm SubstituteWithReads(
         IrFactory factory,
         IrTerm root,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,
-        Func<IrSequenceAccessTerm, IrTerm, IrTerm, IrTerm> read)
+        Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?> read)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(root, nameof(root));
@@ -171,15 +172,14 @@ public static class IrSubstitution
         Dictionary<IrId, IrTerm> memo,
         ISet<IrVarId>? allowedVariables,
         out bool variablesValid,
-        Func<IrSequenceAccessTerm, IrTerm, IrTerm, IrTerm>? read = null)
+        Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?>? read = null)
     {
         var allVariablesValid = true;
         var result = IrTraversal.FoldBottomUp(
             root,
             memo,
-            (term, _, rewritten) => read != null && term is IrSequenceAccessTerm access
-                ? read(access, rewritten[access.Sequence.Id], rewritten[access.Index.Id])
-                : RewriteNode(factory, term, rewritten),
+            (term, _, rewritten) => (read != null && term is IrSequenceAccessTerm or IrOpaqueTerm
+                ? read(term, child => rewritten[child.Id]) : null) ?? RewriteNode(factory, term, rewritten),
             term =>
             {
                 if (term is not IrVariableTerm variable)

@@ -207,9 +207,9 @@ internal sealed partial class PassiveLoopCutter
             var source = _candidate.Program.GetBlock(original);
             if (!unroll && _havoc.TryGetValue(original, out var writes))
             {
-                // A loop that stores elements also forgets array contents.
+                // A loop that stores elements or fields also forgets heap contents.
                 var memory = _loops[original].Any(node => _candidate.Program.GetBlock(node).Instructions
-                    .Any(instruction => instruction is IrWriteInstruction { Region: IrWriteRegion.Element }));
+                    .Any(instruction => instruction is IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter }));
                 if (writes.Length != 0 || memory)
                 {
                     Spend(writes.Length);
@@ -238,8 +238,11 @@ internal sealed partial class PassiveLoopCutter
                     case IrLockInstruction synchronization:
                         builder.Lock(encoded, synchronization.Operation, synchronization.Receiver);
                         break;
-                    case IrWriteInstruction { Sequence: { } stored, Index: { } index, Value: { } value } write:
+                    case IrWriteInstruction { Target: { } stored, Index: { } index, Value: { } value } write:
                         builder.ElementStore(encoded, write.Operation, stored, index, value);
+                        break;
+                    case IrWriteInstruction { Target: { } receiver, Field: { } field, Value: { } value } write:
+                        builder.FieldStore(encoded, write.Operation, write.Region, receiver, field, value);
                         break;
                     case IrWriteInstruction write:
                         builder.Write(encoded, write.Operation, write.Region);

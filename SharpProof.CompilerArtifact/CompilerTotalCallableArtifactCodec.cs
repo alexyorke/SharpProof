@@ -164,7 +164,8 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             cancellationToken.ThrowIfCancellationRequested();
             Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.String or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
-                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast && SupportedType(artifact.Graph, term.Type) &&
+                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast or IrTermKind.Opaque && SupportedType(artifact.Graph, term.Type) &&
+                (term.Kind != IrTermKind.Opaque || IsFieldRead(artifact.Graph, term)) &&
                 (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
                 (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer ||
@@ -176,6 +177,17 @@ internal static class CompilerTotalCallableArtifactCodec
                     (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat or
                         IrBinaryOperator.StringEquals),
                 "The Total graph contains unsupported term evidence.");
+        }
+        // The only opaque term is a pure read of an instance scalar field
+        // through an object receiver.
+        static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
+        {
+            return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
+                name.StartsWith(IrFieldSites.Prefix, StringComparison.Ordinal) && term.B >= 0 && term.B < graph.Terms.Length &&
+                graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
+                term.Items is not { Length: > 0 } && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
+                PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure &&
+                graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer;
         }
         var identities = new HashSet<IrVarId>();
         IrVarId Variable(int index, string name)

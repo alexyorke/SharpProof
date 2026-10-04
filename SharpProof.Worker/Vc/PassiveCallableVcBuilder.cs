@@ -9,12 +9,14 @@ internal sealed class PassiveCallableVcBuilder
     private sealed class ConstructionLimitException : Exception;
     private sealed record Edge(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? PendingException);
     private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value, Heap Contents);
-    // The element stores made so far in program order, each under its reach,
-    // over the entry contents; forgotten contents are unknown after something
-    // wrote elements without a modeled store. A store's reach is false on
-    // every path that does not execute it, and a path that executes it before
-    // a read processes it first, so the latest matching store decides a read.
-    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Sequence, IrTerm Index, IrTerm Value)> Stores, bool Forgotten);
+    // The element and field stores made so far in program order, each under
+    // its reach, over the entry contents; forgotten contents are unknown after
+    // something wrote the heap without a modeled store. A store's reach is
+    // false on every path that does not execute it, and a path that executes
+    // it before a read processes it first, so the latest matching store
+    // decides a read.
+    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm Value)> Stores,
+        bool Forgotten);
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
     private readonly IrProgram _program;
@@ -283,15 +285,17 @@ internal sealed class PassiveCallableVcBuilder
                         break;
                     case IrWriteInstruction write:
                         _writes.Add((reach, write.Operation, IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local));
-                        if (write is { Sequence: { } stored, Index: { } storedIndex, Value: { } storedValue })
+                        if (write is { Target: { } stored, Value: { } storedValue })
                         {
-                            if (!TryRewrite(stored, state, out var storedArray) || !TryRewrite(storedIndex, state, out var storedPosition) ||
+                            IrTerm? storedPosition = null;
+                            if (!TryRewrite(stored, state, out var storedTarget) ||
+                                write.Index is { } storedIndex && !TryRewrite(storedIndex, state, out storedPosition) ||
                                 !TryRewrite(storedValue, state, out var storedElement))
                             { return null; }
                             Spend(_heap.Stores.Length);
-                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedArray, storedPosition, storedElement)) };
+                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement)) };
                         }
-                        else if (write.Region is IrWriteRegion.Element or IrWriteRegion.Unknown)
+                        else if (write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
                         { _heap = new([], true); }
                         break;
                     case IrCallInstruction call:
@@ -517,7 +521,31 @@ internal sealed class PassiveCallableVcBuilder
             substitutions.Add(variable, replacement);
         }
         var consistent = true;
-        IrTerm Read(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index)
+        IrTerm? Read(IrTerm original, Func<IrTerm, IrTerm> rewritten)
+        {
+            if (original is IrSequenceAccessTerm access)
+            { return ElementRead(access, rewritten(access.Sequence), rewritten(access.Index)); }
+            if (!IrFieldSites.IsFieldRead(_factory, original))
+            { return null; }
+            var field = (IrOpaqueTerm)original;
+            var receiver = rewritten(field.Receiver!);
+            Spend(heap.Stores.Length);
+            // An old value reads the objects as the callable entered.
+            var entry = _factory.PureOpaque(field.Member, receiver);
+            if (postcondition && IrTraversal.CollectVariables(field.Receiver!).Any(_oldInputs.ContainsKey))
+            { return entry; }
+            IrTerm read = heap.Forgotten ? Fresh(original.Type) : entry;
+            foreach (var store in heap.Stores)
+            {
+                if (store.Field != field.Member)
+                { continue; }
+                if (store.Target.Type != receiver.Type || store.Value.Type != original.Type)
+                { consistent = false; continue; }
+                read = _factory.Conditional(And(store.Reach, Equal(receiver, store.Target)), store.Value, read);
+            }
+            return read;
+        }
+        IrTerm ElementRead(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index)
         {
             Spend(heap.Stores.Length);
             // An old value reads the arrays as the callable entered.
@@ -526,11 +554,11 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = heap.Forgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
-                if (store.Sequence.Type != sequence.Type)
+                if (store.Index is not { } storeIndex || store.Target.Type != sequence.Type)
                 { continue; }
-                if (Position(store.Index) is not { } stored || Position(index) is not { } position || store.Value.Type != original.Type)
+                if (Position(storeIndex) is not { } stored || Position(index) is not { } position || store.Value.Type != original.Type)
                 { consistent = false; continue; }
-                read = _factory.Conditional(And(store.Reach, And(Equal(sequence, store.Sequence), Equal(position, stored))),
+                read = _factory.Conditional(And(store.Reach, And(Equal(sequence, store.Target), Equal(position, stored))),
                     store.Value, read);
             }
             return read;
@@ -551,7 +579,8 @@ internal sealed class PassiveCallableVcBuilder
         return !IrTraversal.Any(root, term =>
         {
             Spend();
-            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm) ||
+            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm) ||
+                term is IrOpaqueTerm && (!IrFieldSites.IsFieldRead(_factory, term) || _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer)) ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer &&
                     !(cast.Type == _factory.ObjectType && _factory.GetTypeInfo(cast.Operand.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||

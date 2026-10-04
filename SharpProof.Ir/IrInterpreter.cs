@@ -155,7 +155,7 @@ public sealed class IrInterpreter(IrFactory factory)
     // The heap holds the current contents of each array stored to so far.
     internal IrEvaluationResult Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
-        Action<IrVarId>? onVariableRead, IReadOnlyDictionary<IrValue, IrValue[]>? heap, CancellationToken cancellationToken)
+        Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
@@ -266,6 +266,14 @@ public sealed class IrInterpreter(IrFactory factory)
         {
             return Fault(IrExceptionKind.NullReference,
                 "The opaque call receiver is null.");
+        }
+        // A field reads what the execution stored, else its entry value.
+        if (IrFieldSites.IsFieldRead(_factory, opaque) && receiverValue is { Kind: IrValueKind.Reference } owner)
+        {
+            if (state.Heap != null && state.Heap.Fields.TryGetValue((owner.Reference, opaque.Member), out var stored))
+            { return Value(stored); }
+            if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
+            { return Value(initial); }
         }
 
         return Unsupported(IrUnsupportedReason.OpaqueTerm,
@@ -621,7 +629,7 @@ public sealed class IrInterpreter(IrFactory factory)
         if (invalid != null)
         { return invalid; }
         var position = (int)index.Value!.Integer;
-        return Value(state.Heap != null && state.Heap.TryGetValue(sequence.Value!, out var stored)
+        return Value(state.Heap != null && state.Heap.Elements.TryGetValue(sequence.Value!, out var stored)
             ? stored[position] : sequence.Value!.Elements[position]);
     }
 
@@ -713,6 +721,6 @@ public sealed class IrInterpreter(IrFactory factory)
         internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
         internal int Depth { get; set; }
-        internal IReadOnlyDictionary<IrValue, IrValue[]>? Heap { get; set; }
+        internal IrHeap? Heap { get; set; }
     }
 }

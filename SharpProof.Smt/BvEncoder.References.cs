@@ -138,7 +138,7 @@ internal sealed partial class BvEncoder
                     if (info.Kind == IrTypeKind.Reference)
                     {
                         if (!identities.TryGetValue(token, out var identity))
-                        { identities.Add(token, identity = shared.TryGetValue(token, out var view) ? view : new object()); }
+                        { identities.Add(token, identity = shared.TryGetValue(token, out var view) ? view : ObjectState(evaluated, model, meter)); }
                         value = factory.CreateReferenceValue(type, identity);
                     }
                     else
@@ -190,6 +190,7 @@ internal sealed partial class BvEncoder
         { element.Dispose(); }
         _length?.Dispose();
         DisposeStrings();
+        DisposeFields();
         _referenceSort?.Dispose();
     }
 }

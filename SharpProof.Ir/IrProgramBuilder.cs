@@ -72,7 +72,16 @@ public sealed class IrProgramBuilder(IrFactory factory)
     {
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation, IrWriteRegion.Element,
             ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
-            ArgumentNullGuard.NotNull(value, nameof(value))));
+            value: ArgumentNullGuard.NotNull(value, nameof(value))));
+    }
+
+    // Stores value in receiver's field; the caller has already guarded the
+    // receiver's nullness.
+    public IrWriteInstruction FieldStore(IrBlockId block, OperationId operation, IrWriteRegion region, IrTerm receiver,
+        IrMemberId field, IrTerm value)
+    {
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region,
+            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field: field, value: ArgumentNullGuard.NotNull(value, nameof(value))));
     }
 
     public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
@@ -262,17 +271,27 @@ public sealed class IrProgramBuilder(IrFactory factory)
             case IrWriteInstruction write:
                 if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
                 { throw InvalidArgument("A write region is undefined.", "region"); }
-                if (write.Sequence is { } stored)
+                if (write.Field is { } field)
                 {
-                    var sequenceType = _factory.GetTypeInfo(ValidateTerm(stored, "sequence"));
+                    var fieldInfo = _factory.GetMemberInfo(field);
+                    if (write.Region is not (IrWriteRegion.Field or IrWriteRegion.Parameter) || write.Target == null ||
+                        write.Index != null || write.Value == null ||
+                        !IrFieldSites.IsField(_factory, field) || fieldInfo.IsStatic ||
+                        _factory.GetTypeInfo(ValidateTerm(write.Target, "target")).Kind != IrTypeKind.Reference ||
+                        ValidateTerm(write.Value, "value") != fieldInfo.ReturnType)
+                    { throw InvalidArgument("A field store requires an object, an instance field and a value of its type.", "field"); }
+                }
+                else if (write.Target is { } stored)
+                {
+                    var sequenceType = _factory.GetTypeInfo(ValidateTerm(stored, "target"));
                     if (write.Region != IrWriteRegion.Element || sequenceType.Kind != IrTypeKind.Sequence ||
                         write.Index == null || write.Value == null ||
                         _factory.GetTypeInfo(ValidateTerm(write.Index, "index")).Kind != IrTypeKind.Integer ||
                         ValidateTerm(write.Value, "value") != sequenceType.ElementType)
-                    { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "sequence"); }
+                    { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "target"); }
                 }
                 else if (write.Index != null || write.Value != null)
-                { throw InvalidArgument("Only an element store names an index or value.", "index"); }
+                { throw InvalidArgument("Only a store names an index or value.", "index"); }
                 break;
             case IrAllocationInstruction allocation:
                 if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))

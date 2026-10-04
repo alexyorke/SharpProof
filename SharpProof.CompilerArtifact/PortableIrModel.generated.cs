@@ -280,7 +280,7 @@ internal static class PortableIrSlotCatalog
     new("Throw", ["exceptionKind", "blockIndex", "unused", "unused", "empty", "unused"]),
     new("ExceptionalExit", ["unused", "unused", "unused", "unused", "empty", "unused"]),
     new("Allocate", ["typeIndex", "optionalVariableIndex", "optionalTermIndex", "unused", "termIndices", "unused"]),
-    new("Write", ["writeRegion", "optionalTermIndex", "optionalTermIndex", "unused", "termIndices", "unused"]),
+    new("Write", ["writeRegion", "optionalTermIndex", "optionalTermIndex", "unused", "termIndices", "location"]),
     new("Lock", ["termIndex", "unused", "unused", "unused", "empty", "unused"]),
     ];
 }
@@ -464,8 +464,9 @@ internal static class PortableIrGraphCodecProjections
             IrLockInstruction synchronization => row(instruction, operationIndex(instruction.Operation),
                 termIndex(synchronization.Receiver), -1, -1, null, null),
             IrWriteInstruction write => row(instruction, operationIndex(instruction.Operation),
-                (int)write.Region, optionalTermIndex(write.Sequence), optionalTermIndex(write.Index),
-                write.Value == null ? null : termIndices([write.Value]), null),
+                (int)write.Region, write.Field == null ? optionalTermIndex(write.Target) : -1, optionalTermIndex(write.Index),
+                write.Value == null ? null : termIndices([write.Value]),
+                write.Field is { } field ? location(new IrMemberLocation(write.Value!.Type, field, write.Target, [])) : null),
             IrAssignInstruction value => row(
                 instruction,
                 operationIndex(instruction.Operation),
@@ -686,7 +687,11 @@ internal static class PortableIrGraphCodecProjections
         return row.Kind switch
         {
             IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A), optionalVariable(row.B), optionalTerm(row.C), terms(row.Items).ToImmutableArray()),
-            IrInstructionKind.Write => optionalTerm(row.B) is { } stored
+            IrInstructionKind.Write => row.Location != null
+                ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && location(row.Location) is IrMemberLocation { Receiver: { } receiver } field
+                    ? builder.FieldStore(block, operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, terms(row.Items)[0])
+                    : throw invalid()
+                : optionalTerm(row.B) is { } stored
                 ? row.Items.Length == 1 && optionalTerm(row.C) is { } index
                     ? builder.ElementStore(block, operation(row.Operation), stored, index, terms(row.Items)[0])
                     : throw invalid()

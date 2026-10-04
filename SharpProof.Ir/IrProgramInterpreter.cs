@@ -129,21 +129,32 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrWriteInstruction write:
                         replayOptions?.WriteObserver?.Invoke(write);
                         replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
-                        if (write is { Sequence: { } storedSequence, Index: { } storedIndex, Value: { } storedElement })
+                        if (write is { Target: { } storedTarget, Value: { } storedElement })
                         {
-                            var target = _terms.Evaluate(storedSequence, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            var target = _terms.Evaluate(storedTarget, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                             if (target.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(target, write, values, steps); }
-                            var position = _terms.Evaluate(storedIndex, values.Current, values.ObserveRead, values.Heap, cancellationToken);
-                            if (position.Status != IrEvaluationStatus.Value)
-                            { return FromEvaluation(position, write, values, steps); }
+                            IrEvaluationResult? position = null;
+                            if (write.Index is { } storedIndex)
+                            {
+                                position = _terms.Evaluate(storedIndex, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                                if (position.Status != IrEvaluationStatus.Value)
+                                { return FromEvaluation(position, write, values, steps); }
+                            }
                             var element = _terms.Evaluate(storedElement, values.Current, values.ObserveRead, values.Heap, cancellationToken);
                             if (element.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(element, write, values, steps); }
                             // The lowering guards the store, so an invalid one is not C#.
-                            if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
-                            { return Unsupported(write, values, steps, "An element store was not in bounds."); }
-                            values.Store(target.Value!, (int)position.Value!.Integer, element.Value!);
+                            if (position != null)
+                            {
+                                if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
+                                { return Unsupported(write, values, steps, "An element store was not in bounds."); }
+                                values.Heap.StoreElement(target.Value!, (int)position.Value!.Integer, element.Value!);
+                            }
+                            else if (write.Field is { } field && target.Value!.Kind == IrValueKind.Reference)
+                            { values.Heap.Fields[(target.Value.Reference, field)] = element.Value!; }
+                            else
+                            { return Unsupported(write, values, steps, "A field store needs an object receiver."); }
                         }
                         break;
                     case IrAssignInstruction assign:
@@ -428,15 +439,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         private readonly HashSet<IrVarId> _approximations = [];
         internal bool ConsumedApproximation { get; private set; }
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
-        private Dictionary<IrValue, IrValue[]>? _heap;
-        internal IReadOnlyDictionary<IrValue, IrValue[]>? Heap => _heap;
-        internal void Store(IrValue sequence, int index, IrValue value)
-        {
-            _heap ??= new(IrValueIdentity.Instance);
-            if (!_heap.TryGetValue(sequence, out var elements))
-            { _heap.Add(sequence, elements = [.. sequence.Elements]); }
-            elements[index] = value;
-        }
+        internal IrHeap Heap { get; } = new();
         internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
         internal IrValue this[IrVarId key]
         {
@@ -475,12 +478,4 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             return _values.ToImmutable();
         }
     }
-}
-
-// Arrays are compared by identity, as the CLR compares references.
-internal sealed class IrValueIdentity : IEqualityComparer<IrValue>
-{
-    internal static IrValueIdentity Instance { get; } = new();
-    public bool Equals(IrValue? x, IrValue? y) { return ReferenceEquals(x, y); }
-    public int GetHashCode(IrValue obj) { return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj); }
 }

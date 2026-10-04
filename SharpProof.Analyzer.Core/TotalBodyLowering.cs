@@ -248,14 +248,17 @@ internal static class TotalBodyLowering
     internal static bool MutatesElements(IrProgram program)
     {
         return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-            instruction is IrCallInstruction { Receiver: null, Target: null } or IrWriteInstruction { Region: IrWriteRegion.Element });
+            instruction is IrCallInstruction { Receiver: null, Target: null } or
+                IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter });
     }
 
-    // A call or an unmodeled element write may write any array.
+    // A call or an unmodeled element or field write may write any array or
+    // object.
     internal static bool UnmodeledElementWrites(IrProgram program)
     {
         return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-            instruction is IrCallInstruction { Receiver: null, Target: null } or IrWriteInstruction { Region: IrWriteRegion.Element, IsElementStore: false });
+            instruction is IrCallInstruction { Receiver: null, Target: null } or
+                IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter, IsStore: false });
     }
 
     internal static IEnumerable<IrTerm> BodyTerms(IrProgram program)

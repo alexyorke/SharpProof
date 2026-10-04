@@ -22,7 +22,7 @@ internal static class CallableReplayValidator
     {
         var final = model.ToBuilder();
         var approximationVariables = new HashSet<IrVarId>();
-        IReadOnlyDictionary<IrValue, IrValue[]>? heap = null;
+        IrHeap? heap = null;
         if (!context.IsTrivial)
         {
             if (context.Program is not { } program || !ReferenceEquals(program.Factory, factory) ||
@@ -57,7 +57,7 @@ internal static class CallableReplayValidator
             heap = execution.Heap;
             // An old element read sees the arrays as the callable entered; the
             // final heap holds only their current contents.
-            if (heap is { Count: > 0 } && (ReadsOldElements(context.Postcondition, context) ||
+            if (heap is { IsEmpty: false } && (ReadsOldElements(context.Postcondition, context) ||
                 context.PostconditionGuard is { } oldGuard && ReadsOldElements(oldGuard, context)))
             {
                 return AbstentionReason.CounterexampleNotReplayable;
@@ -170,7 +170,8 @@ internal static class CallableReplayValidator
 
     private static bool ReadsOldElements(IrTerm root, CallableReplayContext context)
     {
-        return IrTraversal.Any(root, term => term is IrSequenceAccessTerm access &&
-            IrTraversal.CollectVariables(access.Sequence).Any(variable => context.PreStateBindings.ContainsKey(variable)));
+        return IrTraversal.Any(root, term => (term is IrSequenceAccessTerm access ? access.Sequence
+                : term is IrOpaqueTerm { Receiver: { } receiver } ? receiver : null) is { } owner &&
+            IrTraversal.CollectVariables(owner).Any(variable => context.PreStateBindings.ContainsKey(variable)));
     }
 }

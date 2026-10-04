@@ -87,6 +87,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return Compose(operation, [LowerClause(conversion.Operand, state, depth + 1)]);
             case IPropertyReferenceOperation { Instance: { } receiver }:
                 return Compose(operation, [LowerClause(receiver, state, depth + 1)]);
+            case IFieldReferenceOperation { Instance: { } owner } fieldReference when !IsImplicitThis(owner) &&
+                FieldMember(fieldReference.Field) is { } member:
+                {
+                    var receiver = LowerClause(owner, state, depth + 1);
+                    return receiver.Classification.IsExact
+                        ? new(_factory.PureOpaque(member, AsObject(receiver.Value)),
+                            And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type)))),
+                            receiver.Classification)
+                        : Failed(operation, receiver.Classification.Abstention);
+                }
             case IArrayElementReferenceOperation { Indices.Length: 1 } access:
                 return Compose(operation, [LowerClause(access.ArrayReference, state, depth + 1), LowerClause(access.Indices[0], state, depth + 1)]);
             case IUnaryOperation unary:
@@ -506,6 +516,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var field = (IFieldReferenceOperation)operation.Target;
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(field.Instance);
+        // A modeled field keeps its value, so the increment is computed.
+        if (!implicitThis && field.Instance != null && !ApproximateElementReads && FieldMember(field.Field) != null)
+        { return FieldMutation(operation, field, block, 1); }
         if (!implicitThis)
         {
             if (field.Instance == null)
@@ -712,11 +725,29 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
+        if (receiver != null && !ApproximateElementReads && FieldMember(field) is { } member)
+        {
+            var read = ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.PureOpaque(member, AsObject(receiver)), receiver), block);
+            return PinElementReads && read.Classification.IsExact ? Pin(operation, read) : read;
+        }
         var value = _context.Temporary(_context.Type(field.Type));
         _builder!.Havoc(block, field.IsStatic ? _context.StaticReadSite(operation) : _context.Site(operation),
             IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
     }
+
+    // A scalar instance field of a class: its reads and stores are modeled
+    // through an object-typed receiver.
+    private IrMemberId? FieldMember(IFieldSymbol field)
+    {
+        return field.IsStatic || !field.ContainingType.IsReferenceType || !CSharpOperationSemantics.IsScalar(field.Type)
+            ? null
+            : _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, field), _factory.ObjectType,
+                IrFieldSites.Prefix + CompilerIdentityBridge.CreateSymbolDisplay(field), _context.Type(field.Type), false);
+    }
+
+    private IrTerm AsObject(IrTerm receiver)
+    { return receiver.Type == _factory.ObjectType ? receiver : _factory.Cast(_factory.ObjectType, receiver); }
 
     // A field increment or compound assignment on `this`, a parameter or a
     // local reads the field (faulting on a null receiver), computes from that
@@ -733,6 +764,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var old = FieldRead(field, field.Field, field.Instance, block, depth);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
+        if (old.Value is not IrVariableTerm)
+        { old = Pin(field, old); }
         TotalBodyValue next;
         if (operation is IIncrementOrDecrementOperation increment)
         {
@@ -760,7 +793,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
         var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        _builder!.Write(stored.Continuation, ReceiverWriteSite(operation, field.Instance), region);
+        Store(stored.Continuation, ReceiverWriteSite(operation, field.Instance), region, field.Field, receiver, next.Value);
         return operation is IIncrementOrDecrementOperation { IsPostfix: true }
             ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
             : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
@@ -790,8 +823,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.FieldWrite(_factory, right.Value, receiver), right.Continuation);
         var region = field.Field.IsStatic ? IrWriteRegion.Static :
             field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        _builder!.Write(result.Continuation, ReceiverWriteSite(assignment, field.Instance), region);
+        Store(result.Continuation, ReceiverWriteSite(assignment, field.Instance), region, field.Field, receiver, right.Value);
         return result;
+    }
+
+    // A modeled field of an explicit receiver is stored with its value; any
+    // other field write is an effect site only.
+    private void Store(IrBlockId block, OperationId site, IrWriteRegion region, IFieldSymbol field, IrTerm? receiver, IrTerm value)
+    {
+        if (receiver != null && region is IrWriteRegion.Field or IrWriteRegion.Parameter && FieldMember(field) is { } member &&
+            _factory.GetMemberInfo(member).ReturnType == value.Type)
+        { _builder!.FieldStore(block, site, region, AsObject(receiver), member, value); }
+        else
+        { _builder!.Write(block, site, region); }
     }
 
     private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
