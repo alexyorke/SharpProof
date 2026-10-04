@@ -39,6 +39,18 @@ internal static partial class CSharpOperationSemantics
         return instance is IInstanceReferenceOperation && instance.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.BaseExpressionSyntax;
     }
 
+    // The backing field a nonvirtual auto-property's setter stores.
+    internal static IFieldSymbol? SetterField(IPropertySymbol property)
+    {
+        if (property.IsIndexer || property.IsVirtual || property.IsOverride || property.IsAbstract ||
+            property.SetMethod is not { IsInitOnly: false } setter || !property.IsStatic && !property.ContainingType.IsReferenceType ||
+            setter.DeclaringSyntaxReferences.Length != 1 ||
+            setter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
+        { return null; }
+        return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+    }
+
     internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
     {
         if (property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||

@@ -641,7 +641,13 @@ modeled as above or approximated. Roslyn's flow captures of `this`, and of a fie
 assignment target, stand for that receiver and field. An instance field store
 is admitted when the type's static constructors are compiler-generated, and
 entry initialization is effect-free when such a constructor only stores scalar
-constants into readonly statics.
+constants into readonly statics. A nonvirtual auto-property's setter only
+stores its backing field, so stores, increments and compound assignments of
+such a property are those of the field, and a contract clause reading a
+property whose getter returns a field reads that field. Roslyn's null test for
+`??` and `?.` on a reference compares it with null. A metadata constructor of
+a class (`new HashSet<T>()`) evaluates its arguments, allocates the object
+and runs as an opaque call that may throw; its value is the fresh object.
 Claim lowering widens class, interface, delegate and array references to
 object implicitly (for example the receiver a `lock` hands to
 Monitor.Enter); the cast keeps the reference. A dispatched (virtual, abstract, override or interface) source call is also

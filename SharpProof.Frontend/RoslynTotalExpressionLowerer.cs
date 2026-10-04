@@ -46,6 +46,24 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
     }
 
+    // A clause's read of a modeled field: through `this` once it is modeled,
+    // else through a receiver that must not be null.
+    private GuardedExpression? FieldClause(IOperation operation, IrMemberId member, IOperation owner, TotalParameterState state, int depth)
+    {
+        if (IsImplicitThis(owner))
+        {
+            return _context.ReceiverValue(state) is { } self
+                ? new(_factory.PureOpaque(member, AsObject(self)), _factory.Boolean(true), FrontendSubsetClassification.Exact)
+                : null;
+        }
+        var receiver = LowerClause(owner, state, depth + 1);
+        return receiver.Classification.IsExact
+            ? new(_factory.PureOpaque(member, AsObject(receiver.Value)),
+                And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type)))),
+                receiver.Classification)
+            : Failed(operation, receiver.Classification.Abstention);
+    }
+
     // An instance call checks its receiver after evaluating the arguments.
     internal IrBlockId CheckReceiver(IOperation operation, IrTerm receiver, IrBlockId block)
     { return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Boolean(true), receiver), block).Continuation; }
@@ -85,21 +103,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 }
             case IConversionOperation conversion:
                 return Compose(operation, [LowerClause(conversion.Operand, state, depth + 1)]);
+            // A getter that returns a field reads that field.
+            case IPropertyReferenceOperation { Instance: { } owner, Arguments.Length: 0 } property when
+                CSharpOperationSemantics.GetterField(property.Property, CSharpOperationSemantics.IsBaseAccess(owner)) is { } backing &&
+                FieldMember(backing) is { } member && FieldClause(operation, member, owner, state, depth) is { } propertyRead:
+                return propertyRead;
             case IPropertyReferenceOperation { Instance: { } receiver }:
                 return Compose(operation, [LowerClause(receiver, state, depth + 1)]);
-            case IFieldReferenceOperation { Instance: { } owner } fieldReference when IsImplicitThis(owner) &&
-                _context.ReceiverValue(state) is { } self && FieldMember(fieldReference.Field) is { } member:
-                return new(_factory.PureOpaque(member, AsObject(self)), _factory.Boolean(true), FrontendSubsetClassification.Exact);
-            case IFieldReferenceOperation { Instance: { } owner } fieldReference when !IsImplicitThis(owner) &&
-                FieldMember(fieldReference.Field) is { } member:
-                {
-                    var receiver = LowerClause(owner, state, depth + 1);
-                    return receiver.Classification.IsExact
-                        ? new(_factory.PureOpaque(member, AsObject(receiver.Value)),
-                            And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type)))),
-                            receiver.Classification)
-                        : Failed(operation, receiver.Classification.Abstention);
-                }
+            case IFieldReferenceOperation { Instance: { } owner } fieldReference when FieldMember(fieldReference.Field) is { } member &&
+                FieldClause(operation, member, owner, state, depth) is { } read:
+                return read;
             case IArrayElementReferenceOperation { Indices.Length: 1 } access:
                 return Compose(operation, [LowerClause(access.ArrayReference, state, depth + 1), LowerClause(access.Indices[0], state, depth + 1)]);
             case IUnaryOperation unary:
@@ -180,6 +193,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
             SourceConstruction?.Invoke(sourceCreation, block, depth) is { } constructed)
         { return constructed; }
+        if (depth < 256 && operation is IObjectCreationOperation opaqueCreation &&
+            !CSharpOperationSemantics.IsCoreExceptionCreation(opaqueCreation) &&
+            OpaqueConstruction(opaqueCreation, block, depth) is { } opaquelyConstructed)
+        { return opaquelyConstructed; }
         if (depth < 256 && operation is IObjectCreationOperation exceptionCreation &&
             CSharpOperationSemantics.IsCoreExceptionCreation(exceptionCreation))
         {
@@ -321,6 +338,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             (incrementedField.Target as IFieldReferenceOperation ?? _context.CapturedField(incrementedField.Target)) is { } incrementTarget &&
             IsMutableField(incrementTarget))
         { return FieldMutation(operation, incrementTarget, block, depth, captured: incrementedField.Target is not IFieldReferenceOperation); }
+        // A nonvirtual auto-property's setter only stores its backing field.
+        if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation { Arguments.Length: 0 } setProperty } propertyStore &&
+            CSharpOperationSemantics.SetterField(setProperty.Property) is { } setField &&
+            CSharpOperationSemantics.IsSupportedFieldWrite(setField, _context.Target.ContainingAssembly))
+        { return FieldWrite(propertyStore, setField, setProperty.Instance, block, depth); }
+        if (depth < 256 && operation is IIncrementOrDecrementOperation { Target: IPropertyReferenceOperation { Arguments.Length: 0 } incrementedProperty } &&
+            CSharpOperationSemantics.SetterField(incrementedProperty.Property) is { } incrementedBacking &&
+            IsMutableField(incrementedBacking, incrementedProperty.Instance))
+        { return FieldMutation(operation, incrementedProperty, incrementedBacking, incrementedProperty.Instance, block, depth); }
+        if (depth < 256 && operation is ICompoundAssignmentOperation { Target: IPropertyReferenceOperation { Arguments.Length: 0 } compoundedProperty } &&
+            CSharpOperationSemantics.SetterField(compoundedProperty.Property) is { } compoundedBacking &&
+            IsMutableField(compoundedBacking, compoundedProperty.Instance))
+        { return FieldMutation(operation, compoundedProperty, compoundedBacking, compoundedProperty.Instance, block, depth); }
         if (depth < 256 && operation is ICompoundAssignmentOperation compoundedField &&
             (compoundedField.Target as IFieldReferenceOperation ?? _context.CapturedField(compoundedField.Target)) is { } compoundTarget &&
             IsMutableField(compoundTarget))
@@ -340,6 +370,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IPropertyReferenceOperation { Arguments.Length: 0 } propertyRead &&
             CSharpOperationSemantics.GetterField(propertyRead.Property, CSharpOperationSemantics.IsBaseAccess(propertyRead.Instance)) is { } getterField)
         { return FieldRead(operation, getterField, propertyRead.Instance, block, depth); }
+        // Roslyn's null test for `??` and `?.` on a reference compares it with
+        // null; it runs no code.
+        if (depth < 256 && operation is IIsNullOperation { Operand: var nullable } && CSharpOperationSemantics.IsReferenceDomain(nullable.Type))
+        {
+            var value = LowerBodyValue(nullable, block, depth + 1);
+            return value.Classification.IsExact
+                ? new(_factory.Binary(IrBinaryOperator.Equal, value.Value, _factory.Null(value.Value.Type)), value.Continuation,
+                    FrontendSubsetClassification.Exact)
+                : value;
+        }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -609,6 +649,44 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
     }
 
+    // `new T(arguments)` with a metadata constructor evaluates its arguments,
+    // allocates the object and runs the constructor as an opaque call, which
+    // may throw. Its value is the fresh object.
+    private TotalBodyValue? OpaqueConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
+    {
+        if (!AllowOpaqueCalls || creation.Constructor is not { } constructor || !constructor.DeclaringSyntaxReferences.IsEmpty ||
+            creation.Initializer != null || creation.Type is not { IsReferenceType: true } type ||
+            !CSharpOperationSemantics.IsValueDomain(type) || _factory.GetTypeInfo(_context.Type(type)).Kind != IrTypeKind.Reference ||
+            IsSharpProofApi(constructor.ContainingNamespace) ||
+            constructor.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+            creation.Arguments.Any(argument => argument.Parameter == null ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
+        { return null; }
+        var values = new IrTerm[creation.Arguments.Length];
+        foreach (var argument in creation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
+        {
+            var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(creation, lowered.Continuation, lowered.Classification.Abstention); }
+            values[creation.Arguments.IndexOf(argument)] = lowered.Value;
+            block = lowered.Continuation;
+        }
+        var created = AllocateValue(creation, block);
+        var display = CompilerIdentityBridge.CreateSymbolDisplay(constructor);
+        var member = _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, constructor), _context.Type(constructor.ContainingType),
+            "opaque-call:" + display, _factory.BooleanType, true, [.. values.Select(value => value.Type)]);
+        var effects = OpaqueEffects?.Invoke(constructor) ?? IrOpaqueCallEffects.All;
+        _builder!.Call(created.Continuation, _context.OpaqueCallSite(creation, effects, display), null, member, null, values);
+        ImmutableArray<TotalThrow> faults = [];
+        if ((effects & IrOpaqueCallEffects.Throws) != 0)
+        {
+            var throws = _context.Temporary(_factory.BooleanType);
+            _builder.Havoc(created.Continuation, _context.Site(creation), IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
+            faults = [new(IrExceptionKind.Unknown, _factory.Variable(throws))];
+        }
+        return ApplyRule(creation, new TotalScalarRule(created.Value, faults, FrontendSubsetClassification.Exact), created.Continuation);
+    }
+
     // An element read, store, increment or compound assignment. The array and
     // indexes evaluate first. A store evaluates its value before the null and
     // bounds checks; an increment or compound assignment checks first. The
@@ -762,20 +840,28 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // local reads the field (faulting on a null receiver), computes from that
     // approximated value, and writes it back.
     private bool IsMutableField(IFieldReferenceOperation field)
+    { return IsMutableField(field.Field, field.Instance); }
+
+    private bool IsMutableField(IFieldSymbol field, IOperation? instance)
     {
-        return CSharpOperationSemantics.IsSupportedFieldRead(field.Field) &&
-            CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) &&
-            (IsImplicitThis(field.Instance) || field.Instance is IParameterReferenceOperation or ILocalReferenceOperation);
+        return CSharpOperationSemantics.IsSupportedFieldRead(field) &&
+            CSharpOperationSemantics.IsSupportedFieldWrite(field, _context.Target.ContainingAssembly) &&
+            (IsImplicitThis(instance) || instance is IParameterReferenceOperation or ILocalReferenceOperation);
     }
 
     private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth,
         bool captured = false)
+    { return FieldMutation(operation, field, field.Field, field.Instance, block, depth, captured); }
+
+    // `access` is the field or auto-property reference being mutated.
+    private TotalBodyValue FieldMutation(IOperation operation, IOperation access, IFieldSymbol field, IOperation? instance,
+        IrBlockId block, int depth, bool captured = false)
     {
-        var old = FieldRead(field, field.Field, field.Instance, block, depth, captured);
+        var old = FieldRead(access, field, instance, block, depth, captured);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
         if (old.Value is not IrVariableTerm)
-        { old = Pin(field, old); }
+        { old = Pin(access, old); }
         TotalBodyValue next;
         if (operation is IIncrementOrDecrementOperation increment)
         {
@@ -796,15 +882,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             next = ApplyRule(operation, rule, right.Continuation);
         }
         IrTerm? receiver = null;
-        if (!IsImplicitThis(field.Instance))
-        {
-            var instance = LowerBodyValue(field.Instance!, next.Continuation, depth + 1);
-            receiver = instance.Value;
-        }
+        if (!IsImplicitThis(instance))
+        { receiver = LowerBodyValue(instance!, next.Continuation, depth + 1).Value; }
         var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
-        var region = field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        Store(stored.Continuation, ReceiverWriteSite(operation, field.Instance), region, field.Field,
-            receiver ?? (captured ? null : ImplicitReceiver(field.Instance)), next.Value);
+        var region = instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+        Store(stored.Continuation, ReceiverWriteSite(operation, instance), region, field,
+            receiver ?? (captured ? null : ImplicitReceiver(instance)), next.Value);
         return operation is IIncrementOrDecrementOperation { IsPostfix: true }
             ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
             : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
@@ -812,18 +895,22 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldReferenceOperation field, IrBlockId block, int depth, bool captured = false)
+    { return FieldWrite(assignment, field.Field, field.Instance, block, depth, captured); }
+
+    private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
+        IFieldSymbol field, IOperation? instance, IrBlockId block, int depth, bool captured = false)
     {
         IrTerm? receiver = null;
-        var implicitThis = IsImplicitThis(field.Instance);
-        if (!field.Field.IsStatic && !implicitThis)
+        var implicitThis = IsImplicitThis(instance);
+        if (!field.IsStatic && !implicitThis)
         {
-            if (field.Instance == null)
+            if (instance == null)
             { return Approximate(assignment, block, FrontendAbstention.UnsupportedOperationKind); }
-            var instance = LowerBodyValue(field.Instance, block, depth + 1);
-            if (!instance.Classification.IsExact)
-            { return Approximate(assignment, instance.Continuation, instance.Classification.Abstention); }
-            receiver = instance.Value;
-            block = instance.Continuation;
+            var lowered = LowerBodyValue(instance, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(assignment, lowered.Continuation, lowered.Classification.Abstention); }
+            receiver = lowered.Value;
+            block = lowered.Continuation;
         }
         // C# captures the receiver before evaluating the RHS, but faults on a
         // null receiver only after the RHS has finished evaluating.
@@ -832,10 +919,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return right; }
         var result = ApplyRule(assignment,
             CSharpOperationSemantics.FieldWrite(_factory, right.Value, receiver), right.Continuation);
-        var region = field.Field.IsStatic ? IrWriteRegion.Static :
-            field.Instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        Store(result.Continuation, ReceiverWriteSite(assignment, field.Instance), region, field.Field,
-            receiver ?? (captured ? null : ImplicitReceiver(field.Instance)), right.Value);
+        var region = field.IsStatic ? IrWriteRegion.Static :
+            instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+        Store(result.Continuation, ReceiverWriteSite(assignment, instance), region, field,
+            receiver ?? (captured ? null : ImplicitReceiver(instance)), right.Value);
         return result;
     }
 
@@ -1100,7 +1187,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (admission == TotalOperationAdmission.Incomplete)
         {
             // `this` is a value only once the receiver is modeled.
-            if ((operation is not IPropertyReferenceOperation property || !CSharpOperationSemantics.IsLength(property)) &&
+            if ((operation is not IPropertyReferenceOperation property || !CSharpOperationSemantics.IsLength(property) &&
+                    !(property is { Instance: { } owner, Arguments.Length: 0 } &&
+                        CSharpOperationSemantics.GetterField(property.Property, CSharpOperationSemantics.IsBaseAccess(owner)) is { } backing &&
+                        FieldMember(backing) != null)) &&
                 (operation is not IInstanceReferenceOperation self || !IsImplicitThis(self) || _context.ThisValue() == null))
             { return FrontendAbstention.UnsupportedOperationKind; }
         }

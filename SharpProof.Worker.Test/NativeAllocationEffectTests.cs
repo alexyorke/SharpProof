@@ -73,6 +73,8 @@ public sealed class NativeAllocationEffectTests
     [TestCase("object[] values = new object[] { null }; return values.Length;", false)]
     [TestCase("Contract.Requires(x >= 0); int[] values = new int[x]; return x;", false)]
     [TestCase("Contract.Requires(x != 0); if (x == 0) { int[] values = new int[x]; } return x;", true)]
+    [TestCase("new System.Text.StringBuilder(); return x;", false)]
+    [TestCase("Contract.Requires(x != 0); if (x == 0) { new System.Text.StringBuilder(); } return x;", true)]
     [TestCase("while (x > 0) { int[] values = new int[x]; x--; } return x;", false)]
     [TestCase("while (x > 0) { int[] values = new int[] { 1, -2 }; x--; } return x;", false)]
     [TestCase("return string.Concat(x == 0 ? \"\" : \"a\", \"b\").Length;", false)]
@@ -112,7 +114,6 @@ public sealed class NativeAllocationEffectTests
     [TestCase("", "return ((x == 0 ? \"a\" : \"b\") + (x == 0 ? \"c\" : \"d\") + (x == 0 ? \"e\" : \"f\") + (x == 0 ? \"g\" : \"h\") + (x == 0 ? \"i\" : \"j\")).Length;")]
     [TestCase("", "throw null;")]
     [TestCase("", "try { return 10 / x; } catch (System.DivideByZeroException) { return x; }")]
-    [TestCase("", "new System.Text.StringBuilder(); return x;")]
     public async Task MissingImplicitAllocationOrInitializationRowsAbstain(string members, string body)
     {
         var preparation = Prepare("using SharpProof.Attributes; public static class C { " + members +

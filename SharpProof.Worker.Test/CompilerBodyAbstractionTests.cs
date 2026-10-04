@@ -17,7 +17,7 @@ public sealed class CompilerBodyAbstractionTests
                 Contract.Requires(x >= 0);
                 Contract.Ensures(Contract.Result<int>() == Contract.Result<int>());
                 Contract.Ensures(Contract.Result<int>() == x);
-                var unsupported = new System.Random(x);
+                var unsupported = 1.5 * x;
                 throw null!;
             }
         }
@@ -32,7 +32,7 @@ public sealed class CompilerBodyAbstractionTests
             public static class Subject { public static void Target() {
                 Contract.Ensures(true);
                 Contract.Ensures(false);
-                var unsupported = new System.Random(1);
+                var unsupported = 0; System.Threading.Interlocked.Increment(ref unsupported);
                 throw null!;
             } }
             """ : Source;
