@@ -6,9 +6,10 @@ internal static class LoopInvariantCandidates
 {
     internal const int MaximumPerLoop = 48;
 
-    // Each integer the loop carries is compared with the integers it reads but
-    // does not write, the other integers it carries, zero and the constants of
-    // its conditions; each boolean it carries is guessed true and false.
+    // Each integer the loop carries (in a variable or a field it stores to) is
+    // compared with the integers it reads but does not write, the other
+    // integers it carries, zero and the constants of its conditions; each
+    // boolean it carries is guessed true and false.
     internal static ImmutableArray<PassiveLoopCutter.Invariant> Generate(PassiveCallableCandidate candidate,
         ImmutableArray<PassiveLoopCutter.Loop> loops, CancellationToken cancellationToken)
     {
@@ -18,10 +19,10 @@ internal static class LoopInvariantCandidates
         {
             var (tracked, anchors) = State(candidate, loop, cancellationToken);
             var conditions = new List<IrTerm>();
-            foreach (var variable in tracked)
+            for (var ordinal = 0; ordinal < tracked.Length; ordinal++)
             {
-                var type = factory.GetVariableInfo(variable).Type;
-                var value = factory.Variable(variable);
+                var value = tracked[ordinal];
+                var type = value.Type;
                 if (type == factory.BooleanType)
                 {
                     conditions.Add(value);
@@ -30,8 +31,7 @@ internal static class LoopInvariantCandidates
                 }
                 if (factory.GetTypeInfo(type) is not { Kind: IrTypeKind.Integer, Width: > 0 })
                 { continue; }
-                var others = anchors.Concat(tracked.Where(other => other.Value > variable.Value)
-                    .Select(other => factory.Variable(other))).Append(factory.Integer(type, 0L));
+                var others = anchors.Concat(tracked.Skip(ordinal + 1)).Append(factory.Integer(type, 0L));
                 foreach (var other in others.Where(other => other.Type == type).Distinct())
                 {
                     conditions.Add(factory.Binary(IrBinaryOperator.LessThanOrEqual, value, other));
@@ -45,10 +45,11 @@ internal static class LoopInvariantCandidates
         return invariants.ToImmutable();
     }
 
-    // The state a loop carries (its writes that are also set before it) and
-    // its anchors (what it reads but does not write, and its conditions'
+    // The state a loop carries (its writes that are also set before it, and
+    // the fields it stores to) and its anchors (what it reads but does not
+    // write, those fields as the callable entered, and its conditions'
     // constants).
-    internal static (IrVarId[] Tracked, IrTerm[] Anchors) State(PassiveCallableCandidate candidate,
+    internal static (IrTerm[] Tracked, IrTerm[] Anchors) State(PassiveCallableCandidate candidate,
         PassiveLoopCutter.Loop loop, CancellationToken cancellationToken)
     {
         var factory = candidate.Factory;
@@ -94,8 +95,15 @@ internal static class LoopInvariantCandidates
                 { entering.Add(assign.Target); }
             }
         }
+        // A field read through an input's Old snapshot is its entry value.
+        var snapshots = candidate.Parameters.SelectMany(parameter => new[]
+        {
+            (parameter.Entry, (IrTerm)factory.Variable(parameter.Old)), (parameter.Current, factory.Variable(parameter.Old))
+        }).ToDictionary(pair => pair.Item1, pair => pair.Item2);
+        var entered = loop.Fields.Select(field => IrSubstitution.Substitute(factory, field, snapshots)).Where(field => !loop.Fields.Contains(field));
         var anchors = read.Where(variable => !written.Contains(variable)).OrderBy(variable => variable.Value)
-            .Select(variable => factory.Variable(variable)).Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
-        return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.Value)], anchors);
+            .Select(variable => (IrTerm)factory.Variable(variable)).Concat(entered).Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
+        return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.Value)
+            .Select(variable => (IrTerm)factory.Variable(variable)).Concat(loop.Fields)], anchors);
     }
 }

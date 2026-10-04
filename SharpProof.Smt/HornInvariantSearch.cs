@@ -36,6 +36,7 @@ public static class HornInvariantSearch
         private readonly Dictionary<string, IrTerm> _names = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
+        private readonly Dictionary<uint, Expr> _unknowns = [];
         private FuncDecl? _error;
 
         internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
@@ -85,7 +86,8 @@ public static class HornInvariantSearch
 
         // The unbounded integer reading of a bitvector formula: arithmetic does
         // not wrap and comparisons ignore signedness; an operation with no
-        // integer reading is a fresh unknown.
+        // integer reading (a field read, a reference comparison) is an
+        // unknown, the same one wherever the operation recurs.
         private Expr Integer(Expr expression)
         {
             _meter.Consume();
@@ -122,7 +124,16 @@ public static class HornInvariantSearch
             }
             if (!expression.IsApp)
             { throw new UnsupportedIrEncodingException(); }
+            if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
+            { return Unknown(expression); }
             var operands = expression.Args.Select(Integer).ToArray();
+            if (expression.FuncDecl.DeclKind is Z3_decl_kind.Z3_OP_EQ or Z3_decl_kind.Z3_OP_DISTINCT &&
+                operands.Any(operand => !operand.Sort.Equals(context.BoolSort) && operand.Sort is not IntSort))
+            {
+                return operands.Length == 2 && operands[0].Equals(operands[1])
+                    ? Own(expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_EQ ? context.MkTrue() : context.MkFalse())
+                    : Unknown(expression);
+            }
             var numbers = operands.OfType<ArithExpr>().ToArray();
             var arithmetic = numbers.Length == operands.Length && operands.Length != 0;
             Expr? result = expression.FuncDecl.DeclKind switch
@@ -147,11 +158,18 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_SGT or Z3_decl_kind.Z3_OP_UGT when arithmetic => context.MkGt(numbers[0], numbers[1]),
                 _ => null
             };
-            if (result != null)
+            if (result != null && (result.Sort.Equals(context.BoolSort) || result.Sort is IntSort || ReferenceEquals(result, expression)))
             { return ReferenceEquals(result, expression) ? expression : Own(result); }
-            var unknown = "unknown" + _integers.Count.ToString(CultureInfo.InvariantCulture);
-            var fresh = expression.Sort is BitVecSort ? Own(context.MkIntConst(unknown)) : Own(context.MkConst(unknown, expression.Sort));
-            _integers.Add(unknown, fresh);
+            return Unknown(expression);
+        }
+
+        private Expr Unknown(Expr expression)
+        {
+            if (_unknowns.TryGetValue(expression.Id, out var known))
+            { return known; }
+            var name = "unknown" + _unknowns.Count.ToString(CultureInfo.InvariantCulture);
+            Expr fresh = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
+            _unknowns.Add(expression.Id, fresh);
             return fresh;
         }
 

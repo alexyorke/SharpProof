@@ -295,7 +295,8 @@ internal sealed class PassiveCallableVcBuilder
                         _locks.Add((reach, synchronization.Operation));
                         break;
                     case IrWriteInstruction write:
-                        _writes.Add((reach, write.Operation, IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local));
+                        if (!IrWriteSites.IsLoopCell(_factory, write))
+                        { _writes.Add((reach, write.Operation, IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local)); }
                         if (write is { Target: { } stored, Value: { } storedValue })
                         {
                             IrTerm? storedPosition = null;
@@ -547,9 +548,10 @@ internal sealed class PassiveCallableVcBuilder
             var field = (IrOpaqueTerm)original;
             var receiver = rewritten(field.Receiver!);
             Spend(heap.Stores.Length);
-            // An old value reads the objects as the callable entered.
+            // A read through an Old snapshot sees the objects as the callable
+            // entered; only clauses and loop invariants read through one.
             var entry = _factory.PureOpaque(field.Member, receiver);
-            if (postcondition && IrTraversal.CollectVariables(field.Receiver!).Any(_oldInputs.ContainsKey))
+            if (IrTraversal.CollectVariables(field.Receiver!).Any(_oldInputs.ContainsKey))
             { return entry; }
             IrTerm read = heap.Forgotten ? Fresh(original.Type) : entry;
             foreach (var store in heap.Stores)
@@ -566,7 +568,7 @@ internal sealed class PassiveCallableVcBuilder
         {
             Spend(heap.Stores.Length);
             // An old value reads the arrays as the callable entered.
-            if (postcondition && IrTraversal.CollectVariables(original.Sequence).Any(_oldInputs.ContainsKey))
+            if (IrTraversal.CollectVariables(original.Sequence).Any(_oldInputs.ContainsKey))
             { return _factory.SequenceAccess(sequence, index); }
             IrTerm read = heap.Forgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)

@@ -377,8 +377,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         foreach (var loop in PassiveLoopCutter.Loops(candidate, cancellationToken))
         {
             var (tracked, anchors) = LoopInvariantCandidates.State(candidate, loop, cancellationToken);
-            ImmutableArray<IrTerm> state = [.. tracked.Select(variable => (IrTerm)factory.Variable(variable))
-                .Concat(anchors.OfType<IrVariableTerm>()).Distinct()
+            ImmutableArray<IrTerm> state = [.. tracked.Concat(anchors.Where(anchor => anchor is not IrIntegerTerm)).Distinct()
                 .Where(term => factory.GetTypeInfo(term.Type) is { Kind: IrTypeKind.Boolean } or { Kind: IrTypeKind.Integer, Width: > 0 })];
             if (state.IsEmpty)
             { continue; }

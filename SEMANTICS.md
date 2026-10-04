@@ -429,7 +429,16 @@ cannot change them. A postcondition reads the final contents, and
 `Contract.Old` reads the entry contents, in replay as in the verification
 condition. A call, an unmodeled
 element write or a loop that stores elements forgets the contents: later
-reads are unknown until stored again.
+reads are unknown until stored again. A loop whose every heap store is a
+field store through a receiver over inputs it does not write (`this`, a
+parameter, or a copy of one) forgets only those fields at its header: the cut
+stores an unknown value into each, which is no write of the program, and other
+fields keep their contents. Those fields join the loop's invariant candidates,
+compared with its counters and with their entry values (a read through an Old
+snapshot, which in invariants as in clauses sees the entry contents), and
+they are part of the state Spacer reasons about, where a field read or a
+reference comparison is an unknown: `count == Old(count) + i` proves
+`count == Old(count) + n` after a loop that increments `count` n times.
 
 Scalar and reference (object, string and array) instance fields of classes,
 read and stored through a parameter, a local or `this`, follow the same model. A field read is a

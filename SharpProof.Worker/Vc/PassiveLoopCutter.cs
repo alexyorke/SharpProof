@@ -14,6 +14,13 @@ internal sealed partial class PassiveLoopCutter
     private readonly HashSet<IrBlockId> _reachable = [];
     private readonly List<IrBlockId> _finished = [];
     private readonly Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc = [];
+    // The field stores of each loop whose every heap store is one of them,
+    // through a receiver over inputs; any other heap store forgets the heap.
+    private readonly Dictionary<IrBlockId, ImmutableArray<Cell>?> _cells = [];
+
+    // A location a loop stores to: its receiver over inputs the loop does not
+    // write, the field, and a store that writes it.
+    private sealed record Cell(IrTerm Target, IrMemberId Field, IrWriteInstruction Store);
     private readonly Dictionary<IrBlockId, ExceptionComponent> _exceptionComponents = [];
     private ImmutableArray<Invariant> _invariants = [];
 
@@ -27,8 +34,10 @@ internal sealed partial class PassiveLoopCutter
             ImmutableDictionary<IrInstructionId, int>.Empty;
     }
 
-    // A natural loop: its header, its blocks and the variables it writes.
-    internal sealed record Loop(IrBlockId Header, ImmutableHashSet<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes);
+    // A natural loop: its header, its blocks, the variables it writes and the
+    // fields it stores to, read at the header.
+    internal sealed record Loop(IrBlockId Header, ImmutableHashSet<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes,
+        ImmutableArray<IrTerm> Fields);
 
     // An invariant assumed at a loop header once its writes are cut.
     internal sealed record Invariant(IrBlockId Header, IrTerm Condition);
@@ -62,7 +71,9 @@ internal sealed partial class PassiveLoopCutter
         {
             return cutter.FindLoops()
                 ? [.. cutter._loops.OrderBy(loop => loop.Key.Value).Select(loop =>
-                    new Loop(loop.Key, [.. loop.Value], cutter._havoc[loop.Key]))]
+                    new Loop(loop.Key, [.. loop.Value], cutter._havoc[loop.Key], cutter._cells[loop.Key] is { } cells
+                        ? [.. cells.Select(cell => (IrTerm)candidate.Factory.PureOpaque(cell.Field, cell.Target))]
+                        : []))]
                 : [];
         }
         catch (ConstructionLimitException)
@@ -159,8 +170,38 @@ internal sealed partial class PassiveLoopCutter
                 { Spend(); pending.Push(predecessor); }
             }
         }
+        var inputs = _candidate.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old }).ToHashSet();
         foreach (var (header, nodes) in _loops)
-        { Spend(); _havoc.Add(header, WrittenVariables(nodes)); }
+        {
+            Spend();
+            var written = WrittenVariables(nodes);
+            _havoc.Add(header, written);
+            var instructions = nodes.SelectMany(node => _candidate.Program.GetBlock(node).Instructions).ToArray();
+            Spend(instructions.Length);
+            // A variable the loop only ever sets to one unwritten input is that
+            // input wherever the loop reads it.
+            var copies = new Dictionary<IrVarId, IrTerm>();
+            foreach (var group in instructions.SelectMany(IrInstructionFacts.WrittenVariables).Distinct()
+                .Select(variable => (Variable: variable, Writers: instructions.Where(instruction => IrInstructionFacts.WrittenVariables(instruction).Contains(variable)).ToArray())))
+            {
+                Spend(group.Writers.Length);
+                if (group.Writers.All(writer => writer is IrAssignInstruction { Value: IrVariableTerm source } &&
+                        inputs.Contains(source.Variable) && !written.Contains(source.Variable)) &&
+                    group.Writers.Select(writer => ((IrVariableTerm)((IrAssignInstruction)writer).Value).Variable).Distinct().Count() == 1)
+                { copies.Add(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
+            }
+            var cells = new List<Cell>();
+            foreach (var write in instructions.OfType<IrWriteInstruction>()
+                .Where(write => write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown))
+            {
+                var target = write.IsFieldStore ? IrSubstitution.Substitute(_candidate.Factory, write.Target!, copies) : null;
+                if (target == null || !IrTraversal.CollectVariables(target).All(variable => inputs.Contains(variable) && !written.Contains(variable)))
+                { cells = null; break; }
+                if (!cells.Any(cell => cell.Target.Id == target.Id && cell.Field == write.Field!.Value))
+                { cells.Add(new(target, write.Field!.Value, write)); }
+            }
+            _cells.Add(header, cells == null ? null : [.. cells]);
+        }
         return true;
     }
 
@@ -207,16 +248,29 @@ internal sealed partial class PassiveLoopCutter
             var source = _candidate.Program.GetBlock(original);
             if (!unroll && _havoc.TryGetValue(original, out var writes))
             {
-                // A loop that stores elements or fields also forgets heap contents.
-                var memory = _loops[original].Any(node => _candidate.Program.GetBlock(node).Instructions
-                    .Any(instruction => instruction is IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter }));
-                if (writes.Length != 0 || memory)
+                // A loop that stores only to fixed fields forgets those; any
+                // other heap store forgets all heap contents.
+                var cells = _cells[original];
+                var memory = cells == null;
+                var values = cells is { } stored
+                    ? [.. stored.Select(cell => _candidate.Factory.CreateVariable("loop:cell", cell.Store.Value!.Type))]
+                    : Array.Empty<IrVarId>();
+                if (writes.Length != 0 || memory || values.Length != 0)
                 {
-                    Spend(writes.Length);
+                    Spend(writes.Length + values.Length);
                     Count();
                     builder.Havoc(encoded, source.Instructions[0].Operation,
                         memory ? writes.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
-                        IrHavocOrigin.Approximation, [.. writes]);
+                        IrHavocOrigin.Approximation, [.. writes, .. values]);
+                }
+                for (var ordinal = 0; ordinal < values.Length; ordinal++)
+                {
+                    Count();
+                    var cell = cells!.Value[ordinal];
+                    builder.FieldStore(encoded, _candidate.Factory.CreateOperation(IrWriteSites.LoopCellPrefix +
+                        original.Value.ToString(CultureInfo.InvariantCulture), _candidate.Factory.GetOperationInfo(cell.Store.Operation).SourceSpan),
+                        cell.Store.Region == IrWriteRegion.Parameter ? IrWriteRegion.Parameter : IrWriteRegion.Field, cell.Target, cell.Field,
+                        _candidate.Factory.Variable(values[ordinal]));
                 }
             }
             if (!unroll)
