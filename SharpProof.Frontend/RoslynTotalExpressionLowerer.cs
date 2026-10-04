@@ -239,6 +239,17 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         // A constructor's call to object's constructor does nothing.
         if (CSharpOperationSemantics.IsObjectConstructorCall(operation))
         { return new(_factory.Boolean(false), block, FrontendSubsetClassification.Exact); }
+        if (depth < 256 && operation is IInvocationOperation { Instance: { } equalsReceiver, Arguments.Length: 1 } instanceEquals &&
+            CSharpOperationSemantics.IsStringInstanceEqualsCall(instanceEquals.TargetMethod))
+        {
+            var receiver = LowerBodyValue(equalsReceiver, block, depth + 1);
+            if (!receiver.Classification.IsExact)
+            { return receiver; }
+            var argument = LowerBodyValue(instanceEquals.Arguments[0].Value, receiver.Continuation, depth + 1);
+            if (!argument.Classification.IsExact)
+            { return argument; }
+            return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
+        }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
@@ -766,6 +777,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private GuardedExpression? StringEqualsClause(IInvocationOperation invocation, TotalParameterState state, int depth)
     {
+        if (invocation is { Instance: { } instance, Arguments.Length: 1 } &&
+            CSharpOperationSemantics.IsStringInstanceEqualsCall(invocation.TargetMethod))
+        {
+            var receiver = LowerClause(instance, state, depth + 1);
+            var argument = LowerClause(invocation.Arguments[0].Value, state, depth + 1);
+            return Compose(invocation, receiver, argument,
+                CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value));
+        }
         if (!CSharpOperationSemantics.IsStringEqualsCall(invocation.TargetMethod) || invocation.Arguments.Length != 2)
         { return null; }
         var arguments = new GuardedExpression[2];
@@ -776,6 +795,17 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             ? new(_factory.Binary(IrBinaryOperator.StringEquals, arguments[0].Value, arguments[1].Value),
                 And(arguments[0].SafeCondition, arguments[1].SafeCondition), classification)
             : Failed(invocation, classification.Abstention);
+    }
+
+    private GuardedExpression Compose(IOperation operation, GuardedExpression receiver, GuardedExpression argument, TotalScalarRule rule)
+    {
+        var classification = First(receiver.Classification, argument.Classification);
+        if (!classification.IsExact)
+        { return Failed(operation, classification.Abstention); }
+        var safe = And(receiver.SafeCondition, argument.SafeCondition);
+        foreach (var fault in rule.Throws)
+        { safe = And(safe, Not(fault.Condition)); }
+        return new(rule.Value, safe, rule.Classification);
     }
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)

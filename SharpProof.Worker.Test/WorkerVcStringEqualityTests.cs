@@ -63,6 +63,19 @@ public sealed class WorkerVcStringEqualityTests
                 Contract.Ensures(Contract.Result<string>().Length == 3);
                 return value;
             }
+            public static bool InstanceEquals(string left, string? right) {
+                Contract.Ensures(Contract.Result<bool>() == (left == right));
+                return left.Equals(right);
+            }
+            [DoesNotThrow]
+            public static bool InstanceEqualsMayThrow(string left) => left.Equals("x");
+            [DoesNotThrow]
+            public static bool InstanceEqualsOnNonNull([NotNull] string left) => left.Equals("x");
+            public static string InstanceEqualsInClause(string value) {
+                Contract.Requires(value.Equals("abc"));
+                Contract.Ensures(Contract.Result<string>().Length == 3);
+                return value;
+            }
             public static bool PrefixedLength(string name) {
                 Contract.Requires(name == "ab");
                 Contract.Ensures(Contract.Result<bool>());
@@ -93,6 +106,10 @@ public sealed class WorkerVcStringEqualityTests
     [TestCase("WrongGreeting", WorkerClaimOutcome.Refuted)]
     [TestCase("StaticEquals", WorkerClaimOutcome.Proven)]
     [TestCase("EqualsInClause", WorkerClaimOutcome.Proven)]
+    [TestCase("InstanceEquals", WorkerClaimOutcome.Proven)]
+    [TestCase("InstanceEqualsMayThrow", WorkerClaimOutcome.Refuted)]
+    [TestCase("InstanceEqualsOnNonNull", WorkerClaimOutcome.Proven)]
+    [TestCase("InstanceEqualsInClause", WorkerClaimOutcome.Proven)]
     public void ContentEqualityIsDecided(string method, WorkerClaimOutcome expected)
     {
         var claim = Claim(method);

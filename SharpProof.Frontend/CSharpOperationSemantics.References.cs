@@ -129,6 +129,24 @@ internal static partial class CSharpOperationSemantics
                 parameter.Type.SpecialType == SpecialType.System_String);
     }
 
+    // The framework's instance string.Equals(string): content equality, with a
+    // NullReference fault on a null receiver once the argument is evaluated.
+    internal static bool IsStringInstanceEqualsCall(IMethodSymbol method)
+    {
+        return !method.IsStatic && method.Name == "Equals" &&
+            method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+            method.ContainingType.SpecialType == SpecialType.System_String &&
+            method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.None &&
+            method.Parameters[0].Type.SpecialType == SpecialType.System_String;
+    }
+
+    internal static TotalScalarRule StringInstanceEquals(IrFactory factory, IrTerm receiver, IrTerm argument)
+    {
+        return new(factory.Binary(IrBinaryOperator.StringEquals, receiver, argument),
+            [new(IrExceptionKind.NullReference, factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type)))],
+            FrontendSubsetClassification.Exact);
+    }
+
     internal static (IOperation Left, IOperation Right) EqualityOperands(IBinaryOperation operation)
     {
         if (operation.OperatorMethod != null || operation.IsLifted ||
