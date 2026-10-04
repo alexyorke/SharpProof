@@ -136,7 +136,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
         Func<IrBlockId, IrBlockId>? prelude = null)
     {
-        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null))
+        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null) &&
+            !(_expressions.AllowOpaqueCalls && _calls.IsActive(method) &&
+                _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true)))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);
@@ -216,6 +218,14 @@ internal sealed partial class RoslynTotalProgramLowerer
                 CompilerIdentityBridge.CreateSymbolDisplay(callee.Target), callSpan));
         }
         RecordCallPreconditions(callee, arguments, block, site, callAncestry);
+        // A recursive call checks its callee's preconditions, then runs the
+        // callee as an unknown call: it may do anything, throw included.
+        if (graph == null)
+        {
+            var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
+                IrOpaqueCallEffects.All);
+            return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
+        }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))

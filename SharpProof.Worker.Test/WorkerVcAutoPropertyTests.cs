@@ -53,6 +53,13 @@ public sealed class WorkerVcAutoPropertyTests
                 value = 1;
                 return value;
             }
+            public static int Depth(int n) {
+                Contract.Requires(n >= 0);
+                Contract.Ensures(Contract.Result<int>() >= 0);
+                if (n == 0) { return 0; }
+                Depth(n - 1);
+                return n;
+            }
             public static System.Text.StringBuilder Fresh() {
                 Contract.Ensures(Contract.Result<System.Text.StringBuilder>() != null);
                 return new System.Text.StringBuilder();
@@ -80,6 +87,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("StoreThroughList")]
     [TestCase("CountUpTo")]
     [TestCase("ReadThroughRef")]
+    [TestCase("Depth")]
     public void PostconditionIsProven(string method)
     {
         var claim = Claim(method);
@@ -91,6 +99,17 @@ public sealed class WorkerVcAutoPropertyTests
     public void WrittenRefParameterStaysUnsupported()
     {
         Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    // A recursive call is an unknown call after its callee's preconditions,
+    // which stay checked at the call.
+    [Test]
+    public void RecursiveCallKeepsItsPrecondition()
+    {
+        using var project = new ShadowTestProject(Source);
+        var depth = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(".Depth(", StringComparison.Ordinal));
+        Assert.That(depth.Total, Is.Not.Null);
+        Assert.That(depth.Total!.CallPreconditions, Is.Not.Empty);
     }
 
     private static WorkerClaimResult Claim(string method)

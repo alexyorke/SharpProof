@@ -646,16 +646,23 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         if (receiver != null && instance!.Type!.IsReferenceType)
         { block = CheckReceiver(operation, receiver, block); }
+        // A dispatched call may run an override the specification does not describe.
+        return EmitOpaqueCall(operation, method, values, block, assigned != null ? values[values.Length - 1] : null,
+            (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
+    }
+
+    // The call itself is only an effect site; its result and whether it
+    // throws are approximation havocs, so no refutation may depend on them. An
+    // assignment's value is the assigned one.
+    internal TotalBodyValue EmitOpaqueCall(IOperation operation, IMethodSymbol method, IrTerm[] values, IrBlockId block,
+        IrTerm? assigned, IrOpaqueCallEffects effects)
+    {
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
         var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
         var member = _factory.GetOrCreateMember(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
             "opaque-call:" + display, resultType, true, [.. values.Select(value => value.Type)]);
-        // The call itself is only an effect site; its result and whether it
-        // throws are approximation havocs, so no refutation may depend on them.
-        // A dispatched call may run an override the specification does not describe.
-        var effects = (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All;
         _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
         if ((effects & IrOpaqueCallEffects.Throws) != 0)
@@ -664,7 +671,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
             faults = [new(IrExceptionKind.Unknown, _factory.Variable(throws))];
         }
-        IrTerm result = assigned != null ? values[values.Length - 1] : _factory.Boolean(false);
+        IrTerm result = assigned ?? _factory.Boolean(false);
         if (!method.ReturnsVoid)
         {
             var target = _context.Temporary(resultType);

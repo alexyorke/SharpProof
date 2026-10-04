@@ -70,6 +70,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         return Spend() && _active.Count < 256 && _active.Add(method);
     }
 
+    internal bool IsActive(IMethodSymbol method)
+    { return _active.Contains(method) || _active.Contains(method.OriginalDefinition); }
+
     internal void Leave(IMethodSymbol method)
     {
         _active.Remove(method);
@@ -126,13 +129,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // An accessor takes its property's arguments, and a setter also takes the
     // assigned value as its final `value` parameter. A generic callee runs its
     // declaration, whose parameters must share the call's value domains.
+    // With `contractOnly`, a callee already being inlined (a recursive call)
+    // gets a frame for its preconditions and no body.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
-        bool assigned = false)
+        bool assigned = false, bool contractOnly = false)
     {
         frame = null;
         graph = null;
-        if (!Spend(method.Parameters.Length + 1) || _active.Contains(method) || _active.Contains(method.OriginalDefinition) ||
+        if (!Spend(method.Parameters.Length + 1) || IsActive(method) != contractOnly ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
@@ -185,6 +190,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { frame.ModelReceiver(); }
         if (!prepareCallee(frame))
         { frame = null; return false; }
+        if (contractOnly)
+        { return true; }
         cancellationToken.ThrowIfCancellationRequested();
         try
         { graph = ControlFlowGraph.Create(declaration, CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree), cancellationToken); }

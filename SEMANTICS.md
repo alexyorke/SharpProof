@@ -638,7 +638,10 @@ body never writes (no assignment, increment, compound assignment, `ref` or
 `out` argument or `ref` expression naming it) holds its caller's value
 throughout and is verified as a by-value input; any other by-reference
 parameter, and every struct one, keeps the callable unsupported. Explicit
-interface implementations are verified like other methods.
+interface implementations are verified like other methods. A call to a
+source callee already being inlined (recursion, direct or mutual) records the
+callee's preconditions at the call as any inlined call does, then runs as an
+unknown call that may do anything, throw included; its result is unknown.
 Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on
