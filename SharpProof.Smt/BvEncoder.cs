@@ -68,10 +68,27 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 Encode(conditional.WhenTrue, meter), Encode(conditional.WhenFalse, meter))),
             IrCastTerm cast => EncodeCast(cast, meter),
             IrOpaqueTerm field when IrFieldSites.IsFieldRead(factory, field) => EncodeFieldRead(field, meter),
+            IrOpaqueTerm relation when Relations != null && IrInvariantRelations.IsRelation(factory, relation) =>
+                EncodeRelation(relation, meter),
             _ => throw new UnsupportedIrEncodingException()
         };
         _encoded.Add(term.Id, expression);
         return expression;
+    }
+
+    // Only a Horn search encodes unknown invariants, as uninterpreted relations.
+    internal Dictionary<IrMemberId, FuncDecl>? Relations { get; set; }
+
+    private Expr EncodeRelation(IrOpaqueTerm relation, SmtQueryResourceMeter meter)
+    {
+        var arguments = relation.Arguments.Select(argument => Encode(argument, meter)).ToArray();
+        if (!Relations!.TryGetValue(relation.Member, out var declaration))
+        {
+            declaration = context.MkFuncDecl("invariant" + relation.Member.Value.ToString(CultureInfo.InvariantCulture),
+                [.. arguments.Select(argument => argument.Sort)], context.BoolSort);
+            Relations.Add(relation.Member, declaration);
+        }
+        return owner.Own(context.MkApp(declaration, arguments));
     }
 
     private Expr EncodeUnary(IrUnaryTerm unary, SmtQueryResourceMeter meter)

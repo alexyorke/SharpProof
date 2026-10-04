@@ -406,7 +406,16 @@ An inductive invariant holds on every execution reaching its header, so every
 claim decided over the cut (exceptions, allocations, purity, capabilities and
 effect contracts) retries with the same invariants: for example, `i >= 0`
 keeps `values[i]` in bounds in a counting loop and rules out a site guarded by
-`i < 0`. Refutations still come only from bounded search and replay.
+`i < 0`. When the surviving templates do not prove a goal, Z3's Spacer engine
+proposes more: each loop's invariant becomes an unknown relation over the
+boolean and integer values it carries and reads, the checkpoints and the goal
+become Horn clauses over those relations, and Spacer solves their unbounded
+integer reading (arithmetic does not wrap; any other operation is a fresh
+unknown) under a fixed resource limit. Its solution, translated back to IR and
+split into conjuncts, joins the templates as further untrusted candidates for
+Houdini, so the kernel checks every one over bitvectors: `s == 2 * i` proves
+`s == 2 * n` after a loop adding two per step. Refutations still come only
+from bounded search and replay.
 Unsupported async and iterator callables abstain.
 
 Element stores into single-dimensional arrays of bool or integer elements

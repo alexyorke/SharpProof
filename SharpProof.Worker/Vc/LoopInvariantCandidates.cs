@@ -16,52 +16,8 @@ internal static class LoopInvariantCandidates
         var invariants = ImmutableArray.CreateBuilder<PassiveLoopCutter.Invariant>();
         foreach (var loop in loops)
         {
-            var written = loop.Writes.ToHashSet();
-            var read = new HashSet<IrVarId>();
-            var constants = new HashSet<IrTerm>();
-            foreach (var block in loop.Blocks.OrderBy(block => block.Value))
-            {
-                foreach (var instruction in candidate.Program.GetBlock(block).Instructions)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    IrTerm? term = instruction switch
-                    {
-                        IrAssignInstruction assign => assign.Value,
-                        IrBranchInstruction branch => branch.Condition,
-                        IrAssumeInstruction assume => assume.Condition,
-                        IrReturnInstruction returned => returned.Value,
-                        _ => null
-                    };
-                    if (term == null)
-                    { continue; }
-                    read.UnionWith(IrTraversal.CollectVariables(term));
-                    if (instruction is IrBranchInstruction)
-                    {
-                        _ = IrTraversal.Any(term, child =>
-                        {
-                            if (child is IrIntegerTerm)
-                            { constants.Add(child); }
-                            return false;
-                        });
-                    }
-                }
-            }
-            // Only state that enters the loop can be checked on its entry edges:
-            // a variable the loop writes must also be set before it.
-            var entering = new HashSet<IrVarId>(candidate.Parameters.SelectMany(parameter => new[] { parameter.Current, parameter.Old }));
-            foreach (var block in candidate.Program.Blocks.Where(block => !loop.Blocks.Contains(block.Id)))
-            {
-                foreach (var instruction in block.Instructions)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (instruction is IrAssignInstruction assign)
-                    { entering.Add(assign.Target); }
-                }
-            }
-            var anchors = read.Where(variable => !written.Contains(variable)).OrderBy(variable => variable.Value)
-                .Select(variable => factory.Variable(variable)).Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
+            var (tracked, anchors) = State(candidate, loop, cancellationToken);
             var conditions = new List<IrTerm>();
-            var tracked = loop.Writes.Where(entering.Contains).OrderBy(variable => variable.Value).ToArray();
             foreach (var variable in tracked)
             {
                 var type = factory.GetVariableInfo(variable).Type;
@@ -87,5 +43,59 @@ internal static class LoopInvariantCandidates
                 .Take(MaximumPerLoop).Select(condition => new PassiveLoopCutter.Invariant(loop.Header, condition)));
         }
         return invariants.ToImmutable();
+    }
+
+    // The state a loop carries (its writes that are also set before it) and
+    // its anchors (what it reads but does not write, and its conditions'
+    // constants).
+    internal static (IrVarId[] Tracked, IrTerm[] Anchors) State(PassiveCallableCandidate candidate,
+        PassiveLoopCutter.Loop loop, CancellationToken cancellationToken)
+    {
+        var factory = candidate.Factory;
+        var written = loop.Writes.ToHashSet();
+        var read = new HashSet<IrVarId>();
+        var constants = new HashSet<IrTerm>();
+        foreach (var block in loop.Blocks.OrderBy(block => block.Value))
+        {
+            foreach (var instruction in candidate.Program.GetBlock(block).Instructions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IrTerm? term = instruction switch
+                {
+                    IrAssignInstruction assign => assign.Value,
+                    IrBranchInstruction branch => branch.Condition,
+                    IrAssumeInstruction assume => assume.Condition,
+                    IrReturnInstruction returned => returned.Value,
+                    _ => null
+                };
+                if (term == null)
+                { continue; }
+                read.UnionWith(IrTraversal.CollectVariables(term));
+                if (instruction is IrBranchInstruction)
+                {
+                    _ = IrTraversal.Any(term, child =>
+                    {
+                        if (child is IrIntegerTerm)
+                        { constants.Add(child); }
+                        return false;
+                    });
+                }
+            }
+        }
+        // Only state that enters the loop can be checked on its entry edges:
+        // a variable the loop writes must also be set before it.
+        var entering = new HashSet<IrVarId>(candidate.Parameters.SelectMany(parameter => new[] { parameter.Current, parameter.Old }));
+        foreach (var block in candidate.Program.Blocks.Where(block => !loop.Blocks.Contains(block.Id)))
+        {
+            foreach (var instruction in block.Instructions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (instruction is IrAssignInstruction assign)
+                { entering.Add(assign.Target); }
+            }
+        }
+        var anchors = read.Where(variable => !written.Contains(variable)).OrderBy(variable => variable.Value)
+            .Select(variable => factory.Variable(variable)).Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
+        return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.Value)], anchors);
     }
 }

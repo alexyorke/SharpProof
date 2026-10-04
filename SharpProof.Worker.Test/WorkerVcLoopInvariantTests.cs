@@ -84,6 +84,22 @@ public sealed class WorkerVcLoopInvariantTests
                 }
                 return total;
             }
+            public static int DoubleCount(int n) {
+                Contract.Requires(n >= 0 && n <= 1000);
+                Contract.Ensures(Contract.Result<int>() == 2 * n);
+                var i = 0;
+                var s = 0;
+                while (i < n) { i++; s += 2; }
+                return s;
+            }
+            public static int WrongDoubleCount(int n) {
+                Contract.Requires(n >= 1 && n <= 1000);
+                Contract.Ensures(Contract.Result<int>() == 2 * n + 1);
+                var i = 0;
+                var s = 0;
+                while (i < n) { i++; s += 2; }
+                return s;
+            }
             public static int NeedsNoNegative(int n) {
                 Contract.Ensures(Contract.Result<int>() == n);
                 var i = 0;
@@ -112,6 +128,22 @@ public sealed class WorkerVcLoopInvariantTests
     {
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
+    // s == 2 * i is beyond the templates; Spacer proposes it and the kernel
+    // proves it inductive.
+    [Test]
+    public void SpacerProposalProvesThePostcondition()
+    {
+        var claim = Claim("DoubleCount");
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
+    // No invariant proves a false postcondition.
+    [Test]
+    public void FalseLoopPostconditionIsNotProven()
+    {
+        Assert.That(Claim("WrongDoubleCount").Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }
 
     // i <= n is not inductive when i steps by two; n = 1 returns 2.

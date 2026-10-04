@@ -24,9 +24,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     // A normal return was found, but only through approximation havocs.
     private bool _approximateNormalReturn;
     private bool _invariantsSearched;
-    private PassiveCallableVcPlan? _invariantPlan;
-    private ImmutableArray<string> _invariantCore = [];
-    private ImmutableArray<OperationId> _invariantAssumptions = [];
+    private InvariantSet? _invariantPlan;
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan,
         uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit)
@@ -278,37 +276,60 @@ internal sealed class PassiveCallableSolver : IDisposable
     }
 
     // Retries a goal the loop cut could not prove with the checked loop
-    // invariants assumed; null when they do not prove it.
+    // invariants assumed; null when they do not prove it. Spacer's proposals
+    // for this goal join the templates when those alone do not suffice.
     private async Task<PassiveCallableCheckResult?> ProveWithInvariantsAsync(PassiveCallableCheckResult witness,
         Func<PassiveCallableVcPlan, VerificationQuery> query, CancellationToken cancellationToken)
     {
-        if (_plan.LoopSearch == null || witness.Outcome is RefutedOutcome || witness.Reason == WorkerClaimReason.ResourceLimit ||
-            await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is not { } invariants)
+        if (_plan.LoopSearch == null || witness.Outcome is RefutedOutcome || witness.Reason == WorkerClaimReason.ResourceLimit)
         { return null; }
-        var proven = await VerifyAsync(query(invariants), null, cancellationToken, invariants).ConfigureAwait(false);
-        return proven.Outcome is ProvenOutcome ? WithInvariantPremises(proven) : null;
+        if (await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is { } invariants)
+        {
+            var proven = await VerifyAsync(query(invariants.Plan), null, cancellationToken, invariants.Plan).ConfigureAwait(false);
+            if (proven.Outcome is ProvenOutcome)
+            { return WithInvariantPremises(proven, invariants); }
+        }
+        var proposals = HornProposals(query, cancellationToken);
+        if (proposals.IsEmpty ||
+            await HoudiniAsync([.. Templates(cancellationToken), .. proposals], cancellationToken).ConfigureAwait(false) is not { } extended)
+        { return null; }
+        var result = await VerifyAsync(query(extended.Plan), null, cancellationToken, extended.Plan).ConfigureAwait(false);
+        return result.Outcome is ProvenOutcome ? WithInvariantPremises(result, extended) : null;
     }
 
     // A proof over assumed invariants also rests on the premises that proved them.
-    private PassiveCallableCheckResult WithInvariantPremises(PassiveCallableCheckResult proven)
+    private static PassiveCallableCheckResult WithInvariantPremises(PassiveCallableCheckResult proven, InvariantSet invariants)
     {
         return proven with
         {
-            Core = [.. proven.Core.Union(_invariantCore, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
-            BodyAssumptions = [.. proven.BodyAssumptions.Union(_invariantAssumptions).OrderBy(value => value.Value)]
+            Core = [.. proven.Core.Union(invariants.Core, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
+            BodyAssumptions = [.. proven.BodyAssumptions.Union(invariants.Assumptions).OrderBy(value => value.Value)]
         };
+    }
+
+    private sealed record InvariantSet(PassiveCallableVcPlan Plan, ImmutableArray<string> Core, ImmutableArray<OperationId> Assumptions);
+
+    private ImmutableArray<PassiveLoopCutter.Invariant> Templates(CancellationToken cancellationToken)
+    {
+        var candidate = _plan.Candidate;
+        return LoopInvariantCandidates.Generate(candidate, PassiveLoopCutter.Loops(candidate, cancellationToken), cancellationToken);
+    }
+
+    // The template invariants that survive Houdini, searched once.
+    private async Task<InvariantSet?> InvariantPlanAsync(CancellationToken cancellationToken)
+    {
+        if (_invariantsSearched)
+        { return _invariantPlan; }
+        _invariantsSearched = true;
+        return _invariantPlan = await HoudiniAsync(Templates(cancellationToken), cancellationToken).ConfigureAwait(false);
     }
 
     // The cut proof plan with the largest inductive set of candidate loop
     // invariants (Houdini): a candidate whose checkpoint the kernel does not
     // prove is dropped and the rest are checked again.
-    private async Task<PassiveCallableVcPlan?> InvariantPlanAsync(CancellationToken cancellationToken)
+    private async Task<InvariantSet?> HoudiniAsync(ImmutableArray<PassiveLoopCutter.Invariant> active, CancellationToken cancellationToken)
     {
-        if (_invariantsSearched)
-        { return _invariantPlan; }
-        _invariantsSearched = true;
         var candidate = _plan.Candidate;
-        var active = LoopInvariantCandidates.Generate(candidate, PassiveLoopCutter.Loops(candidate, cancellationToken), cancellationToken);
         // A candidate the encoding cannot state (it reads a value undefined on
         // an entry edge) is dropped before any check.
         if (!active.IsEmpty && PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken) == null)
@@ -337,14 +358,49 @@ internal sealed class PassiveCallableSolver : IDisposable
                 { failed.Add(invariant); }
             }
             if (failed.Count == 0)
-            {
-                _invariantCore = [.. cores];
-                _invariantAssumptions = [.. assumptions];
-                return _invariantPlan = plan;
-            }
+            { return new(plan, [.. cores], [.. assumptions]); }
             active = [.. active.Where((_, ordinal) => !failed.Contains(ordinal))];
         }
         return null;
+    }
+
+    // Each loop's invariant is an unknown relation over the state it carries
+    // and the variables it reads; the checkpoints and the goal are Horn
+    // clauses over them, which Spacer solves. Its answers are only guesses.
+    private ImmutableArray<PassiveLoopCutter.Invariant> HornProposals(Func<PassiveCallableVcPlan, VerificationQuery> query,
+        CancellationToken cancellationToken)
+    {
+        var candidate = _plan.Candidate;
+        var factory = candidate.Factory;
+        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>>();
+        var relations = ImmutableArray.CreateBuilder<PassiveLoopCutter.Invariant>();
+        foreach (var loop in PassiveLoopCutter.Loops(candidate, cancellationToken))
+        {
+            var (tracked, anchors) = LoopInvariantCandidates.State(candidate, loop, cancellationToken);
+            ImmutableArray<IrTerm> state = [.. tracked.Select(variable => (IrTerm)factory.Variable(variable))
+                .Concat(anchors.OfType<IrVariableTerm>()).Distinct()
+                .Where(term => factory.GetTypeInfo(term.Type) is { Kind: IrTypeKind.Boolean } or { Kind: IrTypeKind.Integer, Width: > 0 })];
+            if (state.IsEmpty)
+            { continue; }
+            var relation = IrInvariantRelations.Create(factory, relations.Count, state);
+            states.Add(relation.Member, state);
+            relations.Add(new(loop.Header, relation));
+        }
+        if (relations.Count == 0 ||
+            PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, relations.ToImmutable(), cancellationToken) is not { } plan)
+        { return []; }
+        var proposals = HornInvariantSearch.Propose(factory, [.. plan.InvariantQueries().Select(pair => pair.Query), query(plan)],
+            states, WorkerBudgets.DefaultQueryRlimit, cancellationToken);
+        return [.. relations.SelectMany(relation => proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
+            ? Conjuncts(invariant).Select(conjunct => new PassiveLoopCutter.Invariant(relation.Header, conjunct))
+            : [])];
+
+        static IEnumerable<IrTerm> Conjuncts(IrTerm term)
+        {
+            return term is IrBinaryTerm { Operator: IrBinaryOperator.AndAlso } conjunction
+                ? Conjuncts(conjunction.Left).Concat(Conjuncts(conjunction.Right))
+                : term is IrBooleanTerm { Value: true } ? [] : [term];
+        }
     }
 
     internal async Task<PassiveCallableCheckResult> VerifyNormalCompletionAsync(CancellationToken cancellationToken = default)
