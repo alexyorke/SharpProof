@@ -650,6 +650,12 @@ with `yield`) is such an unknown call too, since its body runs only as it is
 enumerated; an iterator with preconditions stays unsupported, as they would
 run at enumeration, not at the call. A call whose callee body does not lower
 is an unknown call as well, after its preconditions are checked at the call.
+One source expansion session caches completed declaration iterator scans and
+type-initialization eligibility checks. Declaration facts use the original
+method definition; type initialization uses the constructed type, including
+its containing types. Cache hits still consume construction work and check
+cancellation. Incomplete scans are never cached, and each call retains fresh
+frames, precondition checks and body expansion within the shared limit.
 Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on

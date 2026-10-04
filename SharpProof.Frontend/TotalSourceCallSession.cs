@@ -21,6 +21,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 {
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
+    private readonly Dictionary<IMethodSymbol, bool> _iterators = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<INamedTypeSymbol, bool> _typeInitialization = new(SymbolEqualityComparer.Default);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool ConstructionLimitExceeded { get; private set; }
 
@@ -180,11 +182,22 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 AccessorDeclarationSyntax { ExpressionBody: not null }))
         { return false; }
         var iterator = false;
-        foreach (var node in declaration.DescendantNodesAndSelf())
+        if (_iterators.TryGetValue(method.OriginalDefinition, out iterator))
         {
-            if (!Spend() || node is YieldStatementSyntax && !contractOnly)
+            if (!Spend() || iterator && !contractOnly)
             { return false; }
-            iterator |= node is YieldStatementSyntax;
+        }
+        else
+        {
+            foreach (var node in declaration.DescendantNodesAndSelf())
+            {
+                if (!Spend())
+                { return false; }
+                iterator |= node is YieldStatementSyntax;
+                if (iterator && !contractOnly)
+                { _iterators[method.OriginalDefinition] = true; return false; }
+            }
+            _iterators[method.OriginalDefinition] = iterator;
         }
         if (contractOnly && !IsActive(method) && !iterator &&
             !(method.MethodKind == MethodKind.Constructor && !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)))
@@ -215,6 +228,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     private bool HasNoTypeInitialization(INamedTypeSymbol type)
     {
+        if (_typeInitialization.TryGetValue(type, out var eligible))
+        { return Spend() && eligible; }
+        if (!TryCheckTypeInitialization(type, out eligible))
+        { return false; }
+        _typeInitialization[type] = eligible;
+        return eligible;
+    }
+
+    private bool TryCheckTypeInitialization(INamedTypeSymbol type, out bool eligible)
+    {
+        eligible = false;
         for (var current = type; current != null; current = current.ContainingType)
         {
             foreach (var member in current.GetMembers())
@@ -222,7 +246,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 if (!Spend())
                 { return false; }
                 if (member is IMethodSymbol { MethodKind: MethodKind.StaticConstructor, IsImplicitlyDeclared: false })
-                { return false; }
+                { return true; }
                 if (!member.IsStatic || member is IFieldSymbol { IsConst: true })
                 { continue; }
                 foreach (var reference in member.DeclaringSyntaxReferences)
@@ -238,10 +262,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     };
                     if (value != null && (!CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree).GetConstantValue(value, cancellationToken).HasValue ||
                         !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : (member as IPropertySymbol)?.Type)))
-                    { return false; }
+                    { return true; }
                 }
             }
         }
+        eligible = true;
         return true;
     }
 }

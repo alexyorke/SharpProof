@@ -252,6 +252,30 @@ public sealed class TypedSourceCallLoweringTests
         Assert.Throws<OperationCanceledException>((Action)(() => subject.LowerSourceCalls(canceled.Token)));
     }
 
+    [Test]
+    public void RepeatedSourceCallsReuseEligibilityWithinSharedLimit()
+    {
+        var members = new System.Text.StringBuilder("int Target(int x) { ");
+        for (var index = 0; index < 32; index++)
+        { members.Append("x = Increment(x); "); }
+        members.Append("return x; } static int Increment(int value) => value + 1;");
+        for (var index = 0; index < 64; index++)
+        {
+            members.Append(" static int Padding");
+            members.Append(index);
+            members.Append("() => 0;");
+        }
+        using var subject = TypedProgramSubject.Create(members.ToString());
+        Assert.That(subject.Invoke([3]), Is.EqualTo(35));
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.True);
+        Assert.That(lowering.ConstructionLimitExceeded, Is.False);
+        var execution = subject.Execute(lowering, [3]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(35)));
+    }
+
     [TestCase(0, 1)]
     [TestCase(1, 3)]
     public void OrdinaryConditionalVoidReturnEvaluatesItsGuardBeforeLeaving(int input, int current)

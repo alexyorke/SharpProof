@@ -139,6 +139,28 @@ public sealed class WorkerVcAutoPropertyTests
         Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
+    [Test]
+    public async Task RepeatedSourceCallsProveWithinSharedConstructionLimit()
+    {
+        var source = new System.Text.StringBuilder("using SharpProof.Attributes; public static class Subject { public static int Target(int x) { Contract.Requires(x == 0); Contract.Ensures(Contract.Result<int>() == 32); var value = x; ");
+        for (var index = 0; index < 32; index++)
+        { source.Append("value = Increment(value); "); }
+        source.Append("return value; } private static int Increment(int value) => unchecked(value + 1);");
+        for (var index = 0; index < 64; index++)
+        {
+            source.Append(" private static int Padding");
+            source.Append(index);
+            source.Append("() => 0;");
+        }
+        source.Append('}');
+        using var project = new ShadowTestProject(source.ToString());
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.Errors, Is.Empty);
+        var claim = response.ClaimResults.Single();
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
     // A recursive call, one whose callee body does not lower, or one to a
     // constructor with field initializers is an unknown call after its
     // callee's preconditions, which stay checked.
