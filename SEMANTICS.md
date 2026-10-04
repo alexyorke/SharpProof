@@ -402,9 +402,11 @@ checks them on every edge into it, entry and back edges alike; the kernel must
 prove every check, and a candidate that fails one is dropped until the rest
 are inductive (Houdini). The postcondition is then proven with the surviving
 invariants assumed, and the Requires clauses used by any check count as used.
-An inductive invariant holds on every execution reaching its header, so
-DoesNotThrow and AllowedExceptions claims use the same invariants (for
-example, `i >= 0` keeps `values[i]` in bounds in a counting loop).
+An inductive invariant holds on every execution reaching its header, so every
+claim decided over the cut (exceptions, allocations, purity, capabilities and
+effect contracts) retries with the same invariants: for example, `i >= 0`
+keeps `values[i]` in bounds in a counting loop and rules out a site guarded by
+`i < 0`. Refutations still come only from bounded search and replay.
 Unsupported async and iterator callables abstain.
 Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
 claims over the Total program: a proof is a complete may-effect summary and a

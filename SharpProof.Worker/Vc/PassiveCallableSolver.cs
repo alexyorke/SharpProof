@@ -77,7 +77,10 @@ internal sealed class PassiveCallableSolver : IDisposable
         var witness = _plan.LoopSearch == null ? proof
             : await VerifyAsync(search.CapabilityQuery(synchronizationAllowed, callViolates), null, cancellationToken, search).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
-        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        {
+            return await ProveWithInvariantsAsync(witness, plan => plan.CapabilityQuery(synchronizationAllowed, callViolates), cancellationToken)
+                .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
+        }
         OperationId? site = null;
         _plan.ReplayEffects(witness.EntryModel, cancellationToken, lockPrefixObserver: (instruction, approximation) =>
         { if (!approximation) { site ??= instruction.Operation; } });
@@ -102,7 +105,10 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(encoding.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates), null, cancellationToken, encoding)
                 .ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
-        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        {
+            return await ProveWithInvariantsAsync(witness, plan => plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates),
+                cancellationToken).ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
+        }
         OperationId? write = null;
         OperationId? synchronization = null;
         _plan.ReplayEffects(witness.EntryModel, cancellationToken,
@@ -134,7 +140,10 @@ internal sealed class PassiveCallableSolver : IDisposable
         var witness = _plan.LoopSearch == null ? proof
             : await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
-        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        {
+            return await ProveWithInvariantsAsync(witness, plan => allocations ? plan.AllocationQuery() : plan.PurityQuery(), cancellationToken)
+                .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
+        }
         OperationId? site = null;
         OperationId? synchronizationSite = null;
         _plan.ReplayEffects(witness.EntryModel, cancellationToken,
@@ -180,15 +189,8 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(encoding.ExceptionQuery(allowed, allowedSite), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            if (_plan.LoopSearch != null && witness.Reason != WorkerClaimReason.ResourceLimit &&
-                await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is { } invariants)
-            {
-                var proven = await VerifyAsync(invariants.ExceptionQuery(allowed, allowedSite), null, cancellationToken, invariants)
-                    .ConfigureAwait(false);
-                if (proven.Outcome is ProvenOutcome)
-                { return WithInvariantPremises(proven); }
-            }
-            return witness.Outcome is ProvenOutcome ? Inconclusive() : witness;
+            return await ProveWithInvariantsAsync(witness, plan => plan.ExceptionQuery(allowed, allowedSite), cancellationToken)
+                .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         if (!_plan.HasBodyAbstraction)
         {
@@ -269,15 +271,22 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
         var witness = await VerifyAsync(search.EnsuresQuery(ordinal), search.Replay(ordinal), cancellationToken, search).ConfigureAwait(false);
-        if (witness.Outcome is not RefutedOutcome && witness.Reason != WorkerClaimReason.ResourceLimit &&
-            await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is { } invariants)
-        {
-            var proven = await VerifyAsync(invariants.EnsuresQuery(ordinal), null, cancellationToken, invariants).ConfigureAwait(false);
-            if (proven.Outcome is ProvenOutcome)
-            { return WithInvariantPremises(proven); }
-        }
+        if (await ProveWithInvariantsAsync(witness, plan => plan.EnsuresQuery(ordinal), cancellationToken).ConfigureAwait(false) is { } proven)
+        { return proven; }
         // A cut model is never a refutation; finite search is never a proof.
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
+    }
+
+    // Retries a goal the loop cut could not prove with the checked loop
+    // invariants assumed; null when they do not prove it.
+    private async Task<PassiveCallableCheckResult?> ProveWithInvariantsAsync(PassiveCallableCheckResult witness,
+        Func<PassiveCallableVcPlan, VerificationQuery> query, CancellationToken cancellationToken)
+    {
+        if (_plan.LoopSearch == null || witness.Outcome is RefutedOutcome || witness.Reason == WorkerClaimReason.ResourceLimit ||
+            await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is not { } invariants)
+        { return null; }
+        var proven = await VerifyAsync(query(invariants), null, cancellationToken, invariants).ConfigureAwait(false);
+        return proven.Outcome is ProvenOutcome ? WithInvariantPremises(proven) : null;
     }
 
     // A proof over assumed invariants also rests on the premises that proved them.

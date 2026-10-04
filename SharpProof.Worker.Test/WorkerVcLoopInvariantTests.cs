@@ -56,6 +56,34 @@ public sealed class WorkerVcLoopInvariantTests
                 for (var i = 1; i <= values.Length; i++) { total += values[i]; }
                 return total;
             }
+            private static int s_counter;
+            [ZeroAllocations]
+            public static int GuardedAllocation(int n) {
+                var total = 0;
+                for (var i = 0; i < n; i++) {
+                    if (i < 0) { total += new int[1].Length; }
+                    total++;
+                }
+                return total;
+            }
+            [EnforcePure]
+            public static int GuardedWrite(int n) {
+                var total = 0;
+                for (var i = 0; i < n; i++) {
+                    if (i < 0) { s_counter = i; }
+                    total++;
+                }
+                return total;
+            }
+            [ZeroAllocations]
+            public static int ReachedAllocation(int n) {
+                var total = 0;
+                for (var i = 0; i < n; i++) {
+                    if (i > 2) { total += new int[1].Length; }
+                    total++;
+                }
+                return total;
+            }
             public static int NeedsNoNegative(int n) {
                 Contract.Ensures(Contract.Result<int>() == n);
                 var i = 0;
@@ -106,6 +134,22 @@ public sealed class WorkerVcLoopInvariantTests
     public void OutOfBoundsLoopReadIsRefuted()
     {
         Assert.That(Claim("SumFromOne").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
+    // i >= 0 rules out the guarded allocation and static write.
+    [TestCase("GuardedAllocation")]
+    [TestCase("GuardedWrite")]
+    public void InductiveInvariantProvesEffectSiteClaims(string method)
+    {
+        var claim = Claim(method);
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
+    // The fourth iteration allocates.
+    [Test]
+    public void ReachableLoopAllocationIsRefuted()
+    {
+        Assert.That(Claim("ReachedAllocation").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
     // Without n >= 0 a negative n returns 0.
