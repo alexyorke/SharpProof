@@ -112,7 +112,8 @@ public sealed class TotalLoweringContext
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
 
     // `this` of a class instance member, once modeled, is a trailing input
-    // whose fields are read and stored like those of any other object.
+    // whose fields are read and stored like those of any other object. An
+    // inlined callee's receiver is assigned by its caller.
     internal TotalInputBinding? Receiver { get; private set; }
 
     internal void ModelReceiver()
@@ -120,9 +121,9 @@ public sealed class TotalLoweringContext
         if (Receiver != null || Target.IsStatic || !Target.ContainingType.IsReferenceType)
         { return; }
         var ordinal = Parameters.Length.ToString(CultureInfo.InvariantCulture);
-        Receiver = new(Factory.CreateVariable("entry:" + ordinal, Factory.ObjectType),
-            Factory.CreateVariable("current:" + ordinal, Factory.ObjectType),
-            Factory.CreateVariable("old:" + ordinal, Factory.ObjectType));
+        var type = Type(Target.ContainingType);
+        Receiver = new(Factory.CreateVariable("entry:" + ordinal, type), Factory.CreateVariable("current:" + ordinal, type),
+            Factory.CreateVariable("old:" + ordinal, type));
     }
 
     internal IrTerm? ReceiverValue(TotalParameterState state = TotalParameterState.Current)
@@ -134,6 +135,11 @@ public sealed class TotalLoweringContext
             _ => Receiver.Current
         });
     }
+
+    // A constructor's `this` stays a receiver only: once it escapes, its
+    // earlier field writes are no longer those of an unobserved object.
+    internal IrTerm? ThisValue(TotalParameterState state = TotalParameterState.Current)
+    { return Target.MethodKind == MethodKind.Constructor ? null : ReceiverValue(state); }
 
     internal ImmutableArray<TotalInputBinding> Inputs =>
         Receiver == null ? [.. Parameters] : [.. Parameters, Receiver];

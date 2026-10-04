@@ -158,6 +158,15 @@ internal sealed partial class RoslynTotalProgramLowerer
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
+        // The callee's `this` is the receiver as evaluated before the
+        // arguments; an unmodeled caller `this` is unknown.
+        if (callee.Receiver is { } self)
+        {
+            if ((receiver ?? _context.ReceiverValue()) is { } value)
+            { _builder.Assign(block, site, self.Entry, Bridge(value, _context.Factory.GetVariableInfo(self.Entry).Type)); }
+            else
+            { _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, self.Entry); }
+        }
         if (returned is { } initialized)
         {
             // A fault never reads a call result. Keeping its internal storage

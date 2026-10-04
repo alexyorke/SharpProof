@@ -122,7 +122,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     { return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
     // An instance callee is a nonvirtual member on a reference receiver. Its
-    // implicit `this` is never null; field reads through it are approximations.
+    // implicit `this` is never null and is the caller's receiver value.
     // An accessor takes its property's arguments, and a setter also takes the
     // assigned value as its final `value` parameter.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
@@ -180,6 +180,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Source operations bind to declaration symbols. Closed outer types
         // may share that body only when their intrinsic signature is unchanged.
         frame = caller.CreateFrame(method.OriginalDefinition);
+        if (instance != null)
+        { frame.ModelReceiver(); }
         if (!prepareCallee(frame))
         { frame = null; return false; }
         cancellationToken.ThrowIfCancellationRequested();

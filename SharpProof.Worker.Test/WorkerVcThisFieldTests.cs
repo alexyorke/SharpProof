@@ -4,7 +4,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 // Scalar fields of `this` in a class instance member are modeled like those
-// of any other object: `this` is a never-null trailing input.
+// of any other object: `this` is a never-null trailing input, a value, and
+// the receiver of inlined instance callees.
 [TestFixture]
 public sealed class WorkerVcThisFieldTests
 {
@@ -66,6 +67,26 @@ public sealed class WorkerVcThisFieldTests
                 Contract.Ensures(count == Contract.Old(count) + 2);
                 count++;
             }
+            private void Bump() { count++; }
+            public void IncrementViaHelper() {
+                Contract.Ensures(count == Contract.Old(count) + 1);
+                Bump();
+            }
+            public static void IncrementOther([NotNull] Counter other) {
+                Contract.Ensures(other.count == Contract.Old(other.count) + 1);
+                other.Bump();
+            }
+            public int Distinct([NotNull] Counter other) {
+                Contract.Requires(other != this);
+                Contract.Ensures(Contract.Result<int>() == 1);
+                count = 1;
+                other.count = 2;
+                return count;
+            }
+            public bool SameAs(Counter other) {
+                Contract.Ensures(Contract.Result<bool>() == (other == this));
+                return other == this;
+            }
             public void ExplicitThis() {
                 Contract.Ensures(this.count == 4);
                 this.count = 4;
@@ -97,6 +118,10 @@ public sealed class WorkerVcThisFieldTests
     [TestCase("MayAlias", WorkerClaimOutcome.Refuted)]
     [TestCase("WrongIncrement", WorkerClaimOutcome.Refuted)]
     [TestCase("ExplicitThis", WorkerClaimOutcome.Proven)]
+    [TestCase("IncrementViaHelper", WorkerClaimOutcome.Proven)]
+    [TestCase("IncrementOther", WorkerClaimOutcome.Proven)]
+    [TestCase("Distinct", WorkerClaimOutcome.Proven)]
+    [TestCase("SameAs", WorkerClaimOutcome.Proven)]
     public void FieldsOfThisAreModeled(string method, WorkerClaimOutcome expected)
     {
         var claim = Claim(method);

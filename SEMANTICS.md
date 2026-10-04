@@ -431,9 +431,11 @@ values, and a counterexample's objects carry their decoded entry field values,
 so replay and the kernel's model check read concrete fields. Contract clauses
 may read such fields, safe only for a non-null receiver, and `Contract.Old`
 reads entry values. In a class instance member `this` is a trailing input,
-named `this` in counterexamples and assumed non-null on entry; a field of
-`this` reached through a Roslyn flow capture, and any field of `this` inside an
-inlined callee, stays approximated. Reads of non-fresh objects' fields are
+named `this` in counterexamples and assumed non-null on entry, and a value
+outside constructors (a constructor's `this` stays a receiver only). An
+inlined instance callee's `this` is the receiver as evaluated before the
+arguments, unknown when the caller's own `this` is not modeled. A field of
+`this` reached through a Roslyn flow capture stays approximated. Reads of non-fresh objects' fields are
 state reads for EnforcePure. Static fields, struct fields and reference-typed
 fields stay approximated.
 Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure

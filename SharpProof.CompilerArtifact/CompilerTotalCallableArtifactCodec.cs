@@ -221,8 +221,8 @@ internal static class CompilerTotalCallableArtifactCodec
             parameters.Add(parameter);
         }
         Require(!artifact.HasReceiver || parameters.Count != 0 &&
-            factory.GetVariableInfo(parameters[parameters.Count - 1].Entry).Type == factory.ObjectType,
-            "A receiver is a trailing object parameter.");
+            factory.GetTypeInfo(factory.GetVariableInfo(parameters[parameters.Count - 1].Entry).Type).Kind == IrTypeKind.Reference,
+            "A receiver is a trailing reference parameter.");
         IrVarId? result = artifact.Result == -1 ? null : Variable(artifact.Result, "result");
         var entryVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Entry));
         var currentVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Current));

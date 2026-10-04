@@ -89,7 +89,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 return Compose(operation, [LowerClause(receiver, state, depth + 1)]);
             case IFieldReferenceOperation { Instance: { } owner } fieldReference when IsImplicitThis(owner) &&
                 _context.ReceiverValue(state) is { } self && FieldMember(fieldReference.Field) is { } member:
-                return new(_factory.PureOpaque(member, self), _factory.Boolean(true), FrontendSubsetClassification.Exact);
+                return new(_factory.PureOpaque(member, AsObject(self)), _factory.Boolean(true), FrontendSubsetClassification.Exact);
             case IFieldReferenceOperation { Instance: { } owner } fieldReference when !IsImplicitThis(owner) &&
                 FieldMember(fieldReference.Field) is { } member:
                 {
@@ -304,9 +304,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && AllowOpaqueCalls && operation is ICompoundAssignmentOperation { Target: IArrayElementReferenceOperation compounded } &&
             CSharpOperationSemantics.IsModeledElementAccess(compounded) && compounded.Type?.IsValueType == true)
         { return ElementAccess(compounded, operation, block, depth); }
-        // A captured `this` is only a receiver; as a value it stays closed.
+        // A captured `this` is the modeled receiver; without one, as a value
+        // it stays closed.
         if (operation is IFlowCaptureReferenceOperation thisReference && _context.IsThisCapture(thisReference.Id))
-        { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
+        {
+            return _context.ThisValue() is { } self ? new(self, block, FrontendSubsetClassification.Exact)
+                : Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind);
+        }
         if (depth < 256 && _context.CapturedField(operation) is { } capturedRead)
         { return FieldRead(operation, capturedRead.Field, capturedRead.Instance, block, depth, captured: true); }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false } capturedStore &&
@@ -1062,6 +1066,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             ILocalReferenceOperation local when local.Local.RefKind == RefKind.None => _factory.Variable(_context.Variable(local.Local)),
             IFlowCaptureReferenceOperation capture => _factory.Variable(_context.Capture(capture.Id, capture.Type)),
             IFieldReferenceOperation field when field.Field.HasConstantValue => CSharpOperationSemantics.Literal(_factory, field.Type!, field.Field.ConstantValue),
+            IInstanceReferenceOperation self when IsImplicitThis(self) => _context.ThisValue(state),
             _ => null
         };
         return value != null;
@@ -1093,7 +1098,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return FrontendAbstention.InvalidOperation; }
         if (admission == TotalOperationAdmission.Incomplete)
         {
-            if (operation is not IPropertyReferenceOperation property || !CSharpOperationSemantics.IsLength(property))
+            // `this` is a value only once the receiver is modeled.
+            if ((operation is not IPropertyReferenceOperation property || !CSharpOperationSemantics.IsLength(property)) &&
+                (operation is not IInstanceReferenceOperation self || !IsImplicitThis(self) || _context.ThisValue() == null))
             { return FrontendAbstention.UnsupportedOperationKind; }
         }
         if (operation.ConstantValue is { HasValue: true, Value: string text } && !Utf16WellFormedness.IsWellFormed(text))
