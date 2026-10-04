@@ -1,0 +1,56 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:<no-assembly>::System.Func{System.Object}[][width=0,signed=False] current=v1:<no-assembly>::System.Func{System.Object}[][width=0,signed=False] old=v2:<no-assembly>::System.Func{System.Object}[][width=0,signed=False]
+parameter: 1 entry=v3:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False] current=v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False] old=v5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False]
+result: void
+variable: v1:<no-assembly>::System.Func{System.Object}[][width=0,signed=False] source=values
+variable: v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False] source=item
+block: b0 entry
+  i0 op0 Assign v1:<no-assembly>::System.Func{System.Object}[][width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:<no-assembly>::System.Func{System.Object}[][width=0,signed=False] = v0 source=none
+  i2 op0 Assign v4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False] = v3 source=none
+  i3 op0 Assign v5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False] = v3 source=none
+  i5 op0 Goto b1 source=none
+block: b1 cfg:0
+  i6 op0 Goto b2 source=none
+block: b2 cfg:1
+  i7 op1 Assign v6:<no-assembly>::System.Func{System.Object}[][width=0,signed=False] = v1 source=total-variant-delegate-store.cs:181+6
+  i8 op2 Assign v7:int[width=32,signed=True] = 0 source=total-variant-delegate-store.cs:188+1
+  i9 op4 Assign v8:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object}[width=0,signed=False] = v4 source=total-variant-delegate-store.cs:193+4
+  i10 op5 Branch (v6 == (("<no-assembly>::System.Func{System.Object}[]"#t5)null)) ? b5 : b6 source=total-variant-delegate-store.cs:181+9
+block: b3 cfg:2
+  i21 op0 Return void source=none
+block: b4 exceptional:exit
+  i4 op0 ExceptionalExit source=none
+block: b5 throw
+  i11 op5 Throw NullReference -> b4 source=total-variant-delegate-store.cs:181+9
+block: b6 normal
+  i12 op6 Branch ((v7 < 0) || (v7 >= len(v6))) ? b7 : b8 source=total-variant-delegate-store.cs:181+9
+block: b7 throw
+  i13 op6 Throw IndexOutOfRange -> b4 source=total-variant-delegate-store.cs:181+9
+block: b8 normal
+  i14 op7 Assign v9:bool[width=0,signed=False] = true source=total-variant-delegate-store.cs:181+9
+  i15 op3 Havoc Variables/Approximation [v10:bool[width=0,signed=False]] source=total-variant-delegate-store.cs:181+16
+  i16 op8 Branch v10 ? b9 : b10 source=total-variant-delegate-store.cs:181+9
+block: b9 throw
+  i17 op8 Throw Unknown -> b4 source=total-variant-delegate-store.cs:181+9
+block: b10 normal
+  i18 op9 Assign v11:bool[width=0,signed=False] = true source=total-variant-delegate-store.cs:181+9
+  i19 op3 Write Element source=total-variant-delegate-store.cs:181+16
+  i20 op0 Goto b3 source=none
+term: ir0 Variable type=t5:<no-assembly>::System.Func{System.Object}[] width=0 signed=False value=v0
+term: ir1 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object} width=0 signed=False value=v3
+term: ir2 Variable type=t5:<no-assembly>::System.Func{System.Object}[] width=0 signed=False value=v1
+term: ir3 Variable type=t5:<no-assembly>::System.Func{System.Object}[] width=0 signed=False value=v6
+term: ir4 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir5 Variable type=t1:int width=32 signed=True value=v7
+term: ir6 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object} width=0 signed=False value=v4
+term: ir8 Null type=t5:<no-assembly>::System.Func{System.Object}[] width=0 signed=False value=(("<no-assembly>::System.Func{System.Object}[]"#t5)null)
+term: ir9 Binary type=t0:bool width=0 signed=False value=(v6 == (("<no-assembly>::System.Func{System.Object}[]"#t5)null))
+term: ir10 Length type=t1:int width=32 signed=True value=len(v6)
+term: ir11 Binary type=t0:bool width=0 signed=False value=(v7 >= len(v6))
+term: ir12 Binary type=t0:bool width=0 signed=False value=(v7 < 0)
+term: ir13 Binary type=t0:bool width=0 signed=False value=((v7 < 0) || (v7 >= len(v6)))
+term: ir14 Boolean type=t0:bool width=0 signed=False value=true
+term: ir16 Variable type=t0:bool width=0 signed=False value=v10

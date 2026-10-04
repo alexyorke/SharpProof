@@ -104,7 +104,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         if (constructor.IsImplicitlyDeclared)
         {
-            if (!creation.Arguments.IsEmpty || _calls == null)
+            if (!creation.Arguments.IsEmpty || _calls == null || !_calls.HasNoTypeInitialization(constructor.ContainingType))
             { return null; }
             block = Allocate(block);
             return new(created!, block, FrontendSubsetClassification.Exact);

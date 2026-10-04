@@ -1,0 +1,32 @@
+mode: Total
+classification: ClosedAbstention/UnsupportedOperationKind
+entry: b0
+result: v0:int[width=32,signed=True]
+variable: v1:<no-assembly>::System.Nullable{System.Int32}[][width=0,signed=False] source=values
+block: b0 entry
+  i1 op0 Goto b1 source=none
+block: b1 cfg:0
+  i2 op0 Goto b2 source=none
+block: b2 cfg:1
+  i3 op1 Havoc Variables/Approximation [v2:<no-assembly>::System.Nullable{System.Int32}[][width=0,signed=False]] source=total-nullable-array-collection.cs:113+6
+  i4 op2 Havoc Variables/Approximation [v3:<no-assembly>::System.Nullable{System.Int32}[][width=0,signed=False]] source=total-nullable-array-collection.cs:113+6
+  i5 op5 Assign v4:<no-assembly>::System.Nullable{System.Int32}[][width=0,signed=False] = v1 source=total-nullable-array-collection.cs:136+6
+  i6 op6 Branch (v4 == (("<no-assembly>::System.Nullable{System.Int32}[]"#t5)null)) ? b5 : b6 source=total-nullable-array-collection.cs:136+13
+block: b3 cfg:2
+  i11 op0 Return void source=none
+block: b4 exceptional:exit
+  i0 op0 ExceptionalExit source=none
+block: b5 throw
+  i7 op6 Throw NullReference -> b4 source=total-nullable-array-collection.cs:136+13
+block: b6 normal
+  i8 op7 Assign v5:int[width=32,signed=True] = len(v4) source=total-nullable-array-collection.cs:136+13
+  i9 op4 Assign v0:int[width=32,signed=True] = v5 source=total-nullable-array-collection.cs:136+13
+  i10 op4 Return v0 source=total-nullable-array-collection.cs:136+13
+term: ir2 Variable type=t5:<no-assembly>::System.Nullable{System.Int32}[] width=0 signed=False value=v1
+term: ir3 Variable type=t5:<no-assembly>::System.Nullable{System.Int32}[] width=0 signed=False value=v4
+term: ir4 Length type=t1:int width=32 signed=True value=len(v4)
+term: ir5 Null type=t5:<no-assembly>::System.Nullable{System.Int32}[] width=0 signed=False value=(("<no-assembly>::System.Nullable{System.Int32}[]"#t5)null)
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v4 == (("<no-assembly>::System.Nullable{System.Int32}[]"#t5)null))
+term: ir7 Variable type=t1:int width=32 signed=True value=v5
+term: ir8 Variable type=t1:int width=32 signed=True value=v0
+diagnostic: op3 UnsupportedOperationKind SimpleAssignment@104

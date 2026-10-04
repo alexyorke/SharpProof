@@ -40,6 +40,22 @@ internal static partial class CSharpOperationSemantics
                     SpecialType.System_Byte or SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_UInt32);
     }
 
+    internal static bool ArrayStoreNeedsCompatibility(ITypeSymbol element)
+    {
+        if (element.IsValueType)
+        { return false; }
+        if (!element.IsSealed)
+        { return true; }
+        if (element is not INamedTypeSymbol { TypeKind: TypeKind.Delegate } named)
+        { return false; }
+        for (INamedTypeSymbol? current = named; current != null; current = current.ContainingType)
+        {
+            if (current.OriginalDefinition.TypeParameters.Any(parameter => parameter.Variance != VarianceKind.None))
+            { return true; }
+        }
+        return false;
+    }
+
     private static TotalScalarRule ArrayReadRule(IrFactory factory, IArrayElementReferenceOperation access, ImmutableArray<IrTerm> operands)
     {
         if (access.Indices.Length != 1 || access.ArrayReference.Type is not IArrayTypeSymbol { IsSZArray: true } array ||

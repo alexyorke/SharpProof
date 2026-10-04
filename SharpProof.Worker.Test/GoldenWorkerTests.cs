@@ -33,7 +33,8 @@ public sealed class GoldenWorkerTests
         var first = fixture.Source.Split('\n')[0];
         Assert.That(first, Does.StartWith(prefix));
         var scenario = first[prefix.Length..];
-        var actual = scenario == "synchronization-projection" ? await SynchronizationProjection(fixture)
+        var actual = scenario == "write-operand-approximation" ? await WriteOperandApproximation()
+            : scenario == "synchronization-projection" ? await SynchronizationProjection(fixture)
             : scenario == "native-infrastructure" ? await NativeInfrastructure()
             : scenario == "native-cancellation" ? await NativeCancellation()
             : scenario == "native-resource" ? await NativeResource()
@@ -57,6 +58,27 @@ public sealed class GoldenWorkerTests
             : scenario.StartsWith("model-", StringComparison.Ordinal) ? await TypedModel(scenario)
             : scenario.StartsWith("replay-", StringComparison.Ordinal) ? await Replay(scenario) : await Verify(fixture, scenario);
         GoldenTest.Compare(fixture, actual);
+    }
+
+    private static async Task<string> WriteOperandApproximation()
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        var receiver = factory.CreateVariable("receiver", factory.ObjectType);
+        var value = factory.CreateVariable("approximate", factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        subject.Builder.Allocate(block, subject.Site, factory.ObjectType, receiver);
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        subject.Builder.FieldStore(block, factory.CreateOperation("write-site"), IrWriteRegion.Field,
+            factory.Variable(receiver), field, factory.Variable(value));
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(subject.Candidate(factory.Boolean(true)), out var plan, out var failure),
+            Is.True, failure.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var result = await solver.VerifyPurityAsync();
+        return "outcome: " + (result.Outcome == null ? "Unknown" : result.Outcome.GetType().Name) + "\nreason: " +
+            result.Reason + "\nwrite-witness: " + (result.WriteWitness != null) + "\n";
     }
 
     private static async Task<string> TotalClaimResults(string source)

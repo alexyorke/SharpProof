@@ -226,7 +226,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         return graph != null;
     }
 
-    private bool HasNoTypeInitialization(INamedTypeSymbol type)
+    internal bool HasNoTypeInitialization(INamedTypeSymbol type)
     {
         if (_typeInitialization.TryGetValue(type, out var eligible))
         { return Spend() && eligible; }

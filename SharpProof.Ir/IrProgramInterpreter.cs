@@ -127,8 +127,6 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         return Unsupported(synchronization, values, steps,
                             "Concrete execution stopped at a synchronization attempt.");
                     case IrWriteInstruction write:
-                        replayOptions?.WriteObserver?.Invoke(write);
-                        replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
                         if (write is { Target: { } storedTarget, Value: { } storedElement })
                         {
                             var target = _terms.Evaluate(storedTarget, values.Current, values.ObserveRead, values.Heap, cancellationToken);
@@ -156,6 +154,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             else
                             { return Unsupported(write, values, steps, "A field store needs an object receiver."); }
                         }
+                        replayOptions?.WriteObserver?.Invoke(write);
+                        replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
                         break;
                     case IrAssignInstruction assign:
                         var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, values.Heap, cancellationToken);

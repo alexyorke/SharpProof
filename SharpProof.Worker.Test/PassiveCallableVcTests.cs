@@ -565,6 +565,28 @@ public sealed class PassiveCallableVcTests
         }
     }
 
+    [Test]
+    public async Task EffectReplayIncludesApproximationReadByStore()
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        var receiver = factory.CreateVariable("receiver", factory.ObjectType);
+        var value = factory.CreateVariable("approximate", factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            "field:Value", factory.IntegerType, false);
+        var site = factory.CreateOperation("effect-site");
+        subject.Builder.Allocate(block, subject.Site, factory.ObjectType, receiver);
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        subject.Builder.FieldStore(block, site, IrWriteRegion.Field, factory.Variable(receiver), field, factory.Variable(value));
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        using var solver = new PassiveCallableSolver(Build(subject.Candidate(factory.Boolean(true))));
+        var result = await solver.VerifyPurityAsync();
+        Assert.That(result.Outcome, Is.Null);
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+        Assert.That(result.WriteWitness, Is.Null);
+    }
+
     [TestCase("allocation", true, false)]
     [TestCase("write", true, false)]
     [TestCase("allocation", false, false)]

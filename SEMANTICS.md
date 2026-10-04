@@ -421,6 +421,11 @@ Houdini, so the kernel checks every one over bitvectors: `s == 2 * i` proves
 from bounded search and replay.
 Unsupported async and iterator callables abstain.
 
+Field and auto-property compound assignments capture their receiver before
+reading the old value and evaluating the right-hand side. The final store uses
+that same receiver even if the right-hand side reassigns the receiver local.
+The null check precedes right-hand-side evaluation.
+
 Element stores into single-dimensional arrays of bool or integer elements
 carry their array, index and value (`a[i] = v`, `a[i]++`, compound
 assignments). Replay applies them to the arrays by identity. In the
@@ -516,9 +521,11 @@ Bounds use the original unsigned value or a widened narrow value; only a
 successful check converts the captured index to the signed Int32 domain used
 by sequence reads and stores. A uint index above Int32.MaxValue is rejected
 before that conversion. Index expressions evaluate once.
-Each store writes Element state, and a
-store of a reference into an array whose element type is not sealed may fail
-its covariance check. A body that stores elements or calls opaque code reads
+Each store writes Element state. A reference store may fail its covariance
+check when the element type is unsealed or is a delegate with variance in its
+generic scope. Delegates are sealed but can still have variance-compatible
+runtime array types. Such compatibility remains an approximation after exact
+null and bounds checks. A body that stores elements or calls opaque code reads
 elements as approximations, and stays abstract when an Ensures clause or a
 callee precondition reads elements. Arrays of any value-domain element type,
 and multidimensional arrays, are references; their non-scalar or
@@ -555,8 +562,11 @@ collection expressions targeting supported arrays use the same allocation and
 contents model. Source params calls preserve explicit arrays and nulls;
 constant expanded arguments allocate a fresh array. Empty expanded params use
 the compiler's Array.Empty cache only when its owned model is available.
-Nonconstant initializer evaluation, dynamic params expansion and array mutation
-are not yet represented. Empty collection expressions and spreads remain
+Null initializer constants require a reference-domain element type. Nullable
+struct initializers and collections abstain rather than materializing a
+reference null as a value-type default.
+Nonconstant initializer evaluation and dynamic params expansion are not yet
+represented. Empty collection expressions and spreads remain
 incomplete. Default-array element contents remain an
 overapproximation in the VC.
 Explicit delegate construction for static or nonvirtual reference receivers
@@ -662,6 +672,12 @@ method definition; type initialization uses the constructed type, including
 its containing types. Cache hits still consume construction work and check
 cancellation. Incomplete scans are never cached, and each call retains fresh
 frames, precondition checks and body expansion within the shared limit.
+Implicit source constructors use the same type-initialization eligibility
+check before allocation. A type with potentially executing initialization
+uses the opaque construction path, retaining All effects and approximation
+throws, rather than an exact allocation alone. That rejected implicit source
+constructor completes its unknown initialization before allocating the
+instance, so no concrete allocation witness precedes the approximation.
 Source setters and indexers inline the same way: an accessor takes its
 property's arguments, a setter takes the assigned value as its final `value`
 parameter, and the assignment's value is the assigned one. Effect claims on
@@ -801,6 +817,11 @@ discrepancy for an otherwise executable counterexample remains the fatal
 `CounterexampleReplayFailed` run failure. Optional SARIF 2.1.0 is a
 deterministic projection of the validated protocol response; it does not
 participate in proof construction or change build success.
+
+Write replay observers run only after receiver, index and value evaluation
+and successful storage validation. A write consuming approximation is marked
+before an effect witness can be admitted; rejected storage emits no write
+notification. Operand-free effect markers retain their existing notifications.
 
 Effect refutation replay is separate from SMT and whole-body postcondition
 replay. The worker interprets the compiler-neutral ordered event, recomputes
