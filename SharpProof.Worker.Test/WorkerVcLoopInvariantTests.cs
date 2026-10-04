@@ -44,6 +44,18 @@ public sealed class WorkerVcLoopInvariantTests
                 while (i < n) { i += 2; }
                 return i;
             }
+            [DoesNotThrow]
+            public static int Sum([NotNull] int[] values) {
+                var total = 0;
+                for (var i = 0; i < values.Length; i++) { total += values[i]; }
+                return total;
+            }
+            [DoesNotThrow]
+            public static int SumFromOne([NotNull] int[] values) {
+                var total = 0;
+                for (var i = 1; i <= values.Length; i++) { total += values[i]; }
+                return total;
+            }
             public static int NeedsNoNegative(int n) {
                 Contract.Ensures(Contract.Result<int>() == n);
                 var i = 0;
@@ -79,6 +91,21 @@ public sealed class WorkerVcLoopInvariantTests
     public void NonInductiveGuessIsNotAssumed()
     {
         Assert.That(Claim("StepTwo").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
+    // i >= 0 keeps every read in bounds.
+    [Test]
+    public void InductiveInvariantProvesAnEffectClaim()
+    {
+        var claim = Claim("Sum");
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
+    // The last iteration reads values[values.Length].
+    [Test]
+    public void OutOfBoundsLoopReadIsRefuted()
+    {
+        Assert.That(Claim("SumFromOne").Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
     // Without n >= 0 a negative n returns 0.

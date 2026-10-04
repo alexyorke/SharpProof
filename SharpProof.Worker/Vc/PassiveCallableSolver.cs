@@ -179,7 +179,17 @@ internal sealed class PassiveCallableSolver : IDisposable
         var witness = _plan.LoopSearch == null ? proof
             : await VerifyAsync(encoding.ExceptionQuery(allowed, allowedSite), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
-        { return witness.Outcome is ProvenOutcome ? Inconclusive() : witness; }
+        {
+            if (_plan.LoopSearch != null && witness.Reason != WorkerClaimReason.ResourceLimit &&
+                await InvariantPlanAsync(cancellationToken).ConfigureAwait(false) is { } invariants)
+            {
+                var proven = await VerifyAsync(invariants.ExceptionQuery(allowed, allowedSite), null, cancellationToken, invariants)
+                    .ConfigureAwait(false);
+                if (proven.Outcome is ProvenOutcome)
+                { return WithInvariantPremises(proven); }
+            }
+            return witness.Outcome is ProvenOutcome ? Inconclusive() : witness;
+        }
         if (!_plan.HasBodyAbstraction)
         {
             var replay = _plan.ReplayException(witness.EntryModel, cancellationToken);
@@ -264,16 +274,20 @@ internal sealed class PassiveCallableSolver : IDisposable
         {
             var proven = await VerifyAsync(invariants.EnsuresQuery(ordinal), null, cancellationToken, invariants).ConfigureAwait(false);
             if (proven.Outcome is ProvenOutcome)
-            {
-                return proven with
-                {
-                    Core = [.. proven.Core.Union(_invariantCore, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
-                    BodyAssumptions = [.. proven.BodyAssumptions.Union(_invariantAssumptions).OrderBy(value => value.Value)]
-                };
-            }
+            { return WithInvariantPremises(proven); }
         }
         // A cut model is never a refutation; finite search is never a proof.
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
+    }
+
+    // A proof over assumed invariants also rests on the premises that proved them.
+    private PassiveCallableCheckResult WithInvariantPremises(PassiveCallableCheckResult proven)
+    {
+        return proven with
+        {
+            Core = [.. proven.Core.Union(_invariantCore, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
+            BodyAssumptions = [.. proven.BodyAssumptions.Union(_invariantAssumptions).OrderBy(value => value.Value)]
+        };
     }
 
     // The cut proof plan with the largest inductive set of candidate loop
