@@ -870,11 +870,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // are modeled through an object-typed receiver.
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
-        return field.IsStatic || !field.ContainingType.IsReferenceType ||
-            !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type)
-            ? null
-            : _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, field), _factory.ObjectType,
-                IrFieldSites.Prefix + CompilerIdentityBridge.CreateSymbolDisplay(field), _context.Type(field.Type), false);
+        if (field.IsStatic || !field.ContainingType.IsReferenceType ||
+            !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type))
+        { return null; }
+        // Inlined source bodies bind declaration symbols. A field whose type
+        // does not change under substitution must name the same slot there
+        // and at a constructed caller. Generic-dependent storage stays distinct.
+        var definition = field.OriginalDefinition;
+        var identity = SymbolEqualityComparer.Default.Equals(field.Type, definition.Type) ? definition : field;
+        return _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, identity), _factory.ObjectType,
+            IrFieldSites.Prefix + CompilerIdentityBridge.CreateSymbolDisplay(identity), _context.Type(field.Type), false);
     }
 
     private IrTerm AsObject(IrTerm receiver)

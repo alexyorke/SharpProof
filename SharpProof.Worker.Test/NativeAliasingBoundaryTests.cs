@@ -6,6 +6,72 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeAliasingBoundaryTests
 {
+    [TestCase(7, WorkerClaimOutcome.Proven)]
+    [TestCase(3, WorkerClaimOutcome.Refuted)]
+    public async Task GenericReceiverContractsShareFieldIdentity(int expected, WorkerClaimOutcome outcome)
+    {
+        var source = "using SharpProof.Attributes; public class Outer<T> { public class Cell<U> { public int Value; " +
+            "public void Set() { Contract.Requires(Value == 3); Value = 7; } } } public static class C { " +
+            "public static int Target(Outer<int>.Cell<string> cell) { Contract.Requires(cell != null && cell.Value == 3); " +
+            "Contract.Ensures(cell.Value == " + expected + " && Contract.Old(cell).Value == 3); cell.Set(); return cell.Value; } }";
+        Assert.That(await Verify(source), Is.EqualTo(outcome));
+    }
+
+    [TestCase(73, WorkerClaimOutcome.Proven)]
+    [TestCase(77, WorkerClaimOutcome.Refuted)]
+    public async Task GenericFieldIdentityPreservesDistinctReceivers(int expected, WorkerClaimOutcome outcome)
+    {
+        var source = "using SharpProof.Attributes; public class Cell<T> { public int Value; " +
+            "public void Set() { Value = 7; } } public static class C { public static int Target(Cell<int> a, Cell<int> b) { " +
+            "Contract.Requires(a != null && b != null && a != b && a.Value == 1 && b.Value == 3); " +
+            "Contract.Ensures(Contract.Result<int>() == " + expected + "); a.Set(); return a.Value * 10 + b.Value; } }";
+        Assert.That(await Verify(source), Is.EqualTo(outcome));
+    }
+
+    [TestCase("int", "3", "7")]
+    [TestCase("string", "\"before\"", "\"after\"")]
+    public async Task GenericDependentFieldRetainsConservativeCallBoundary(string type, string before, string after)
+    {
+        var source = "using SharpProof.Attributes; public class Cell<T> { public T Value; " +
+            "public void Set(T value) { Value = value; } } public static class C { public static " + type + " Target() { " +
+            "Contract.Ensures(Contract.Result<" + type + ">() == " + after + "); var cell = new Cell<" + type +
+            ">(); cell.Value = " + before + "; cell.Set(" + after + "); return cell.Value; } }";
+        Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase("bool", "false", "true", "cell.Value ? 7 : 3", 7, WorkerClaimOutcome.Proven)]
+    [TestCase("bool", "false", "true", "cell.Value ? 7 : 3", 3, WorkerClaimOutcome.Refuted)]
+    [TestCase("string", "\"before\"", "\"after\"", "cell.Value == \"after\" ? 7 : 3", 7, WorkerClaimOutcome.Proven)]
+    [TestCase("string", "\"before\"", "\"after\"", "cell.Value == \"after\" ? 7 : 3", 3, WorkerClaimOutcome.Refuted)]
+    [TestCase("Node", "first", "second", "cell.Value.Score", 7, WorkerClaimOutcome.Proven)]
+    [TestCase("Node", "first", "second", "cell.Value.Score", 3, WorkerClaimOutcome.Refuted)]
+    [TestCase("int[]", "new int[3]", "new int[7]", "cell.Value.Length", 7, WorkerClaimOutcome.Proven)]
+    [TestCase("int[]", "new int[3]", "new int[7]", "cell.Value.Length", 3, WorkerClaimOutcome.Refuted)]
+    public async Task NestedGenericReceiverWritesTheSameFieldSlot(string type, string before, string after,
+        string result, int expected, WorkerClaimOutcome outcome)
+    {
+        var source = "using SharpProof.Attributes; public class Node { public int Score; } " +
+            "public class Outer<T> { public class Cell<U> { public " + type + " Value; public void Set(" + type +
+            " value) { Value = value; } } } public static class C { public static int Target() { " +
+            "Contract.Ensures(Contract.Result<int>() == " + expected + "); var first = new Node(); first.Score = 3; " +
+            "var second = new Node(); second.Score = 7; var cell = new Outer<int>.Cell<string>(); " +
+            "cell.Value = " + before + "; cell.Set(" + after + "); return " + result + "; } }";
+        Assert.That(await Verify(source), Is.EqualTo(outcome));
+    }
+
+    [TestCase("cell.Set();", 7, WorkerClaimOutcome.Proven)]
+    [TestCase("cell.Set();", 3, WorkerClaimOutcome.Refuted)]
+    [TestCase("cell.Property = 7;", 7, WorkerClaimOutcome.Proven)]
+    [TestCase("cell.Property = 7;", 3, WorkerClaimOutcome.Refuted)]
+    public async Task GenericReceiverWritesTheSameFieldSlot(string mutation, int expected, WorkerClaimOutcome outcome)
+    {
+        var source = "using SharpProof.Attributes; public class Cell<T> { public int Value; " +
+            "public void Set() { Value = 7; } public int Property { get { return Value; } set { Value = value; } } } " +
+            "public static class C { public static int Target() { Contract.Ensures(Contract.Result<int>() == " + expected +
+            "); var cell = new Cell<int>(); cell.Value = 3; " + mutation + " return cell.Value; } }";
+        Assert.That(await Verify(source), Is.EqualTo(outcome));
+    }
+
     [TestCase(false, 7, WorkerClaimOutcome.Proven)]
     [TestCase(false, 2, WorkerClaimOutcome.Refuted)]
     [TestCase(true, 1, WorkerClaimOutcome.Proven)]

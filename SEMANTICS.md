@@ -656,7 +656,12 @@ type-parameter types bridge to the caller's by reference casts, and so do a
 generic method's: its declaration inlines when every parameter and its result
 share the call's value domain (`Swap<T>(IList<T>, int, int)` called on an
 `IList<int>`), while a scalar argument for a type parameter (`Id<int>(x)`)
-does not. A `ref` or `in` parameter of a scalar or reference type that the
+does not. Instance fields whose declared types are unchanged by generic
+substitution share their declaration identity across constructed callers and
+inlined source bodies, including nested generic containers and custom
+accessors. Receiver identity still separates objects. Generic-dependent
+field types retain their existing specialization and approximation boundaries.
+A `ref` or `in` parameter of a scalar or reference type that the
 body never writes (no assignment, increment, compound assignment, `ref` or
 `out` argument or `ref` expression naming it) starts with its caller's value.
 Nonlocal writes and opaque calls with write effects invalidate its current

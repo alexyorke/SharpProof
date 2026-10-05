@@ -6,6 +6,57 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedMutationBoundaryTests
 {
+    [Test]
+    public void GenericFieldIdentityPreservesConstructedObjectSeparation()
+    {
+        using var subject = TypedProgramSubject.Create("int Target() { var a = new Cell<int>(); var b = new Cell<string>(); " +
+            "a.Value = 1; b.Value = 3; a.Set(); return a.Value * 10 + b.Value; }",
+            "public class Cell<T> { public int Value; public void Set() { Value = 7; } }");
+        Assert.That(subject.Invoke([]), Is.EqualTo(73));
+        var lowered = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowered.IsExact, Is.True);
+        var replay = subject.Execute(lowered, []);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(73));
+    }
+
+    [TestCase("bool", "false", "true", "cell.Value ? 7 : 3")]
+    [TestCase("string", "\"before\"", "\"after\"", "cell.Value == \"after\" ? 7 : 3")]
+    [TestCase("Node", "first", "second", "cell.Value.Score")]
+    [TestCase("int[]", "new int[3]", "new int[7]", "cell.Value.Length")]
+    public void NestedGenericReceiverRetainsFixedFieldIdentity(string type, string before, string after, string result)
+    {
+        using var subject = TypedProgramSubject.Create("int Target() { var first = new Node(); first.Score = 3; " +
+            "var second = new Node(); second.Score = 7; var cell = new Outer<int>.Cell<string>(); cell.Value = " +
+            before + "; cell.Set(" + after + "); return " + result + "; }", "public class Node { public int Score; } " +
+            "public class Outer<T> { public class Cell<U> { public " + type + " Value; public void Set(" + type +
+            " value) { Value = value; } } }");
+        Assert.That(subject.Invoke([]), Is.EqualTo(7));
+        var lowered = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowered.IsExact, Is.True);
+        var replay = subject.Execute(lowered, []);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(7));
+    }
+
+    [TestCase("cell.Set();")]
+    [TestCase("cell.Property = 7;")]
+    public void GenericReceiverStoresRetainFieldIdentity(string mutation)
+    {
+        using var subject = TypedProgramSubject.Create("int Target() { var cell = new Cell<int>(); cell.Value = 3; " +
+            mutation + " return cell.Value; }", "public class Cell<T> { public int Value; public void Set() { Value = 7; } " +
+            "public int Property { get { return Value; } set { Value = value; } } }");
+        Assert.That(subject.Invoke([]), Is.EqualTo(7));
+        var lowered = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowered.IsExact, Is.True);
+        var replay = subject.Execute(lowered, []);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(7));
+    }
+
     [TestCase("ref", "cell.Value", "cell.Value = 5;")]
     [TestCase("in", "cell.Value", "cell.Value = 5;")]
     [TestCase("ref", "values[0]", "values[0] = 5;")]
