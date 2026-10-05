@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 28;
+    internal const int Current = 29;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -76,6 +76,7 @@ internal sealed record CompilerTotalCallablePreparation(
     ImmutableArray<CompilerTotalClause> Clauses,
     bool IsBodyAbstraction = false)
 {
+    internal ImmutableArray<CompilerDisjointInputPair> DisjointInputs { get; init; } = [];
     internal ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints { get; init; } = [];
     internal ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions { get; init; } = [];
     internal bool EffectsCompleteAtEntry { get; init; }
@@ -113,11 +114,15 @@ internal sealed record CompilerShadowCallHop(string CallerIdentity, string Calle
 
 internal readonly record struct CompilerTotalParameter(IrVarId Entry, IrVarId Current, IrVarId Old);
 
+internal sealed record CompilerDisjointInputPair([property: JsonRequired] int Left, [property: JsonRequired] int Right);
+
 internal sealed record CompilerTotalClause(CompilerContractKind Kind, IrTerm Value, IrTerm Safe,
     OperationId Operation, string? ClaimId, string? AssumptionId);
 
 internal sealed class CompilerTotalCallableArtifact
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompilerDisjointInputPair[]? DisjointInputs { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool EffectsCompleteAtEntry { get; set; }
     public string[] ValidEffectClaimIds { get; set; } = [];

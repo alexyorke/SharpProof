@@ -345,13 +345,22 @@ rethrown from that handler is never offered to later sibling catches.
 Nonconstant filters and uncertain runtime subtypes retain every feasible
 escape path.
 
-The packaged verifier consumes compiler artifact schema version 28 produced
+The packaged verifier consumes compiler artifact schema version 29 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
 metadata for the remaining legacy API-spec payload. Typed Total graphs carry
-composed source and metadata bodies. The artifact also contains admitted
+composed source and metadata bodies. It also carries
+compiler-certified disjoint entry-parameter pairs for distinct closed sealed
+classes. These pairs constrain non-null object identity in every body query
+and are checked before concrete replay or effect/precondition observers run.
+They permit null aliases and do not constrain later parameter assignments.
+The compiler, as the trusted artifact producer, supplies the type facts;
+distinct IR type names alone never establish disjointness. Entry-only,
+shadow, and abstract-body payloads cannot carry these certificates. This
+initial scope excludes interfaces, object, receivers, open generic types,
+and references reached only through fields or elements. The artifact also contains admitted
 unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
 their source-tree identities and spans. Worker protocol version 13 and semantic

@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -6,6 +8,71 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeAliasingBoundaryTests
 {
+    internal const string DistinctSealedSource = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
+        "public static class C { public static bool Target(A a, B b) { Contract.Requires(a != null && b != null); " +
+        "Contract.Ensures(Contract.Result<bool>()); object left = a; object right = b; return left != right; } }";
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void EntryIdentityIsValidatedBeforeEffectReplay(bool alias, bool nullInputs)
+    {
+        var source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } public static class C { " +
+            "public static int Target(A a, B b) { Contract.Ensures(Contract.Result<int>() == 1); var allocated = new object(); return 1; } }";
+        using var project = new ShadowTestProject(source);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        var identity = new object();
+        var inputs = candidate.Parameters.Select((parameter, ordinal) =>
+        {
+            var type = candidate.Factory.GetVariableInfo(parameter.Entry).Type;
+            return (parameter.Entry, Value: nullInputs ? candidate.Factory.CreateNullValue(type) :
+                candidate.Factory.CreateReferenceValue(type, alias || ordinal == 0 ? identity : new object()));
+        }).ToImmutableDictionary(pair => pair.Entry, pair => pair.Value);
+        var observed = 0;
+        var execution = plan!.ReplayEffects(inputs, CancellationToken.None, allocationObserver: _ => observed++);
+        Assert.That(execution.Status, Is.EqualTo(alias && !nullInputs ? IrProgramExecutionStatus.Unsupported : IrProgramExecutionStatus.Returned));
+        Assert.That(observed, Is.EqualTo(alias && !nullInputs ? 0 : 1));
+        if (alias && !nullInputs)
+        { Assert.That(execution.Steps, Is.Zero); }
+    }
+
+    [Test]
+    public async Task DisjointEntryIdentityDoesNotForbidLaterNullAssignments()
+    {
+        var source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } public static class C { " +
+            "public static bool Target(A a, B b) { Contract.Requires(a != null && b != null); Contract.Ensures(Contract.Result<bool>()); " +
+            "a = null; b = null; object left = a; object right = b; return left == right; } }";
+        Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    [TestCase("public sealed class A { } public sealed class B { }", "A", "B", false, WorkerClaimOutcome.Proven)]
+    [TestCase("public sealed class A { } public sealed class B { }", "A", "B", true, WorkerClaimOutcome.Proven)]
+    [TestCase("public sealed class A { }", "A", "object", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public class A { } public sealed class B : A { }", "A", "B", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public interface A { } public sealed class B : A { }", "A", "B", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public interface A { } public interface B { } public sealed class Both : A, B { }", "A", "B", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public sealed class A { }", "A", "A", false, WorkerClaimOutcome.Refuted)]
+    public async Task EntryIdentityPreservesCompatibleAliases(string declarations, string firstType, string secondType,
+        bool nullInputs, WorkerClaimOutcome expected)
+    {
+        var source = "using SharpProof.Attributes; " + declarations + " public static class C { public static bool Target(" +
+            firstType + " a, " + secondType + " b) { Contract.Requires(a " + (nullInputs ? "==" : "!=") +
+            " null && b " + (nullInputs ? "==" : "!=") + " null); Contract.Ensures(Contract.Result<bool>()); " +
+            "object left = a; object right = b; return left " + (nullInputs ? "==" : "!=") + " right; } }";
+        Assert.That(await Verify(source), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public async Task DistinctSealedInputsCannotProduceAnImpossibleAliasRefutation()
+    {
+        using var project = new ShadowTestProject(DistinctSealedSource);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.Errors, Is.Empty);
+        var claim = response.ClaimResults.Single();
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
     [TestCase(7, WorkerClaimOutcome.Proven)]
     [TestCase(3, WorkerClaimOutcome.Refuted)]
     public async Task GenericReceiverContractsShareFieldIdentity(int expected, WorkerClaimOutcome outcome)

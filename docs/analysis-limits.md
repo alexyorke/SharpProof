@@ -240,7 +240,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 13, cache schema version 15,
-claim-manifest schema version 5, compiler artifact schema version 28,
+claim-manifest schema version 5, compiler artifact schema version 29,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,

@@ -1,4 +1,4 @@
-schema: 28
+schema: 29
 authority: legacy
 legacy-success: False
 total-present: True
@@ -7,3 +7,5 @@ unsigned: True
 roots-interleaved: True
 same-claim-ids: True
 full-ulong-wrap: ProvenOutcome
+disjoint-entry-pairs: 0:1
+distinct-sealed-identity: Proven

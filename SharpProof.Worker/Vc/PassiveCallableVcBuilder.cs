@@ -469,6 +469,13 @@ internal sealed class PassiveCallableVcBuilder
             _labels.Add(receiver.Justification, ReceiverLabel);
             entryAssumptions.Add(receiver);
         }
+        foreach (var constraint in _candidate.EntryConstraints)
+        {
+            Spend();
+            var assumption = new Assumption(_factory, constraint, new LoweredJustification(_factory.CreateOperation("disjoint-input")));
+            _labels.Add(assumption.Justification, "input:disjoint:" + entryAssumptions.Count.ToString(CultureInfo.InvariantCulture));
+            entryAssumptions.Add(assumption);
+        }
         var goals = ImmutableArray.CreateBuilder<IrTerm>();
         foreach (var clause in _candidate.Ensures)
         {

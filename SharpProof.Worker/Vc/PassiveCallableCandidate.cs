@@ -14,7 +14,8 @@ internal sealed class PassiveCallableCandidate
     internal PassiveCallableCandidate(string callableId, IrProgram program,
         ImmutableArray<PassiveParameterBinding> parameters, IrVarId? result,
         ImmutableArray<PassiveContractClause> requires, ImmutableArray<PassiveContractClause> ensures, bool isBodyAbstraction = false,
-        ImmutableArray<PassiveCallPrecondition> callPreconditions = default)
+        ImmutableArray<PassiveCallPrecondition> callPreconditions = default,
+        ImmutableArray<CompilerDisjointInputPair> disjointInputs = default)
     {
         if (string.IsNullOrWhiteSpace(callableId))
         { throw new ArgumentException("A callable identity is required.", nameof(callableId)); }
@@ -60,6 +61,24 @@ internal sealed class PassiveCallableCandidate
         Requires = requires;
         Ensures = ensures;
         IsBodyAbstraction = isBodyAbstraction;
+        var constraints = ImmutableArray.CreateBuilder<IrTerm>();
+        CompilerDisjointInputPair? previous = null;
+        foreach (var pair in disjointInputs.IsDefault ? [] : disjointInputs)
+        {
+            if (pair == null || isBodyAbstraction || pair.Left < 0 || pair.Left >= pair.Right || pair.Right >= parameters.Length ||
+                previous != null && (pair.Left < previous.Left || pair.Left == previous.Left && pair.Right <= previous.Right))
+            { throw new ArgumentException("Disjoint inputs must be canonical owned pairs.", nameof(disjointInputs)); }
+            var left = Factory.Variable(parameters[pair.Left].Entry);
+            var right = Factory.Variable(parameters[pair.Right].Entry);
+            if (left.Type == right.Type || left.Type == Factory.ObjectType || right.Type == Factory.ObjectType ||
+                Factory.GetTypeInfo(left.Type).Kind != IrTypeKind.Reference || Factory.GetTypeInfo(right.Type).Kind != IrTypeKind.Reference)
+            { throw new ArgumentException("Disjoint inputs require distinct nominal reference types.", nameof(disjointInputs)); }
+            constraints.Add(Factory.Binary(IrBinaryOperator.OrElse, Factory.Binary(IrBinaryOperator.Equal, left, Factory.Null(left.Type)),
+                Factory.Binary(IrBinaryOperator.OrElse, Factory.Binary(IrBinaryOperator.Equal, right, Factory.Null(right.Type)),
+                    Factory.Binary(IrBinaryOperator.NotEqual, Factory.Cast(Factory.ObjectType, left), Factory.Cast(Factory.ObjectType, right)))));
+            previous = pair;
+        }
+        EntryConstraints = constraints.ToImmutable();
         CallPreconditions = callPreconditions.IsDefault ? [] : callPreconditions;
         if (CallPreconditions.IsEmpty)
         {
@@ -102,4 +121,5 @@ internal sealed class PassiveCallableCandidate
     internal ImmutableArray<PassiveContractClause> Requires { get; }
     internal ImmutableArray<PassiveContractClause> Ensures { get; }
     internal ImmutableArray<PassiveCallPrecondition> CallPreconditions { get; }
+    internal ImmutableArray<IrTerm> EntryConstraints { get; }
 }

@@ -2,6 +2,19 @@ namespace SharpProof.Verify;
 
 internal static class CallableReplayValidator
 {
+    internal static bool EntryConstraintsHold(IrFactory factory, ImmutableArray<IrTerm> constraints,
+        IReadOnlyDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
+    {
+        var interpreter = new IrInterpreter(factory);
+        foreach (var constraint in constraints)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var evaluated = interpreter.Evaluate(constraint, inputs, cancellationToken: cancellationToken);
+            if (evaluated.Status != IrEvaluationStatus.Value || evaluated.Value is not { Kind: IrValueKind.Boolean, Boolean: true })
+            { return false; }
+        }
+        return true;
+    }
     internal static AbstentionReason? Validate(
         IrFactory factory, CallableReplayContext context,
         ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken)
@@ -20,6 +33,8 @@ internal static class CallableReplayValidator
         IrFactory factory, CallableReplayContext context,
         ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken)
     {
+        if (!EntryConstraintsHold(factory, context.EntryConstraints, model, cancellationToken))
+        { return AbstentionReason.CounterexampleReplayFailed; }
         var final = model.ToBuilder();
         var approximationVariables = new HashSet<IrVarId>();
         IrHeap? heap = null;

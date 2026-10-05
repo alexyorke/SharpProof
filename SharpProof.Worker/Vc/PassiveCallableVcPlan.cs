@@ -115,6 +115,8 @@ internal sealed class PassiveCallableVcPlan
     {
         if (ordinal < 0 || ordinal >= CallPreconditionCount)
         { throw new ArgumentOutOfRangeException(nameof(ordinal)); }
+        if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
+        { return null; }
         var marker = _candidate.CallPreconditions[ordinal].Marker;
         OperationId? witness = null;
         var initial = new Dictionary<IrVarId, IrValue>();
@@ -234,6 +236,8 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
         Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
+        if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
+        { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
         {
@@ -288,10 +292,10 @@ internal sealed class PassiveCallableVcPlan
             bindings[parameter.Current] = parameter.Current;
             old[parameter.Old] = parameter.Entry;
         }
-        return new(_candidate.Program, false, bindings.ToImmutable(), old.ToImmutable(),
+        return new(new CallableReplayContext(_candidate.Program, false, bindings.ToImmutable(), old.ToImmutable(),
             _candidate.Result is { } result ? [result] : [], value,
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, PassiveCallableVcBuilder.MaximumSteps, [],
-            postconditionGuard: safe, replayOptions: ReplayOptions());
+            postconditionGuard: safe, replayOptions: ReplayOptions()), _candidate.EntryConstraints);
     }
 
     internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)

@@ -43,4 +43,11 @@ public sealed class CallableReplayContext(
     internal Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? CallHost { get; } = callHost;
     public IrTerm? PostconditionGuard { get; }
     public IrProgramReplayOptions? ReplayOptions { get; }
+    internal ImmutableArray<IrTerm> EntryConstraints { get; } = [];
+
+    internal CallableReplayContext(CallableReplayContext context, ImmutableArray<IrTerm> entryConstraints)
+        : this(context.Program, context.IsTrivial, context.ParameterBindings, context.PreStateBindings,
+            context.ResultVariables, context.Postcondition, context.IntegerDomains, context.MaximumSteps,
+            context.RegisteredCalls, context.PostconditionGuard, context.ReplayOptions, context.CallHost)
+    { EntryConstraints = entryConstraints; }
 }

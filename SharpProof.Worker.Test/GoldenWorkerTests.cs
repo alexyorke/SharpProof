@@ -660,7 +660,15 @@ public sealed class GoldenWorkerTests
     private static async Task<string> TotalArtifact(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        return await TotalArtifact(artifact);
+        var output = new StringBuilder(await TotalArtifact(artifact));
+        using var project = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedSource);
+        var total = project.Snapshot.Callables.Single().Total!;
+        output.AppendLine("disjoint-entry-pairs: " + string.Join(",", total.DisjointInputs.Select(pair => pair.Left + ":" + pair.Right)));
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.Errors, Is.Empty);
+        output.AppendLine("distinct-sealed-identity: " + response.ClaimResults.Single().Outcome);
+        return output.ToString();
     }
 
     private static async Task<string> TotalArtifact(CompilerManifestArtifact artifact)

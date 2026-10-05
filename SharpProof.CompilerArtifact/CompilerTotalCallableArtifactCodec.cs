@@ -17,6 +17,7 @@ internal static class CompilerTotalCallableArtifactCodec
             preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions);
         artifact.EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry;
         artifact.HasReceiver = preparation.HasReceiver;
+        artifact.DisjointInputs = preparation.DisjointInputs.IsEmpty ? null : [.. preparation.DisjointInputs];
         artifact.ValidEffectClaimIds = [.. preparation.ValidEffectClaimIds];
         artifact.ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => new CompilerTotalExceptionConstraintArtifact
         { ClaimId = constraint.ClaimId, AllowedKinds = [.. constraint.AllowedKinds] })];
@@ -81,6 +82,7 @@ internal static class CompilerTotalCallableArtifactCodec
             CallPreconditions = decoded.CallPreconditions,
             EffectsCompleteAtEntry = artifact!.EffectsCompleteAtEntry,
             HasReceiver = artifact.HasReceiver,
+            DisjointInputs = decoded.DisjointInputs,
             ValidEffectClaimIds = [.. artifact.ValidEffectClaimIds]
         };
     }
@@ -108,7 +110,7 @@ internal static class CompilerTotalCallableArtifactCodec
             "A shadow body has an invalid owner label.");
         Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry && !artifact.HasReceiver &&
             artifact.Clauses is { Length: 0 } && artifact.ValidEffectClaimIds is { Length: 0 } &&
-            artifact.ExceptionConstraints is { Length: 0 },
+            artifact.ExceptionConstraints is { Length: 0 } && artifact.DisjointInputs is null or { Length: 0 },
             "A shadow body cannot carry own contracts, effects or abstraction.");
         var decoded = DecodeCore(artifact, [], [], entryOnly: false, cancellationToken, metadataReferences)!;
         return new(ownerId, decoded.Program!, decoded.Parameters, decoded.Result, [])
@@ -117,7 +119,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private sealed record DecodedTotal(IrFactory Factory, IrProgram? Program, ImmutableArray<CompilerTotalParameter> Parameters,
         IrVarId? Result, ImmutableArray<CompilerTotalClause> Clauses, ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints,
-        ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions);
+        ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions, ImmutableArray<CompilerDisjointInputPair> DisjointInputs);
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         WorkerAssumptionEvidence[] assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
@@ -128,6 +130,9 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
         Require(!artifact.HasReceiver || !artifact.IsBodyAbstraction, "A body abstraction has no receiver.");
+        Require(artifact.DisjointInputs == null || artifact.DisjointInputs.Length <= CompilerArtifactLimits.MaximumInstructions &&
+            (!(entryOnly || artifact.IsBodyAbstraction) || artifact.DisjointInputs.Length == 0),
+            "Disjoint input evidence exceeds its bound or mode.");
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null ||
             artifact.CallPreconditions == null || artifact.Result < -1)
@@ -224,6 +229,23 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(!artifact.HasReceiver || parameters.Count != 0 &&
             factory.GetTypeInfo(factory.GetVariableInfo(parameters[parameters.Count - 1].Entry).Type).Kind == IrTypeKind.Reference,
             "A receiver is a trailing reference parameter.");
+        var disjointInputs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
+        CompilerDisjointInputPair? previousPair = null;
+        foreach (var pair in artifact.DisjointInputs ?? [])
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(pair != null && pair.Left >= 0 && pair.Left < pair.Right &&
+                pair.Right < parameters.Count - (artifact.HasReceiver ? 1 : 0) &&
+                (previousPair == null || pair.Left > previousPair.Left || pair.Left == previousPair.Left && pair.Right > previousPair.Right),
+                "Disjoint inputs must be canonical distinct parameter pairs.");
+            var leftType = factory.GetVariableInfo(parameters[pair!.Left].Entry).Type;
+            var rightType = factory.GetVariableInfo(parameters[pair.Right].Entry).Type;
+            Require(leftType != rightType && leftType != factory.ObjectType && rightType != factory.ObjectType &&
+                factory.GetTypeInfo(leftType).Kind == IrTypeKind.Reference && factory.GetTypeInfo(rightType).Kind == IrTypeKind.Reference,
+                "Disjoint inputs require distinct nominal reference types.");
+            disjointInputs.Add(pair);
+            previousPair = pair;
+        }
         IrVarId? result = artifact.Result == -1 ? null : Variable(artifact.Result, "result");
         var entryVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Entry));
         var currentVariables = new HashSet<IrVarId>(parameters.Select(parameter => parameter.Current));
@@ -288,7 +310,7 @@ internal static class CompilerTotalCallableArtifactCodec
                 effectOwners.Contains(id)),
             "Validated effect claims must be canonical and owned by this callable.");
         var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities, metadataReferences, cancellationToken);
-        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints, callPreconditions);
+        return new(factory, decoded.Program, parameters.MoveToImmutable(), result, clauses.MoveToImmutable(), exceptionConstraints, callPreconditions, disjointInputs.ToImmutable());
     }
 
     private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,

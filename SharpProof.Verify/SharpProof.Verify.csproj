@@ -9,6 +9,7 @@
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Worker" />
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />
     <InternalsVisibleTo Include="SharpProof.Verify.Test" />
   </ItemGroup>

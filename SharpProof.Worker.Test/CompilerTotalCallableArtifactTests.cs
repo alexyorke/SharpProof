@@ -10,6 +10,86 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    private const string DisjointInputSource = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
+        "public sealed class Other { } public static class C { public static bool Target(A a, B b, Other c, object o, int n) { " +
+        "Contract.Ensures(Contract.Result<bool>()); object left = a; object right = b; return left != right || a == null || b == null; } }";
+
+    [Test]
+    public async Task DisjointInputsSurviveCanonicalArtifactRoundTrip()
+    {
+        var artifact = CreateArtifact(DisjointInputSource);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var preparation = preparations.Single();
+        Assert.That(preparation.Total!.DisjointInputs, Is.EqualTo(new CompilerDisjointInputPair[] { new(0, 1), new(0, 2), new(1, 2) }));
+        Assert.That(CompilerTotalCallableArtifactCodec.Encode(preparation.Total)!.DisjointInputs, Is.EqualTo(artifact.Callables.Single().Total!.DisjointInputs));
+        Assert.That((await Check(preparation, 0)).Outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [TestCase("null-row")]
+    [TestCase("negative")]
+    [TestCase("self")]
+    [TestCase("reversed")]
+    [TestCase("range")]
+    [TestCase("duplicate")]
+    [TestCase("unsorted")]
+    [TestCase("object")]
+    [TestCase("scalar")]
+    [TestCase("entry")]
+    [TestCase("abstraction")]
+    [TestCase("missing-left")]
+    [TestCase("missing-right")]
+    public void MalformedDisjointInputsRejectThePreparedArtifact(string mutation)
+    {
+        var artifact = CreateArtifact(DisjointInputSource);
+        var total = artifact.Callables.Single().Total!;
+        switch (mutation)
+        {
+            case "null-row":
+                total.DisjointInputs = [null!];
+                break;
+            case "negative":
+                total.DisjointInputs = [new(-1, 1)];
+                break;
+            case "self":
+                total.DisjointInputs = [new(0, 0)];
+                break;
+            case "reversed":
+                total.DisjointInputs = [new(1, 0)];
+                break;
+            case "range":
+                total.DisjointInputs = [new(0, 5)];
+                break;
+            case "duplicate":
+                total.DisjointInputs = [new(0, 1), new(0, 1)];
+                break;
+            case "unsorted":
+                total.DisjointInputs = [new(1, 2), new(0, 1)];
+                break;
+            case "object":
+                total.DisjointInputs = [new(0, 3)];
+                break;
+            case "scalar":
+                total.DisjointInputs = [new(0, 4)];
+                break;
+            case "entry":
+                artifact.Callables.Single().TotalEntry!.DisjointInputs = [new(0, 1)];
+                break;
+            case "abstraction":
+                total.IsBodyAbstraction = true;
+                break;
+        }
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        if (mutation is "missing-left" or "missing-right")
+        {
+            var node = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+            var pair = node["callables"]![0]!["total"]!["disjointInputs"]![0]!.AsObject();
+            Assert.That(pair.Remove(mutation == "missing-left" ? "left" : "right"), Is.True);
+            json = node.ToJsonString();
+        }
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void EmptyStructuralReturnsAreOnlyAllowedOutsideReachableNonvoidFlow(bool reachable)
