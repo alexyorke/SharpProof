@@ -276,8 +276,11 @@ public sealed class IrInterpreter(IrFactory factory)
         {
             if (!TryCurrentHeap(opaque.Receiver!, state, out var heap, out var failure))
             { return failure!; }
-            if (heap != null && heap.Fields.TryGetValue((owner.Reference, opaque.Member), out var stored))
-            { return Value(stored); }
+            if (heap != null)
+            {
+                return heap.TryReadField(owner, opaque.Member, out var stored) ? Value(stored)
+                    : Unsupported(IrUnsupportedReason.OpaqueTerm, "The current field has no concrete value.");
+            }
             if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
             { return Value(initial); }
         }
@@ -637,8 +640,10 @@ public sealed class IrInterpreter(IrFactory factory)
         var position = (int)index.Value!.Integer;
         if (!TryCurrentHeap(access.Sequence, state, out var heap, out var failure))
         { return failure!; }
-        return Value(heap != null && heap.Elements.TryGetValue(sequence.Value!, out var stored)
-            ? stored[position] : sequence.Value!.Elements[position]);
+        if (heap == null)
+        { return Value(sequence.Value!.Elements[position]); }
+        return heap.TryReadElement(sequence.Value!, position, out var stored) ? Value(stored)
+            : Unsupported(IrUnsupportedReason.UnsupportedOperation, "The current array element has no concrete value.");
     }
 
     private IrEvaluationResult CastFault(IrTypeId type, IrExceptionKind kind, string detail)

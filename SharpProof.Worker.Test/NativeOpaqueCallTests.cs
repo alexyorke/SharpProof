@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -11,6 +13,90 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeOpaqueCallTests
 {
+    [TestCase(false, false, "untouched")]
+    [TestCase(false, true, "untouched")]
+    [TestCase(true, false, "untouched")]
+    [TestCase(false, false, "no-op-stable")]
+    [TestCase(true, false, "no-op-stable")]
+    [TestCase(true, true, "untouched")]
+    [TestCase(true, true, "overwrite-true")]
+    [TestCase(true, true, "overwrite-false")]
+    [TestCase(true, true, "neighbor")]
+    [TestCase(false, true, "old")]
+    [TestCase(true, true, "old")]
+    [TestCase(false, true, "identity")]
+    [TestCase(true, true, "identity")]
+    [TestCase(true, true, "length")]
+    [TestCase(true, true, "lazy")]
+    [TestCase(true, true, "guard")]
+    public async Task TrustedWriterCannotRefuteUsingStaleHeap(bool array, bool writer, string scenario)
+    {
+        using var directory = new TempDirectory("sharpproof-trusted-writer");
+        var external = TestCompilation.Create("TrustedWriter", """
+            using SharpProof.Attributes;
+            public sealed class Box { public int Value; }
+            public static class Boundary {
+                [SharpProofTrusted("Reviewed argument state boundary.")]
+                [EffectContract(
+            """ + (writer ? "SharpProofEffect.WritesArgumentState" : "SharpProofEffect.None") + """
+                , Complete = true, PreconditionFree = true)]
+                public static void Set(
+            """ + (array ? "int[] value" : "Box value") + ") { " +
+            (writer ? (array ? "if (value != null && value.Length > 0) { value[0] = 5; if (value.Length > 1) value[1] = 5; }"
+                : "if (value != null) value.Value = 5;") : "") + " } }");
+        var path = Path.Combine(directory.FullName, "TrustedWriter.dll");
+        Assert.That(external.Emit(path).Success, Is.True);
+        var runtime = System.Reflection.Assembly.Load(await File.ReadAllBytesAsync(path));
+        var boxType = runtime.GetType("Box")!;
+        var actual = array ? (object)new[] { 3, 3 } : Activator.CreateInstance(boxType)!;
+        if (!array)
+        { boxType.GetField("Value")!.SetValue(actual, 3); }
+        runtime.GetType("Boundary")!.GetMethod("Set")!.Invoke(null, [actual]);
+        Assert.That(array ? ((int[])actual)[0] : boxType.GetField("Value")!.GetValue(actual), Is.EqualTo(writer ? 5 : 3));
+        var type = array ? "int[]" : "Box";
+        var cell = array ? "value[0]" : "value.Value";
+        var length = scenario is "neighbor" or "guard" ? 2 : 1;
+        var postcondition = scenario switch
+        {
+            "overwrite-true" => cell + " == 7",
+            "no-op-stable" => cell + " == 3",
+            "neighbor" => "value[1] == 5",
+            "old" => array ? "Contract.Old(value)[0] == 3" : "Contract.Old(value).Value == 3",
+            "identity" => "value == Contract.Old(value)",
+            "length" => "value.Length == 1",
+            "lazy" => "true || value[0] == 5",
+            "guard" => "value[value[1]] == 7",
+            _ => cell + " == 5"
+        };
+        var afterCall = scenario is "overwrite-true" or "overwrite-false" or "neighbor" ? cell + " = 7; " : "";
+        var source = "using SharpProof.Attributes; public static class Subject { public static int Target(" + type + " value) { " +
+            "Contract.Requires(value != null" + (array ? " && value.Length == " + length : "") + " && " + cell + " == 3); " +
+            "Contract.Ensures(" + postcondition + "); " + (array ? cell + " = 3; " : "") + "Boundary.Set(value); " + afterCall + "return 0; } }";
+        var compilation = CSharpCompilation.Create("TrustedCaller", [CSharpSyntaxTree.ParseText(source,
+            (CSharpParseOptions)external.SyntaxTrees.Single().Options, "Subject.cs")],
+            external.References.Append(MetadataReference.CreateFromFile(path)), external.Options);
+        TestCompilation.AssertNoErrors(compilation);
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        using var project = new ShadowTestProject(artifact);
+        var preparation = project.Snapshot.Callables.Single();
+        Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        var call = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Single();
+        var description = candidate.Factory.GetString(candidate.Factory.GetOperationInfo(call.Operation).Description!.Value);
+        Assert.That(description, Does.StartWith("opaque-call:"));
+        var effects = int.Parse(description.Split(':')[1], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.That(effects & 4, Is.EqualTo(writer ? 4 : 0));
+        Assert.That(effects & 1, Is.Zero);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var result = await solver.VerifyEnsuresAsync(0);
+        var unknown = writer && scenario is "untouched" or "neighbor" or "guard";
+        var refuted = !writer && scenario != "no-op-stable" || scenario == "overwrite-false";
+        Assert.That(result.Outcome, unknown ? Is.TypeOf<UnknownOutcome>() : refuted ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>());
+        Assert.That(result.Reason, Is.EqualTo(unknown ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
+    }
+
     [TestCase("version.GetHashCode()")]
     [TestCase("version.Major")]
     [TestCase("System.Environment.TickCount")]

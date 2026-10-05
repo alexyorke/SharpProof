@@ -135,7 +135,7 @@ internal static class CallableReplayValidator
                 return AbstentionReason.CounterexampleNotReplayable;
             }
             var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken, snapshots);
-            if (consumedApproximation)
+            if (consumedApproximation || heap?.ConsumedApproximation == true)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
@@ -149,7 +149,7 @@ internal static class CallableReplayValidator
             }
         }
         var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken, snapshots);
-        if (consumedApproximation)
+        if (consumedApproximation || heap?.ConsumedApproximation == true)
         {
             return AbstentionReason.CounterexampleNotReplayable;
         }

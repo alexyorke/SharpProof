@@ -111,7 +111,9 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                                 : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
                             var elements = allocation.InitialValues.IsEmpty ? Enumerable.Repeat(initial, count)
                                 : allocation.InitialValues.Select(value => _terms.Evaluate(value, values.Current, values.ObserveRead, values.Heap, cancellationToken).Value!);
-                            values[allocation.Target!.Value] = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
+                            var createdArray = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
+                            values[allocation.Target!.Value] = createdArray;
+                            values.Heap.RegisterFreshArray(createdArray);
                         }
                         else if (allocation.Target is { } allocatedTarget)
                         { values[allocatedTarget] = _factory.CreateReferenceValue(allocation.AllocatedType, new object()); }
@@ -154,6 +156,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             else
                             { return Unsupported(write, values, steps, "A field store needs an object receiver."); }
                         }
+                        else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Element or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
+                        { values.Heap.Invalidate(); }
                         replayOptions?.WriteObserver?.Invoke(write);
                         replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
                         break;
@@ -270,18 +274,22 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         return Unsupported(instruction, values, steps, instruction is IrLoadInstruction
                             ? "Concrete execution requires a memory host for load."
                             : "Concrete execution requires a memory host for store.");
-                    case IrCallInstruction { Target: null } when callHost == null && replayOptions != null &&
+                    case IrCallInstruction { Target: null } opaqueCall when callHost == null && replayOptions != null &&
                         _factory.Semantics == IrExecutionSemantics.Total:
-                        // An opaque call in model-driven replay: its result and
-                        // exception are approximation havocs and the heap is never
-                        // read concretely, so replay continues past it. Plain
-                        // execution still stops at every call.
+                        // Results and exceptions have separate approximation
+                        // havocs. Operands still run, and a writer forgets current
+                        // contents until an exact store supplies a demanded cell.
+                        if (EvaluateCallOperands(opaqueCall.Receiver, opaqueCall.Arguments, null, values,
+                                "The call receiver is null.", cancellationToken) is { } operandFailure)
+                        { return FromEvaluation(operandFailure, opaqueCall, values, steps); }
+                        if ((IrOpaqueCallSite.Effects(_factory, opaqueCall.Operation) & IrOpaqueCallEffects.Writes) != 0)
+                        { values.Heap.Invalidate(); }
                         break;
                     case IrCallInstruction call:
                         {
                             var callResult = IrProgramCallHostExecution.Execute(
                                 _factory, _terms, call, values.Current, callHost,
-                                values.ObserveRead, cancellationToken);
+                                values.ObserveRead, values.Heap, cancellationToken);
                             if (callResult.Status != IrEvaluationStatus.Value)
                             {
                                 return FromEvaluation(callResult, call, values, steps);
@@ -437,7 +445,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     {
         private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         private readonly HashSet<IrVarId> _approximations = [];
-        internal bool ConsumedApproximation { get; private set; }
+        private bool _consumedApproximation;
+        internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
         internal IrHeap Heap { get; } = new();
         internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
@@ -453,7 +462,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         {
             if (_approximations.Contains(key))
             {
-                ConsumedApproximation = true;
+                _consumedApproximation = true;
             }
         }
         internal void Add(IrVarId key, IrValue value)

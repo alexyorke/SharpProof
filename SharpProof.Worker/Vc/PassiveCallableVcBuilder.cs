@@ -324,9 +324,10 @@ internal sealed class PassiveCallableVcBuilder
                             if (!TryRewrite(argument, state, out _))
                             { return null; }
                         }
-                        _opaqueCalls.Add((reach, IrOpaqueCallSite.Effects(_factory, call.Operation)));
-                        // A call may write any array.
-                        _heap = new([], true);
+                        var effects = IrOpaqueCallSite.Effects(_factory, call.Operation);
+                        _opaqueCalls.Add((reach, effects));
+                        if ((effects & IrOpaqueCallEffects.Writes) != 0)
+                        { _heap = new([], true); }
                         break;
                     case IrAssignInstruction assign:
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||

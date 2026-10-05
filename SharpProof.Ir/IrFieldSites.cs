@@ -33,15 +33,51 @@ public sealed class IrObjectState
 // identity.
 internal sealed class IrHeap
 {
-    internal Dictionary<IrValue, IrValue[]> Elements { get; } = new(IrValueIdentity.Instance);
+    private readonly Dictionary<IrValue, Dictionary<int, IrValue>> _elements = new(IrValueIdentity.Instance);
+    private readonly HashSet<IrValue> _freshArrays = new(IrValueIdentity.Instance);
     internal Dictionary<(object Identity, IrMemberId Field), IrValue> Fields { get; } = new(FieldKey.Instance);
-    internal bool IsEmpty => Elements.Count == 0 && Fields.Count == 0;
+    internal bool ConsumedApproximation { get; private set; }
+    private bool UnknownContents { get; set; }
+
+    internal void Invalidate()
+    {
+        UnknownContents = true;
+        _elements.Clear();
+        Fields.Clear();
+        _freshArrays.Clear();
+    }
+
+    internal void RegisterFreshArray(IrValue sequence)
+    { _freshArrays.Add(sequence); }
 
     internal void StoreElement(IrValue sequence, int index, IrValue value)
     {
-        if (!Elements.TryGetValue(sequence, out var elements))
-        { Elements.Add(sequence, elements = [.. sequence.Elements]); }
+        if (!_elements.TryGetValue(sequence, out var elements))
+        { _elements.Add(sequence, elements = []); }
         elements[index] = value;
+    }
+
+    internal bool TryReadElement(IrValue sequence, int index, out IrValue value)
+    {
+        if (_elements.TryGetValue(sequence, out var elements) && elements.TryGetValue(index, out value!))
+        { return true; }
+        if (!UnknownContents || _freshArrays.Contains(sequence))
+        { value = sequence.Elements[index]; return true; }
+        ConsumedApproximation = true;
+        value = null!;
+        return false;
+    }
+
+    internal bool TryReadField(IrValue owner, IrMemberId field, out IrValue value)
+    {
+        if (Fields.TryGetValue((owner.Reference, field), out value!))
+        { return true; }
+        if (UnknownContents)
+        { ConsumedApproximation = true; value = null!; return false; }
+        if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(field, out value!))
+        { return true; }
+        value = null!;
+        return false;
     }
 
     private sealed class FieldKey : IEqualityComparer<(object Identity, IrMemberId Field)>

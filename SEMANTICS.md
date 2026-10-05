@@ -450,7 +450,18 @@ condition. A conditional receiver selects the heap of its chosen reference
 branch, including through casts and nested fields. Old values in a guard or
 index alone do not change the receiver's heap. Both verification and replay
 use this same bounded selection rule and close unsupported receiver shapes.
-A call, an unmodeled
+Concrete replay stores current field and element values in sparse overlays.
+Before skipping an opaque call it evaluates the receiver and arguments in
+order, observing approximation reads. A writer or an unresolved instance
+write invalidates current contents. An exact store restores only its own
+cell; a demanded unknown cell makes the counterexample non-replayable,
+including when the demand occurs only in a postcondition guard. Snapshot-aware
+clause reads retain Old contents; reference identity, string contents and
+array lengths remain available. Trusted nonwriters preserve current cells in
+both verification and replay.
+Arrays allocated after invalidation retain their initialized or default
+contents until a subsequent writer. Hosted calls read current overlays too.
+A potentially writing call, an unmodeled
 element write or a loop that stores elements forgets the contents: later
 reads are unknown until stored again; element contents alone are forgotten by
 an element write, which never changes a field. A loop whose every heap store
@@ -540,9 +551,11 @@ Each store writes Element state. A reference store may fail its covariance
 check when the element type is unsealed or is a delegate with variance in its
 generic scope. Delegates are sealed but can still have variance-compatible
 runtime array types. Such compatibility remains an approximation after exact
-null and bounds checks. A body that stores elements or calls opaque code reads
-elements as approximations, and stays abstract when an Ensures clause or a
-callee precondition reads elements. Arrays of any value-domain element type,
+null and bounds checks. Exact stores preserve current element reads. A body
+with unmodeled writes approximates body reads and stays abstract when a callee
+precondition still reads those contents. Postcondition values and guards may
+read the heap: replay rejects a counterexample when a demanded current cell
+has no concrete value after an opaque writer. Arrays of any value-domain element type,
 and multidimensional arrays, are references; their non-scalar or
 multidimensional element reads are approximations, and multidimensional bounds
 are approximated.

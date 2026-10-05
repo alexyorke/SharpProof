@@ -89,8 +89,6 @@ internal static class CompilerTotalCallableLowerer
         var isBodyAbstraction = false;
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions ||
             TotalBodyLowering.UnmodeledElementWrites(lowering.Program) && TotalBodyLowering.ReadsElements(context.Factory, TotalBodyLowering.BodyTerms(lowering.Program)
-                .Concat(binding.Clauses.Where(clause => clause.Kind != BoundContractKind.Requires)
-                    .SelectMany(clause => new[] { clause.Value, clause.SafeCondition }))
                 .Concat(lowering.CallPreconditions.Values.SelectMany(clause => new[] { clause.Value, clause.Safe }))))
         {
             if (lowering.ConstructionLimitExceeded || graph == null || graph.Blocks.Length > CompilerArtifactLimits.MaximumInstructions ||

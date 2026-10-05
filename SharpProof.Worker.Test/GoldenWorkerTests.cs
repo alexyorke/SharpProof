@@ -133,8 +133,35 @@ public sealed class GoldenWorkerTests
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         var result = await solver.VerifyPurityAsync();
-        return "outcome: " + (result.Outcome == null ? "Unknown" : result.Outcome.GetType().Name) + "\nreason: " +
-            result.Reason + "\nwrite-witness: " + (result.WriteWitness != null) + "\n";
+        var output = new StringBuilder("outcome: " + (result.Outcome == null ? "Unknown" : result.Outcome.GetType().Name) + "\nreason: " +
+            result.Reason + "\nwrite-witness: " + (result.WriteWitness != null) + "\n");
+        foreach (var approximate in new[] { false, true })
+        {
+            var call = PassiveCallableVcTests.SkippedCallEffectCandidate(approximate);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(call.Candidate, out var callPlan, out failure), Is.True, failure.ToString());
+            using var callSolver = new PassiveCallableSolver(callPlan!);
+            var callResult = await callSolver.VerifyPurityAsync();
+            output.AppendLine("skipped-call-" + (approximate ? "approximation" : "constant") + ": " +
+                (callResult.Outcome?.GetType().Name ?? "Unknown") + "/" + callResult.Reason + "/witness=" + (callResult.WriteWitness != null));
+        }
+        foreach (var array in new[] { false, true })
+        {
+            var unchanged = PassiveCallableVcTests.OpaqueWriterHeapCandidate(array, restore: false, nonwriter: true);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(unchanged, out var unchangedPlan, out failure), Is.True, failure.ToString());
+            using var unchangedSolver = new PassiveCallableSolver(unchangedPlan!);
+            var unchangedResult = await unchangedSolver.VerifyEnsuresAsync(0);
+            output.AppendLine((array ? "array" : "field") + "-nonwriter: " + unchangedResult.Outcome!.GetType().Name);
+            foreach (var restore in new[] { false, true })
+            {
+                var heap = PassiveCallableVcTests.OpaqueWriterHeapCandidate(array, restore);
+                Assert.That(PassiveCallableVcBuilder.TryBuild(heap, out var heapPlan, out failure), Is.True, failure.ToString());
+                using var heapSolver = new PassiveCallableSolver(heapPlan!);
+                var heapResult = await heapSolver.VerifyEnsuresAsync(0);
+                output.AppendLine((array ? "array" : "field") + (restore ? "-restored" : "-unknown") + ": " +
+                    heapResult.Outcome!.GetType().Name + "/" + heapResult.Reason);
+            }
+        }
+        return output.ToString();
     }
 
     private static async Task<string> TotalClaimResults(string source)

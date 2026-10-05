@@ -390,6 +390,115 @@ public sealed class IrTotalExecutionTests
         Assert.That(result.Status, Is.EqualTo(expected ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
     }
 
+    [TestCase("approximation", true, true)]
+    [TestCase("missing-first", false, false)]
+    [TestCase("unused", false, true)]
+    public void SkippedCallsStillEvaluateTheirOperands(string scenario, bool consumed, bool returned)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var unknown = factory.CreateVariable("unknown", factory.IntegerType);
+        var missing = factory.CreateVariable("missing", factory.IntegerType);
+        var arguments = scenario == "missing-first" ? new IrTerm[] { factory.Variable(missing), factory.Variable(unknown) }
+            : new IrTerm[] { scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown) };
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
+            true, arguments.Select(argument => argument.Type).ToArray());
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+        builder.Call(entry, factory.CreateOperation(), null, member, null, arguments);
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100,
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
+        Assert.That(result.Status, Is.EqualTo(returned ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
+        Assert.That(result.ConsumedApproximation, Is.EqualTo(consumed));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void HostedCallArgumentsReadCurrentHeap(bool array, bool store)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
+        var owner = factory.CreateVariable("owner", type);
+        var target = factory.CreateVariable("result", factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType, true, [factory.IntegerType]);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        if (store)
+        {
+            if (array)
+            { builder.ElementStore(entry, factory.CreateOperation(), factory.Variable(owner), factory.Integer(0), factory.Integer(7)); }
+            else
+            { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, factory.Variable(owner), field, factory.Integer(7)); }
+        }
+        var argument = array ? factory.SequenceAccess(factory.Variable(owner), factory.Integer(0))
+            : factory.PureOpaque(field, factory.Variable(owner));
+        builder.Call(entry, factory.CreateOperation(), target, member, null, argument);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var initial = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
+            : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
+            new Dictionary<IrVarId, IrValue> { [owner] = initial }, 100,
+            (_, _, values) => values.Single(), null, CancellationToken.None);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store ? 7 : 3));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SkippedInstanceCallsRespectReceiverReadOrder(bool missing)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var owner = factory.CreateVariable("owner", factory.ObjectType);
+        var argument = factory.CreateVariable("argument", factory.IntegerType);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType, false, [factory.IntegerType]);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, argument);
+        builder.Call(entry, factory.CreateOperation(), null, member, factory.Variable(owner), factory.Variable(argument));
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
+        var initial = new Dictionary<IrVarId, IrValue>();
+        if (!missing)
+        { initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
+        Assert.That(result.Status, Is.EqualTo(missing ? IrProgramExecutionStatus.Unsupported : IrProgramExecutionStatus.Exception));
+        Assert.That(result.ConsumedApproximation, Is.EqualTo(!missing));
+        if (!missing)
+        { Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.NullReference)); }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void HostedCallReceiverReadsCurrentHeap(bool store)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var holder = factory.CreateVariable("holder", factory.ObjectType);
+        var replacement = factory.CreateVariable("replacement", factory.ObjectType);
+        var target = factory.CreateVariable("result", factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Next", factory.ObjectType, false);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType, false);
+        var oldValue = factory.CreateReferenceValue(factory.ObjectType, new object());
+        var newValue = factory.CreateReferenceValue(factory.ObjectType, new object());
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        if (store)
+        { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, factory.Variable(holder), field, factory.Variable(replacement)); }
+        builder.Call(entry, factory.CreateOperation(), target, member, factory.PureOpaque(field, factory.Variable(holder)));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), new Dictionary<IrVarId, IrValue>
+        {
+            [holder] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, oldValue)),
+            [replacement] = newValue
+        }, 100, (_, receiver, _) => factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3),
+            null, CancellationToken.None);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store ? 7 : 3));
+    }
+
     [Test]
     public void TotalSequenceAndUnboxingFaultsUseTypedDefaults()
     {

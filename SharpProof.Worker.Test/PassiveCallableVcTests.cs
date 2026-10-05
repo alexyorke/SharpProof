@@ -587,6 +587,82 @@ public sealed class PassiveCallableVcTests
         Assert.That(result.WriteWitness, Is.Null);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task EffectReplayIncludesApproximationReadBySkippedCall(bool approximateArgument)
+    {
+        var subject = SkippedCallEffectCandidate(approximateArgument);
+        using var solver = new PassiveCallableSolver(Build(subject.Candidate));
+        var result = await solver.VerifyPurityAsync();
+        Assert.That(result.Outcome, approximateArgument ? Is.Null : Is.TypeOf<RefutedOutcome>());
+        Assert.That(result.Reason, Is.EqualTo(approximateArgument ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
+        Assert.That(result.WriteWitness, Is.EqualTo(approximateArgument ? null : subject.WriteSite));
+    }
+
+    internal static (PassiveCallableCandidate Candidate, OperationId WriteSite) SkippedCallEffectCandidate(bool approximateArgument)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        var local = factory.CreateVariable("approximate", factory.IntegerType);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType, true, [factory.IntegerType]);
+        subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, local);
+        subject.Builder.Call(block, factory.CreateOperation("opaque-call:0:Call"),
+            null, member, null, approximateArgument ? factory.Variable(local) : factory.Integer(4));
+        var writeSite = factory.CreateOperation("write-site");
+        subject.Builder.Write(block, writeSite, IrWriteRegion.Static);
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        return (subject.Candidate(factory.Boolean(true)), writeSite);
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task OpaqueWriterHeapReplayUsesOnlyRestoredCells(bool array, bool restore)
+    {
+        var candidate = OpaqueWriterHeapCandidate(array, restore);
+        using var solver = new PassiveCallableSolver(Build(candidate));
+        var result = await solver.VerifyEnsuresAsync(0);
+        Assert.That(result.Outcome, restore ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<UnknownOutcome>());
+        Assert.That(result.Reason, Is.EqualTo(restore ? WorkerClaimReason.None : WorkerClaimReason.CounterexampleNotReplayable));
+    }
+
+    internal static PassiveCallableCandidate OpaqueWriterHeapCandidate(bool array, bool restore, bool nonwriter = false)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
+        var owner = new PassiveParameterBinding(factory.CreateVariable("owner:entry", type), factory.CreateVariable("owner:current", type),
+            factory.CreateVariable("owner:old", type));
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Write", factory.IntegerType, true, [type]);
+        var block = subject.Builder.CreateBlock();
+        subject.Builder.Assign(block, subject.Site, owner.Current, factory.Variable(owner.Entry));
+        subject.Builder.Assign(block, subject.Site, owner.Old, factory.Variable(owner.Entry));
+        void Store(int value)
+        {
+            if (array)
+            { subject.Builder.ElementStore(block, subject.Site, factory.Variable(owner.Current), factory.Integer(0), factory.Integer(value)); }
+            else
+            { subject.Builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(value)); }
+        }
+        Store(3);
+        subject.Builder.Call(block, factory.CreateOperation(nonwriter ? "opaque-call:0:Read" : "opaque-call:4:Write"),
+            null, member, null, factory.Variable(owner.Current));
+        if (restore)
+        { Store(7); }
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        var requires = new List<PassiveContractClause>
+        { new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site) };
+        if (array)
+        { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
+        var cell = array ? factory.SequenceAccess(factory.Variable(owner.Current), factory.Integer(0))
+            : factory.PureOpaque(field, factory.Variable(owner.Current));
+        return new("opaque-heap", subject.Builder.Build(), [owner], subject.Result, [.. requires],
+            [new(factory.Binary(IrBinaryOperator.Equal, cell, factory.Integer(nonwriter ? 3 : 5)), factory.Boolean(true), subject.Site)]);
+    }
+
     [TestCase("allocation", true, false)]
     [TestCase("write", true, false)]
     [TestCase("allocation", false, false)]
