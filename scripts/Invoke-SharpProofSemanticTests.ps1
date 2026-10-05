@@ -212,7 +212,10 @@ if (-not $ArchitectureOnly) {
                 Filter = $semanticFilter
                 ProjectParallelism = $mainParallelism
                 IsolateOutput = $false
-                Slots = $mainParallelism
+                # Instrumented corpus verification can use the full worker CPU
+                # budget. Keep other solver shards out of this phase without
+                # changing its tests, instrumentation, or verification budgets.
+                Slots = $(if ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = 60000L
             })
     }
