@@ -216,6 +216,37 @@ public sealed class GoldenWorkerTests
             output.AppendLine((array ? "element" : "field") + "-loop-original-return: " + heapExecution.ReturnValue!.IntegerNumericValue);
             output.AppendLine((array ? "element" : "field") + "-loop-false-ensures: " + heapEnsures.Outcome!.GetType().Name);
         }
+        foreach (var explicitThrows in new[] { false, true })
+        {
+            var pendingCandidate = PassiveExceptionLoopTests.ChangingPendingExceptionCandidate(explicitThrows);
+            var pendingExecution = new IrProgramInterpreter(pendingCandidate.Factory).Execute(pendingCandidate.Program);
+            var sites = pendingCandidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>()
+                .Select(thrown => thrown.Operation).ToArray();
+            var prefix = explicitThrows ? "explicit-pending" : "builtin-pending";
+            output.AppendLine(prefix + "-original-kind: " + pendingExecution.Exception!.Kind);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(pendingCandidate, out var pendingPlan, out reason), Is.True, reason.ToString());
+            using var pendingSolver = new PassiveCallableSolver(pendingPlan!);
+            foreach (var allowReplacement in new[] { false, true })
+            {
+                var allowed = explicitThrows ? ImmutableHashSet<IrExceptionKind>.Empty : ImmutableHashSet.Create(IrExceptionKind.Overflow);
+                if (!explicitThrows && allowReplacement)
+                { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
+                var pendingPolicy = await pendingSolver.VerifyExceptionsAsync(allowed,
+                    allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true);
+                output.AppendLine(prefix + (allowReplacement ? "-complete-policy: " : "-restricted-policy: ") + pendingPolicy.Outcome!.GetType().Name);
+            }
+        }
+        foreach (var conditional in new[] { false, true })
+        {
+            var (receiverCandidate, inputs, _) = PassiveLoopCutterTests.ChangingHeapReceiverCandidate(conditional);
+            var receiverExecution = new IrProgramInterpreter(receiverCandidate.Factory).Execute(receiverCandidate.Program, inputs);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(receiverCandidate, out var receiverPlan, out reason), Is.True, reason.ToString());
+            using var receiverSolver = new PassiveCallableSolver(receiverPlan!);
+            var receiverEnsures = await receiverSolver.VerifyEnsuresAsync(0);
+            var prefix = conditional ? "conditional-receiver" : "nested-receiver";
+            output.AppendLine(prefix + "-original-return: " + receiverExecution.ReturnValue!.IntegerNumericValue);
+            output.AppendLine(prefix + "-false-ensures: " + receiverEnsures.Outcome!.GetType().Name);
+        }
         return output.ToString();
     }
 

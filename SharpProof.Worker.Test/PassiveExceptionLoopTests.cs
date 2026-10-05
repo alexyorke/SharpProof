@@ -8,6 +8,87 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class PassiveExceptionLoopTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task RouterPreservesExceptionsReplacedBySkippedIterations(bool allowDivision)
+    {
+        var candidate = ChangingPendingExceptionCandidate();
+        var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, maximumSteps: 128);
+        Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(actual.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+        var replacementSite = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>().Last().Operation;
+        Assert.That(actual.Exception.Site, Is.EqualTo(replacementSite));
+        Assert.That(actual.ConsumedApproximation, Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var allowed = System.Collections.Immutable.ImmutableHashSet.Create(IrExceptionKind.Overflow);
+        if (allowDivision)
+        { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
+        var result = await solver.VerifyExceptionsAsync(allowed);
+        Assert.That(result.Outcome, allowDivision ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
+        if (!allowDivision)
+        {
+            Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+            Assert.That(result.ExceptionWitness.Site, Is.EqualTo(replacementSite));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task RouterPreservesOriginalExplicitThrowSites(bool allowReplacement)
+    {
+        var candidate = ChangingPendingExceptionCandidate(explicitThrows: true);
+        var sites = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>()
+            .Select(thrown => thrown.Operation).ToArray();
+        var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, maximumSteps: 128);
+        Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(actual.Exception!.Kind, Is.EqualTo(IrExceptionKind.Explicit));
+        Assert.That(actual.Exception.Site, Is.EqualTo(sites[1]));
+        Assert.That(actual.ConsumedApproximation, Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var result = await solver.VerifyExceptionsAsync(System.Collections.Immutable.ImmutableHashSet<IrExceptionKind>.Empty,
+            allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true);
+        Assert.That(result.Outcome, allowReplacement ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
+        if (!allowReplacement)
+        { Assert.That(result.ExceptionWitness!.Site, Is.EqualTo(sites[1])); }
+    }
+
+    [Test]
+    public void PendingSummariesUseOnlyOriginalThrowsAndNeverWitnessSearch()
+    {
+        var candidate = ChangingPendingExceptionCandidate();
+        var originalThrows = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>().ToArray();
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, CancellationToken.None),
+            Is.True, reason.ToString());
+        Assert.That(proof!.PendingThrows, Is.Not.Empty);
+        var proofHavocs = proof.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Where(havoc => havoc.Origin == IrHavocOrigin.Approximation).Select(havoc => havoc.Id).ToHashSet();
+        Assert.That(proof.PendingThrows.Keys.All(proofHavocs.Contains), Is.True);
+        Assert.That(proof.PendingThrows.Values.SelectMany(throws => throws)
+            .All(thrown => originalThrows.Any(original => ReferenceEquals(original, thrown))), Is.True);
+        Assert.That(search!.PendingThrows, Is.Empty);
+    }
+
+    internal static PassiveCallableCandidate ChangingPendingExceptionCandidate(bool explicitThrows = false)
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var builder = subject.Builder;
+        var count = factory.CreateVariable("count", factory.IntegerType);
+        var entry = builder.CreateBlock();
+        var header = builder.CreateBlock();
+        var body = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        builder.Assign(entry, subject.Site, count, factory.Integer(0));
+        builder.Throw(entry, factory.CreateOperation("incoming-overflow"), explicitThrows ? IrExceptionKind.Explicit : IrExceptionKind.Overflow, header);
+        builder.Branch(header, subject.Site, factory.Binary(IrBinaryOperator.LessThan, factory.Variable(count), factory.Integer(2)), body, exit);
+        builder.Assign(body, subject.Site, count, factory.Binary(IrBinaryOperator.Add, factory.Variable(count), factory.Integer(1)));
+        builder.Throw(body, factory.CreateOperation("replacement-division"), explicitThrows ? IrExceptionKind.Explicit : IrExceptionKind.DivideByZero, header);
+        builder.ExceptionalExit(exit, subject.Site);
+        return subject.Candidate(factory.Boolean(true));
+    }
+
     [TestCase("call", true)]
     [TestCase("memory", true)]
     [TestCase("variables-memory", true)]

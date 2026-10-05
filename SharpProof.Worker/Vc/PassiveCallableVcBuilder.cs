@@ -36,6 +36,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
     private readonly Dictionary<IrInstructionId, int> _callMarkers;
     private readonly ImmutableDictionary<IrInstructionId, int> _checkpointMarkers;
+    private readonly ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>> _pendingThrows;
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints = [];
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> Checkpoints =>
         [.. _checkpoints];
@@ -105,6 +106,7 @@ internal sealed class PassiveCallableVcBuilder
         _callMarkers = encoding == null ? originalMarkers : encoding.CallMarkers
             .ToDictionary(row => row.Key, row => originalMarkers[row.Value]);
         _checkpointMarkers = encoding?.Checkpoints ?? ImmutableDictionary<IrInstructionId, int>.Empty;
+        _pendingThrows = encoding?.PendingThrows ?? ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>>.Empty;
         _cancellationToken = cancellationToken;
     }
 
@@ -391,6 +393,21 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                             state[variable] = replacement;
                         }
+                        if (pendingException != null && _pendingThrows.TryGetValue(havoc.Id, out var possibleThrows))
+                        {
+                            var incomingException = pendingException;
+                            pendingException = Fresh(_factory.IntegerType);
+                            var range = Equal(pendingException, incomingException);
+                            var codes = new HashSet<int>();
+                            foreach (var possibleThrow in possibleThrows)
+                            {
+                                Spend();
+                                var possibleCode = ExceptionCode(possibleThrow);
+                                if (codes.Add(possibleCode))
+                                { range = Or(range, Equal(pendingException, _factory.Integer(possibleCode))); }
+                            }
+                            _exceptionFacts.Add((Guard(reach, range), havoc.Operation));
+                        }
                         break;
                     case IrAssumeInstruction assume:
                         if (!TryRewrite(assume.Condition, state, out var condition))
@@ -412,14 +429,7 @@ internal sealed class PassiveCallableVcBuilder
                         // Constructing a runtime fault can allocate even when
                         // a handler prevents it from escaping the callable.
                         _potentialExceptionAllocations.Add(reach);
-                        var code = (int)thrown.ExceptionKind;
-                        if (thrown.ExceptionKind == IrExceptionKind.Explicit)
-                        {
-                            if (!_explicitSites.Contains(thrown.Operation))
-                            { _explicitSites.Add(thrown.Operation); }
-                            code = ExplicitSiteCode + _explicitSites.IndexOf(thrown.Operation);
-                        }
-                        AddEdge(thrown.Target, reach, state, _factory.Integer(code), thrown.Operation);
+                        AddEdge(thrown.Target, reach, state, _factory.Integer(ExceptionCode(thrown)), thrown.Operation);
                         break;
                     case IrExceptionalExitInstruction:
                         // Never assume validity to delete an executable naked
@@ -489,6 +499,16 @@ internal sealed class PassiveCallableVcBuilder
         foreach (var fact in _exceptionFacts)
         { Fact(fact.Predicate, fact.Site, "exception-kind"); }
         return new(this, loopSearch, boundedSearch);
+    }
+
+    private int ExceptionCode(IrThrowInstruction thrown)
+    {
+        if (thrown.ExceptionKind != IrExceptionKind.Explicit)
+        { return (int)thrown.ExceptionKind; }
+        Spend(_explicitSites.Count * 2 + 1);
+        if (!_explicitSites.Contains(thrown.Operation))
+        { _explicitSites.Add(thrown.Operation); }
+        return ExplicitSiteCode + _explicitSites.IndexOf(thrown.Operation);
     }
 
     private void AddEdge(IrBlockId destination, IrTerm condition, Dictionary<IrVarId, IrTerm> state,

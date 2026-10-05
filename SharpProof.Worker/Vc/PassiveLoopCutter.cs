@@ -34,6 +34,10 @@ internal sealed partial class PassiveLoopCutter
         // its header, with the invariant's ordinal.
         internal ImmutableDictionary<IrInstructionId, int> Checkpoints { get; init; } =
             ImmutableDictionary<IrInstructionId, int>.Empty;
+        // Proof routers can represent iterations whose throws replaced the
+        // incoming pending exception. Witness search has no such summaries.
+        internal ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>> PendingThrows { get; init; } =
+            ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>>.Empty;
     }
 
     // A natural loop: its header, its blocks, the variables it writes and the
@@ -193,8 +197,19 @@ internal sealed partial class PassiveLoopCutter
                     group.Writers.Select(writer => ((IrVariableTerm)((IrAssignInstruction)writer).Value).Variable).Distinct().Count() == 1)
                 { copies.Add(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
             }
-            // An opaque call may write anything.
-            List<Cell>? cells = instructions.Any(instruction => instruction is IrCallInstruction) ? null : [];
+            // Calls and memory havocs can change every cell. A fixed cell's
+            // address must also remain stable when a guard selects its owner.
+            List<Cell>? cells = instructions.Any(instruction => instruction is IrCallInstruction ||
+                instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory }) ? null : [];
+            bool StableAddress(IrTerm target)
+            {
+                return !IrTraversal.Any(target, term =>
+                {
+                    Spend();
+                    return term is IrVariableTerm variable && (!inputs.Contains(variable.Variable) || written.Contains(variable.Variable)) ||
+                        IrFieldSites.IsFieldRead(_candidate.Factory, term) || term is IrSequenceAccessTerm;
+                });
+            }
             foreach (var write in cells == null ? [] : instructions.OfType<IrWriteInstruction>()
                 .Where(write => write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown))
             {
@@ -204,7 +219,7 @@ internal sealed partial class PassiveLoopCutter
                     continue;
                 }
                 var target = write.IsFieldStore ? IrSubstitution.Substitute(_candidate.Factory, write.Target!, copies) : null;
-                if (target == null || !IrTraversal.CollectVariables(target).All(variable => inputs.Contains(variable) && !written.Contains(variable)))
+                if (target == null || !StableAddress(target))
                 { cells = null; break; }
                 if (!cells!.Any(cell => cell.Target.Id == target.Id && cell.Field == write.Field!.Value))
                 { cells!.Add(new(target, write.Field!.Value, write)); }
@@ -222,6 +237,7 @@ internal sealed partial class PassiveLoopCutter
         var stops = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         var callMarkers = ImmutableDictionary.CreateBuilder<IrInstructionId, IrInstructionId>();
         var checkpoints = ImmutableDictionary.CreateBuilder<IrInstructionId, int>();
+        var pendingThrows = ImmutableDictionary.CreateBuilder<IrInstructionId, ImmutableArray<IrThrowInstruction>>();
         var originalMarkers = _candidate.CallPreconditions.Select(clause => clause.Marker).ToHashSet();
         var instructions = 0;
         var allocatedBlocks = 0;
@@ -374,7 +390,8 @@ internal sealed partial class PassiveLoopCutter
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None || order.IsDefault)
         { throw new ConstructionLimitException(); }
-        return new(program, stops.ToImmutable()) { CallMarkers = callMarkers.ToImmutable(), Checkpoints = checkpoints.ToImmutable() };
+        return new(program, stops.ToImmutable())
+        { CallMarkers = callMarkers.ToImmutable(), Checkpoints = checkpoints.ToImmutable(), PendingThrows = pendingThrows.ToImmutable() };
 
         // An edge into a header first checks the header's invariants.
         IrBlockId Checked(IrBlockId header, OperationId site, IrBlockId target)
@@ -427,8 +444,9 @@ internal sealed partial class PassiveLoopCutter
             var dispatch = CreateBlock("loop:exception-entry");
             var choice = _candidate.Factory.CreateVariable("loop:choice", _candidate.Factory.IntegerType);
             Count();
-            builder.Havoc(dispatch, site, component.ForgetsHeap ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
+            var routerHavoc = builder.Havoc(dispatch, site, component.ForgetsHeap ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
                 IrHavocOrigin.Approximation, [.. component.Writes, choice]);
+            pendingThrows.Add(routerHavoc.Id, component.Throws);
             var first = dispatch;
             for (var ordinal = 0; ordinal < length - 1; ordinal++)
             {

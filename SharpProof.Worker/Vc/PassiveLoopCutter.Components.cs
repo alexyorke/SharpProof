@@ -2,7 +2,8 @@ namespace SharpProof.Worker;
 
 internal sealed partial class PassiveLoopCutter
 {
-    private sealed record ExceptionComponent(ImmutableArray<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes, bool ForgetsHeap);
+    private sealed record ExceptionComponent(ImmutableArray<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes, bool ForgetsHeap,
+        ImmutableArray<IrThrowInstruction> Throws);
 
     private bool FindExceptionComponents()
     {
@@ -38,6 +39,7 @@ internal sealed partial class PassiveLoopCutter
             { continue; }
             var exceptionFlow = false;
             var forgetsHeap = false;
+            var throws = ImmutableArray.CreateBuilder<IrThrowInstruction>();
             foreach (var block in nodes)
             {
                 foreach (var instruction in _candidate.Program.GetBlock(block).Instructions)
@@ -46,6 +48,8 @@ internal sealed partial class PassiveLoopCutter
                     if (instruction is IrAssumeInstruction)
                     { return false; }
                     exceptionFlow |= instruction is IrThrowInstruction;
+                    if (instruction is IrThrowInstruction thrown)
+                    { throws.Add(thrown); }
                     forgetsHeap |= instruction is IrCallInstruction ||
                         instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory } ||
                         instruction is IrWriteInstruction write && (write.IsFieldStore || write.Index != null ||
@@ -62,7 +66,7 @@ internal sealed partial class PassiveLoopCutter
             if (!exceptionFlow)
             { continue; }
             Spend(nodes.Count);
-            var component = new ExceptionComponent([.. nodes.OrderBy(block => block.Value)], writes, forgetsHeap);
+            var component = new ExceptionComponent([.. nodes.OrderBy(block => block.Value)], writes, forgetsHeap, throws.ToImmutable());
             foreach (var block in nodes)
             { Spend(); _exceptionComponents.Add(block, component); }
         }

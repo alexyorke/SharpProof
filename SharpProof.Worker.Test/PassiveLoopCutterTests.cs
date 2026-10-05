@@ -8,6 +8,188 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class PassiveLoopCutterTests
 {
+    [TestCase("input")]
+    [TestCase("cast")]
+    [TestCase("boolean")]
+    [TestCase("array-length")]
+    [TestCase("string-content")]
+    [TestCase("string-length")]
+    [TestCase("copy")]
+    [TestCase("old-input")]
+    public void HeapIndependentReceiverRetainsFixedCellCut(string shape)
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var builder = subject.Builder;
+        PassiveParameterBinding Parameter(string name, IrTypeId type)
+        {
+            return new(factory.CreateVariable(name + ":entry", type), factory.CreateVariable(name + ":current", type),
+                factory.CreateVariable(name + ":old", type));
+        }
+        var owner = Parameter("owner", shape == "cast" ? factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Owner") : factory.ObjectType);
+        var other = Parameter("other", factory.ObjectType);
+        var flagType = shape == "array-length" ? factory.GetOrCreateSequenceType(factory.IntegerType)
+            : shape is "string-content" or "string-length" ? factory.StringType : factory.BooleanType;
+        var flag = Parameter("flag", flagType);
+        var parameters = new[] { subject.Parameter, owner, other, flag };
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        var entry = builder.CreateBlock();
+        var header = builder.CreateBlock();
+        var body = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var headerSite = factory.CreateOperation("header");
+        foreach (var parameter in parameters)
+        {
+            builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
+            builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));
+        }
+        builder.Goto(entry, subject.Site, header);
+        builder.Branch(header, headerSite, factory.Binary(IrBinaryOperator.GreaterThan,
+            factory.Variable(subject.Parameter.Current), factory.Integer(0)), body, exit);
+        IrTerm receiver = factory.Variable(shape == "old-input" ? owner.Old : owner.Current);
+        if (shape == "cast")
+        { receiver = factory.Cast(factory.ObjectType, receiver); }
+        else if (shape is "boolean" or "array-length" or "string-content" or "string-length")
+        {
+            var condition = shape == "boolean" ? factory.Variable(flag.Current)
+                : shape == "string-content" ? factory.Binary(IrBinaryOperator.StringEquals, factory.Variable(flag.Current), factory.String("x"))
+                : factory.Binary(IrBinaryOperator.GreaterThan, factory.Length(factory.Variable(flag.Current)), factory.Integer(0));
+            receiver = factory.Conditional(condition, factory.Variable(owner.Current), factory.Variable(other.Current));
+        }
+        var expectedReceiver = receiver;
+        if (shape == "copy")
+        {
+            var copy = factory.CreateVariable("copy", factory.ObjectType);
+            builder.Assign(body, subject.Site, copy, receiver);
+            receiver = factory.Variable(copy);
+        }
+        builder.FieldStore(body, subject.Site, IrWriteRegion.Field, receiver, field, factory.Integer(2));
+        builder.Assign(body, subject.Site, subject.Parameter.Current, factory.Binary(IrBinaryOperator.Subtract,
+            factory.Variable(subject.Parameter.Current), factory.Integer(1)));
+        builder.Goto(body, subject.Site, header);
+        builder.Return(exit, subject.Site, factory.Integer(0));
+        var candidate = new PassiveCallableCandidate("stable-cell", builder.Build(), [.. parameters], subject.Result, [],
+            [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
+        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None).Single().Fields, Has.Length.EqualTo(1));
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, CancellationToken.None), Is.True, reason.ToString());
+        var instructions = proof!.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        Assert.That(instructions.OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.False);
+        var cell = instructions.OfType<IrWriteInstruction>().Single(write => factory.GetOperationInfo(write.Operation).Description is { } id &&
+            factory.GetString(id).StartsWith("LoopCell@", StringComparison.Ordinal));
+        Assert.That(cell.Target!.Id, Is.EqualTo(expectedReceiver.Id));
+    }
+
+    [TestCase(IrHavocKind.Memory)]
+    [TestCase(IrHavocKind.VariablesAndMemory)]
+    public void MemoryHavocRequiresWholeMemoryHeaderCut(IrHavocKind kind)
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var builder = subject.Builder;
+        var entry = builder.CreateBlock();
+        var header = builder.CreateBlock();
+        var body = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var headerSite = factory.CreateOperation("header");
+        var bodySite = factory.CreateOperation("body");
+        var dummy = factory.CreateVariable("unused", factory.IntegerType);
+        builder.Assign(entry, subject.Site, subject.Parameter.Current, factory.Variable(subject.Parameter.Entry));
+        builder.Goto(entry, subject.Site, header);
+        builder.Branch(header, headerSite, factory.Binary(IrBinaryOperator.GreaterThan,
+            factory.Variable(subject.Parameter.Current), factory.Integer(0)), body, exit);
+        if (kind == IrHavocKind.Memory)
+        { builder.Havoc(body, bodySite, kind, IrHavocOrigin.Approximation); }
+        else
+        { builder.Havoc(body, bodySite, kind, IrHavocOrigin.Approximation, dummy); }
+        builder.Assign(body, subject.Site, subject.Parameter.Current, factory.Binary(IrBinaryOperator.Subtract,
+            factory.Variable(subject.Parameter.Current), factory.Integer(1)));
+        builder.Goto(body, subject.Site, header);
+        builder.Return(exit, subject.Site, factory.Integer(0));
+        Assert.That(PassiveLoopCutter.TryCreate(subject.Candidate(factory.Boolean(true)), out var proof, out _, out var reason,
+            CancellationToken.None), Is.True, reason.ToString());
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind == IrHavocKind.VariablesAndMemory), Is.True);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ChangingHeapReceiverCannotPreserveAnotherObjectsEntryField(bool conditional)
+    {
+        var (candidate, inputs, headerSite) = ChangingHeapReceiverCandidate(conditional);
+        var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, inputs, maximumSteps: 128);
+        Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(actual.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(2)));
+        Assert.That(actual.ConsumedApproximation, Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out reason, CancellationToken.None), Is.True, reason.ToString());
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.True);
+        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None).Single().Fields, Is.Empty);
+    }
+
+    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs, OperationId HeaderSite)
+        ChangingHeapReceiverCandidate(bool conditional)
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var builder = subject.Builder;
+        PassiveParameterBinding Parameter(string name)
+        {
+            return new(factory.CreateVariable(name + ":entry", factory.ObjectType), factory.CreateVariable(name + ":current", factory.ObjectType),
+                factory.CreateVariable(name + ":old", factory.ObjectType));
+        }
+        var a = Parameter("a");
+        var b = Parameter("b");
+        var c = Parameter("c");
+        var value = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        var selector = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, conditional ? "field:Flag" : "field:Next",
+            conditional ? factory.BooleanType : factory.ObjectType, false);
+        var entry = builder.CreateBlock();
+        var header = builder.CreateBlock();
+        var body = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var headerSite = factory.CreateOperation("header");
+        foreach (var parameter in new[] { a, b, c, subject.Parameter })
+        {
+            builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
+            builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));
+        }
+        builder.FieldStore(entry, subject.Site, IrWriteRegion.Field, factory.Variable(a.Current), selector,
+            conditional ? factory.Boolean(false) : factory.Variable(b.Current));
+        foreach (var parameter in new[] { b, c })
+        { builder.FieldStore(entry, subject.Site, IrWriteRegion.Field, factory.Variable(parameter.Current), value, factory.Integer(0)); }
+        builder.Goto(entry, subject.Site, header);
+        builder.Branch(header, headerSite, factory.Binary(IrBinaryOperator.GreaterThan,
+            factory.Variable(subject.Parameter.Current), factory.Integer(0)), body, exit);
+        var selected = factory.PureOpaque(selector, factory.Variable(a.Current));
+        var receiver = conditional ? factory.Conditional(selected, factory.Variable(c.Current), factory.Variable(b.Current)) : selected;
+        builder.FieldStore(body, subject.Site, IrWriteRegion.Field, receiver, value, factory.Integer(2));
+        builder.FieldStore(body, subject.Site, IrWriteRegion.Field, factory.Variable(a.Current), selector,
+            conditional ? factory.Boolean(true) : factory.Variable(c.Current));
+        builder.Assign(body, subject.Site, subject.Parameter.Current, factory.Binary(IrBinaryOperator.Subtract,
+            factory.Variable(subject.Parameter.Current), factory.Integer(1)));
+        builder.Goto(body, subject.Site, header);
+        builder.Return(exit, subject.Site, factory.PureOpaque(value, factory.Variable(c.Current)));
+        var requires = new List<PassiveContractClause>();
+        foreach (var parameter in new[] { a, b, c })
+        { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(parameter.Entry), factory.Null(factory.ObjectType)), factory.Boolean(true), subject.Site)); }
+        foreach (var pair in new[] { (a, b), (a, c), (b, c) })
+        { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(pair.Item1.Entry), factory.Variable(pair.Item2.Entry)), factory.Boolean(true), subject.Site)); }
+        requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
+        var candidate = new PassiveCallableCandidate("changing-heap-receiver", builder.Build(), [a, b, c, subject.Parameter], subject.Result,
+            [.. requires], [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
+        return (candidate, new Dictionary<IrVarId, IrValue>
+        {
+            [a.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
+            [b.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
+            [c.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
+            [subject.Parameter.Entry] = factory.CreateIntegerValue(2)
+        }, headerSite);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task ExceptionLoopRouterCannotRetainEntryHeapAfterSkippedStores(bool array)
