@@ -50,3 +50,25 @@ jobs:
             security-dependency-audit-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/dependency-audit/dependency-audit.json
           if-no-files-found: error
+
+  # Preserve the branch-rule contexts for both gates in the combined profile.
+  # Always report a failure if that profile failed, was canceled, or was skipped.
+  dependency-audit:
+    needs: repository-security
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the complete security profile
+        env:
+          SECURITY_RESULT: ${{ needs.repository-security.result }}
+        run: test "$SECURITY_RESULT" = success
+
+  banned-apis:
+    needs: repository-security
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the complete security profile
+        env:
+          SECURITY_RESULT: ${{ needs.repository-security.result }}
+        run: test "$SECURITY_RESULT" = success
