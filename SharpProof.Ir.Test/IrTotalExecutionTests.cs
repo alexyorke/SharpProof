@@ -413,15 +413,18 @@ public sealed class IrTotalExecutionTests
         Assert.That(result.ConsumedApproximation, Is.EqualTo(consumed));
     }
 
-    [TestCase(false, false)]
-    [TestCase(false, true)]
-    [TestCase(true, false)]
-    [TestCase(true, true)]
-    public void HostedCallArgumentsReadCurrentHeap(bool array, bool store)
+    [TestCase(false, false, false)]
+    [TestCase(false, true, false)]
+    [TestCase(true, false, false)]
+    [TestCase(true, true, false)]
+    [TestCase(false, true, true)]
+    [TestCase(true, true, true)]
+    public void HostedCallArgumentsReadCurrentHeap(bool array, bool store, bool snapshot)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
+        var alias = factory.CreateVariable("alternate", type);
         var target = factory.CreateVariable("result", factory.IntegerType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType, true, [factory.IntegerType]);
@@ -434,22 +437,27 @@ public sealed class IrTotalExecutionTests
             else
             { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, factory.Variable(owner), field, factory.Integer(7)); }
         }
-        var argument = array ? factory.SequenceAccess(factory.Variable(owner), factory.Integer(0))
-            : factory.PureOpaque(field, factory.Variable(owner));
+        var readOwner = snapshot ? alias : owner;
+        var argument = array ? factory.SequenceAccess(factory.Variable(readOwner), factory.Integer(0))
+            : factory.PureOpaque(field, factory.Variable(readOwner));
         builder.Call(entry, factory.CreateOperation(), target, member, null, argument);
         builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
         var initial = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = initial }, 100,
-            (_, _, values) => values.Single(), null, CancellationToken.None);
+            new Dictionary<IrVarId, IrValue> { [owner] = initial, [alias] = initial }, 100,
+            (_, _, values) => values.Single(),
+            new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
-        Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store ? 7 : 3));
+        Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
+        Assert.That(result.ConsumedApproximation, Is.False);
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void SkippedInstanceCallsRespectReceiverReadOrder(bool missing)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void SkippedInstanceCallsRespectReceiverReadOrder(bool missing, bool hosted)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var owner = factory.CreateVariable("owner", factory.ObjectType);
@@ -463,20 +471,27 @@ public sealed class IrTotalExecutionTests
         var initial = new Dictionary<IrVarId, IrValue>();
         if (!missing)
         { initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        var hostCalls = 0;
+        IrValue? Host(IrCallInstruction call, IrValue? receiver, ImmutableArray<IrValue> arguments)
+        { hostCalls++; return factory.CreateIntegerValue(0); }
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
-            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
+            hosted ? Host : null,
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)), CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(missing ? IrProgramExecutionStatus.Unsupported : IrProgramExecutionStatus.Exception));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(!missing));
+        Assert.That(hostCalls, Is.Zero);
         if (!missing)
         { Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.NullReference)); }
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void HostedCallReceiverReadsCurrentHeap(bool store)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void HostedCallReceiverReadsCurrentHeap(bool store, bool snapshot)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var holder = factory.CreateVariable("holder", factory.ObjectType);
+        var alias = factory.CreateVariable("alternate", factory.ObjectType);
         var replacement = factory.CreateVariable("replacement", factory.ObjectType);
         var target = factory.CreateVariable("result", factory.IntegerType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Next", factory.ObjectType, false);
@@ -487,16 +502,33 @@ public sealed class IrTotalExecutionTests
         var entry = builder.CreateBlock();
         if (store)
         { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, factory.Variable(holder), field, factory.Variable(replacement)); }
-        builder.Call(entry, factory.CreateOperation(), target, member, factory.PureOpaque(field, factory.Variable(holder)));
+        builder.Call(entry, factory.CreateOperation(), target, member, factory.PureOpaque(field, factory.Variable(snapshot ? alias : holder)));
         builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var initialHolder = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, oldValue));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), new Dictionary<IrVarId, IrValue>
         {
-            [holder] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, oldValue)),
+            [holder] = initialHolder,
+            [alias] = initialHolder,
             [replacement] = newValue
         }, 100, (_, receiver, _) => factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3),
-            null, CancellationToken.None);
+            new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
-        Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store ? 7 : 3));
+        Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
+        Assert.That(result.ConsumedApproximation, Is.False);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SnapshotRolesRejectUnownedVariableIds(bool foreign)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
+        var other = new IrFactory(IrExecutionSemantics.Total);
+        var options = new IrProgramReplayOptions(_ => null)
+        { SnapshotVariables = [foreign ? other.CreateVariable("old", other.IntegerType) : default] };
+        Assert.Throws<ArgumentException>((Action)(() => new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100, options)));
     }
 
     [Test]

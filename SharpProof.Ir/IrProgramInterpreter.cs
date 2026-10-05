@@ -61,7 +61,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         {
             throw new ArgumentException("Modeled havoc requires total program semantics.", nameof(replayOptions));
         }
-        var values = new ReplayValues();
+        var snapshots = replayOptions?.SnapshotVariables ?? ImmutableHashSet<IrVarId>.Empty;
+        foreach (var snapshot in snapshots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _factory.GetVariableInfo(snapshot);
+        }
+        var values = new ReplayValues(snapshots);
         if (initialValues != null)
         {
             foreach (var pair in initialValues)
@@ -95,7 +101,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrAllocationInstruction allocation:
                         if (allocation.Length is { } length)
                         {
-                            var size = _terms.Evaluate(length, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            var size = Evaluate(length, values, cancellationToken);
                             if (size.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(size, allocation, values, steps); }
                             var count = (int)size.Value!.IntegerNumericValue;
@@ -110,7 +116,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             var initial = info.Kind == IrTypeKind.Boolean ? _factory.CreateBooleanValue(false)
                                 : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
                             var elements = allocation.InitialValues.IsEmpty ? Enumerable.Repeat(initial, count)
-                                : allocation.InitialValues.Select(value => _terms.Evaluate(value, values.Current, values.ObserveRead, values.Heap, cancellationToken).Value!);
+                                : allocation.InitialValues.Select(value => Evaluate(value, values, cancellationToken).Value!);
                             var createdArray = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
                             values[allocation.Target!.Value] = createdArray;
                             values.Heap.RegisterFreshArray(createdArray);
@@ -121,7 +127,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         replayOptions?.AllocationPrefixObserver?.Invoke(allocation, values.ConsumedApproximation);
                         break;
                     case IrLockInstruction synchronization:
-                        var receiver = _terms.Evaluate(synchronization.Receiver, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                        var receiver = Evaluate(synchronization.Receiver, values, cancellationToken);
                         if (receiver.Status != IrEvaluationStatus.Value)
                         { return FromEvaluation(receiver, synchronization, values, steps); }
                         replayOptions?.LockObserver?.Invoke(synchronization);
@@ -131,17 +137,17 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrWriteInstruction write:
                         if (write is { Target: { } storedTarget, Value: { } storedElement })
                         {
-                            var target = _terms.Evaluate(storedTarget, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            var target = Evaluate(storedTarget, values, cancellationToken);
                             if (target.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(target, write, values, steps); }
                             IrEvaluationResult? position = null;
                             if (write.Index is { } storedIndex)
                             {
-                                position = _terms.Evaluate(storedIndex, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                                position = Evaluate(storedIndex, values, cancellationToken);
                                 if (position.Status != IrEvaluationStatus.Value)
                                 { return FromEvaluation(position, write, values, steps); }
                             }
-                            var element = _terms.Evaluate(storedElement, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                            var element = Evaluate(storedElement, values, cancellationToken);
                             if (element.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(element, write, values, steps); }
                             // The lowering guards the store, so an invalid one is not C#.
@@ -162,7 +168,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
                         break;
                     case IrAssignInstruction assign:
-                        var assigned = _terms.Evaluate(assign.Value, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                        var assigned = Evaluate(assign.Value, values, cancellationToken);
                         if (assigned.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(assigned, assign, values, steps);
@@ -226,7 +232,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             return Result(IrProgramExecutionStatus.Returned, returned, values, steps);
                         }
 
-                        var returnValue = _terms.Evaluate(returned.Value, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                        var returnValue = Evaluate(returned.Value, values, cancellationToken);
                         if (returnValue.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(returnValue, returned, values, steps);
@@ -288,8 +294,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrCallInstruction call:
                         {
                             var callResult = IrProgramCallHostExecution.Execute(
-                                _factory, _terms, call, values.Current, callHost,
-                                values.ObserveRead, values.Heap, cancellationToken);
+                                _factory, call, term => Evaluate(term, values, cancellationToken), callHost);
                             if (callResult.Status != IrEvaluationStatus.Value)
                             {
                                 return FromEvaluation(callResult, call, values, steps);
@@ -321,13 +326,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     member.Receiver, member.Arguments, storedValue, values,
                     "The member access receiver is null.", cancellationToken);
             case IrSequenceLocation sequence:
-                var sequenceResult = _terms.Evaluate(sequence.Sequence, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                var sequenceResult = Evaluate(sequence.Sequence, values, cancellationToken);
                 if (sequenceResult.Status != IrEvaluationStatus.Value)
                 {
                     return sequenceResult;
                 }
 
-                var indexResult = _terms.Evaluate(sequence.Index, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+                var indexResult = Evaluate(sequence.Index, values, cancellationToken);
                 if (indexResult.Status != IrEvaluationStatus.Value)
                 {
                     return indexResult;
@@ -352,7 +357,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         IrValue? receiverValue = null;
         if (receiver != null)
         {
-            var receiverResult = _terms.Evaluate(receiver, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+            var receiverResult = Evaluate(receiver, values, cancellationToken);
             if (receiverResult.Status != IrEvaluationStatus.Value)
             {
                 return receiverResult;
@@ -362,7 +367,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
         foreach (var argument in arguments)
         {
-            var argumentResult = _terms.Evaluate(argument, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+            var argumentResult = Evaluate(argument, values, cancellationToken);
             if (argumentResult.Status != IrEvaluationStatus.Value)
             {
                 return argumentResult;
@@ -388,7 +393,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             return null;
         }
 
-        var result = _terms.Evaluate(storedValue, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+        var result = Evaluate(storedValue, values, cancellationToken);
         return result.Status == IrEvaluationStatus.Value ? null : result;
     }
 
@@ -409,7 +414,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         out bool value)
     {
         value = false;
-        var result = _terms.Evaluate(condition, values.Current, values.ObserveRead, values.Heap, cancellationToken);
+        var result = Evaluate(condition, values, cancellationToken);
         if (result.Status != IrEvaluationStatus.Value)
         {
             return result;
@@ -441,7 +446,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
     }
 
-    private sealed class ReplayValues
+    private IrEvaluationResult Evaluate(IrTerm term, ReplayValues values, CancellationToken cancellationToken)
+    {
+        return _terms.Evaluate(term, values.Current, values.ObserveRead, values.Heap,
+            cancellationToken, values.Snapshots);
+    }
+
+    private sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
     {
         private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         private readonly HashSet<IrVarId> _approximations = [];
@@ -449,6 +460,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
         internal IrHeap Heap { get; } = new();
+        internal ImmutableHashSet<IrVarId> Snapshots { get; } = snapshots;
         internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
         internal IrValue this[IrVarId key]
         {

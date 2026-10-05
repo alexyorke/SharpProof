@@ -113,6 +113,18 @@ public sealed class GoldenWorkerTests
                     .Append(verified.Outcome!.GetType().Name).Append('/').Append(verified.Reason).Append('\n');
             }
         }
+        foreach (var array in new[] { false, true })
+        {
+            var (candidate, _) = PassiveCallableVcTests.BodyOldHeapCandidate(array);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+            using var solver = new PassiveCallableSolver(plan!);
+            foreach (var correct in new[] { false, true })
+            {
+                var verified = await solver.VerifyEnsuresAsync(correct ? 1 : 0);
+                output.Append(array ? "array-" : "field-").Append(correct ? "body-old-true: " : "body-old-false: ")
+                    .Append(verified.Outcome!.GetType().Name).Append('/').Append(verified.Reason).Append('\n');
+            }
+        }
         return output.ToString();
     }
 

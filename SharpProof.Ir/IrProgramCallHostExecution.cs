@@ -4,19 +4,14 @@ internal static class IrProgramCallHostExecution
 {
     internal static IrEvaluationResult Execute(
         IrFactory factory,
-        IrInterpreter terms,
         IrCallInstruction call,
-        IReadOnlyDictionary<IrVarId, IrValue> values,
-        Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
-        Action<IrVarId> onVariableRead,
-        IrHeap heap,
-        CancellationToken cancellationToken)
+        Func<IrTerm, IrEvaluationResult> evaluate,
+        Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost)
     {
         IrValue? receiverValue = null;
         if (call.Receiver is { } receiver)
         {
-            var receiverResult = terms.Evaluate(
-                receiver, values, onVariableRead, heap, cancellationToken);
+            var receiverResult = evaluate(receiver);
             if (receiverResult.Status != IrEvaluationStatus.Value)
             {
                 return receiverResult;
@@ -29,8 +24,7 @@ internal static class IrProgramCallHostExecution
             call.Arguments.Length);
         foreach (var argument in call.Arguments)
         {
-            var argumentResult = terms.Evaluate(
-                argument, values, onVariableRead, heap, cancellationToken);
+            var argumentResult = evaluate(argument);
             if (argumentResult.Status != IrEvaluationStatus.Value)
             {
                 return argumentResult;

@@ -456,7 +456,12 @@ order, observing approximation reads. A writer or an unresolved instance
 write invalidates current contents. An exact store restores only its own
 cell; a demanded unknown cell makes the counterexample non-replayable,
 including when the demand occurs only in a postcondition guard. Snapshot-aware
-clause reads retain Old contents; reference identity, string contents and
+clause and original-body reads retain Old contents when owned replay supplies
+the validated root Old variable IDs. Plain program execution has no callable
+roles and reads current contents. Roles come from bindings, never variable
+names or reference identity; copying an Old reference into an ordinary local
+does not grant that local a snapshot role. Source body uses of `Contract.Old`
+remain rejected. Reference identity, string contents and
 array lengths remain available. Trusted nonwriters preserve current cells in
 both verification and replay.
 Arrays allocated after invalidation retain their initialized or default

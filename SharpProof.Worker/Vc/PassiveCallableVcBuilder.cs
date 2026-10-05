@@ -583,7 +583,7 @@ internal sealed class PassiveCallableVcBuilder
             var receiver = rewritten(field.Receiver!);
             Spend(heap.Stores.Length);
             // A read through an Old snapshot sees the objects as the callable
-            // entered; only clauses and loop invariants read through one.
+            // entered, including direct owned body reads.
             var entry = _factory.PureOpaque(field.Member, receiver);
             var snapshot = Snapshot(field.Receiver!, rewritten);
             if (snapshot is IrBooleanTerm { Value: true })

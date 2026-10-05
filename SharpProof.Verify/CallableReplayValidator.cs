@@ -48,6 +48,8 @@ internal static class CallableReplayValidator
                     IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
                 });
+            if (factory.Semantics == IrExecutionSemantics.Total)
+            { replayOptions!.SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(); }
             var execution = new IrProgramInterpreter(factory).Execute(
                 program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
             if (execution.ConsumedApproximation)

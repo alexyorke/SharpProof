@@ -663,6 +663,66 @@ public sealed class PassiveCallableVcTests
             [new(factory.Binary(IrBinaryOperator.Equal, cell, factory.Integer(nonwriter ? 3 : 5)), factory.Boolean(true), subject.Site)]);
     }
 
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task BodyOldHeapReadsUseOwnedSnapshotRoles(bool array, bool correctClaim)
+    {
+        var (candidate, inputs) = BodyOldHeapCandidate(array);
+        var returned = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().Single().Value!.Id;
+        var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, inputs);
+        Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(actual.ReturnValue!.Integer, Is.EqualTo(7));
+        Assert.That(actual.ConsumedApproximation, Is.False);
+        var plan = Build(candidate);
+        var replay = plan.ReplayEffects(inputs.ToImmutableDictionary(), CancellationToken.None);
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(3));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(plan.ReplayException(inputs.ToImmutableDictionary(), CancellationToken.None).ReturnValue!.Integer, Is.EqualTo(3));
+        using var solver = new PassiveCallableSolver(plan);
+        var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0);
+        Assert.That(result.Outcome, correctClaim ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().Single().Value!.Id,
+            Is.EqualTo(returned));
+        if (!correctClaim)
+        { Assert.That(result.EntryModel.All(row => row.Key == candidate.Parameters.Single().Entry), Is.True); }
+    }
+
+    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) BodyOldHeapCandidate(bool array)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
+        // Deliberately no role names: only the binding grants snapshot meaning.
+        var owner = new PassiveParameterBinding(factory.CreateVariable("a", type), factory.CreateVariable("b", type), factory.CreateVariable("c", type));
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        IrTerm Read(IrVarId variable)
+        { return array ? factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)) : factory.PureOpaque(field, factory.Variable(variable)); }
+        var block = subject.Builder.CreateBlock();
+        subject.Builder.Assign(block, subject.Site, owner.Current, factory.Variable(owner.Entry));
+        subject.Builder.Assign(block, subject.Site, owner.Old, factory.Variable(owner.Entry));
+        if (array)
+        { subject.Builder.ElementStore(block, subject.Site, factory.Variable(owner.Current), factory.Integer(0), factory.Integer(7)); }
+        else
+        { subject.Builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(7)); }
+        subject.Builder.Return(block, subject.Site, Read(owner.Old));
+        var requires = new List<PassiveContractClause>
+        {
+            new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site),
+            new(factory.Binary(IrBinaryOperator.Equal, Read(owner.Entry), factory.Integer(3)), factory.Boolean(true), subject.Site)
+        };
+        if (array)
+        { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
+        var candidate = new PassiveCallableCandidate("body-snapshot", subject.Builder.Build(), [owner], subject.Result, [.. requires],
+            [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(7)), factory.Boolean(true), subject.Site),
+                new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(3)), factory.Boolean(true), subject.Site)]);
+        var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
+            : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
+        return (candidate, new Dictionary<IrVarId, IrValue> { [owner.Entry] = value });
+    }
+
     [TestCase("allocation", true, false)]
     [TestCase("write", true, false)]
     [TestCase("allocation", false, false)]

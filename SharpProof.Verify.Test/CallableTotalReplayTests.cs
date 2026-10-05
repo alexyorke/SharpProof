@@ -6,6 +6,41 @@ namespace SharpProof.Verify.Test;
 [TestFixture]
 public sealed class CallableTotalReplayTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task OriginalBodyReadsValidatedOldHeapRoles(bool array)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
+        var entry = factory.CreateVariable("a", type);
+        var current = factory.CreateVariable("b", type);
+        var old = factory.CreateVariable("c", type);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        builder.Assign(block, factory.CreateOperation(), current, factory.Variable(entry));
+        builder.Assign(block, factory.CreateOperation(), old, factory.Variable(entry));
+        if (array)
+        { builder.ElementStore(block, factory.CreateOperation(), factory.Variable(current), factory.Integer(0), factory.Integer(7)); }
+        else
+        { builder.FieldStore(block, factory.CreateOperation(), IrWriteRegion.Field, factory.Variable(current), field, factory.Integer(7)); }
+        builder.Return(block, factory.CreateOperation(), array
+            ? factory.SequenceAccess(factory.Variable(old), factory.Integer(0))
+            : factory.PureOpaque(field, factory.Variable(old)));
+        var context = new CallableReplayContext(builder.Build(), false,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty.Add(entry, entry).Add(current, entry),
+            ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(old, entry), [result],
+            factory.Binary(IrBinaryOperator.Equal, factory.Variable(result), factory.Integer(7)),
+            ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 100, [],
+            postconditionGuard: factory.Boolean(true), replayOptions: null);
+        var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
+            : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
+        var outcome = await new ProofKernel(new StubBackend(new BackendModel([KeyValuePair.Create(entry, value)])))
+            .VerifyCallableAsync(Query(factory, [entry]), context);
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+    }
+
     [TestCase("postcondition", AbstentionReason.CounterexampleNotReplayable)]
     [TestCase("guard", AbstentionReason.CounterexampleNotReplayable)]
     [TestCase("read-then-overwritten", AbstentionReason.CounterexampleNotReplayable)]

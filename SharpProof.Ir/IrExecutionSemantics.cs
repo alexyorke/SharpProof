@@ -114,6 +114,8 @@ public sealed class IrHavocRequest(
 
 public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
 {
+    internal ImmutableHashSet<IrVarId> SnapshotVariables { get; set; } = [];
+
     public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; set; }
     public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
     public Action<IrWriteInstruction>? WriteObserver { get; set; }

@@ -261,6 +261,7 @@ internal sealed class PassiveCallableVcPlan
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type))
         {
             AllocationObserver = allocationObserver,
+            SnapshotVariables = _candidate.Parameters.Select(parameter => parameter.Old).ToImmutableHashSet(),
             WriteObserver = writeObserver,
             LockObserver = lockObserver,
             AllocationPrefixObserver = allocationPrefixObserver,

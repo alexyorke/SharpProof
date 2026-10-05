@@ -2,3 +2,7 @@ field-current: RefutedOutcome/None
 field-old: ProvenOutcome/None
 array-current: RefutedOutcome/None
 array-old: ProvenOutcome/None
+field-body-old-false: RefutedOutcome/None
+field-body-old-true: ProvenOutcome/None
+array-body-old-false: RefutedOutcome/None
+array-body-old-true: ProvenOutcome/None
